@@ -6,7 +6,8 @@
 	"scripts": {
 		"dev": "nodemon index.js",
 		"start": "node index.js",
-		"seed": "node seedServices.js"
+		"seed-db": "node seeds/seedServices.js",
+		"reset-db": "node resetDb.js"
 	},
 	"dependencies": {
 		"@faker-js/faker": "^9.8.0",

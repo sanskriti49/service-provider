@@ -142,6 +142,9 @@ async function updateProvider(req, res, next) {
 	const { error, value } = providerUpdateSchema.validate(req.body);
 	if (error) return res.status(400).json({ error: error.details[0].message });
 
+	const id = req.params.id; // Assumes you're sending id as a route param
+	if (!id) return res.status(400).json({ error: "Missing provider id" });
+
 	const {
 		name,
 		email,
@@ -155,10 +158,6 @@ async function updateProvider(req, res, next) {
 		rating,
 		availability,
 	} = value;
-
-	const id = req.params.id; // Assumes you're sending id as a route param
-
-	if (!id) return res.status(400).json({ error: "Missing user id" });
 
 	const client = await db.connect();
 	try {
@@ -191,7 +190,7 @@ async function updateProvider(req, res, next) {
 
 		if (userResult.rowCount === 0) {
 			await client.query("ROLLBACK");
-			return res.status(404).json({ error: "User / provider not found" });
+			return res.status(404).json({ error: "Provider not found" });
 		}
 
 		await client.query("COMMIT");

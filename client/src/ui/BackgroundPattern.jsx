@@ -3,7 +3,9 @@ const BackgroundPattern = () => (
 		viewBox="0 0 1349 524"
 		fill="none"
 		xmlns="http://www.w3.org/2000/svg"
-		className="w-full h-fit"
+		//className="w-full h-fit"
+		preserveAspectRatio="xMidYMid slice"
+		className="absolute lg:inset-0 md:mt-25 sm:mt-40 mt-60 xl:mt-0 lg:-mt-5 lg:w-full w-fit object-cover z-[-10]"
 	>
 		<rect
 			width="1728"

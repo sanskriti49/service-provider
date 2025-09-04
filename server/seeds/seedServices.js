@@ -7,6 +7,11 @@ const { getPriceForService } = require("../utils/getPriceForService");
 const { generateAvailability } = require("../utils/generateAvailability");
 
 const db = require("../config/db");
+const {
+	SERVICES,
+	slugify,
+	getDescriptionForService,
+} = require("../utils/services");
 
 // const db = new Client({
 // 	host: process.env.DB_HOST,
@@ -16,37 +21,11 @@ const db = require("../config/db");
 // 	database: process.env.DB_NAME,
 // });
 
-const SERVICES = [
-	"House Cleaning",
-	"Plumbing",
-	"Electrical Repair",
-	"Gardening",
-	"Babysitting",
-	"Pet Sitting",
-	"Pest Control",
-	"Appliance Repair",
-	"Window Cleaning",
-	"Carpet Cleaning",
-	"Haircut",
-	"Makeup",
-	"Eyebrow Threading",
-	"Facial",
-	"Manicure",
-	"Pedicure",
-	"Waxing - Full Body",
-	"Waxing - Arms",
-	"Waxing - Legs",
-	"Massage Therapy",
-	"Bridal Makeup",
-	"Hair Coloring",
-	"Nail Art",
-	"Eyelash Extensions",
-	"Skin Treatment",
-	"Beard Styling",
-	"Hair Spa",
-	"Mehndi (Henna)",
-];
+// CONFIG
+const PROVIDER_COUNT = 5;
+const RESET_TABLES = false;
 
+// Indian cities
 const indianCities = [
 	{ city: "Mumbai", lat: 19.076, lng: 72.8777 },
 	{ city: "Delhi", lat: 28.7041, lng: 77.1025 },
@@ -105,93 +84,93 @@ function getRandomRating() {
 
 	return parseFloat(rating);
 }
-
 const seedData = async () => {
 	try {
 		await db.connect();
+		console.log("✅ Connected to the DB for seeding...");
 
-		console.log("Connected to the database for seeding...");
-
-		const providers = Array.from({ length: 5 }, (_, i) => {
-			const service = SERVICES[Math.floor(Math.random() * SERVICES.length)];
-			const cityData =
-				indianCities[Math.floor(Math.random() * indianCities.length)];
-			const [lat, lng] = faker.location.nearbyGPSCoordinate({
-				origin: [cityData.lat, cityData.lng],
-				radius: 5,
-			});
-
-			return {
-				name: faker.person.fullName(),
-				email: faker.internet.email(),
-				password: faker.internet.password(),
-				photo: faker.image.avatar(),
-				location: cityData.city,
-				lat: lat,
-				lng: lng,
-				bio: faker.person.bio(),
-				service: service,
-				price: getPriceForService(service),
-				rating: getRandomRating(),
-				availability: JSON.stringify(generateAvailability(), null, 2),
-			};
-		});
+		if (RESET_TABLES) {
+			console.log("🔄 Resetting tables...");
+			await db.query(
+				"TRUNCATE availability_slots, providers, users RESTART IDENTITY CASCADE"
+			);
+		}
 
 		await db.query("BEGIN");
-		const role = "provider";
 
-		for (const provider of providers) {
+		for (let i = 0; i < PROVIDER_COUNT; i++) {
+			const service = faker.helpers.arrayElement(SERVICES);
+			const city = faker.helpers.arrayElement(indianCities);
+			const [lat, lng] = faker.location.nearbyGPSCoordinate({
+				origin: [city.lat, city.lng],
+				radius: 5,
+			});
 			const slots = generateAvailability();
-			console.log(slots);
-			provider.availability = JSON.stringify(slots, null, 2);
+
+			const name = faker.person.fullName();
+			const email = faker.internet.email({ firstName: name });
+			const password = await hashIfPresent(faker.internet.password());
+			const photo = faker.image.avatar();
+			const bio = faker.person.bio();
+
+			const slug = slugify(service.name);
+			const description = getDescriptionForService(service.name);
+			const price = getPriceForService(service.name);
+			const rating = getRandomRating();
+			const availability = JSON.stringify(slots, null, 2);
 			const nanoid = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20);
 			const customId = "SRV" + nanoid();
-
-			const userResult = await db.query(
-				"INSERT INTO users (name, email,role,custom_id, password, photo, location, lat, lng, bio) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
+			// Create user
+			const userRes = await db.query(
+				`INSERT INTO users 
+				(name, email, role, custom_id, password, photo, location, lat, lng, bio) 
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) 
+				RETURNING id`,
 				[
-					provider.name,
-					provider.email,
-					role,
+					name,
+					email,
+					"provider",
 					customId,
-					provider.password,
-					provider.photo,
-					provider.location,
-					provider.lat,
-					provider.lng,
-					provider.bio,
+					password,
+					photo,
+					city.city,
+					lat,
+					lng,
+					bio,
 				]
 			);
-			const userId = userResult.rows[0].id;
+			const userId = userRes.rows[0].id;
 
+			// Create provider
 			const providerResult = await db.query(
-				"INSERT INTO providers (user_id,service, price, rating, availability) VALUES ($1,$2,$3,$4,$5) RETURNING user_id",
-				[
-					userId,
-					provider.service,
-					provider.price,
-					provider.rating,
-					provider.availability,
-				]
+				`INSERT INTO providers 
+   (user_id, service, slug, description, price, rating, availability) 
+   VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+				[userId, service.name, slug, description, price, rating, availability]
 			);
-			const providerId = providerResult.rows[0].user_id;
-			console.log(providerId);
 
+			// Insert slots
 			for (const slot of slots) {
 				await db.query(
-					"INSERT INTO availability_slots (provider_id, date, start_time, end_time) VALUES ($1, $2, $3, $4)",
-					[providerId, slot.date, slot.start_time, slot.end_time]
+					`INSERT INTO availability_slots 
+					(provider_id, date, start_time, end_time) 
+					VALUES ($1, $2, $3, $4)`,
+					[userId, slot.date, slot.start_time, slot.end_time]
 				);
 			}
+
+			console.log(`👤 Provider #${i + 1} inserted`);
 		}
+
 		await db.query("COMMIT");
-		console.log("Seeding completed with faker! 🚀");
+		console.log(`🎉 Seeded ${PROVIDER_COUNT} providers successfully!`);
 	} catch (err) {
-		db.query("ROLLBACK");
-		console.error("Seeding failed❌:", err);
+		console.error("❌ Error during seeding:", err.message);
+		await db.query("ROLLBACK");
 	} finally {
 		await db.end();
-		console.log("Connection closed.");
+		console.log("🔌 DB connection closed.");
 	}
 };
+
 seedData();

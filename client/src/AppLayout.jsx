@@ -1,18 +1,25 @@
-import { HeroSection } from "./HeroSection";
-import ServicesSection from "./ServicesSection";
-import BackgroundNavbar from "./ui/BackgroundNavbar";
-import Navbar from "./ui/Navbar";
+import { HeroSection } from "../src/HeroSection";
+import ServicesSection from "../src/ServicesSection";
+import Navbar from "../src/ui/Navbar";
+import HowItWorksSection from "./ui/HowItWorksSection";
+import FadeIn from "./ui/FadeIn";
 
 export default function AppLayout() {
 	return (
 		<div>
-			<div className="aboslute">
+			<div className="relative  overflow-hidden">
 				<Navbar />
 
-				<div className="">
-					<BackgroundNavbar /> {/* Custom component or background div */}
+				<div className="relative w-full">
 					<HeroSection />
-					<ServicesSection />
+
+					<FadeIn>
+						<ServicesSection />
+					</FadeIn>
+
+					<FadeIn>
+						<HowItWorksSection />
+					</FadeIn>
 				</div>
 			</div>
 		</div>

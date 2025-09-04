@@ -5,7 +5,7 @@
 @font-face {
 	font-family: "Daito";
 	src: url("/fonts/daito/Daito-ExtendedBold.otf") format("opentype");
-	font-weight: 400; /* adjust weight */
+	font-weight: 400;
 	font-style: normal;
 	font-display: swap;
 }
@@ -17,7 +17,14 @@
 	font-style: normal;
 	font-display: swap;
 }
-
+@font-face {
+	font-family: "P22Mackinac-B";
+	src: url("/fonts/P22-Mackinac/P22MackinacPro-Medium_26.otf")
+		format("opentype");
+	font-weight: 500; /* or adjust as needed */
+	font-style: normal;
+	font-display: swap;
+}
 @font-face {
 	font-family: "WhiteDream";
 	src: url("/fonts/white-dream-font/WhiteDreamPersonalUseOnlyRegular-L37Rn.otf")
@@ -26,20 +33,83 @@
 	font-style: normal;
 	font-display: swap;
 }
+
+@layer utilities {
+	@media (min-width: 1024px) and (max-width: 1279px) {
+		.mt-between-lg-xl {
+			margin-top: 14.5rem; /* mt-58 */
+		}
+	}
+}
+.forum-regular {
+	font-family: "Forum", serif;
+	font-weight: 400;
+	font-style: normal;
+}
+.quintessential-regular {
+	font-family: "Quintessential", serif;
+	font-weight: 400;
+	font-style: normal;
+}
+
 .bricolage-grotesque {
 	font-family: "Bricolage Grotesque", sans-serif;
 	font-optical-sizing: auto;
-	font-weight: 400; /* adjust weight */
+	font-weight: 400;
 	font-style: normal;
 	font-display: swap;
 }
-.lobster {
-	font-family: "Lobster Two", sans-serif;
-	font-weight: 700; /* adjust weight */
+.mackinac {
+	font-family: "P22Mackinac", sans-serif;
+	font-optical-sizing: auto;
+	font-weight: 300;
 	font-style: normal;
 	font-display: swap;
 }
 
+.lobster {
+	font-family: "Lobster Two", sans-serif;
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+.inter {
+	font-family: "Inter", sans-serif;
+	font-display: swap;
+}
+.inter-regular {
+	font-family: "Inter", sans-serif;
+	font-style: normal;
+	font-display: swap;
+}
+
+.arrow {
+	border: solid black;
+	border-width: 0 3px 3px 0;
+	display: inline-block;
+	padding: 3px;
+}
+
+.right {
+	transform: rotate(-45deg);
+	-webkit-transform: rotate(-45deg);
+}
+
+.left {
+	transform: rotate(135deg);
+	-webkit-transform: rotate(135deg);
+}
+
+.up {
+	transform: rotate(-135deg);
+	-webkit-transform: rotate(-135deg);
+}
+
+.down {
+	transform: rotate(45deg);
+	-webkit-transform: rotate(45deg);
+}
 /* Gradient.css */
 .mesh-gradient {
 	animation: float 10s ease-in-out infinite;
