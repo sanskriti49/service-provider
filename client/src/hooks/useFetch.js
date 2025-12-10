@@ -20,7 +20,6 @@ export const useFetch = (url) => {
 				const response = await axios.get(url, { signal: controller.signal });
 				setData(response.data);
 			} catch (err) {
-				// Don't update state if the request was cancelled
 				if (axios.isCancel(err)) {
 					console.log("Request canceled:", err.message);
 				} else {
@@ -28,14 +27,12 @@ export const useFetch = (url) => {
 					setError("Oops! Something went wrong while fetching the data.");
 				}
 			} finally {
-				// Only set loading to false if the component is still mounted
 				if (!controller.signal.aborted) {
 					setLoading(false);
 				}
 			}
 		};
 		fetchData();
-		// Cleanup function: this runs when the component unmounts or the URL changes.
 		return () => {
 			controller.abort();
 		};

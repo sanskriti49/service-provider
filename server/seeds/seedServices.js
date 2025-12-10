@@ -148,6 +148,25 @@ const seedData = async () => {
    VALUES ($1,$2,$3,$4,$5,$6,$7)`,
 				[userId, service.name, slug, description, price, rating, availability]
 			);
+			// Insert default weekly availability (master template)
+			// const defaultWeekAvailability = [
+			// 	{ day_of_week: 1, start_time: "09:00", end_time: "17:00" }, // Monday
+			// 	{ day_of_week: 2, start_time: "09:00", end_time: "17:00" }, // Tuesday
+			// 	{ day_of_week: 3, start_time: "09:00", end_time: "17:00" },
+			// 	{ day_of_week: 4, start_time: "09:00", end_time: "17:00" },
+			// 	{ day_of_week: 5, start_time: "09:00", end_time: "17:00" },
+			// 	{ day_of_week: 6, start_time: "09:00", end_time: "17:00" },
+			// 	{ day_of_week: 0, start_time: "09:00", end_time: "17:00" }, // Sunday
+			// ];
+			const defaultWeekAvailability = generateAvailability({ template: true });
+
+			for (const slot of defaultWeekAvailability) {
+				await db.query(
+					`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
+     				 VALUES ($1, $2, $3, $4)`,
+					[userId, slot.day_of_week, slot.start_time, slot.end_time]
+				);
+			}
 
 			// Insert slots
 			for (const slot of slots) {

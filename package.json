@@ -3,7 +3,7 @@
 	"private": true,
 	"version": "0.0.0",
 	"scripts": {
-		"dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
+		"dev": "concurrently --raw \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
 		"lint": "npm run lint --prefix client",
 		"reset-db": "npm --prefix server run reset-db",
 		"seed-db": "npm --prefix server run seed-db"
@@ -14,13 +14,19 @@
 	"dependencies": {
 		"@emotion/react": "^11.14.0",
 		"@emotion/styled": "^11.14.1",
+		"@gsap/react": "^2.1.2",
+		"@heroicons/react": "^2.2.0",
 		"@mui/lab": "^7.0.0-beta.14",
 		"@mui/material": "^7.2.0",
 		"axios": "^1.10.0",
 		"cors": "^2.8.5",
 		"framer-motion": "^12.23.11",
+		"google-one-tap": "^1.0.6",
+		"gsap": "^3.14.1",
+		"jwt-decode": "^4.0.0",
 		"lucide-react": "^0.525.0",
 		"react-icons": "^5.5.0",
-		"react-multi-carousel": "^2.8.6"
+		"react-multi-carousel": "^2.8.5",
+		"react-scroll": "^1.9.3"
 	}
 }

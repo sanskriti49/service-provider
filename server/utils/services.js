@@ -1,12 +1,55 @@
+// List
+export const SERVICE_NAMES = [
+	// Home Services
+	"House Cleaning",
+	"Laundry",
+	"Plumbing",
+	"Pest Control",
+	"Electrical Repair",
+	"Tech Support",
+	"Cooking Help",
+	"Gardening",
+	"Massage",
+	"Moving Help",
+	"Painting",
+	"Appliance Repair",
+	"Driver Service",
+
+	// Beauty & Personal Care - Men
+	"Haircut",
+	"Shaving",
+
+	// Beauty & Personal Care - Women
+	"Bridal Makeup",
+	"Eyebrow Threading",
+	"Facial",
+	"Hair Spa",
+	"Makeup",
+	"Hand Spa",
+	"Nail Art",
+	"Foot Spa",
+	"Full Body Glow",
+	"Arm Smoothening ",
+	"Leg Smoothening ",
+	"Mehndi",
+
+	// Child Services
+	"Babysitting",
+	"Child Tutoring",
+
+	// Fitness / Health
+	"Nutritionist",
+	"Yoga Instructor",
+];
 // Helpers
-function slugify(serviceName) {
+export function slugify(serviceName) {
 	return serviceName
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/(^-|-$)/g, "");
 }
 
-function getDescriptionForService(serviceName) {
+export function getDescriptionForService(serviceName) {
 	const descriptions = {
 		// Home Services
 		"House Cleaning": "Professional and thorough cleaning for a spotless home.",
@@ -60,22 +103,15 @@ function getDescriptionForService(serviceName) {
 	return descriptions[serviceName] || "High-quality service at your doorstep.";
 }
 
-function getImageForService(serviceName) {
+export function getImageForService(serviceName) {
 	const images = {
 		// Home Services
-		//"House Cleaning": "/images/house-clean.jpeg",
 		"House Cleaning": "/images/clean.jpg",
-		// Laundry: "/images/laund.jpeg",
 		Laundry: "/images/laundryy.jpg",
-		// Plumbing: "/images/plumb1.jpeg",
 		Plumbing: "/images/plumbi.jpg",
-		//"Electrical Repair": "/images/elecc.jpeg",
 		"Electrical Repair": "/images/electr.jpg",
-		//Gardening: "/images/garden1.jpeg",
 		Gardening: "/images/gardenn.jpg",
-		// "Pest Control": "/images/pest.jpeg",
 		"Pest Control": "/images/pestt.jpg",
-		// "Appliance Repair": "/images/repair.jpeg",
 		"Appliance Repair": "/images/repai.jpg",
 		"Cooking Help": "/images/cookk.jpg",
 		"Tech Support": "/images/tech.jpg",
@@ -120,62 +156,10 @@ function getImageForService(serviceName) {
 	return img || null;
 }
 
-// List
-const SERVICE_NAMES = [
-	// Home Services
-	"House Cleaning",
-	"Laundry",
-	"Plumbing",
-	"Pest Control",
-	"Electrical Repair",
-	"Tech Support",
-	"Cooking Help",
-	"Gardening",
-	"Massage",
-	"Moving Help",
-	"Painting",
-	"Appliance Repair",
-	"Driver Service",
-
-	// Beauty & Personal Care - Men
-	"Haircut",
-	"Shaving",
-
-	// Beauty & Personal Care - Women
-	"Bridal Makeup",
-	"Eyebrow Threading",
-	"Facial",
-	"Hair Spa",
-	"Makeup",
-	"Hand Spa",
-	"Nail Art",
-	"Foot Spa",
-	"Full Body Glow",
-	"Arm Smoothening ",
-	"Leg Smoothening ",
-	"Mehndi",
-
-	// Child Services
-	"Babysitting",
-	"Child Tutoring",
-
-	// Fitness / Health
-	"Nutritionist",
-	"Yoga Instructor",
-];
-
 // Services with metadata
-const SERVICES = SERVICE_NAMES.map((name) => ({
+export const SERVICES = SERVICE_NAMES.map((name) => ({
 	name,
 	slug: slugify(name),
 	description: getDescriptionForService(name),
 	image: getImageForService(name),
 }));
-
-module.exports = {
-	SERVICE_NAMES,
-	slugify,
-	getDescriptionForService,
-	getImageForService,
-	SERVICES,
-};

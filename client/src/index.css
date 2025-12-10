@@ -1,6 +1,15 @@
 @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lobster+Two:ital,wght@0,400;0,700;1,400;1,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,100..900;1,100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+
 @import "tailwindcss";
+
+@theme {
+	--color-white-100: #efefef;
+	--font-raleway: "Raleway", serif;
+	/* --font-inter: "Inter", serif; */
+}
 
 @font-face {
 	font-family: "Daito";
@@ -37,9 +46,20 @@
 @layer utilities {
 	@media (min-width: 1024px) and (max-width: 1279px) {
 		.mt-between-lg-xl {
-			margin-top: 14.5rem; /* mt-58 */
+			margin-top: 14.5rem;
 		}
 	}
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+.transition-colors {
+	transition-property: color, background-color, border-color,
+		text-decoration-color, fill, stroke;
+	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+	transition-duration: 150ms;
 }
 .forum-regular {
 	font-family: "Forum", serif;
@@ -123,29 +143,6 @@
 	50% {
 		transform: translateX(10%) scale(1.05) rotate(2deg);
 	}
-}
-
-.icon {
-	/* Icon */
-
-	position: absolute;
-	width: 122.99px;
-	height: 12px;
-	left: 1072px;
-	top: 53px;
-
-	mix-blend-mode: normal;
-
-	background: linear-gradient(261.08deg, #ca7ff8 98.81%, #795be9 326.26%);
-}
-.genie {
-	background: linear-gradient(135deg, #8b3696, #1e90ff, #d6216a);
-	background-size: 200% 200%;
-	background-clip: text;
-	-webkit-background-clip: text;
-	color: transparent;
-	animation: gradient 4s ease infinite;
-	/* font-size: 18px; */
 }
 
 @keyframes gradient {

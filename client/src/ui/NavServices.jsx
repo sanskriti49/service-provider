@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
 const servicesList = [
-	{ name: "House Cleaning", path: "/services/house-clean" },
+	{ name: "House Cleaning", path: "/services/house-cleaning" },
 	{ name: "Laundry", path: "/services/laundry" },
 	{ name: "Plumbing", path: "/services/plumbing" },
 	{ name: "Electrical Repair", path: "/services/electric-repair" },

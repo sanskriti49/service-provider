@@ -1,179 +1,187 @@
 import { Search, ArrowRight, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 
-// const allServices = [
-// 	"Plumbing",
-// 	"Cleaning",
-// 	"Painting",
-// 	"Haircut",
-// 	"Electrician",
-// 	"Gardening",
-// 	"Moving",
-// 	"Appliance Repair",
-// 	"Pest Control",
-// 	"Personal Trainer",
-// 	"Handyman Services",
-// 	"Housekeeping",
-// ];
-
-export const SearchBar = ({ onSearch }) => {
+export const SearchBar = () => {
 	const [query, setQuery] = useState("");
 	const [suggestions, setSuggestions] = useState([]);
+	const [allServices, setAllServices] = useState([]);
 	const [activeIndex, setActiveIndex] = useState(-1);
+
 	const searchContainerRef = useRef(null);
+	const navigate = useNavigate();
 
 	const {
 		data: apiResponse,
 		loading,
 		error,
-	} = useFetch("http://localhost:3000/api/services");
+	} = useFetch("http://localhost:3000/api/services/v1");
 
-	const [allServices, setAllServices] = useState([]);
+	// Load services
 	useEffect(() => {
-		if (apiResponse && apiResponse.services) {
-			// Assuming each service is an object with a 'name' property
-			const serviceNames = apiResponse.services.map((service) => service.name);
-			setAllServices(serviceNames);
-		}
-	}, [apiResponse]); // This effect runs only when the apiResponse data arrives/changes
+		if (!apiResponse) return;
 
-	// This ensures that if the services load *after* you've typed,
-	// the suggestions are correctly filtered.
+		// Case 1: backend returns { services: [...] }
+		if (apiResponse.services) {
+			setAllServices(apiResponse.services);
+		}
+
+		// Case 2: backend returns array directly
+		else if (Array.isArray(apiResponse)) {
+			setAllServices(apiResponse);
+		}
+
+		// Case 3: backend returns { data: [...] }
+		else if (apiResponse.data) {
+			setAllServices(apiResponse.data);
+		}
+	}, [apiResponse]);
+
+	// Filter suggestions
 	useEffect(() => {
 		if (query.length > 1 && allServices.length > 0) {
-			const filteredSuggestions = allServices.filter((serviceName) =>
-				serviceName.toLowerCase().includes(query.toLowerCase())
+			const filtered = allServices.filter((service) =>
+				(service.name || service.title || service.serviceName)
+					?.toLowerCase()
+					.includes(query.toLowerCase())
 			);
-			setSuggestions(filteredSuggestions);
+			setSuggestions(filtered);
 		} else {
 			setSuggestions([]);
 		}
 	}, [query, allServices]);
 
+	// Hide dropdown when clicking outside
 	useEffect(() => {
-		const handleClickOutside = (event) => {
+		const handler = (e) => {
 			if (
 				searchContainerRef.current &&
-				!searchContainerRef.current.contains(event.target)
+				!searchContainerRef.current.contains(e.target)
 			) {
 				setSuggestions([]);
 			}
 		};
-		document.addEventListener("mousedown", handleClickOutside);
-		return () => {
-			document.removeEventListener("mousedown", handleClickOutside);
-		};
+		document.addEventListener("mousedown", handler);
+		return () => document.removeEventListener("mousedown", handler);
 	}, []);
 
-	const handleInputChange = (e) => {
-		setQuery(e.target.value);
-		setActiveIndex(-1);
-	};
-
-	const handleSuggestionClick = (suggestion) => {
-		setQuery(suggestion);
+	// Navigate to selected
+	const handleSelectService = (service) => {
+		setQuery(service.name);
 		setSuggestions([]);
-		onSearch(suggestion);
+		navigate(`/services/${service.slug}`);
 	};
 
+	// Form submit
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		if (!query.trim()) return;
+
+		const exact = allServices.find(
+			(s) => s.name.toLowerCase() === query.toLowerCase()
+		);
+
+		if (exact) return handleSelectService(exact);
+		if (suggestions[0]) return handleSelectService(suggestions[0]);
+	};
+
+	// Keyboard navigation
 	const handleKeyDown = (e) => {
 		if (suggestions.length === 0) return;
 
-		if (e.key === "ArrowDown") {
-			e.preventDefault();
-			setActiveIndex((prevIndex) => (prevIndex + 1) % suggestions.length);
-		} else if (e.key === "ArrowUp") {
-			e.preventDefault();
-			// FIX #2: Corrected the modulo logic for negative numbers
-			setActiveIndex(
-				(prevIndex) => (prevIndex - 1 + suggestions.length) % suggestions.length
-			);
-		} else if (e.key === "Enter") {
-			e.preventDefault();
-			if (activeIndex > -1) {
-				const selectedSuggestion = suggestions[activeIndex];
-				handleSuggestionClick(selectedSuggestion);
-			} else {
-				handleSubmit(e);
-			}
-		} else if (e.key === "Escape") {
-			setSuggestions([]);
+		switch (e.key) {
+			case "ArrowDown":
+				e.preventDefault();
+				setActiveIndex((i) => (i + 1) % suggestions.length);
+				break;
+			case "ArrowUp":
+				e.preventDefault();
+				setActiveIndex(
+					(i) => (i - 1 + suggestions.length) % suggestions.length
+				);
+				break;
+			case "Enter":
+				e.preventDefault();
+				if (activeIndex >= 0) handleSelectService(suggestions[activeIndex]);
+				else handleSubmit(e);
+				break;
+			case "Escape":
+				setSuggestions([]);
+				break;
 		}
 	};
 
-	const handleSubmit = (e) => {
-		e.preventDefault();
-		if (query.trim()) {
-			onSearch(query.trim());
-			setSuggestions([]);
-		}
-	};
 	const clearInput = () => {
 		setQuery("");
 		setSuggestions([]);
 	};
 
 	return (
-		// ... your JSX remains the same, it was already correct ...
 		<form
-			className="w-full max-w-xl mx-auto"
+			className="w-full max-w-2xl mx-auto relative"
 			onSubmit={handleSubmit}
 			ref={searchContainerRef}
+			autoComplete="off"
 		>
-			<div className="relative group">
-				<Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-violet-900/50 pointer-events-none transition-colors group-focus-within:text-violet-600" />
+			{/* SEARCH BAR */}
+			<div className="relative group drop-shadow-xl">
+				<Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-violet-900/50 group-focus-within:text-violet-700 transition" />
+
 				<input
 					type="text"
 					value={query}
-					onChange={handleInputChange}
 					onKeyDown={handleKeyDown}
-					className="w-full pl-14 pr-32 py-4 rounded-full border border-transparent text-indigo-900/95 bg-white/60 backdrop-blur-sm
-					focus:outline-none focus:ring-2 focus:ring-violet-400 focus:bg-white/80
-					transition-all duration-300 shadow-lg shadow-gray-800/10 placeholder:text-gray-500"
+					onChange={(e) => {
+						setQuery(e.target.value);
+						setActiveIndex(-1);
+					}}
 					placeholder={
 						loading ? "Loading services..." : "What service do you need today?"
 					}
-					disabled={loading || error}
-					autoComplete="off"
+					className="w-full pl-14 pr-32 py-4 text-lg rounded-full border border-transparent bg-white/70 backdrop-blur-md shadow-lg
+					focus:outline-none focus:ring-2 focus:ring-violet-400 focus:bg-white transition-all duration-300 placeholder:text-gray-600"
+					disabled={loading || !!error}
 				/>
 
+				{/* CLEAR BUTTON */}
 				{query && !loading && (
 					<button
 						type="button"
 						onClick={clearInput}
-						className="absolute right-36 top-1/2 -translate-y-1/2 p-2 text-gray-500 hover:text-gray-800"
-						aria-label="Clear search"
+						className="absolute right-36 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800 p-2"
 					>
-						<X className="w-5 h-5" />
+						<X className="h-5 w-5" />
 					</button>
 				)}
 
+				{/* SUBMIT BUTTON */}
 				<button
 					type="submit"
-					className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-white group/btn flex justify-center items-center h-12 border-none rounded-full px-6
-					bg-violet-600 bg-gradient-to-br from-[#b369de] to-[#4f46e5]
-					active:scale-95 hover:scale-105 hover:shadow-lg hover:shadow-violet-400/50 
-					transition-all duration-300 ease-in-out"
+					disabled={!query.trim()}
+					className="absolute right-2 top-1/2 -translate-y-1/2 h-12 px-6 rounded-full text-white font-medium flex items-center gap-2
+					bg-gradient-to-br from-violet-600 to-indigo-600 
+					shadow-md hover:shadow-violet-300/40 hover:scale-105 active:scale-95
+					transition-all duration-300"
 				>
-					<span className="font-semibold">Search</span>
-					<ArrowRight className="w-4 h-4 ml-2 transition-transform duration-300 group-hover/btn:translate-x-1" />
+					Search
+					<ArrowRight className="w-4 h-4" />
 				</button>
 			</div>
 
-			{error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-
+			{/* DROPDOWN */}
 			{suggestions.length > 0 && (
-				<ul className="absolute w-full max-w-xl mt-2 bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden z-20">
-					{suggestions.map((suggestion, index) => (
+				<ul className="absolute w-full max-w-2xl mt-2 bg-white/90 backdrop-blur-lg rounded-2xl shadow-lg border border-gray-200/50 z-20 overflow-hidden">
+					{suggestions.map((service, i) => (
 						<li
-							key={suggestion}
-							onClick={() => handleSuggestionClick(suggestion)}
-							className={`px-6 py-3 cursor-pointer text-left text-indigo-900/90 hover:bg-violet-100/80 transition-colors duration-150 ${
-								index === activeIndex ? "bg-violet-200/80" : ""
-							}`}
+							key={service.id}
+							onClick={() => handleSelectService(service)}
+							className={`px-6 py-3 cursor-pointer text-left text-indigo-900 
+							 hover:bg-violet-100/80 transition
+							 ${i === activeIndex ? "bg-violet-200/80" : ""}
+							`}
 						>
-							{suggestion}
+							{service.name}
 						</li>
 					))}
 				</ul>

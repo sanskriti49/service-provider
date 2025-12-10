@@ -107,32 +107,113 @@ async function createProvider(req, res, next) {
 
 async function getProviders(req, res, next) {
 	try {
-		const result = await db.query("SELECT * FROM providers");
-		res.json(result.rows);
+		const { service } = req.query;
+
+		let query = `
+      SELECT 
+        users.name, 
+        users.photo, 
+        users.bio, 
+        users.location, 
+        users.custom_id,
+        providers.service, 
+        providers.price, 
+        providers.rating,
+        providers.availability,
+        providers.user_id
+      FROM providers
+      JOIN users ON providers.user_id = users.id
+    `;
+
+		const params = [];
+
+		if (service) {
+			query += " WHERE LOWER(providers.service) = LOWER($1)";
+			params.push(service);
+		}
+
+		const result = await db.query(query, params);
+
+		//res.json(result.rows);
+		const freshAvailability = generateAvailability();
+
+		res.json(
+			result.rows.map((provider) => ({
+				...provider,
+				availability: freshAvailability,
+			}))
+		);
 	} catch (err) {
+		console.error("Error in getProviders:", err);
 		next(err);
 	}
 }
+
+// async function getProviderById(req, res, next) {
+// 	try {
+// 		const { custom_id } = req.params;
+
+// 		const result = await db.query(
+// 			`SELECT users.id, users.name, users.email, users.role, users.custom_id,
+// 			        users.location, users.photo, users.bio,
+// 			        providers.service, providers.price, providers.rating, providers.availability
+//        FROM users
+//        JOIN providers ON users.id = providers.user_id
+//        WHERE users.custom_id = $1`,
+// 			[custom_id]
+// 		);
+
+// 		if (result.rows.length === 0) {
+// 			return res.status(404).json({ error: "Provider not found" });
+// 		}
+
+// 		const freshAvailability = generateAvailability();
+
+// 		res.json({
+// 			message: "Provider fetched",
+// 			provider: {
+// 				...result.rows[0],
+// 				availability: freshAvailability,
+// 			},
+// 		});
+// 	} catch (err) {
+// 		next(err);
+// 	}
+// }
 
 async function getProviderById(req, res, next) {
 	try {
 		const { custom_id } = req.params;
 
-		const result = await db.query(
+		const provider = await db.query(
 			`SELECT users.id, users.name, users.email, users.role, users.custom_id,
-			        users.location, users.photo, users.bio,
-			        providers.service, providers.price, providers.rating, providers.availability
-       FROM users
-       JOIN providers ON users.id = providers.user_id
-       WHERE users.custom_id = $1`,
+                    users.location, users.photo, users.bio,
+                    providers.service, providers.price, providers.rating
+            FROM users
+            JOIN providers ON users.id = providers.user_id
+            WHERE users.custom_id = $1`,
 			[custom_id]
 		);
 
-		if (result.rows.length === 0) {
+		if (provider.rows.length === 0) {
 			return res.status(404).json({ error: "Provider not found" });
 		}
 
-		res.json({ message: "Provider fetched", provider: result.rows[0] });
+		const slots = await db.query(
+			`SELECT date, start_time, end_time 
+             FROM availability_slots 
+             WHERE provider_id = $1
+             ORDER BY date, start_time`,
+			[provider.rows[0].id]
+		);
+
+		res.json({
+			message: "Provider fetched",
+			provider: {
+				...provider.rows[0],
+				availability: slots.rows,
+			},
+		});
 	} catch (err) {
 		next(err);
 	}
@@ -142,7 +223,7 @@ async function updateProvider(req, res, next) {
 	const { error, value } = providerUpdateSchema.validate(req.body);
 	if (error) return res.status(400).json({ error: error.details[0].message });
 
-	const id = req.params.id; // Assumes you're sending id as a route param
+	const id = req.params.id;
 	if (!id) return res.status(400).json({ error: "Missing provider id" });
 
 	const {
@@ -152,7 +233,6 @@ async function updateProvider(req, res, next) {
 		location,
 		photo,
 		bio,
-		custom_id,
 		service,
 		price,
 		rating,
@@ -165,32 +245,49 @@ async function updateProvider(req, res, next) {
 
 		const hashed = await hashIfPresent(password);
 
+		// Update user
 		const userResult = await client.query(
 			`UPDATE users
-         	 SET name = COALESCE($1, name),
-				email = COALESCE($2, email),
-				password = COALESCE($3, password),
-				location = COALESCE($4, location),
-				photo = COALESCE($5, photo),
-				bio = COALESCE($6, bio),
-				custom_id = COALESCE($7, custom_id)
-         WHERE id = $8`,
-			[name, email, hashed, location, photo, bio, custom_id, id]
-		);
-
-		const providerResult = await client.query(
-			`UPDATE providers
-         	 SET service = COALESCE($1, service),
-            	price = COALESCE($2, price),
-             	rating = COALESCE($3, rating),
-             	availability = COALESCE($4, availability)
-         WHERE user_id = $5`,
-			[service, price, rating, availability, id]
+             SET name = COALESCE($1, name),
+                 email = COALESCE($2, email),
+                 password = COALESCE($3, password),
+                 location = COALESCE($4, location),
+                 photo = COALESCE($5, photo),
+                 bio = COALESCE($6, bio)
+             WHERE id = $7`,
+			[name, email, hashed, location, photo, bio, id]
 		);
 
 		if (userResult.rowCount === 0) {
 			await client.query("ROLLBACK");
 			return res.status(404).json({ error: "Provider not found" });
+		}
+
+		// Update provider table
+		await client.query(
+			`UPDATE providers
+             SET service = COALESCE($1, service),
+                 price = COALESCE($2, price),
+                 rating = COALESCE($3, rating)
+             WHERE user_id = $4`,
+			[service, price, rating, id]
+		);
+
+		// If availability is provided, regenerate slots
+		if (availability) {
+			await client.query(
+				"DELETE FROM availability_slots WHERE provider_id=$1",
+				[id]
+			);
+
+			const newSlots = generateAvailability();
+			for (const slot of newSlots) {
+				await client.query(
+					`INSERT INTO availability_slots (provider_id, date, start_time, end_time)
+                     VALUES ($1, $2, $3, $4)`,
+					[id, slot.date, slot.start_time, slot.end_time]
+				);
+			}
 		}
 
 		await client.query("COMMIT");
