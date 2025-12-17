@@ -69,16 +69,25 @@ const SignIn = () => {
 
 	const handleGoogleResponse = async (response) => {
 		try {
-			const googleToken = response.credential;
+			const position = await new Promise((resolve, reject) => {
+				navigator.geolocation.getCurrentPosition(resolve, reject);
+			});
+			const lat = position.coords.latitude;
+			const lng = position.coords.longitude;
+
 			const res = await axios.post("http://localhost:3000/api/auth/google", {
-				googleToken,
+				googleToken: response.credential,
+				lat,
+				lng,
 			});
 
 			const { token } = res.data;
 			localStorage.setItem("token", token);
 
 			const decoded = jwtDecode(token);
-			if (decoded.role === "provider") {
+			if (!decoded.role) {
+				navigate("/choose-role");
+			} else if (decoded.role === "provider") {
 				navigate("/provider/dashboard");
 			} else {
 				navigate("/dashboard");
@@ -151,25 +160,22 @@ const SignIn = () => {
 							<div className="space-y-4">
 								{/* Sign /in With Google */}
 								<div className="relative w-full">
-									{/* 1. INVISIBLE GOOGLE BUTTON (Captures the click) */}
 									<div
 										id="googleButtonDiv"
 										className="absolute inset-0 z-10 opacity-0 overflow-hidden flex items-center justify-center cursor-pointer"
 									></div>
 
-									{/* 2. VISIBLE CUSTOM BUTTON (Visuals only) */}
-									{/* Note: We removed onClick={handleGoogleLogin} because the div above catches the click */}
 									<button
 										type="button" // Prevent form submission
 										className="
-        w-full flex items-center justify-center gap-2
-        text-gray-700 font-medium
-        py-2 rounded-lg transition cursor-pointer
-        bg-white border border-[#d4ceea]
-        shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
-        hover:shadow-[inset_0_3px_6px_#ddd6fe]         
-        active:shadow-[inset_0_0_6px_#ddd6fe]         
-      "
+											w-full flex items-center justify-center gap-2
+											text-gray-700 font-medium
+											py-2 rounded-lg transition cursor-pointer
+											bg-white border border-[#d4ceea]
+											shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
+											hover:shadow-[inset_0_3px_6px_#ddd6fe]         
+											active:shadow-[inset_0_0_6px_#ddd6fe]         
+										"
 									>
 										<img
 											src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"

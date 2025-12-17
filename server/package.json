@@ -6,7 +6,8 @@
 	"scripts": {
 		"dev": "nodemon",
 		"start": "node index.js",
-		"seed-db": "node seeds/seedServices.js",
+		"seed-services": "node seeds/seedServices.js",
+		"seed-db": "node seeds/seedDb.js",
 		"reset-db": "node resetDb.js"
 	},
 	"dependencies": {

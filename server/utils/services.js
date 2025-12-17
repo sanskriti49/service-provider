@@ -29,8 +29,8 @@ export const SERVICE_NAMES = [
 	"Nail Art",
 	"Foot Spa",
 	"Full Body Glow",
-	"Arm Smoothening ",
-	"Leg Smoothening ",
+	"Arm Smoothening",
+	"Leg Smoothening",
 	"Mehndi",
 
 	// Child Services
@@ -68,36 +68,31 @@ export function getDescriptionForService(serviceName) {
 		"Driver Service": "Trained drivers for travel or local errands.",
 		Massage: "Therapeutic massage for relaxation and stress relief.",
 
-		// Child Services
-		Babysitting: "Trusted babysitters to care for your little ones.",
-		"Child Tutoring": "Personalized tutoring in core school subjects.",
-		"Haircut (Kids)": "Friendly and patient haircuts for kids.",
+		// Beauty & Personal Care – Men
+		Haircut: "Clean and stylish haircut by a trained professional.",
+		Shaving: "Smooth and comfortable shaving at home.",
 
-		// Beauty & Personal Care - Women
-		"Haircut (Women)": "Salon-style women’s haircut in the comfort of home.",
-		Makeup: "Flawless makeup for daily wear or special events.",
+		// Beauty & Personal Care – Women
 		"Bridal Makeup": "Elegant and long-lasting bridal makeup service.",
 		"Eyebrow Threading": "Perfectly shaped brows with minimal discomfort.",
 		Facial: "Glowing skin with deep-cleansing and nourishing facials.",
-		Manicure: "Clean, shaped nails with polish and hand care.",
-		Pedicure: "Relaxing foot care and grooming by professionals.",
-		"Waxing (Full Body)": "Smooth skin with hygienic full-body waxing.",
-		"Waxing (Arms)": "Quick and gentle waxing for arms.",
-		"Waxing (Legs)": "Expert waxing for silky-smooth legs.",
-		"Hair Coloring": "Safe, trendy hair coloring by trained stylists.",
-		"Nail Art": "Stylish and creative nail designs at home.",
-		"Skin Treatment": "Targeted skincare for healthy and radiant skin.",
 		"Hair Spa": "Deep conditioning hair spa to nourish and restore.",
+		Makeup: "Flawless makeup for daily wear or special events.",
+		"Hand Spa": "Relaxing hand spa with exfoliation and moisturization.",
+		"Nail Art": "Stylish and creative nail designs at home.",
+		"Foot Spa": "Soothing foot spa for relaxation and soft skin.",
+		"Full Body Glow": "Skin-brightening and exfoliating full-body treatment.",
+		"Arm Smoothening": "Gentle exfoliation and smoothening treatment for arms.",
+		"Leg Smoothening": "Smoothening and exfoliation treatment for legs.",
 		Mehndi: "Beautiful mehndi designs for weddings and occasions.",
 
-		// Beauty & Personal Care - Men
-		"Haircut (Men)": "Clean, sharp haircuts tailored to your style.",
-		"Beard Styling": "Trim, shape, and style your beard professionally.",
-		Shaving: "Smooth and comfortable shaving at home.",
+		// Child Services
+		Babysitting: "Trusted babysitters to care for your little ones.",
+		"Child Tutoring": "Personalized tutoring in core school subjects.",
 
 		// Fitness / Health
-		"Yoga Instructor": "Guided personal yoga sessions for mind and body.",
 		Nutritionist: "Personal diet plans for better health and lifestyle.",
+		"Yoga Instructor": "Guided personal yoga sessions for mind and body.",
 	};
 
 	return descriptions[serviceName] || "High-quality service at your doorstep.";
@@ -133,11 +128,11 @@ export function getImageForService(serviceName) {
 		"Hand Spa": "/images/manicureee.jpg",
 		"Foot Spa": "/images/pedicuree.jpg",
 		"Full Body Glow": "/images/wax.jpg",
-		"Arm Smoothening ": "/images/wax.jpg",
-		"Leg Smoothening ": "/images/wax.jpg",
+		"Arm Smoothening": "/images/wax.jpg",
+		"Leg Smoothening": "/images/wax.jpg",
 		"Hair Spa": "/images/hair.jpg",
 
-		//"Color & Highlights": "/images/hair-colour.jpg",
+		//"Color & Highlights"
 		"Nail Art": "/images/nail-art.jpg",
 		Mehndi: "/images/mehendii.jpg",
 
@@ -155,6 +150,50 @@ export function getImageForService(serviceName) {
 	}
 	return img || null;
 }
+
+// utils/serviceCategories.js
+export const SERVICE_CATEGORIES = {
+	// Home Services
+	"House Cleaning": "Home Services",
+	Laundry: "Home Services",
+	Plumbing: "Home Services",
+	"Pest Control": "Home Services",
+	"Electrical Repair": "Home Services",
+	"Tech Support": "Home Services",
+	"Cooking Help": "Home Services",
+	Gardening: "Home Services",
+	Massage: "Home Services",
+	"Moving Help": "Home Services",
+	Painting: "Home Services",
+	"Appliance Repair": "Home Services",
+	"Driver Service": "Home Services",
+
+	// Beauty – Men
+	Haircut: "Beauty & Personal Care",
+	Shaving: "Beauty & Personal Care",
+
+	// Beauty – Women
+	"Bridal Makeup": "Beauty & Personal Care",
+	"Eyebrow Threading": "Beauty & Personal Care",
+	Facial: "Beauty & Personal Care",
+	"Hair Spa": "Beauty & Personal Care",
+	Makeup: "Beauty & Personal Care",
+	"Hand Spa": "Beauty & Personal Care",
+	"Foot Spa": "Beauty & Personal Care",
+	"Full Body Glow": "Beauty & Personal Care",
+	"Arm Smoothening": "Beauty & Personal Care",
+	"Leg Smoothening": "Beauty & Personal Care",
+	"Nail Art": "Beauty & Personal Care",
+	Mehndi: "Beauty & Personal Care",
+
+	// Child
+	Babysitting: "Child Services",
+	"Child Tutoring": "Child Services",
+
+	// Fitness
+	Nutritionist: "Fitness / Health",
+	"Yoga Instructor": "Fitness / Health",
+};
 
 // Services with metadata
 export const SERVICES = SERVICE_NAMES.map((name) => ({

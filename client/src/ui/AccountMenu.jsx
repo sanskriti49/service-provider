@@ -9,7 +9,6 @@ import {
 } from "@mui/material";
 import { Link } from "react-router-dom";
 
-// LUCIDE ICONS FOR CONSISTENCY
 import {
 	LayoutDashboard,
 	UserCircle,

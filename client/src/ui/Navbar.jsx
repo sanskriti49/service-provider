@@ -16,11 +16,26 @@ const Navbar = () => {
 
 	useEffect(() => {
 		const token = localStorage.getItem("token");
+
 		if (token) {
 			try {
 				const decoded = jwtDecode(token);
-				console.log("Decoded User Data:", decoded);
 				setUser(decoded);
+				if (decoded.custom_id) {
+					fetch(`http://localhost:3000/api/users/${decoded.custom_id}`)
+						.then((res) => {
+							if (res.status === 404) {
+								// User deleted → logout
+								localStorage.removeItem("token");
+								setUser(null);
+							}
+						})
+						.catch(() => {
+							localStorage.removeItem("token");
+							setUser(null);
+						});
+				}
+				// 🔥 Validate user still exists
 			} catch (e) {
 				localStorage.removeItem("token");
 			}
@@ -235,40 +250,6 @@ const Navbar = () => {
 								</Link>
 							</div>
 						) : (
-							// <div className="relative group">
-							// 	<Avatar
-							// 		{...stringAvatar(
-							// 			user.name || user.fullName || user.email || "User"
-							// 		)}
-							// 	/>
-
-							// 	{/* DROPDOWN */}
-							// 	<div
-							// 		className="absolute right-0 mt-2 w-40 bg-white border shadow-lg rounded-xl p-2
-							// opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all"
-							// 	>
-							// 		<Link
-							// 			to={
-							// 				user.role === "provider"
-							// 					? "/provider/dashboard"
-							// 					: "/dashboard"
-							// 			}
-							// 			className="block px-3 py-2 hover:bg-gray-100 rounded-md"
-							// 		>
-							// 			Dashboard
-							// 		</Link>
-
-							// 		<button
-							// 			onClick={() => {
-							// 				localStorage.removeItem("token");
-							// 				window.location.reload();
-							// 			}}
-							// 			className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-md"
-							// 		>
-							// 			Logout
-							// 		</button>
-							// 	</div>
-							// </div>
 							<AccountMenu user={user} />
 						)}
 					</div>

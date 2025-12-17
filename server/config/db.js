@@ -1,5 +1,4 @@
-require("dotenv").config(); // For CommonJS
-const { Client } = require("pg");
+require("dotenv").config();
 const { Pool } = require("pg");
 
 const db = new Pool({
@@ -10,8 +9,7 @@ const db = new Pool({
 	database: process.env.DB_NAME,
 });
 
-db.connect()
-	.then(() => console.log("Connected to DB"))
-	.catch((err) => console.error("DB Connection Error:", err));
+db.on("connect", () => console.log("Connected to DB"));
+db.on("error", (err) => console.error("DB Error:", err));
 
 module.exports = db;

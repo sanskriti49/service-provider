@@ -2,17 +2,153 @@ const express = require("express");
 const router = express.Router();
 const { createBooking } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
-//router.post("/bookings", createBooking);
-router.post(
-	"/bookings",
-	authMiddleware,
-	(req, res, next) => {
-		if (req.user.role !== "customer") {
-			return res.status(403).json({ error: "Only customers can book." });
+const db = require("../config/db");
+
+function allowRoles(...roles) {
+	return (req, res, next) => {
+		if (!roles.includes(req.user.role)) {
+			return res.status(403).json({ message: "Access denied." });
 		}
 		next();
-	},
-	createBooking
+	};
+}
+
+// 1. CREATE BOOKING
+router.post("/", authMiddleware, allowRoles("customer"), createBooking);
+
+// 2. ADMIN: GET ALL
+router.get("/", authMiddleware, allowRoles("admin"), async (req, res) => {
+	try {
+		const q = `
+            SELECT b.*, u.name AS customer_name, pu.name AS provider_name
+            FROM bookings b
+            LEFT JOIN users u ON u.id = b.user_id
+            LEFT JOIN users pu ON pu.id = b.provider_id
+            ORDER BY b.date ASC
+        `;
+		const result = await db.query(q);
+		res.json(result.rows);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: "Error fetching bookings" });
+	}
+});
+
+// CUSTOMER BOOKINGS
+router.get(
+	"/user",
+	authMiddleware,
+	allowRoles("customer"),
+	async (req, res) => {
+		try {
+			const q = `
+            SELECT b.*, pu.name AS provider_name
+            FROM bookings b
+            LEFT JOIN users pu ON pu.id = b.provider_id
+            WHERE b.user_id=$1
+            ORDER BY b.date ASC
+        `;
+			const result = await db.query(q, [req.user.id]);
+			res.json(result.rows);
+		} catch (err) {
+			res.status(500).json({ message: "Error fetching user bookings" });
+		}
+	}
 );
+
+// UPCOMING BOOKINGS (Customer)
+router.get(
+	"/user/upcoming",
+	authMiddleware,
+	allowRoles("customer"),
+	async (req, res) => {
+		try {
+			const q = `
+            SELECT b.*, s.name AS service_name, pu.name AS provider_name
+            FROM bookings b
+			LEFT JOIN services s on s.id = b.service_id
+            LEFT JOIN users pu ON pu.id = b.provider_id
+            WHERE b.user_id = $1
+            AND b.date >= NOW()
+            ORDER BY b.date ASC
+        `;
+			const result = await db.query(q, [req.user.id]);
+			res.json(result.rows);
+		} catch (err) {
+			console.error(err);
+			res.status(500).json({ message: "Error fetching upcoming bookings" });
+		}
+	}
+);
+
+// HISTORY BOOKINGS
+router.get(
+	"/user/history",
+	authMiddleware,
+	allowRoles("customer"),
+	async (req, res) => {
+		try {
+			const q = `
+            SELECT b.*, p.name AS provider_name
+            FROM bookings b
+            LEFT JOIN users pu ON pu.id = b.provider_id
+            WHERE b.user_id = $1
+            AND b.date < NOW()
+            ORDER BY b.date DESC
+        `;
+			const result = await db.query(q, [req.user.id]);
+			res.json(result.rows);
+		} catch (err) {
+			res.status(500).json({ message: "Error fetching history" });
+		}
+	}
+);
+
+// PROVIDER BOOKINGS
+router.get(
+	"/provider",
+	authMiddleware,
+	allowRoles("provider"),
+	async (req, res) => {
+		try {
+			const q = `
+            SELECT b.*, u.name AS customer_name
+            FROM bookings b
+            LEFT JOIN users u ON u.id = b.user_id
+            WHERE b.provider_id=$1
+            ORDER BY b.date ASC
+        `;
+			const result = await db.query(q, [req.user.id]);
+			res.json(result.rows);
+		} catch (err) {
+			res.status(500).json({ message: "Error fetching provider bookings" });
+		}
+	}
+);
+
+// 4. WILDCARD ROUTE (MUST BE LAST)
+router.get("/:booking_id", authMiddleware, async (req, res) => {
+	try {
+		const q = `SELECT * FROM bookings WHERE booking_id=$1`;
+		const result = await db.query(q, [req.params.booking_id]);
+
+		if (result.rowCount === 0)
+			return res.status(404).json({ message: "Not found" });
+
+		const booking = result.rows[0];
+
+		if (
+			req.user.role !== "admin" &&
+			booking.user_id !== req.user.id &&
+			booking.provider_id !== req.user.id
+		) {
+			return res.status(403).json({ message: "Access denied" });
+		}
+
+		res.json(booking);
+	} catch (err) {
+		res.status(500).json({ message: "Server error" });
+	}
+});
 
 module.exports = router;

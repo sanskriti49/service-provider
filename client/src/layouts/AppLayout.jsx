@@ -1,7 +1,7 @@
-import Navbar from "../src/ui/Navbar";
+import Navbar from "../ui/Navbar";
 
 import { Outlet } from "react-router-dom";
-import Footer from "./pages/Footer";
+import Footer from "../pages/Footer";
 import { useState } from "react";
 
 export default function AppLayout() {

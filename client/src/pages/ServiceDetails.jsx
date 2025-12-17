@@ -42,15 +42,17 @@ const ServiceDetails = () => {
 				);
 				if (!serviceRes.ok) throw new Error("Service not found");
 				const serviceData = await serviceRes.json();
+				console.log(serviceData);
 				setService(serviceData);
 
 				const providersRes = await fetch(
 					`http://localhost:3000/api/providers/v1?service=${encodeURIComponent(
-						serviceData.name
+						slug
 					)}`
 				);
 				if (!providersRes.ok) throw new Error("Could not fetch providers");
 				const providersData = await providersRes.json();
+				console.log("providersData: ", providersData);
 				setProviders(providersData);
 			} catch (err) {
 				console.error("Error fetching providers:", err);
@@ -251,121 +253,30 @@ const ServiceDetails = () => {
 
 // --- Child Components ---
 
-const ProviderCard = ({ provider, isExpanded, onToggleExpand }) => {
-	const groupedSlots = provider.availability.reduce((acc, slot) => {
-		const date = formatDate(slot.date);
-		if (!acc[date]) acc[date] = [];
-		acc[date].push(slot.start_time);
-		acc[date].sort();
-		return acc;
-	}, {});
-
-	return (
-		<div className="bg-gradient-to-br from-[#2a1d5a] to-[#1e143f] rounded-xl border border-violet-900/50 flex flex-col transition-all duration-300 hover:border-violet-700 hover:shadow-xl hover:shadow-violet-600/20 hover:-translate-y-2">
-			<div className="p-6">
-				<div className="flex items-start gap-4">
-					<img
-						src={
-							provider.photo ||
-							`https://ui-avatars.com/api/?name=${provider.name}&background=6d28d9&color=fff`
-						}
-						alt={provider.name}
-						className="w-20 h-20 rounded-full object-cover border-2 border-violet-500 flex-shrink-0"
-					/>
-					<div className="flex-1">
-						<h3 className="font-bold text-xl text-white">{provider.name}</h3>
-						<p className="text-sm text-gray-400 mt-1 line-clamp-2">
-							{provider.bio || "No bio available."}
-						</p>
-					</div>
-				</div>
-			</div>
-
-			<div className="px-6 py-4 border-y border-violet-900/50 text-sm flex justify-between items-center gap-4">
-				<div className="flex items-center gap-1.5 text-yellow-400">
-					<StarIcon className="h-5 w-5" />
-					<span className="font-bold text-white">
-						{provider.rating?.toFixed(1) || "New"}
-					</span>
-					<span className="text-gray-400 text-xs">(Rating)</span>
-				</div>
-				<div className="text-right">
-					<span className="font-bold text-lg text-white">
-						₹{provider.price?.toFixed(2) || "N/A"}
-					</span>
-					<span className="text-gray-400 text-xs">/session</span>
-				</div>
-			</div>
-
-			<div className="p-6 flex-grow flex flex-col">
-				{provider.availability?.length > 0 ? (
-					<>
-						<button
-							onClick={onToggleExpand}
-							className="cursor-pointer w-full text-center bg-violet-800/50 text-violet-200 px-4 py-2 rounded-lg hover:bg-violet-800 transition-colors font-semibold"
-						>
-							{isExpanded ? "Hide Availability" : "View Availability"}
-						</button>
-
-						{isExpanded && (
-							<div className="mt-4 space-y-3 animate-fade-in">
-								{/* {groupedSlots[date]} */}
-								{Object.entries(groupedSlots).map(([date, times]) => (
-									<div key={date}>
-										<p className="font-semibold text-gray-300 text-sm mb-2">
-											{date}
-										</p>
-										<div className="flex flex-wrap gap-2">
-											{times.map((time) => (
-												<span
-													key={time}
-													className="bg-violet-900/70 text-gray-200 text-xs font-mno px-3 py-1 rounded-full"
-												>
-													{time}
-												</span>
-											))}
-										</div>
-									</div>
-								))}
-							</div>
-						)}
-					</>
-				) : (
-					<p className="text-center text-gray-500 text-sm py-2">
-						No availability posted.
-					</p>
-				)}
-			</div>
-
-			<div className="p-6 pt-0 mt-auto">
-				{/* IMPROVED: Gradient button with stronger hover state */}
-				<button className="cursor-pointer w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold px-4 py-3 rounded-lg hover:from-violet-500 hover:to-purple-500 hover:scale-105 transition-all duration-300">
-					Book Now
-				</button>
-			</div>
-		</div>
-	);
-};
-
-// --- Child Components ---
-
 // const ProviderCard = ({ provider, isExpanded, onToggleExpand }) => {
-// 	// Group availability slots by date
-// 	const groupedSlots = provider.availability.reduce((acc, slot) => {
+// 	const navigate = useNavigate();
+
+// 	// const groupedSlots = provider.availability.reduce((acc, slot) => {
+// 	// 	const date = formatDate(slot.date);
+// 	// 	if (!acc[date]) acc[date] = [];
+// 	// 	acc[date].push(slot.start_time);
+// 	// 	acc[date].sort();
+// 	// 	return acc;
+// 	// }, {});
+// 	const availability = Array.isArray(provider.availability)
+// 		? provider.availability
+// 		: [];
+
+// 	const groupedSlots = availability.reduce((acc, slot) => {
 // 		const date = formatDate(slot.date);
-// 		if (!acc[date]) {
-// 			acc[date] = [];
-// 		}
-// 		// Assuming start_time is what you want to show
+// 		if (!acc[date]) acc[date] = [];
 // 		acc[date].push(slot.start_time);
-// 		// Sort times chronologically
 // 		acc[date].sort();
 // 		return acc;
 // 	}, {});
 
 // 	return (
-// 		<div className="bg-[#22194A] rounded-xl shadow-lg border border-violet-900/50 flex flex-col transition-all duration-300 hover:shadow-violet-500/30 hover:-translate-y-1">
-// 			{/* Provider Info */}
+// 		<div className="bg-gradient-to-br from-[#2a1d5a] to-[#1e143f] rounded-xl border border-violet-900/50 flex flex-col transition-all duration-300 hover:border-violet-700 hover:shadow-xl hover:shadow-violet-600/20 hover:-translate-y-2">
 // 			<div className="p-6">
 // 				<div className="flex items-start gap-4">
 // 					<img
@@ -385,36 +296,35 @@ const ProviderCard = ({ provider, isExpanded, onToggleExpand }) => {
 // 				</div>
 // 			</div>
 
-// 			{/* Stats */}
-// 			<div className="px-6 py-4 border-t border-b border-violet-900/50 text-sm flex justify-between items-center gap-4">
-// 				<div className="flex items-center gap-1 text-yellow-400">
+// 			<div className="px-6 py-4 border-y border-violet-900/50 text-sm flex justify-between items-center gap-4">
+// 				<div className="flex items-center gap-1.5 text-yellow-400">
 // 					<StarIcon className="h-5 w-5" />
 // 					<span className="font-bold text-white">
-// 						{provider.rating?.toFixed(1) || "N/A"}
+// 						{provider.rating?.toFixed(1) || "New"}
 // 					</span>
-// 					<span className="text-gray-400">(Rating)</span>
+// 					<span className="text-gray-400 text-xs">(Rating)</span>
 // 				</div>
 // 				<div className="text-right">
 // 					<span className="font-bold text-lg text-white">
 // 						₹{provider.price?.toFixed(2) || "N/A"}
 // 					</span>
-// 					<span className="text-gray-400"> / session</span>
+// 					<span className="text-gray-400 text-xs">/session</span>
 // 				</div>
 // 			</div>
 
-// 			{/* Availability */}
 // 			<div className="p-6 flex-grow flex flex-col">
-// 				{provider.availability && provider.availability.length > 0 ? (
+// 				{availability.length > 0 ? (
 // 					<>
 // 						<button
 // 							onClick={onToggleExpand}
-// 							className="cursor-pointer w-full text-center bg-violet-800/50 text-violet-200 px-4 py-2 rounded-lg hover:bg-violet-800 transition-colors"
+// 							className="cursor-pointer w-full text-center bg-violet-800/50 text-violet-200 px-4 py-2 rounded-lg hover:bg-violet-800 transition-colors font-semibold"
 // 						>
 // 							{isExpanded ? "Hide Availability" : "View Availability"}
 // 						</button>
 
 // 						{isExpanded && (
 // 							<div className="mt-4 space-y-3 animate-fade-in">
+// 								{/* {groupedSlots[date]} */}
 // 								{Object.entries(groupedSlots).map(([date, times]) => (
 // 									<div key={date}>
 // 										<p className="font-semibold text-gray-300 text-sm mb-2">
@@ -424,7 +334,7 @@ const ProviderCard = ({ provider, isExpanded, onToggleExpand }) => {
 // 											{times.map((time) => (
 // 												<span
 // 													key={time}
-// 													className="bg-violet-900/70 text-gray-200 text-xs font-mono px-3 py-1 rounded-full"
+// 													className="bg-violet-900/70 text-gray-200 text-xs font-mno px-3 py-1 rounded-full"
 // 												>
 // 													{time}
 // 												</span>
@@ -436,20 +346,169 @@ const ProviderCard = ({ provider, isExpanded, onToggleExpand }) => {
 // 						)}
 // 					</>
 // 				) : (
-// 					<p className="text-center text-gray-500 text-sm">
+// 					<p className="text-center text-gray-500 text-sm py-2">
 // 						No availability posted.
 // 					</p>
 // 				)}
 // 			</div>
 
 // 			<div className="p-6 pt-0 mt-auto">
-// 				<button className="cursor-pointer w-full bg-violet-600 text-white font-bold px-4 py-3 rounded-lg hover:bg-violet-700 transition-colors">
+// 				<button
+// 					onClick={() =>
+// 						navigate(`/book/${provider.custom_id}`, { state: { provider } })
+// 					}
+// 					className="cursor-pointer w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold px-4 py-3 rounded-lg hover:from-violet-500 hover:to-purple-500 hover:scale-105 transition-all duration-300"
+// 				>
 // 					Book Now
 // 				</button>
 // 			</div>
 // 		</div>
 // 	);
 // };
+// Inside ServiceDetails.js
+
+const ProviderCard = ({ provider, isExpanded, onToggleExpand }) => {
+	const navigate = useNavigate();
+
+	// State to hold fetched slots
+	const [availability, setAvailability] = useState([]);
+	const [loadingSlots, setLoadingSlots] = useState(false);
+	const [hasLoaded, setHasLoaded] = useState(false);
+
+	// The fetch logic
+	const loadAvailability = async () => {
+		// If we already loaded data, don't fetch again (cache it in component state)
+		if (hasLoaded) return;
+
+		setLoadingSlots(true);
+		try {
+			const res = await fetch(
+				`http://localhost:3000/api/providers/v1/${provider.user_id}/availability`
+			);
+			if (!res.ok) throw new Error("Failed to load slots");
+			const data = await res.json();
+			setAvailability(data);
+			setHasLoaded(true);
+		} catch (error) {
+			console.error(error);
+		} finally {
+			setLoadingSlots(false);
+		}
+	};
+
+	const handleViewAvailability = () => {
+		// Toggle the UI accordion
+		onToggleExpand();
+
+		// If we are expanding, trigger the fetch
+		// (Note: !isExpanded means we are ABOUT to expand)
+		if (!isExpanded) {
+			loadAvailability();
+		}
+	};
+
+	// Helper to group slots (moved inside or kept outside)
+	const groupedSlots = availability.reduce((acc, slot) => {
+		const date = formatDate(slot.date);
+		if (!acc[date]) acc[date] = [];
+		acc[date].push(slot.start_time);
+		acc[date].sort();
+		return acc;
+	}, {});
+
+	return (
+		<div className="bg-gradient-to-br from-[#2a1d5a] to-[#1e143f] rounded-xl border border-violet-900/50 flex flex-col transition-all duration-300 hover:border-violet-700 hover:shadow-xl hover:shadow-violet-600/20 hover:-translate-y-2">
+			{/* ... (Header Section with Image/Name remains the same) ... */}
+			<div className="p-6">
+				<div className="flex items-start gap-4">
+					<img
+						src={
+							provider.photo ||
+							`https://ui-avatars.com/api/?name=${provider.name}&background=6d28d9&color=fff`
+						}
+						alt={provider.name}
+						className="w-20 h-20 rounded-full object-cover border-2 border-violet-500 flex-shrink-0"
+					/>
+					<div className="flex-1">
+						<h3 className="font-bold text-xl text-white">{provider.name}</h3>
+						<p className="text-sm text-gray-400 mt-1 line-clamp-2">
+							{provider.bio || "No bio available."}
+						</p>
+					</div>
+				</div>
+			</div>
+
+			{/* ... (Rating/Price Section remains the same) ... */}
+			<div className="px-6 py-4 border-y border-violet-900/50 text-sm flex justify-between items-center gap-4">
+				{/* ... rating/price code ... */}
+			</div>
+
+			<div className="p-6 flex-grow flex flex-col">
+				{/* BUTTON */}
+				<button
+					onClick={handleViewAvailability}
+					disabled={loadingSlots}
+					className="cursor-pointer w-full text-center bg-violet-800/50 text-violet-200 px-4 py-2 rounded-lg hover:bg-violet-800 transition-colors font-semibold disabled:opacity-50"
+				>
+					{loadingSlots ? (
+						<span className="flex items-center justify-center gap-2">
+							{/* Simple CSS Spinner */}
+							<span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+							Loading...
+						</span>
+					) : isExpanded ? (
+						"Hide Availability"
+					) : (
+						"View Availability"
+					)}
+				</button>
+
+				{/* ACCORDION CONTENT */}
+				{isExpanded && (
+					<div className="mt-4 space-y-3 animate-fade-in">
+						{!loadingSlots && availability.length === 0 && (
+							<p className="text-center text-gray-500 text-sm py-2">
+								No availability found for the next 7 days.
+							</p>
+						)}
+
+						{Object.entries(groupedSlots).map(([date, times]) => (
+							<div key={date}>
+								<p className="font-semibold text-gray-300 text-sm mb-2">
+									{date}
+								</p>
+								<div className="flex flex-wrap gap-2">
+									{times.map((time) => (
+										<span
+											key={time}
+											className="bg-violet-900/70 text-gray-200 text-xs font-mono px-3 py-1 rounded-full"
+										>
+											{time}
+										</span>
+									))}
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</div>
+
+			{/* Book Now Button remains the same, but pass 'availability' if needed for next screen */}
+			<div className="p-6 pt-0 mt-auto">
+				<button
+					onClick={() =>
+						navigate(`/book/${provider.custom_id}`, {
+							state: { provider, preloadedAvailability: availability },
+						})
+					}
+					className="cursor-pointer w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold px-4 py-3 rounded-lg hover:from-violet-500 hover:to-purple-500 hover:scale-105 transition-all duration-300"
+				>
+					Book Now
+				</button>
+			</div>
+		</div>
+	);
+};
 
 const ServiceDetailsSkeleton = () => (
 	<section className="bg-[#191034] min-h-screen pb-20">

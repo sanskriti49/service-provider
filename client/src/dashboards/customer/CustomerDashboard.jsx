@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
 	Calendar,
 	Clock,
@@ -66,23 +66,27 @@ const QUICK_SERVICES = [
 	},
 	{
 		name: "Electrical",
-		slug: "electrical",
+		slug: "electrical-repair",
 		icon: "⚡",
 		color: "bg-yellow-100 text-yellow-600",
 	},
 	{
 		name: "Moving",
-		slug: "moving",
+		slug: "moving-help",
 		icon: "📦",
 		color: "bg-purple-100 text-purple-600",
 	},
 ];
 
 export default function CustomerDashboard() {
+	const navigate = useNavigate();
+
 	const [user, setUser] = useState({ name: "User" });
 	const [activeTab, setActiveTab] = useState("overview");
 	const [services, setServices] = useState([]);
 	const [bookings, setBookings] = useState([]);
+	const [upcoming, setUpcoming] = useState([]);
+	const [showMoreUpcoming, setShowMoreUpcoming] = useState(false);
 
 	const [loading, setLoading] = useState(true);
 	const totalServices = services.length;
@@ -92,6 +96,7 @@ export default function CustomerDashboard() {
 		if (token) {
 			try {
 				const decoded = jwtDecode(token);
+				console.log("DECODED", decoded);
 				setUser(decoded);
 			} catch (error) {
 				console.error("Invalid token");
@@ -127,6 +132,27 @@ export default function CustomerDashboard() {
 		// };
 		fetchData();
 	}, []);
+	useEffect(() => {
+		const fetchBookings = async () => {
+			try {
+				const token = localStorage.getItem("token");
+				const headers = { Authorization: `Bearer ${token}` };
+
+				const upcomingRes = await fetch(
+					"http://localhost:3000/api/bookings/user/upcoming",
+					{ headers }
+				);
+				const upcomingData = await upcomingRes.json();
+				console.log(upcomingData);
+
+				setUpcoming(upcomingData);
+			} catch (err) {
+				console.error(err);
+			}
+		};
+
+		fetchBookings();
+	}, []);
 
 	return (
 		<div className="lg:-mt-50 -mt-70 bricolage-grotesque min-h-screen bg-gray-50/50 relative overflow-hidden pt-24 pb-12 px-4 sm:px-8">
@@ -139,18 +165,30 @@ export default function CustomerDashboard() {
 					<div className="bg-white/70 backdrop-blur-xl border border-white/50 shadow-xl rounded-3xl p-6 flex flex-col gap-6">
 						{/* Profile Brief */}
 						<div className="flex items-center gap-4 pb-6 border-b border-gray-100">
-							<div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-violet-500/30">
-								{user.name ? user.name[0].toUpperCase() : "U"}
+							<div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-violet-500/30 overflow-hidden">
+								{/* 1. Show Photo if available, otherwise show Initial */}
+								{user.photo ? (
+									<img
+										src={user.photo}
+										alt="Profile"
+										className="w-full h-full object-cover"
+									/>
+								) : (
+									// 2. Safe check: Use Optional Chaining (?.) to prevent crash
+									<span>{user?.name?.[0]?.toUpperCase() || "U"}</span>
+								)}
 							</div>
 							<div>
+								{/* 3. Fallback to "Guest" if name is missing */}
 								<h3 className="font-bold text-gray-800">
 									{user.name || "Guest"}
 								</h3>
-								<p className="text-sm text-gray-500">Customer Account</p>
+								<p className="text-sm text-gray-500">
+									{user.custom_id || "Customer Account"}
+								</p>
 							</div>
 						</div>
 
-						{/* Navigation Tabs */}
 						<nav className="flex flex-col gap-2">
 							<SidebarItem
 								icon={<DashboardIcon />}
@@ -168,7 +206,7 @@ export default function CustomerDashboard() {
 								icon={<SettingsIcon />}
 								label="Settings"
 								active={activeTab === "settings"}
-								onClick={() => setActiveTab("settings")}
+								onClick={() => navigate("/settings")}
 							/>
 						</nav>
 
@@ -223,7 +261,12 @@ export default function CustomerDashboard() {
 
 					{/* Conditional Content based on Tab */}
 					{activeTab === "overview" && (
-						<OverviewTab totalServices={totalServices} />
+						<OverviewTab
+							totalServices={totalServices}
+							upcoming={upcoming}
+							showMoreUpcoming={showMoreUpcoming}
+							setShowMoreUpcoming={setShowMoreUpcoming}
+						/>
 					)}
 					{activeTab === "bookings" && <BookingsTab />}
 					{activeTab === "settings" && <SettingsTab />}
@@ -235,7 +278,12 @@ export default function CustomerDashboard() {
 
 // --- SUB-COMPONENTS ---
 
-function OverviewTab({ totalServices }) {
+function OverviewTab({
+	totalServices,
+	upcoming,
+	showMoreUpcoming,
+	setShowMoreUpcoming,
+}) {
 	return (
 		<motion.div
 			initial={{ opacity: 0 }}
@@ -268,47 +316,44 @@ function OverviewTab({ totalServices }) {
 
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 				{/* 2. Active Booking Card */}
+
+				{/* UPCOMING SECTION */}
 				<div className="bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-sm">
 					<div className="flex justify-between items-center mb-6">
 						<h3 className="font-bold text-lg flex items-center gap-2">
 							<Clock className="text-violet-500" size={20} /> Upcoming
 						</h3>
-						<span className="bg-violet-100 text-violet-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
-							{MOCK_ACTIVE_BOOKING.status}
-						</span>
 					</div>
 
-					<div className="flex gap-4">
-						<img
-							src={MOCK_ACTIVE_BOOKING.image}
-							alt="Service"
-							className="w-24 h-24 rounded-2xl object-cover shadow-sm"
-						/>
-						<div className="flex-1">
-							<h4 className="font-bold text-lg text-gray-800">
-								{MOCK_ACTIVE_BOOKING.service}
-							</h4>
-							<p className="text-gray-500 text-sm mb-3">
-								Provider: {MOCK_ACTIVE_BOOKING.provider}
-							</p>
-							<div className="flex flex-wrap gap-3">
-								<div className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-lg">
-									<Calendar size={12} /> {MOCK_ACTIVE_BOOKING.date}
+					{upcoming.length === 0 && (
+						<p className="text-gray-500 text-sm">No upcoming bookings.</p>
+					)}
+
+					{upcoming.length > 0 && (
+						<>
+							{/* FIRST UPCOMING BOOKING */}
+							<UpcomingCard booking={upcoming[0]} />
+
+							{/* VIEW MORE BUTTON */}
+							{upcoming.length > 1 && (
+								<button
+									onClick={() => setShowMoreUpcoming(!showMoreUpcoming)}
+									className="cursor-pointer px-2 py-1 rounded-xl m-2 text-violet-600 hover:bg-violet-700 hover:text-white float-right transition duration-200"
+								>
+									{showMoreUpcoming ? "Hide" : "View more"}
+								</button>
+							)}
+
+							{/* EXTRA UPCOMING LIST */}
+							{showMoreUpcoming && (
+								<div className="mt-4 space-y-3">
+									{upcoming.slice(1).map((b) => (
+										<UpcomingCard key={b.id} booking={b} />
+									))}
 								</div>
-								<div className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-lg">
-									<Zap size={12} /> {MOCK_ACTIVE_BOOKING.price}
-								</div>
-							</div>
-						</div>
-					</div>
-					<div className="mt-6 flex gap-3">
-						<button className="cursor-pointer flex-1 bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-xl font-medium transition-colors">
-							Track Provider
-						</button>
-						<button className="cursor-pointer flex-1 border border-gray-200 hover:bg-gray-50 py-2.5 rounded-xl font-medium transition-colors text-gray-600">
-							Details
-						</button>
-					</div>
+							)}
+						</>
+					)}
 				</div>
 
 				{/* 3. Quick Book Actions */}
@@ -341,6 +386,25 @@ function OverviewTab({ totalServices }) {
 				</div>
 			</div>
 		</motion.div>
+	);
+}
+function UpcomingCard({ booking }) {
+	return (
+		<div className="flex gap-4 bg-gray-50 p-4 rounded-2xl">
+			<div className="flex-1">
+				<h4 className="font-bold text-lg text-gray-800">
+					{booking.service_name}
+				</h4>
+				<p className="text-gray-500 text-sm mb-3">
+					Provider: {booking.provider?.name}
+				</p>
+				<div className="flex flex-wrap gap-3">
+					<div className="flex items-center gap-1 text-xs text-gray-600 bg-white px-2 py-1 rounded-lg">
+						<Calendar size={12} /> {new Date(booking.date).toLocaleString()}
+					</div>
+				</div>
+			</div>
+		</div>
 	);
 }
 

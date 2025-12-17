@@ -159,8 +159,8 @@ export const SearchBar = () => {
 				<button
 					type="submit"
 					disabled={!query.trim()}
-					className="absolute right-2 top-1/2 -translate-y-1/2 h-12 px-6 rounded-full text-white font-medium flex items-center gap-2
-					bg-gradient-to-br from-violet-600 to-indigo-600 
+					className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 h-12 px-6 rounded-full text-white font-medium flex items-center gap-2
+					bg-violet-600 bg-gradient-to-br from-[#b369de] to-[#4f46e5]
 					shadow-md hover:shadow-violet-300/40 hover:scale-105 active:scale-95
 					transition-all duration-300"
 				>

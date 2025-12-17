@@ -13,7 +13,6 @@ import "./ServicesCarousel.css";
 import AuroraBackground from "../ui/AuroraBackground";
 import { Link } from "react-router-dom";
 
-// --- Responsive settings for the carousel ---
 const responsive = {
 	desktop: {
 		breakpoint: { max: 4000, min: 1280 },

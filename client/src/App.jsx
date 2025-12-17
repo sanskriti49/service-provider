@@ -1,16 +1,20 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import AppLayout from "./AppLayout";
-import PlainLayout from "./PlainLayout";
+import AppLayout from "./layouts/AppLayout";
+import PlainLayout from "./layouts/PlainLayout";
 
 import Home from "./pages/Home";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import BookingPage from "./pages/BookingPage";
 import ServiceDetails from "./pages/ServiceDetails";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import CustomerDashboard from "./dashboards/customer/CustomerDashboard";
 import ProviderDashboard from "./dashboards/provider/ProviderDashboard";
 import ChooseRole from "./pages/ChooseRole";
 import AllServices from "./pages/AllServices";
+import BookingSuccess from "./pages/BookingSuccess";
+import Unauthorized from "./pages/Unauthorized";
+import SettingsPage from "./pages/SettingsPage";
 
 const router = createBrowserRouter([
 	{
@@ -31,7 +35,13 @@ const router = createBrowserRouter([
 		children: [
 			{ path: "login", element: <SignIn /> },
 			{ path: "sign-up", element: <SignUp /> },
+			{ path: "/unauthorized", element: <Unauthorized /> },
 			{ path: "services/:slug", element: <ServiceDetails /> },
+			{ path: "/book/:customId", element: <BookingPage /> },
+			{
+				path: "/booking-success",
+				element: <BookingSuccess />,
+			},
 		],
 	},
 	{
@@ -42,6 +52,14 @@ const router = createBrowserRouter([
 				element: (
 					<ProtectedRoute allowed={["customer"]}>
 						<CustomerDashboard />
+					</ProtectedRoute>
+				),
+			},
+			{
+				path: "/settings",
+				element: (
+					<ProtectedRoute allowed={["customer"]}>
+						<SettingsPage />
 					</ProtectedRoute>
 				),
 			},

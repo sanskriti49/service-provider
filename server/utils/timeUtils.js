@@ -4,6 +4,7 @@ function timeToMinutes(t) {
 	const [h, m] = t.split(":").map(Number);
 	return h * 60 + m;
 }
+
 function minutesToTime(m) {
 	// 570 -> "09:30"
 	const hh = Math.floor(m / 60)
@@ -27,4 +28,23 @@ function splitIntoChunks(start, end, chunkMinutes = 60) {
 	return chunks;
 }
 
-module.exports = { timeToMinutes, minutesToTime, splitIntoChunks };
+function generateDailySlots(startStr, endStr, intervalMin = 60) {
+	const slots = [];
+	let current = new Date(`2000-01-01T${startStr}`);
+	const end = new Date(`2000-01-01T${endStr}`);
+
+	while (current < end) {
+		// Extract "HH:MM"
+		const timeString = current.toTimeString().slice(0, 5);
+		slots.push(timeString);
+		current.setMinutes(current.getMinutes() + intervalMin);
+	}
+	return slots;
+}
+
+module.exports = {
+	timeToMinutes,
+	minutesToTime,
+	splitIntoChunks,
+	generateDailySlots,
+};

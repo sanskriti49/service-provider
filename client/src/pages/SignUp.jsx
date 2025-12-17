@@ -63,15 +63,32 @@ const SignUp = () => {
 
 	const handleGoogleResponse = async (response) => {
 		try {
+			const position = await new Promise((resolve, reject) => {
+				navigator.geolocation.getCurrentPosition(resolve, reject);
+			});
+			const lat = position.coords.latitude;
+			const lng = position.coords.longitude;
+
 			const res = await axios.post("http://localhost:3000/api/auth/google", {
 				googleToken: response.credential,
+				lat,
+				lng,
 			});
+			const { token, user } = res.data;
+			localStorage.setItem("token", token);
+			// 2. CHECK ROLE IMMEDIATELY
+			if (!user.role) {
+				// If role is NULL, go to choose role
+				navigate("/choose-role");
+			} else if (user.role === "provider") {
+				navigate("/provider/dashboard");
+			} else {
+				navigate("/dashboard");
+			}
+			// const payload = JSON.parse(atob(res.data.token.split(".")[1]));
 
-			localStorage.setItem("token", res.data.token);
-			const payload = JSON.parse(atob(res.data.token.split(".")[1]));
-
-			if (payload.role === "provider") navigate("/provider/dashboard");
-			else navigate("/dashboard");
+			// if (payload.role === "provider") navigate("/provider/dashboard");
+			// else navigate("/dashboard");
 		} catch (err) {
 			console.error(err);
 			alert("Google login failed");
@@ -206,7 +223,7 @@ const SignUp = () => {
 										value={form.name}
 										onChange={handleChange}
 										type="text"
-										className="
+										className="capitalize
 											w-full rounded-lg px-3 py-2
 											border border-[#d4ceea]
 											shadow-sm

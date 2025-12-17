@@ -1,14 +1,20 @@
-const { SERVICES } = require("../utils/services");
+const pool = require("../config/db");
 
+const formatService = (row) => ({
+	id: row.id,
+	name: row.name,
+	slug: row.slug,
+	description: row.description,
+	price: row.price,
+	image: row.image_url,
+	category: row.category,
+});
 async function getAllServices(req, res, next) {
 	try {
-		// We only need name, slug, description, and image for the list
-		const serviceList = SERVICES.map(({ name, slug, description, image }) => ({
-			name,
-			slug,
-			description,
-			image,
-		}));
+		const result = await pool.query("SELECT * FROM services");
+
+		const serviceList = result.rows.map(formatService);
+
 		res.json(serviceList);
 	} catch (err) {
 		next(err);
@@ -18,13 +24,17 @@ async function getAllServices(req, res, next) {
 async function getServiceBySlug(req, res, next) {
 	try {
 		const { slug } = req.params;
-		const service = SERVICES.find((s) => s.slug === slug);
+		const result = await pool.query("SELECT * FROM services WHERE slug=$1", [
+			slug,
+		]);
+
+		const service = result.rows[0];
 
 		if (!service) {
 			return res.status(404).json({ error: "Service not found" });
 		}
 
-		res.json(service);
+		res.json(formatService(service));
 	} catch (err) {
 		next(err);
 	}
