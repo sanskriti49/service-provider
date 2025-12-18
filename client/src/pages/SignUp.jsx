@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from "react";
-import Iridescence from "../ui/Iridescence";
+import React, { useEffect, useRef, useState } from "react";
 
 import logoImg from "/images/la.png";
 import signInImg from "/images/sign-in.jpg";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 const SignUp = () => {
 	const navigate = useNavigate();
+	const turnstileRef = useRef();
+	const [token, setToken] = useState("");
+	const [loading, setLoading] = useState(false);
+
 	const [form, setForm] = useState({
 		name: "",
 		email: "",
@@ -34,33 +38,6 @@ const SignUp = () => {
 		);
 	}, []);
 
-	const handleGoogleSignUp = () => {
-		// window.google.accounts.id.initialize({
-		// 	client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-		// 	callback: async (response) => {
-		// 		try {
-		// 			const res = await axios.post(
-		// 				"http://localhost:3000/api/auth/google",
-		// 				{ googleToken: response.credential }
-		// 			);
-		// 			localStorage.setItem("token", res.data.token);
-
-		// 			const payload = JSON.parse(atob(res.data.token.split(".")[1]));
-
-		// 			if (payload.role === "provider") {
-		// 				navigate("/provider/dashboard");
-		// 			} else {
-		// 				navigate("/dashboard");
-		// 			}
-		// 		} catch (err) {
-		// 			console.log(err);
-		// 			alert("Google login failed");
-		// 		}
-		// 	},
-		// });
-		window.google.accounts.id.prompt();
-	};
-
 	const handleGoogleResponse = async (response) => {
 		try {
 			const position = await new Promise((resolve, reject) => {
@@ -76,9 +53,8 @@ const SignUp = () => {
 			});
 			const { token, user } = res.data;
 			localStorage.setItem("token", token);
-			// 2. CHECK ROLE IMMEDIATELY
+
 			if (!user.role) {
-				// If role is NULL, go to choose role
 				navigate("/choose-role");
 			} else if (user.role === "provider") {
 				navigate("/provider/dashboard");
@@ -97,17 +73,29 @@ const SignUp = () => {
 		if (!form.role) {
 			return alert("Please select a role");
 		}
-		try {
-			const res = await axios.post(
-				"http://localhost:3000/api/auth/register",
-				form
-			);
-			alert("Account created!");
 
+		if (!token) {
+			return alert("Please verify you are human");
+		}
+		setLoading(true);
+
+		try {
+			const res = await axios.post("http://localhost:3000/api/auth/register", {
+				...form,
+				captchaToken: token,
+			});
+			alert("Account created!");
 			navigate("/login");
 		} catch (err) {
 			console.log(err);
-			alert(err.response?.data || err.message);
+			alert(err.response?.data?.error || err.message);
+
+			setToken("");
+			if (turnstileRef.current) {
+				turnstileRef.current.reset();
+			}
+		} finally {
+			setLoading(false);
 		}
 	};
 
@@ -248,8 +236,26 @@ const SignUp = () => {
 										"
 									/>
 
-									<button className="cursor-pointer w-full bg-[#7c3aed] text-white py-2 rounded-lg font-medium hover:bg-[#5b21b6] transition duration-250">
-										Create Account
+									<div className="flex justify-center">
+										<Turnstile
+											ref={turnstileRef}
+											siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+											onSuccess={(token) => setToken(token)}
+											onError={() => alert("Verification failed")}
+											options={{
+												theme: "light",
+												size: "flexible",
+											}}
+										/>
+									</div>
+
+									<button
+										disabled={loading}
+										className={`cursor-pointer w-full bg-[#7c3aed] text-white py-2 rounded-lg font-medium hover:bg-[#5b21b6] transition duration-250 ${
+											loading ? "opacity-70 cursor-not-allowed" : ""
+										}`}
+									>
+										{loading ? "Creating..." : "Create Account"}{" "}
 									</button>
 								</form>
 

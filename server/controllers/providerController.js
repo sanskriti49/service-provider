@@ -5,6 +5,7 @@ const db = require("../config/db");
 const { hashIfPresent } = require("../utils/hash");
 const { generateAvailability } = require("../utils/generateAvailability");
 const { generateDailySlots } = require("../utils/timeUtils");
+const { normalizeEmail } = require("../utils/normalizeEmail");
 
 // -------------------- VALIDATION --------------------
 const providerSchema = Joi.object({

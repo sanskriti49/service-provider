@@ -4,9 +4,12 @@ const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const verifyToken = require("../middleware/verifyToken");
+const verifyRecaptcha = require("../middleware/verifyRecaptcha");
 const { OAuth2Client } = require("google-auth-library");
 const { customAlphabet } = require("nanoid");
 const { formatName } = require("../utils/formatName");
+const { normalizeEmail } = require("../utils/normalizeEmail");
+const verifyTurnstile = require("../middleware/verifyRecaptcha");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function generateCustomId(role) {
@@ -79,7 +82,7 @@ router.post("/google", async (req, res) => {
 	}
 });
 
-router.post("/register", async (req, res) => {
+router.post("/register", verifyTurnstile, async (req, res) => {
 	try {
 		const { name, email, password, role, phone } = req.body;
 
@@ -93,12 +96,6 @@ router.post("/register", async (req, res) => {
 		const customId = generateCustomId(role);
 		const hashed = await bcrypt.hash(password, 10);
 
-		// const user = await db.query(
-		// 	`INSERT INTO users (name, email, password, role)
-		//      VALUES ($1,$2,$3,$4)
-		//      RETURNING id, name, email, role`,
-		// 	[name, cleanEmail, hashed, role]
-		// );
 		const user = await db.query(
 			`INSERT INTO users (name, email, password, role, custom_id, phone)
              VALUES ($1, $2, $3, $4, $5, $6)
@@ -115,10 +112,7 @@ router.post("/register", async (req, res) => {
 	}
 });
 
-// LOGIN
-// Inside authRoutes.js
-
-router.post("/login", async (req, res) => {
+router.post("/login", verifyTurnstile, async (req, res) => {
 	try {
 		const { email, password } = req.body;
 		const cleanEmail = normalizeEmail(email);
@@ -188,10 +182,8 @@ router.post("/set-role", verifyToken, async (req, res) => {
 			});
 		}
 
-		// gnerate custom ID
 		const customId = generateCustomId(role);
 
-		// update DB
 		const update = await db.query(
 			`UPDATE users 
              SET role = $1, custom_id = $2 

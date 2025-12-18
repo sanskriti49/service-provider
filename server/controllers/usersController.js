@@ -5,6 +5,7 @@ const db = require("../config/db");
 const { hashIfPresent } = require("../utils/hash");
 const Joi = require("joi");
 const { customAlphabet } = require("nanoid");
+const { normalizeEmail } = require("../utils/normalizeEmail");
 
 const userSchema = Joi.object({
 	name: Joi.string().min(3).max(100).required(),

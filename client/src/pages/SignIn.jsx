@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Iridescence from "../ui/Iridescence";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 import logoImg from "/images/la.png";
 import signInImg from "/images/sign-in.jpg";
@@ -9,6 +10,8 @@ import { Link, useNavigate } from "react-router-dom";
 
 const SignIn = () => {
 	const navigate = useNavigate();
+	const turnstileRef = useRef();
+	const [token, setToken] = useState("");
 
 	const [form, setForm] = useState({
 		email: "",
@@ -34,10 +37,6 @@ const SignIn = () => {
 			}
 		);
 	}, []);
-
-	const handleGoogleLogin = () => {
-		window.google.accounts.id.prompt();
-	};
 
 	const handleGoogleResponse = async (response) => {
 		try {
@@ -66,32 +65,46 @@ const SignIn = () => {
 			}
 		} catch (err) {
 			console.error(err);
-			alert("Google login failed");
+			if (err.code === 1) {
+				alert("Location permission is required to sign in.");
+			} else {
+				alert("Google login failed");
+			}
 		}
 	};
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 
+		if (!token) {
+			return alert("Please verify you are human");
+		}
+
 		try {
-			const res = await axios.post(
-				"http://localhost:3000/api/auth/login",
-				form
-			);
+			const res = await axios.post("http://localhost:3000/api/auth/login", {
+				...form,
+				captchaToken: token,
+			});
 
-			const { token } = res.data;
-			localStorage.setItem("token", token);
+			const { token: authToken } = res.data;
+			localStorage.setItem("token", authToken);
 
-			const decoded = jwtDecode(token);
-			if (decoded.role == "provider") {
+			const decoded = jwtDecode(authToken);
+			if (decoded.role === "provider") {
 				navigate("/provider/dashboard");
 			} else {
 				navigate("/dashboard");
 			}
 		} catch (err) {
 			alert(err.response?.data?.error || "Login failed");
+
+			setToken("");
+			if (turnstileRef.current) {
+				turnstileRef.current.reset();
+			}
 		}
 	};
+
 	return (
 		<div className="bricolage-grotesque w-full overflow-hidden lg:grid lg:grid-cols-3">
 			<div className="relative lg:col-span-2 flex flex-col p-5 overflow-hidden h-full">
@@ -126,16 +139,16 @@ const SignIn = () => {
 									></div>
 
 									<button
-										type="button" // Prevent form submission
+										type="button"
 										className="
-											w-full flex items-center justify-center gap-2
-											text-gray-700 font-medium
-											py-2 rounded-lg transition cursor-pointer
-											bg-white border border-[#d4ceea]
-											shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
-											hover:shadow-[inset_0_3px_6px_#ddd6fe]         
-											active:shadow-[inset_0_0_6px_#ddd6fe]         
-										"
+                                            w-full flex items-center justify-center gap-2
+                                            text-gray-700 font-medium
+                                            py-2 rounded-lg transition cursor-pointer
+                                            bg-white border border-[#d4ceea]
+                                            shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
+                                            hover:shadow-[inset_0_3px_6px_#ddd6fe]         
+                                            active:shadow-[inset_0_0_6px_#ddd6fe]         
+                                        "
 									>
 										<img
 											src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
@@ -145,7 +158,6 @@ const SignIn = () => {
 										Sign in with Google
 									</button>
 								</div>
-								{/* Divider */}
 								<div className="flex items-center gap-4 my-4">
 									<div className="flex-1 h-px bg-gray-300"></div>
 									<span className="text-gray-600 text-sm">
@@ -155,37 +167,50 @@ const SignIn = () => {
 								</div>
 
 								<form className="space-y-5" onSubmit={handleSubmit}>
-									<label htmlFor="name">Email</label>
+									<label htmlFor="email">Email</label>
 									<input
 										name="email"
 										value={form.email}
 										onChange={handleChange}
 										type="email"
 										className="
-											w-full rounded-lg px-3 py-2
-											border border-[#d4ceea]
-											shadow-sm
-											focus:outline-none
-											focus:border-violet-500
-											focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-										"
+                                            w-full rounded-lg px-3 py-2
+                                            border border-[#d4ceea]
+                                            shadow-sm
+                                            focus:outline-none
+                                            focus:border-violet-500
+                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
 									/>
 
-									<label htmlFor="name">Password</label>
+									<label htmlFor="password">Password</label>
 									<input
 										name="password"
 										value={form.password}
 										onChange={handleChange}
 										type="password"
 										className="
-											w-full rounded-lg px-3 py-2
-											border border-[#d4ceea]
-											shadow-sm
-											focus:outline-none
-											focus:border-violet-500
-											focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-										"
+                                            w-full rounded-lg px-3 py-2
+                                            border border-[#d4ceea]
+                                            shadow-sm
+                                            focus:outline-none
+                                            focus:border-violet-500
+                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
 									/>
+
+									<div className="flex justify-center">
+										<Turnstile
+											ref={turnstileRef}
+											siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+											onSuccess={(token) => setToken(token)}
+											onError={() => alert("Verification failed")}
+											options={{
+												theme: "light",
+												size: "flexible",
+											}}
+										/>
+									</div>
 
 									<button className="cursor-pointer w-full bg-[#7c3aed] text-white py-2 rounded-lg font-medium hover:bg-[#5b21b6] transition duration-250">
 										Sign In
@@ -213,7 +238,6 @@ const SignIn = () => {
 							<a
 								className="underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
 								href="#"
-								//	target="_blank"
 							>
 								terms of service
 							</a>
@@ -221,7 +245,6 @@ const SignIn = () => {
 							<a
 								className="underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
 								href="#"
-								//	target="_blank"
 							>
 								privacy policy
 							</a>
@@ -231,7 +254,6 @@ const SignIn = () => {
 				</div>
 			</div>
 
-			{/* --- RIGHT SIDE (25% Width) --- */}
 			<aside className="relative hidden lg:block lg:w-[28rem] xl:w-[32rem] h-full p-16">
 				<img
 					src={signInImg}
@@ -242,7 +264,6 @@ const SignIn = () => {
 					<p className="leading-tight">A gentle reminder</p>
 					<p className="leading-tight">Your tasks await your return</p>
 					<p className="leading-tight">Please sign in to start</p>
-
 					<cite className="block not-italic text-xl mt-6">
 						<span className="opacity-40">—</span>A welcoming haiku
 					</cite>

@@ -17,6 +17,7 @@
 		"@emotion/styled": "^11.14.1",
 		"@gsap/react": "^2.1.2",
 		"@heroicons/react": "^2.2.0",
+		"@marsidev/react-turnstile": "^1.4.0",
 		"@mui/lab": "^7.0.0-beta.14",
 		"@mui/material": "^7.2.0",
 		"axios": "^1.10.0",
