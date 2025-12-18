@@ -85,10 +85,6 @@ const SignUp = () => {
 			} else {
 				navigate("/dashboard");
 			}
-			// const payload = JSON.parse(atob(res.data.token.split(".")[1]));
-
-			// if (payload.role === "provider") navigate("/provider/dashboard");
-			// else navigate("/dashboard");
 		} catch (err) {
 			console.error(err);
 			alert("Google login failed");
@@ -108,7 +104,6 @@ const SignUp = () => {
 			);
 			alert("Account created!");
 
-			// After signup → move to login
 			navigate("/login");
 		} catch (err) {
 			console.log(err);
@@ -119,16 +114,6 @@ const SignUp = () => {
 	return (
 		<div className="bricolage-grotesque w-full overflow-hidden lg:grid lg:grid-cols-3">
 			<div className="relative lg:col-span-2 flex flex-col p-5 overflow-hidden h-full">
-				{/* Background Effect
-				<div className="absolute inset-0 -z-10">
-					<Iridescence
-						color={[0.5, 0.6, 0.8]}
-						mouseReact={false}
-						amplitude={0.1}
-						speed={1.0}
-					/>
-				</div> */}
-
 				<div className="flex flex-col h-full z-10 relative">
 					<div className="flex items-center mb-8">
 						<div className=" w-14 flex items-center cursor-pointer">
@@ -153,7 +138,6 @@ const SignUp = () => {
 							</p>
 
 							<div className="space-y-4">
-								{/* Sign Up With Google */}
 								<div className="relative w-full">
 									<div
 										id="googleButtonDiv"
@@ -161,7 +145,7 @@ const SignUp = () => {
 									></div>
 
 									<button
-										type="button" // Prevent form submission
+										type="button"
 										className="
 											w-full flex items-center justify-center gap-2
 											text-gray-700 font-medium
@@ -181,7 +165,6 @@ const SignUp = () => {
 									</button>
 								</div>
 
-								{/* Divider */}
 								<div className="flex items-center gap-4 my-4">
 									<div className="flex-1 h-px bg-gray-300"></div>
 									<span className="text-gray-600 text-sm">or</span>
@@ -270,7 +253,6 @@ const SignUp = () => {
 									</button>
 								</form>
 
-								{/* Already have account */}
 								<p className="flex gap-1 items-center justify-center text-gray-700 text-sm">
 									Already have an account?
 									<Link
@@ -310,7 +292,6 @@ const SignUp = () => {
 				</div>
 			</div>
 
-			{/* --- RIGHT SIDE (25% Width) --- */}
 			<aside className="relative hidden lg:block lg:w-[28rem] xl:w-[32rem] h-full p-16">
 				<img
 					src={signInImg}

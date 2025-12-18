@@ -4,12 +4,15 @@ BigInt.prototype.toJSON = function () {
 	return this.toString();
 };
 
+const TIME_LIMIT_MINUTES = 10;
+
 async function createBooking(req, res, next) {
 	console.log("--- New Booking Request ---");
 	console.log("User:", req.user);
 	console.log("Body:", req.body);
 
-	const { provider_id, service_id, date, start_time, end_time } = req.body;
+	const { provider_id, service_id, date, start_time, end_time, address } =
+		req.body;
 
 	if (!provider_id || !service_id || !date || !start_time) {
 		return res.status(400).json({ message: "Missing fields" });
@@ -51,7 +54,6 @@ async function createBooking(req, res, next) {
 				.json({ message: "This time slot is already booked." });
 		}
 
-		// Overlap check
 		const conflictQ = `
             SELECT 1 FROM bookings
             WHERE provider_id=$1
@@ -73,11 +75,10 @@ async function createBooking(req, res, next) {
 			return res.status(409).json({ message: "Slot already booked!" });
 		}
 
-		// Insert booking
 		const insertQ = `
-            INSERT INTO bookings (booking_id, provider_id, user_id, service_id, date, start_time, end_time, status)
-            VALUES (gen_random_uuid(), $1, $2, $3, $4::date, $5, $6, 'booked')
-            RETURNING booking_id, provider_id, user_id, service_id, date, start_time, end_time, status
+            INSERT INTO bookings (booking_id, provider_id, user_id, service_id, date, start_time, end_time, status,address)
+            VALUES (gen_random_uuid(), $1, $2, $3, $4::date, $5, $6, 'booked', $7)
+            RETURNING booking_id, provider_id, user_id, service_id, date, start_time, end_time, status, address, created_at
         `;
 
 		const r = await client.query(insertQ, [
@@ -87,6 +88,7 @@ async function createBooking(req, res, next) {
 			cleanDate,
 			start_time,
 			end_time,
+			address,
 		]);
 
 		await client.query("COMMIT");
@@ -102,4 +104,46 @@ async function createBooking(req, res, next) {
 	}
 }
 
-module.exports = { createBooking };
+async function updateBookingAddress(req, res) {
+	const { bookingId } = req.params;
+	const { address } = req.body;
+
+	if (!address) {
+		return res.status(400).json({ message: "Address is required" });
+	}
+
+	try {
+		const checkRes = await db.query(
+			"SELECT created_at FROM bookings WHERE booking_id=$1",
+			[bookingId]
+		);
+		if (checkRes.rows.length === 0) {
+			return res.status(404).json({ message: "Booking not found" });
+		}
+
+		const createdAt = new Date(checkRes.rows[0].created_at);
+		const now = new Date();
+		const diffInMins = (now - createdAt) / 1000 / 60;
+
+		if (diffInMins > TIME_LIMIT_MINUTES) {
+			return res.status(403).json({
+				message:
+					"Time limit exceeded. Address is only allowed to be changed within 10 minutes.",
+			});
+		}
+
+		const updateRes = await db.query(
+			"UPDATE bookings SET address = $1 WHERE booking_id = $2 RETURNING address",
+			[address, bookingId]
+		);
+		res.json({
+			message: "Address updated succesfully",
+			address: updateRes.rows[0].address,
+		});
+	} catch (err) {
+		console.error("Update address error:", err);
+		res.status(500).json({ message: "Server error" });
+	}
+}
+
+module.exports = { createBooking, updateBookingAddress };

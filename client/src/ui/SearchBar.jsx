@@ -18,27 +18,18 @@ export const SearchBar = () => {
 		error,
 	} = useFetch("http://localhost:3000/api/services/v1");
 
-	// Load services
 	useEffect(() => {
 		if (!apiResponse) return;
 
-		// Case 1: backend returns { services: [...] }
 		if (apiResponse.services) {
 			setAllServices(apiResponse.services);
-		}
-
-		// Case 2: backend returns array directly
-		else if (Array.isArray(apiResponse)) {
+		} else if (Array.isArray(apiResponse)) {
 			setAllServices(apiResponse);
-		}
-
-		// Case 3: backend returns { data: [...] }
-		else if (apiResponse.data) {
+		} else if (apiResponse.data) {
 			setAllServices(apiResponse.data);
 		}
 	}, [apiResponse]);
 
-	// Filter suggestions
 	useEffect(() => {
 		if (query.length > 1 && allServices.length > 0) {
 			const filtered = allServices.filter((service) =>
@@ -52,7 +43,6 @@ export const SearchBar = () => {
 		}
 	}, [query, allServices]);
 
-	// Hide dropdown when clicking outside
 	useEffect(() => {
 		const handler = (e) => {
 			if (
@@ -66,14 +56,12 @@ export const SearchBar = () => {
 		return () => document.removeEventListener("mousedown", handler);
 	}, []);
 
-	// Navigate to selected
 	const handleSelectService = (service) => {
 		setQuery(service.name);
 		setSuggestions([]);
 		navigate(`/services/${service.slug}`);
 	};
 
-	// Form submit
 	const handleSubmit = (e) => {
 		e.preventDefault();
 		if (!query.trim()) return;
@@ -86,7 +74,6 @@ export const SearchBar = () => {
 		if (suggestions[0]) return handleSelectService(suggestions[0]);
 	};
 
-	// Keyboard navigation
 	const handleKeyDown = (e) => {
 		if (suggestions.length === 0) return;
 
@@ -124,7 +111,6 @@ export const SearchBar = () => {
 			ref={searchContainerRef}
 			autoComplete="off"
 		>
-			{/* SEARCH BAR */}
 			<div className="relative group drop-shadow-xl">
 				<Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-violet-900/50 group-focus-within:text-violet-700 transition" />
 
@@ -144,7 +130,6 @@ export const SearchBar = () => {
 					disabled={loading || !!error}
 				/>
 
-				{/* CLEAR BUTTON */}
 				{query && !loading && (
 					<button
 						type="button"
@@ -155,7 +140,6 @@ export const SearchBar = () => {
 					</button>
 				)}
 
-				{/* SUBMIT BUTTON */}
 				<button
 					type="submit"
 					disabled={!query.trim()}
@@ -169,7 +153,6 @@ export const SearchBar = () => {
 				</button>
 			</div>
 
-			{/* DROPDOWN */}
 			{suggestions.length > 0 && (
 				<ul className="absolute w-full max-w-2xl mt-2 bg-white/90 backdrop-blur-lg rounded-2xl shadow-lg border border-gray-200/50 z-20 overflow-hidden">
 					{suggestions.map((service, i) => (

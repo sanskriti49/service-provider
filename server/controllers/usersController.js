@@ -1,10 +1,10 @@
 // -- public.users definition
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
-
 const { default: axios } = require("axios");
 const db = require("../config/db");
 const { hashIfPresent } = require("../utils/hash");
 const Joi = require("joi");
+const { customAlphabet } = require("nanoid");
 
 const userSchema = Joi.object({
 	name: Joi.string().min(3).max(100).required(),
@@ -18,6 +18,7 @@ const userSchema = Joi.object({
 	password: Joi.string().min(6).required(),
 	role: Joi.string().valid("customer", "provider"),
 	location: Joi.string().optional(),
+	address: Joi.string().optional(),
 	lat: Joi.number().optional(),
 	lng: Joi.number().optional(),
 	photo: Joi.string().uri().optional(),
@@ -32,11 +33,14 @@ const userUpdateSchema = Joi.object({
 		.message(
 			"Phone must be a valid Indian number (+91 followed by 10 digits starting with 6-9)"
 		)
-		.required(),
+		.optional(),
 	password: Joi.string().min(6).optional(),
-	location: Joi.string().optional(),
-	photo: Joi.string().uri().optional(),
-	bio: Joi.string().max(500).optional(),
+
+	location: Joi.string().allow("").optional(),
+	address: Joi.string().allow("").optional(),
+	bio: Joi.string().max(500).allow("").optional(),
+	photo: Joi.string().uri().allow("").optional(),
+
 	lat: Joi.number().optional(),
 	lng: Joi.number().optional(),
 	role: Joi.string().valid("customer", "provider").optional(),
@@ -119,16 +123,31 @@ async function getUserByCustomId(req, res, next) {
 }
 
 async function updateUser(req, res, next) {
+	// 1. Validate input
 	const { error, value } = userUpdateSchema.validate(req.body);
 	if (error) {
 		return res.status(400).json({ error: error.details[0].message });
 	}
+
 	const id = req.params.id;
-	let { name, email, phone, password, role, location, photo, bio, lat, lng } =
-		value;
+	let {
+		name,
+		email,
+		phone,
+		password,
+		role,
+		location,
+		address,
+		photo,
+		bio,
+		lat,
+		lng,
+	} = value;
 
 	try {
-		if (location) {
+		// --- LOGIC BLOCK 1: FORWARD GEOCODING (Location Text -> Lat/Lng) ---
+		// If user provides a text location but NO coordinates, find the coordinates.
+		if (location && (!lat || !lng)) {
 			try {
 				const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
 					location
@@ -139,18 +158,40 @@ async function updateUser(req, res, next) {
 				if (geoRes.data && geoRes.data.length > 0) {
 					lat = parseFloat(geoRes.data[0].lat);
 					lng = parseFloat(geoRes.data[0].lon);
-					console.log(`Geocoded '${location}' to:`, lat, lng);
 				}
-			} catch (err) {
-				console.error(
-					"Geocoding failed, but continuing update:",
-					geoError.message
-				);
+			} catch (geoErr) {
+				console.error("Forward Geocoding failed:", geoErr.message);
 			}
 		}
-		const hashed = await hashIfPresent(password);
-		await db.query(
-			`UPDATE users SET
+
+		// --- LOGIC BLOCK 2: REVERSE GEOCODING (Lat/Lng -> Location Text) ---
+		// If user provides coordinates but NO text location, find the address name.
+		else if (lat && lng && !location) {
+			try {
+				const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+				const geoRes = await axios.get(url, {
+					headers: { "User-Agent": "TaskGenie/1.0" },
+				});
+
+				if (geoRes.data) {
+					// Option A: Use the full formatted address
+					//  location = geoRes.data.display_name;
+
+					// Option B: If you only want City/State (Cleaner)
+					// const addr = geoRes.data.address;
+					location = `${addr.city || addr.town || addr.village}, ${addr.state}`;
+				}
+			} catch (geoErr) {
+				console.error("Reverse Geocoding failed:", geoErr.message);
+			}
+		}
+
+		// 3. Handle Password Hashing
+		const hashed = password ? await hashIfPresent(password) : undefined;
+
+		// 4. Update Database
+		const query = `
+            UPDATE users SET
                 name = COALESCE($1, name),
                 email = COALESCE($2, email),
                 password = COALESCE($3, password),
@@ -160,11 +201,35 @@ async function updateUser(req, res, next) {
                 bio = COALESCE($7, bio),
                 lat = COALESCE($8, lat),
                 lng = COALESCE($9, lng),
-				phone = COALESCE($10,phone)
-             WHERE id = $11`,
-			[name, email, hashed, role, location, photo, bio, lat, lng, phone, id]
-		);
-		res.json({ message: "User updated successfully" });
+                phone = COALESCE($10, phone),
+                address = COALESCE($11, address)
+            WHERE id = $12
+            RETURNING id, name, email, role, location, lat, lng, address
+        `;
+
+		const result = await db.query(query, [
+			name,
+			email,
+			hashed,
+			role,
+			location,
+			photo,
+			bio,
+			lat,
+			lng,
+			phone,
+			address,
+			id,
+		]);
+
+		if (result.rowCount === 0) {
+			return res.status(404).json({ message: "User not found" });
+		}
+
+		res.json({
+			message: "User updated successfully",
+			user: result.rows[0],
+		});
 	} catch (err) {
 		next(err);
 	}

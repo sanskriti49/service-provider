@@ -31,7 +31,6 @@ const WorkWUs = () => {
 
 			<div className="h-1 w-24 mx-auto bg-gradient-to-r from-[#b369de] to-[#4f46e5] rounded-full"></div>
 
-			{/* Benefits list */}
 			<div
 				className="mx-auto max-w-2xl rounded-3xl shadow-xl p-10 mt-6 
 	bg-gradient-to-r from-pink-200/90 via-violet-300/70 to-indigo-200

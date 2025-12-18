@@ -19,51 +19,23 @@ const SignIn = () => {
 		setForm({ ...form, [e.target.name]: e.target.value });
 	};
 
-	// useEffect(() => {
-	// 	window.google.accounts.id.initialize({
-	// 		client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-	// 		callback: handleGoogleResponse,
-	// 	});
-
-	// 	window.google.accounts.id.renderButton(
-	// 		document.getElementById("googleButtonDiv"),
-	// 		{ theme: "outline", size: "large" }
-	// 	);
-	// }, []);
 	useEffect(() => {
-		/* Initialize Google Accounts */
 		window.google.accounts.id.initialize({
 			client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
 			callback: handleGoogleResponse,
 		});
 
-		/* Render the button via Google API */
 		window.google.accounts.id.renderButton(
 			document.getElementById("googleButtonDiv"),
 			{
 				theme: "outline",
 				size: "large",
-				width: 400, // Make it wide enough to cover your container
+				width: 400,
 			}
 		);
 	}, []);
 
 	const handleGoogleLogin = () => {
-		// const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
-		// // Debugging: Check if ID is loaded
-		// console.log("Google Client ID:", clientId);
-
-		// if (!clientId) {
-		// 	alert("Google Client ID is missing! Check your .env file.");
-		// 	return;
-		// }
-
-		// window.google.accounts.id.initialize({
-		// 	client_id: clientId,
-		// 	callback: handleGoogleResponse,
-		// });
-
 		window.google.accounts.id.prompt();
 	};
 
@@ -107,7 +79,6 @@ const SignIn = () => {
 				form
 			);
 
-			// const token = res.data.token;
 			const { token } = res.data;
 			localStorage.setItem("token", token);
 
@@ -124,16 +95,6 @@ const SignIn = () => {
 	return (
 		<div className="bricolage-grotesque w-full overflow-hidden lg:grid lg:grid-cols-3">
 			<div className="relative lg:col-span-2 flex flex-col p-5 overflow-hidden h-full">
-				{/* Background Effect
-				<div className="absolute inset-0 -z-10">
-					<Iridescence
-						color={[0.5, 0.6, 0.8]}
-						mouseReact={false}
-						amplitude={0.1}
-						speed={1.0}
-					/>
-				</div> */}
-
 				<div className="flex flex-col h-full z-10 relative">
 					<div className="flex items-center mb-10">
 						<div className=" w-14 flex items-center cursor-pointer">
@@ -158,7 +119,6 @@ const SignIn = () => {
 							</p>
 
 							<div className="space-y-4">
-								{/* Sign /in With Google */}
 								<div className="relative w-full">
 									<div
 										id="googleButtonDiv"
@@ -232,7 +192,6 @@ const SignIn = () => {
 									</button>
 								</form>
 
-								{/* Already have account */}
 								<p className="flex gap-1 items-center justify-center text-sm">
 									<span className="text-gray-700">Don't have an account?</span>
 									<Link

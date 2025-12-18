@@ -67,7 +67,6 @@ const ChooseRole = () => {
 				</p>
 
 				<div className="grid grid-cols-1 gap-6">
-					{/* CUSTOMER CARD */}
 					<motion.button
 						whileHover={{ scale: 1.03 }}
 						whileTap={{ scale: 0.97 }}
@@ -87,7 +86,6 @@ const ChooseRole = () => {
 						<span className="text-blue-600 text-xl">→</span>
 					</motion.button>
 
-					{/* PROVIDER CARD */}
 					<motion.button
 						whileHover={{ scale: 1.03 }}
 						whileTap={{ scale: 0.97 }}

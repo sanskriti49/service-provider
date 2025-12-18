@@ -30,33 +30,6 @@ export default function ContactSection() {
 	const currentReplyMessage =
 		replyMessages[form.subject] || replyMessages.default;
 
-	// 	const sendEmail = (e) => {
-	// 		e.preventDefault();
-	// 		setLoading(true);
-	// 		setStatus(null);
-
-	// 		const SERVICE_ID = "service_umuz4f3";
-	// 		const TEMPLATE_ID = "template_44pf72s";
-	// 		const PUBLIC_KEY = "VSuB8cLKQ6u5BQFuj";
-
-	// //template_tsbhnim
-
-	// 		emailjs
-	// 			.sendForm(SERVICE_ID, TEMPLATE_ID, formRef.current, {
-	// 				publicKey: PUBLIC_KEY,
-	// 			})
-	// 			.then(() => {
-	// 				setLoading(false);
-	// 				setStatus("success");
-	// 				e.target.reset();
-	// 				setForm({ name: "", email: "", message: "", subject: "" }); // Reset state logic
-	// 			})
-	// 			.catch((err) => {
-	// 				setLoading(false);
-	// 				setStatus("error");
-	// 				console.error("FAILED...", err.text);
-	// 			});
-	// 	};
 	const sendEmail = (e) => {
 		e.preventDefault();
 		setLoading(true);
@@ -67,13 +40,13 @@ export default function ContactSection() {
 		const TEMPLATE_USER = "template_44pf72s"; // Auto-reply to USER
 		const PUBLIC_KEY = "VSuB8cLKQ6u5BQFuj";
 
-		// 1️⃣ SEND MESSAGE TO ADMIN
+		// SEND MESSAGE TO ADMIN
 		emailjs
 			.sendForm(SERVICE_ID, TEMPLATE_ADMIN, formRef.current, {
 				publicKey: PUBLIC_KEY,
 			})
 			.then(() => {
-				// 2️⃣ SEND AUTO-REPLY TO USER
+				// SEND AUTO-REPLY TO USER
 				emailjs.send(SERVICE_ID, TEMPLATE_USER, {
 					name: form.name,
 					email: form.email,
@@ -113,13 +86,11 @@ export default function ContactSection() {
 			)}
 
 			<div className="bricolage-grotesque relative min-h-screen w-full flex items-center justify-center bg-[#F3F4F6] overflow-hidden p-6 font-sans">
-				{/* Background Gradient Orbs for Creative Vibe */}
 				<div className="absolute top-0 left-0 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" />
 				<div className="absolute top-0 right-0 w-96 h-96 bg-orange-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000" />
 				<div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000" />
 
 				<div className="relative z-10 w-full max-w-6xl grid lg:grid-cols-2 gap-12 items-start">
-					{/* LEFT COLUMN: The "Fancy" List (Your Request) */}
 					<motion.div
 						initial={{ opacity: 0, x: -50 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -143,7 +114,6 @@ export default function ContactSection() {
 
 						<div className="w-full lg:w-auto">
 							<ul className="relative text-lg text-slate-800 font-medium py-10">
-								{/* Vertical Line SVG */}
 								<svg
 									aria-hidden="true"
 									viewBox="0 0 11 1300"
@@ -156,7 +126,6 @@ export default function ContactSection() {
 									</g>
 								</svg>
 
-								{/* List Items */}
 								{[
 									"Verified & Trained Professionals",
 									"Fast, Same-Day Bookings",
@@ -179,7 +148,6 @@ export default function ContactSection() {
 											</g>
 										</svg>
 										{item}
-										{/* Horizontal Line SVG */}
 										<svg
 											aria-hidden="true"
 											viewBox="0 0 1300 10"
@@ -194,7 +162,6 @@ export default function ContactSection() {
 									</li>
 								))}
 
-								{/* Bottom Line SVG */}
 								<svg
 									aria-hidden="true"
 									viewBox="0 0 1300 10"
@@ -210,7 +177,6 @@ export default function ContactSection() {
 						</div>
 					</motion.div>
 
-					{/* RIGHT COLUMN: The Contact Form */}
 					<motion.div
 						initial={{ opacity: 0, x: 50 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -231,8 +197,6 @@ export default function ContactSection() {
 
 								<div className="relative group">
 									<div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-500 transition-colors pointer-events-none">
-										{/* Icon changes based on selection conceptually, but a static Tag icon works well here */}
-
 										<MessageCircleQuestionMark size={20} />
 									</div>
 
@@ -242,19 +206,12 @@ export default function ContactSection() {
 										onChange={handleChange}
 										defaultValue=""
 										className={`w-full pl-10 py-4 rounded-xl bg-white/70 border border-gray-200 outline-none appearance-none transition-all cursor-pointer focus:border-purple-400 focus:ring-4 focus:ring-purple-100
-									${
-										// If form.subject has a value, use Purple Text. Otherwise, use Gray (Placeholder).
-										form.subject
-											? "text-purple-700 font-semibold"
-											: "text-gray-400"
-									}
+									${form.subject ? "text-purple-700 font-semibold" : "text-gray-400"}
         `}
 									>
 										<option value="" disabled>
 											What brings you here?
 										</option>
-
-										{/* We add 'text-gray-900' to options so they are readable in the dropdown list */}
 										<option value="support" className="text-gray-900">
 											I need help / Support
 										</option>
@@ -272,7 +229,6 @@ export default function ContactSection() {
 										</option>
 									</select>
 
-									{/* Custom Arrow Icon because we hid the default one with appearance-none */}
 									<div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
@@ -289,7 +245,6 @@ export default function ContactSection() {
 										</svg>
 									</div>
 								</div>
-								{/* Name */}
 								<div className="relative group">
 									<User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
 									<input
@@ -302,7 +257,6 @@ export default function ContactSection() {
 									/>
 								</div>
 
-								{/* Email */}
 								<div className="relative group">
 									<Mail className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
 									<input
@@ -315,7 +269,6 @@ export default function ContactSection() {
 									/>
 								</div>
 
-								{/* Message */}
 								<div className="relative group">
 									<MessageSquare className="w-5 h-5 absolute left-3 top-4 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
 									<textarea
@@ -327,7 +280,6 @@ export default function ContactSection() {
 									/>
 								</div>
 
-								{/* Button */}
 								<button
 									type="submit"
 									disabled={loading}

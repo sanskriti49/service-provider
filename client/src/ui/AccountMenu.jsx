@@ -40,7 +40,6 @@ export default function AccountMenu({ user }) {
 
 	return (
 		<div>
-			{/* Avatar Button */}
 			<IconButton
 				onClick={handleClick}
 				sx={{
@@ -64,7 +63,6 @@ export default function AccountMenu({ user }) {
 				</Avatar>
 			</IconButton>
 
-			{/* Menu */}
 			<Menu
 				anchorEl={anchorEl}
 				open={open}
@@ -96,7 +94,6 @@ export default function AccountMenu({ user }) {
 					},
 				}}
 			>
-				{/* Profile */}
 				<MenuItem component={Link} to="/profile">
 					<ListItemIcon>
 						<UserCircle size={18} color={iconColor} />
@@ -104,7 +101,6 @@ export default function AccountMenu({ user }) {
 					Profile
 				</MenuItem>
 
-				{/* Dashboard */}
 				<MenuItem
 					component={Link}
 					to={user.role === "provider" ? "/provider/dashboard" : "/dashboard"}
@@ -115,7 +111,6 @@ export default function AccountMenu({ user }) {
 					Dashboard
 				</MenuItem>
 
-				{/* PROVIDER-SPECIFIC MENUS */}
 				{user.role === "provider" && (
 					<>
 						<MenuItem component={Link} to="/provider/services">
@@ -155,7 +150,6 @@ export default function AccountMenu({ user }) {
 					</>
 				)}
 
-				{/* Settings */}
 				<MenuItem component={Link} to="/settings">
 					<ListItemIcon>
 						<Settings size={18} color={iconColor} />
@@ -163,7 +157,6 @@ export default function AccountMenu({ user }) {
 					Settings
 				</MenuItem>
 
-				{/* Help */}
 				<MenuItem component={Link} to="/help">
 					<ListItemIcon>
 						<HelpCircle size={18} color={iconColor} />
@@ -173,7 +166,6 @@ export default function AccountMenu({ user }) {
 
 				<Divider sx={{ my: 1 }} />
 
-				{/* Logout */}
 				<MenuItem
 					onClick={() => {
 						localStorage.removeItem("token");

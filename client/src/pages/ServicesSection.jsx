@@ -53,12 +53,10 @@ const CustomArrow = ({ onClick, direction }) => {
 	);
 };
 
-// --- Skeleton Card for loading ---
 const SkeletonCard = () => (
 	<div className="h-96 w-full animate-pulse rounded-3xl bg-slate-200" />
 );
 
-// --- Service Card ---
 const ServiceCard = ({ service, isActive = 2 }) => {
 	const serviceUrl = `/services/${service.slug || service.id}`;
 
@@ -66,7 +64,6 @@ const ServiceCard = ({ service, isActive = 2 }) => {
 		<motion.a
 			href={serviceUrl}
 			className="group relative block h-[420px] w-full overflow-hidden rounded-2xl shadow-md"
-			// transition-transform duration-300 hover:scale-[1.02]
 			initial={{ scale: 0.9, opacity: 0.5 }}
 			animate={{
 				scale: isActive ? 1 : 0.9,
@@ -133,12 +130,9 @@ const ServicesCarousel = ({ services }) => {
 					const center = currentSlide + Math.floor(visible / 2);
 					setActiveIndex(center);
 				}}
-				// infinite // <-- Disable this. It clones items and is heavy.
 				keyBoardControl
 				swipeable
 				draggable
-				// autoPlay // <-- Disable this. Constant animation is costly.
-				// autoPlaySpeed={8000} // If you must use it, make it slower.
 				pauseOnHover
 				containerClass="w-full"
 				itemClass="px-2 md:px-3"
@@ -166,7 +160,6 @@ const ServicesSection = ({ searchQuery }) => {
 	} = useFetch("http://localhost:3000/api/services/v1");
 	const services = apiResponse || [];
 
-	// Preload images
 	useEffect(() => {
 		if (!services || services.length === 0) return;
 

@@ -1,14 +1,6 @@
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import {
-	ArrowLeft,
-	Calendar,
-	Clock,
-	CheckCircle2,
-	MapPin,
-	Pencil,
-	Navigation,
-} from "lucide-react";
+import { ArrowLeft, Calendar, Clock, CheckCircle2 } from "lucide-react";
 import Alerts from "../ui/Alerts";
 
 export default function BookingPage() {
@@ -17,15 +9,10 @@ export default function BookingPage() {
 	const { state } = useLocation();
 
 	const [provider, setProvider] = useState(state?.provider || null);
+
 	const [availability, setAvailability] = useState(
 		state?.preloadedAvailability || state?.provider?.availability || []
 	);
-
-	const [address, setAddress] = useState(
-		"Home • 12/B, Green Heights, Civil Lines, Kanpur"
-	);
-	const [isEditingAddress, setIsEditingAddress] = useState(false);
-	const [tempAddress, setTempAddress] = useState(address);
 
 	const [selectedDate, setSelectedDate] = useState(null);
 	const [selectedTime, setSelectedTime] = useState(null);
@@ -45,11 +32,6 @@ export default function BookingPage() {
 			hour12: true,
 		});
 	}
-
-	const handleSaveAddress = () => {
-		setAddress(tempAddress);
-		setIsEditingAddress(false);
-	};
 
 	useEffect(() => {
 		const fetchData = async () => {
@@ -114,7 +96,6 @@ export default function BookingPage() {
 			return setAlert({ message: "Please select a slot.", type: "error" });
 
 		const token = localStorage.getItem("token");
-
 		if (!token) {
 			setAlert({ message: "You must be logged in to book.", type: "error" });
 			return;
@@ -134,14 +115,13 @@ export default function BookingPage() {
 					date: selectedDate,
 					start_time: selectedTime,
 					end_time: selectedTime,
-					address: address,
 				}),
 			});
 			const data = await res.json();
 
 			if (res.ok) {
 				navigate("/booking-success", {
-					state: { success: true, booking: data.booking, address: address },
+					state: { success: true, booking: data.booking },
 					replace: true,
 				});
 			} else if (res.status === 409) {
@@ -149,6 +129,14 @@ export default function BookingPage() {
 					message: "Slot already booked! Please choose another time.",
 					type: "error",
 				});
+				setAvailability((prev) =>
+					prev.map((slot) =>
+						slot.date === selectedDate && slot.start_time === selectedTime
+							? { ...slot, isBooked: true }
+							: slot
+					)
+				);
+				setSelectedTime(null);
 			} else {
 				setAlert({ message: data.message || "Booking failed.", type: "error" });
 			}
@@ -188,7 +176,7 @@ export default function BookingPage() {
 	}
 
 	return (
-		<div className="bricolage-grotesque min-h-screen bg-[#0f0c29] text-white font-sans selection:bg-violet-500/30">
+		<div className="min-h-screen bg-[#0f0c29] text-white font-sans selection:bg-violet-500/30">
 			{alert && (
 				<Alerts
 					message={alert.message}
@@ -197,6 +185,7 @@ export default function BookingPage() {
 				/>
 			)}
 
+			{/* Background Gradients */}
 			<div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
 				<div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-violet-900/20 rounded-full blur-[100px]" />
 				<div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-900/20 rounded-full blur-[100px]" />
@@ -215,7 +204,9 @@ export default function BookingPage() {
 					</span>
 				</div>
 
+				{/* RESPONSIVE GRID LAYOUT */}
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+					{/* LEFT COLUMN: Provider Details (Sticky on Desktop) */}
 					<div className="lg:col-span-4">
 						<div className="lg:sticky lg:top-32 space-y-6">
 							<div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 shadow-xl flex lg:flex-col items-center lg:items-start gap-6 group hover:border-violet-500/30 transition-all duration-300">
@@ -248,7 +239,7 @@ export default function BookingPage() {
 											per session
 										</span>
 									</div>
-									<div className="mt-4 text-sm text-gray-400 hidden lg:block leading-relaxed">
+									<div className="mt-4 text-sm text-gray-400 hidden lg:block">
 										Select a date and time to secure your slot with{" "}
 										{provider.name.split(" ")[0]}.
 									</div>
@@ -257,11 +248,11 @@ export default function BookingPage() {
 						</div>
 					</div>
 
-					{/* RIGHT COLUMN: Selection & Address */}
-					<div className="lg:col-span-8 space-y-8">
-						{/* 1. Date Selection */}
+					{/* RIGHT COLUMN: Date & Time Selectors */}
+					<div className="lg:col-span-8 space-y-10">
+						{/* Section 1: Date */}
 						<div className="bg-white/5 lg:bg-transparent rounded-3xl p-6 lg:p-0 border border-white/5 lg:border-none">
-							<div className="flex items-center gap-2 mb-4">
+							<div className="flex items-center gap-2 mb-6">
 								<Calendar className="w-5 h-5 text-violet-400" />
 								<h2 className="text-lg font-semibold text-violet-100">
 									Select Date
@@ -274,14 +265,11 @@ export default function BookingPage() {
 								</div>
 							) : (
 								<div
-									className="flex gap-3 overflow-x-auto pb-4 snap-x flex-nowrap max-h-100
-                                    [&::-webkit-scrollbar]:h-1.5 
-                                    cursor-pointer
-                                    [&::-webkit-scrollbar-track]:bg-white/5 
-                                    [&::-webkit-scrollbar-thumb]:bg-violet-600/50 
-                                    hover:[&::-webkit-scrollbar-thumb]:bg-violet-600 
-                                    [&::-webkit-scrollbar-thumb]:rounded-full"
+									className="flex gap-4 overflow-x-auto pb-4 snap-x flex-nowrap"
+									style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
 								>
+									<style>{` ::-webkit-scrollbar { display: none; } `}</style>
+
 									{Object.keys(groupedSlots).map((date) => (
 										<button
 											key={date}
@@ -289,7 +277,7 @@ export default function BookingPage() {
 												setSelectedDate(date);
 												setSelectedTime(null);
 											}}
-											className={`min-w-[100px] lg:min-w-[120px] flex-shrink-0 snap-start p-4 cursor-pointer rounded-2xl flex flex-col items-center justify-center transition-all duration-300 border focus:outline-none focus:ring-0
+											className={`min-w-[100px] lg:min-w-[120px] flex-shrink-0 snap-start p-4 cursor-pointer rounded-2xl flex flex-col items-center justify-center transition-all duration-300 border
                                                 ${
 																									selectedDate === date
 																										? "bg-violet-600 border-violet-500 shadow-[0_0_20px_rgba(124,58,237,0.3)] scale-105"
@@ -316,10 +304,10 @@ export default function BookingPage() {
 							)}
 						</div>
 
-						{/* 2. Time Selection */}
+						{/* Section 2: Time */}
 						{selectedDate && (
 							<div className="animate-fade-in-up bg-white/5 lg:bg-transparent rounded-3xl p-6 lg:p-0 border border-white/5 lg:border-none">
-								<div className="flex items-center gap-2 mb-4">
+								<div className="flex items-center gap-2 mb-6">
 									<Clock className="w-5 h-5 text-violet-400" />
 									<h2 className="text-lg font-semibold text-violet-100">
 										Select Start Time
@@ -332,7 +320,7 @@ export default function BookingPage() {
 											<button
 												key={t}
 												onClick={() => setSelectedTime(t)}
-												className={`relative p-3 lg:p-4 rounded-xl border text-sm font-semibold transition-all duration-200 focus:outline-none
+												className={`relative p-3 lg:p-4 rounded-xl border text-sm font-semibold transition-all duration-200
                                                     ${
 																											selectedTime === t
 																												? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/50 scale-[1.03]"
@@ -358,93 +346,43 @@ export default function BookingPage() {
 							</div>
 						)}
 
-						{/* 3. Address / Location Section */}
-						<div className="bg-white/5 rounded-3xl p-6 border border-white/10">
-							<div className="flex items-center justify-between mb-4">
-								<div className="flex items-center gap-2">
-									<MapPin className="w-5 h-5 text-violet-400" />
-									<h2 className="text-lg font-semibold text-violet-100">
-										Service Location
-									</h2>
-								</div>
-								{!isEditingAddress && (
-									<button
-										onClick={() => setIsEditingAddress(true)}
-										className="text-xs cursor-pointer text-violet-300 hover:text-violet-100 flex items-center gap-1 transition-colors duration-200"
-									>
-										<Pencil size={12} /> Edit
-									</button>
-								)}
-							</div>
-
-							{isEditingAddress ? (
-								<div className="space-y-3">
-									<textarea
-										value={tempAddress}
-										onChange={(e) => setTempAddress(e.target.value)}
-										className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all resize-none h-24"
-										placeholder="Enter full address..."
-									/>
-									<div className="flex gap-2 justify-end">
-										<button
-											onClick={() => {
-												setTempAddress(address);
-												setIsEditingAddress(false);
-											}}
-											className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:bg-white/5 transition"
-										>
-											Cancel
-										</button>
-										<button
-											onClick={handleSaveAddress}
-											className="px-4 py-2 rounded-lg text-sm bg-violet-600 text-white hover:bg-violet-500 font-medium transition"
-										>
-											Save Address
-										</button>
-									</div>
-								</div>
-							) : (
-								<div className="flex items-start gap-4 p-4 bg-black/20 rounded-2xl border border-white/5">
-									<div className="p-2 bg-violet-500/10 rounded-lg shrink-0">
-										<Navigation className="w-5 h-5 text-violet-400" />
-									</div>
-									<div>
-										<p className="text-xs text-gray-400 mb-1 uppercase tracking-wider">
-											Provider will arrive at
-										</p>
-										<p className="text-white font-medium leading-relaxed">
-											{address}
-										</p>
-										<p className="text-xs text-green-400/70 mt-2 flex items-center gap-1">
-											<CheckCircle2 size={12} /> Within service area
-										</p>
-									</div>
-								</div>
-							)}
-						</div>
-
-						{/* Desktop Confirm Button */}
-						<div className="hidden lg:block pt-4">
+						{/* Desktop-only Confirm Button (Inline) */}
+						<div className="hidden lg:block pt-6">
 							<button
 								onClick={handleConfirm}
 								disabled={isSubmitting || !selectedTime}
-								className={`cursor-pointer w-full py-5 rounded-2xl text-xl font-bold shadow-xl transition-all duration-300 border border-white/10 flex items-center justify-center gap-3
-                                    ${
-																			selectedTime
-																				? "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-900/40 hover:scale-[1.01]"
-																				: "bg-gray-800/50 text-gray-500 cursor-not-allowed border-none"
-																		}`}
+								className={`cursor-pointer disabled:cursor-default w-full py-5 rounded-2xl text-xl font-bold shadow-xl 
+                                transition-all duration-300 border border-white/10 flex items-center justify-center gap-3
+                                ${
+																	selectedTime
+																		? "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-900/40 hover:scale-[1.01]"
+																		: "bg-gray-800/50 text-gray-500 cursor-not-allowed border-none"
+																}`}
 							>
-								{isSubmitting ? "Confirming..." : "Confirm Booking"}
+								{isSubmitting ? (
+									<>
+										<span className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+										Confirming...
+									</>
+								) : (
+									<>
+										<span>Confirm Booking</span>
+										{selectedTime && (
+											<span className="bg-white/20 px-3 py-1 rounded-lg text-sm font-medium">
+												{formatTime(selectedTime)}
+											</span>
+										)}
+									</>
+								)}
 							</button>
 						</div>
 					</div>
 				</div>
 			</div>
 
-			{/* Mobile Footer */}
+			{/* Mobile-only Confirm Button Footer (Fixed Bottom) */}
 			<div
-				className={`lg:hidden fixed bottom-0 left-0 right-0 p-6 bg-[#0f0c29] border-t border-white/10 z-30 transition-transform duration-300 ${
+				className={`lg:hidden fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#0f0c29] via-[#0f0c29] to-transparent z-30 transition-transform duration-300 ${
 					selectedTime ? "translate-y-0" : "translate-y-full"
 				}`}
 			>
@@ -452,14 +390,19 @@ export default function BookingPage() {
 					<button
 						onClick={handleConfirm}
 						disabled={isSubmitting}
-						className="w-full py-4 rounded-2xl text-lg font-bold shadow-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white flex items-center justify-center gap-2"
+						className="cursor-pointer w-full py-4 rounded-2xl text-lg font-bold shadow-xl shadow-violet-900/40
+                        bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 
+                        active:scale-[0.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 border border-white/10"
 					>
 						{isSubmitting ? (
-							"Confirming..."
+							<>
+								<span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+								Confirming...
+							</>
 						) : (
 							<>
-								<span>Confirm</span>
-								<span className="bg-white/20 px-2 py-0.5 rounded text-sm">
+								<span>Confirm Booking</span>
+								<span className="bg-white/20 px-2 py-0.5 rounded text-sm font-medium">
 									{selectedTime ? formatTime(selectedTime) : ""}
 								</span>
 							</>

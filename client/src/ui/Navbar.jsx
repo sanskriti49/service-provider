@@ -35,7 +35,6 @@ const Navbar = () => {
 							setUser(null);
 						});
 				}
-				// 🔥 Validate user still exists
 			} catch (e) {
 				localStorage.removeItem("token");
 			}
@@ -128,7 +127,6 @@ const Navbar = () => {
 
 					<nav className="flex justify-center">
 						<div className="bricolage-grotesque gap-4 -ml-15 hidden shrink-1 md:flex items-center rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-3 text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
-							{/* Home */}
 							<HashLink
 								smooth
 								to="/#hero"
@@ -141,7 +139,6 @@ const Navbar = () => {
 								</span>
 							</HashLink>
 
-							{/* Services with dropdown */}
 							<div className="relative group">
 								<HashLink
 									smooth
@@ -169,7 +166,6 @@ const Navbar = () => {
 									</span>
 								</HashLink>
 
-								{/* Dropdown content */}
 								<div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-in-out">
 									<NavServices />
 								</div>
@@ -187,7 +183,6 @@ const Navbar = () => {
 								</span>
 							</HashLink>
 
-							{/* Work With Us */}
 							<HashLink
 								smooth
 								to="/#work-with-us"
@@ -200,20 +195,6 @@ const Navbar = () => {
 								</span>
 							</HashLink>
 
-							{/* About */}
-							{/* <HashLink
-								smooth
-								to="/#about"
-								className="nav-link group relative px-3 py-2.5 cursor-pointer"
-							>
-								About
-								<span className="absolute inset-x-1 h-px bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0 transition-all duration-300 -bottom-0.5 opacity-0 scale-x-0 group-hover:opacity-100 group-hover:scale-x-100"></span>
-								<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
-									<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-500/20 to-transparent blur rounded-t-full"></span>
-								</span>
-							</HashLink> */}
-
-							{/* Contact */}
 							<HashLink
 								smooth
 								to="/#contact"

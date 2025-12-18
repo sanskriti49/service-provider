@@ -2,7 +2,6 @@ import React from "react";
 
 const Footer = () => {
 	return (
-		// Added 'mt-auto' to the className below
 		<footer className="mt-auto py-10 bg-[#191034] text-white bricolage-grotesque w-full">
 			<div className="container mx-auto px-6 lg:px-16">
 				{/* Top section */}
@@ -21,7 +20,6 @@ const Footer = () => {
 							connects you with trusted professionals for every need.
 						</p>
 
-						{/* Social links */}
 						<div className="flex gap-4 mt-5 text-[#A39AC1] text-sm">
 							<a
 								href="#"
@@ -44,9 +42,7 @@ const Footer = () => {
 						</div>
 					</div>
 
-					{/* Links grid */}
 					<div className="flex-grow grid grid-cols-2 md:grid-cols-4 gap-8">
-						{/* Company */}
 						<div>
 							<h3 className="font-bold uppercase tracking-wider text-[12px] text-white">
 								Company
@@ -67,7 +63,6 @@ const Footer = () => {
 							</div>
 						</div>
 
-						{/* For Customers */}
 						<div>
 							<h3 className="font-bold uppercase tracking-wider text-[12px] text-white">
 								For Customers
@@ -88,7 +83,6 @@ const Footer = () => {
 							</div>
 						</div>
 
-						{/* For Providers */}
 						<div>
 							<h3 className="font-bold uppercase tracking-wider text-[12px] text-white">
 								For Providers
@@ -109,7 +103,6 @@ const Footer = () => {
 							</div>
 						</div>
 
-						{/* Resources */}
 						<div>
 							<h3 className="font-bold uppercase tracking-wider text-[12px] text-white">
 								Resources
@@ -132,7 +125,6 @@ const Footer = () => {
 					</div>
 				</div>
 
-				{/* Divider */}
 				<div className="mt-12 pt-6 border-t border-gray-700 flex flex-col sm:flex-row justify-between items-center">
 					<p className="text-sm text-[#A39AC1]">
 						&copy; {new Date().getFullYear()} TaskGenie. All rights reserved.

@@ -25,7 +25,6 @@ export default function AllServices() {
 
 	const gridRef = useRef(null);
 
-	// Filtering (Fast)
 	const filtered = useMemo(() => {
 		if (!services) return [];
 		return services.filter((s) => {
@@ -40,7 +39,6 @@ export default function AllServices() {
 		});
 	}, [services, searchQuery, selectedCategory]);
 
-	// GSAP grid animation
 	useEffect(() => {
 		if (!filtered || filtered.length === 0) return;
 		const cards = gridRef.current?.querySelectorAll(".service-card");
@@ -62,7 +60,6 @@ export default function AllServices() {
 	return (
 		<div className="lg:-mt-40 -mt-50 bricolage-grotesque min-h-screen pt-24 pb-12 px-4 sm:px-8">
 			<div className="max-w-7xl mx-auto">
-				{/* HEADER */}
 				<h1 className="text-center text-4xl md:text-5xl font-bold text-slate-900 mb-8">
 					Find the perfect{" "}
 					<span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-600">
@@ -70,7 +67,6 @@ export default function AllServices() {
 					</span>
 				</h1>
 
-				{/* SEARCH */}
 				<div className="relative max-w-xl mx-auto mb-8">
 					<div className="absolute left-4 inset-y-0 flex items-center text-gray-400">
 						<Search className="h-5 w-5" />
@@ -95,7 +91,6 @@ export default function AllServices() {
 					)}
 				</div>
 
-				{/* CATEGORIES */}
 				<div className="flex flex-wrap justify-center gap-3 mb-12">
 					{CATEGORIES.map((cat) => (
 						<button
@@ -112,7 +107,6 @@ export default function AllServices() {
 					))}
 				</div>
 
-				{/* LOADING */}
 				{loading && (
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
 						{[...Array(8)].map((_, i) => (
@@ -124,7 +118,6 @@ export default function AllServices() {
 					</div>
 				)}
 
-				{/* ERROR */}
 				{error && (
 					<div className="py-20 text-center text-red-600">
 						<AlertCircle size={40} className="mx-auto mb-2" />
@@ -132,7 +125,6 @@ export default function AllServices() {
 					</div>
 				)}
 
-				{/* EMPTY */}
 				{!loading && filtered.length === 0 && (
 					<div className="text-center py-20">
 						<p className="text-slate-400 text-lg">No services found.</p>
@@ -148,7 +140,6 @@ export default function AllServices() {
 					</div>
 				)}
 
-				{/* GRID */}
 				{!loading && filtered.length > 0 && (
 					<div
 						ref={gridRef}
@@ -164,9 +155,6 @@ export default function AllServices() {
 	);
 }
 
-// ------------------------------------------------------------------
-// PROGRESSIVE IMAGE
-// ------------------------------------------------------------------
 function ProgressiveImage({ src, alt }) {
 	const imgRef = useRef(null);
 	const [loaded, setLoaded] = useState(false);
@@ -200,9 +188,6 @@ function ProgressiveImage({ src, alt }) {
 	);
 }
 
-// ------------------------------------------------------------------
-// SERVICE CARD (GSAP ANIMATED)
-// ------------------------------------------------------------------
 function ServiceCard({ service }) {
 	return (
 		<div className="service-card rounded-3xl overflow-hidden relative shadow-md hover:shadow-xl transition-all">
@@ -210,14 +195,12 @@ function ServiceCard({ service }) {
 				to={`/services/${service.slug}`}
 				className="block h-[350px] group relative"
 			>
-				{/* Image */}
 				<div className="absolute inset-0">
 					<ProgressiveImage src={service.image} alt={service.name} />
 
 					<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-80 group-hover:opacity-90 transition-all duration-300" />
 				</div>
 
-				{/* Content */}
 				<div className="absolute inset-0 p-6 flex flex-col justify-end text-white pointer-events-none z-20">
 					<h3 className="text-2xl font-bold mb-2">{service.name}</h3>
 

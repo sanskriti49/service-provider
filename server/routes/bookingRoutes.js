@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const { createBooking } = require("../controllers/bookingController");
+const {
+	createBooking,
+	updateBookingAddress,
+} = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const db = require("../config/db");
 
@@ -34,7 +37,7 @@ router.get("/", authMiddleware, allowRoles("admin"), async (req, res) => {
 	}
 });
 
-// CUSTOMER BOOKINGS
+// 3. CUSTOMER BOOKINGS (Specific paths first)
 router.get(
 	"/user",
 	authMiddleware,
@@ -56,7 +59,6 @@ router.get(
 	}
 );
 
-// UPCOMING BOOKINGS (Customer)
 router.get(
 	"/user/upcoming",
 	authMiddleware,
@@ -66,10 +68,9 @@ router.get(
 			const q = `
             SELECT b.*, s.name AS service_name, pu.name AS provider_name
             FROM bookings b
-			LEFT JOIN services s on s.id = b.service_id
+            LEFT JOIN services s on s.id = b.service_id
             LEFT JOIN users pu ON pu.id = b.provider_id
-            WHERE b.user_id = $1
-            AND b.date >= NOW()
+            WHERE b.user_id = $1 AND b.date >= NOW()
             ORDER BY b.date ASC
         `;
 			const result = await db.query(q, [req.user.id]);
@@ -81,7 +82,6 @@ router.get(
 	}
 );
 
-// HISTORY BOOKINGS
 router.get(
 	"/user/history",
 	authMiddleware,
@@ -89,11 +89,10 @@ router.get(
 	async (req, res) => {
 		try {
 			const q = `
-            SELECT b.*, p.name AS provider_name
+            SELECT b.*, pu.name AS provider_name 
             FROM bookings b
             LEFT JOIN users pu ON pu.id = b.provider_id
-            WHERE b.user_id = $1
-            AND b.date < NOW()
+            WHERE b.user_id = $1 AND b.date < NOW()
             ORDER BY b.date DESC
         `;
 			const result = await db.query(q, [req.user.id]);
@@ -104,7 +103,6 @@ router.get(
 	}
 );
 
-// PROVIDER BOOKINGS
 router.get(
 	"/provider",
 	authMiddleware,
@@ -126,7 +124,15 @@ router.get(
 	}
 );
 
+router.patch(
+	"/:bookingId/address",
+	authMiddleware,
+	allowRoles("customer"),
+	updateBookingAddress
+);
+
 // 4. WILDCARD ROUTE (MUST BE LAST)
+// This catches anything that looks like /api/bookings/some-id
 router.get("/:booking_id", authMiddleware, async (req, res) => {
 	try {
 		const q = `SELECT * FROM bookings WHERE booking_id=$1`;

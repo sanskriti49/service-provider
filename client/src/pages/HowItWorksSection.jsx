@@ -3,7 +3,6 @@ import { FilePenLine, Users, CheckCircle, Star } from "lucide-react";
 import FadeIn from "../ui/FadeIn";
 import { motion } from "framer-motion";
 
-// MUI Imports
 import Timeline from "@mui/lab/Timeline";
 import TimelineItem from "@mui/lab/TimelineItem";
 import TimelineSeparator from "@mui/lab/TimelineSeparator";
@@ -86,7 +85,6 @@ const HowItWorksSection = () => {
 						you with the perfect pro.
 					</p>
 				</div>
-				{/* MUI Timeline Component */}
 				<div className="mt-16">
 					<Timeline position="alternate">
 						{steps.map((step, index) => (
