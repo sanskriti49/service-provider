@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Avatar } from "@mui/material";
 import { Navigation, MapPin, Phone } from "lucide-react";
 import Alerts from "../ui/Alerts";
+import api from "../api/axios";
 
 const SettingsPage = () => {
 	const navigate = useNavigate();
@@ -45,13 +46,9 @@ const SettingsPage = () => {
 					undefined,
 			};
 
-			const response = await axios.put(
-				`http://localhost:3000/api/users/${user.id}`,
-				payload,
-				{
-					headers: { Authorization: `Bearer ${token}` },
-				}
-			);
+			const response = await api.put(`/api/users/${user.id}`, payload, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
 
 			const updatedUser = { ...user, ...response.data.user };
 
@@ -123,7 +120,7 @@ const SettingsPage = () => {
 				return;
 			}
 			try {
-				const response = await axios.get("http://localhost:3000/api/auth/me", {
+				const response = await api.get("/api/auth/me", {
 					headers: { Authorization: `Bearer ${token}` },
 				});
 				setUser(response.data.user);
@@ -156,8 +153,8 @@ const SettingsPage = () => {
 			setLoading(true);
 			const token = localStorage.getItem("token");
 
-			await axios.post(
-				"http://localhost:3000/api/auth/update-password",
+			await api.post(
+				"/api/auth/update-password",
 				{ newPassword: password },
 				{ headers: { Authorization: `Bearer ${token}` } }
 			);

@@ -11,6 +11,8 @@ import AccountMenu from "./AccountMenu";
 gsap.registerPlugin(ScrollToPlugin);
 
 const Navbar = () => {
+	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 	const [isServicesHovered, setIsServicesHovered] = useState(false);
 	const [user, setUser] = useState(null);
 
@@ -22,7 +24,7 @@ const Navbar = () => {
 				const decoded = jwtDecode(token);
 				setUser(decoded);
 				if (decoded.custom_id) {
-					fetch(`http://localhost:3000/api/users/${decoded.custom_id}`)
+					fetch(`${API_URL}/api/users/${decoded.custom_id}`)
 						.then((res) => {
 							if (res.status === 404) {
 								// User deleted → logout

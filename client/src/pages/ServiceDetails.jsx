@@ -18,6 +18,9 @@ const formatDate = (dateString) => {
 
 const ServiceDetails = () => {
 	const { slug } = useParams();
+
+	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 	const [service, setService] = useState(null);
 	const navigate = useNavigate();
 	const [providers, setProviders] = useState([]);
@@ -36,18 +39,14 @@ const ServiceDetails = () => {
 			try {
 				setLoading(true);
 				setError(null);
-				const serviceRes = await fetch(
-					`http://localhost:3000/api/services/v1/${slug}`
-				);
+				const serviceRes = await fetch(`${API_URL}/api/services/v1/${slug}`);
 				if (!serviceRes.ok) throw new Error("Service not found");
 				const serviceData = await serviceRes.json();
 				console.log(serviceData);
 				setService(serviceData);
 
 				const providersRes = await fetch(
-					`http://localhost:3000/api/providers/v1?service=${encodeURIComponent(
-						slug
-					)}`
+					`${API_URL}/api/providers/v1?service=${encodeURIComponent(slug)}`
 				);
 				if (!providersRes.ok) throw new Error("Could not fetch providers");
 				const providersData = await providersRes.json();
@@ -258,7 +257,7 @@ const ProviderCard = ({ provider, isExpanded, onToggleExpand }) => {
 		setLoadingSlots(true);
 		try {
 			const res = await fetch(
-				`http://localhost:3000/api/providers/v1/${provider.user_id}/availability`
+				`${API_URL}/api/providers/v1/${provider.user_id}/availability`
 			);
 			if (!res.ok) throw new Error("Failed to load slots");
 			const data = await res.json();

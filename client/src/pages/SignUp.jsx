@@ -5,6 +5,7 @@ import signInImg from "/images/sign-in.jpg";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Turnstile } from "@marsidev/react-turnstile";
+import api from "../api/axios";
 
 const SignUp = () => {
 	const navigate = useNavigate();
@@ -46,7 +47,7 @@ const SignUp = () => {
 			const lat = position.coords.latitude;
 			const lng = position.coords.longitude;
 
-			const res = await axios.post("http://localhost:3000/api/auth/google", {
+			const res = await api.post("/api/auth/google", {
 				googleToken: response.credential,
 				lat,
 				lng,
@@ -80,7 +81,7 @@ const SignUp = () => {
 		setLoading(true);
 
 		try {
-			const res = await axios.post("http://localhost:3000/api/auth/register", {
+			const res = await api.post("/api/auth/register", {
 				...form,
 				captchaToken: token,
 			});

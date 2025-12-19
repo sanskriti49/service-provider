@@ -153,11 +153,13 @@ const ServicesCarousel = ({ services }) => {
 };
 
 const ServicesSection = ({ searchQuery }) => {
+	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 	const {
 		data: apiResponse,
 		loading,
 		error,
-	} = useFetch("http://localhost:3000/api/services/v1");
+	} = useFetch(`${API_URL}/api/services/v1`);
 	const services = apiResponse || [];
 
 	useEffect(() => {

@@ -80,6 +80,7 @@ const QUICK_SERVICES = [
 
 export default function CustomerDashboard() {
 	const navigate = useNavigate();
+	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 	const [user, setUser] = useState({ name: "User" });
 	const [activeTab, setActiveTab] = useState("overview");
@@ -105,9 +106,7 @@ export default function CustomerDashboard() {
 
 		const fetchData = async () => {
 			try {
-				const servicesRes = await fetch(
-					"http://localhost:3000/api/services/v1"
-				);
+				const servicesRes = await fetch(`${API_URL}/api/services/v1`);
 				if (servicesRes.ok) {
 					const servicesData = await servicesRes.json();
 					setServices(servicesData);
@@ -119,17 +118,6 @@ export default function CustomerDashboard() {
 			}
 		};
 
-		// const fetchServices = async () => {
-		// 	try {
-		// 		const response = await fetch("http://localhost:3000/api/services/v1");
-		// 		if (response.ok) {
-		// 			const data = await response.json();
-		// 			setTotalServices(data.length);
-		// 		}
-		// 	} catch (err) {
-		// 		console.error("Failed to fetch services:", err);
-		// 	}
-		// };
 		fetchData();
 	}, []);
 	useEffect(() => {
@@ -139,7 +127,7 @@ export default function CustomerDashboard() {
 				const headers = { Authorization: `Bearer ${token}` };
 
 				const upcomingRes = await fetch(
-					"http://localhost:3000/api/bookings/user/upcoming",
+					`${API_URL}/api/bookings/user/upcoming`,
 					{ headers }
 				);
 				const upcomingData = await upcomingRes.json();

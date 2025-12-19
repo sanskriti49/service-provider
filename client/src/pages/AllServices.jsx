@@ -14,11 +14,13 @@ const CATEGORIES = [
 ];
 
 export default function AllServices() {
+	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 	const {
 		data: services,
 		loading,
 		error,
-	} = useFetch("http://localhost:3000/api/services/v1");
+	} = useFetch(`${API_UR}/api/services/v1`);
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCategory, setSelectedCategory] = useState("All");

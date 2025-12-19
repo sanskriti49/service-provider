@@ -16,6 +16,8 @@ export default function BookingPage() {
 	const navigate = useNavigate();
 	const { state } = useLocation();
 
+	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 	const [provider, setProvider] = useState(state?.provider || null);
 	const [availability, setAvailability] = useState(
 		state?.preloadedAvailability || state?.provider?.availability || []
@@ -58,7 +60,7 @@ export default function BookingPage() {
 				if (!currentProvider) {
 					setLoading(true);
 					const provRes = await fetch(
-						`http://localhost:3000/api/providers/v1/${customId}`
+						`${API_URL}/api/providers/v1/${customId}`
 					);
 					if (!provRes.ok) throw new Error("Provider not found");
 					const provData = await provRes.json();
@@ -69,7 +71,7 @@ export default function BookingPage() {
 				if (currentProvider && currentProvider.user_id) {
 					if (availability.length === 0) setLoading(true);
 					const slotsRes = await fetch(
-						`http://localhost:3000/api/providers/v1/${currentProvider.user_id}/availability`
+						`${API_URL}/api/providers/v1/${currentProvider.user_id}/availability`
 					);
 					if (slotsRes.ok) {
 						const slotsData = await slotsRes.json();

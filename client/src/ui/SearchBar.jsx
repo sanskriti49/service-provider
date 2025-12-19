@@ -4,19 +4,21 @@ import { useNavigate } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 
 export const SearchBar = () => {
+	const navigate = useNavigate();
+	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 	const [query, setQuery] = useState("");
 	const [suggestions, setSuggestions] = useState([]);
 	const [allServices, setAllServices] = useState([]);
 	const [activeIndex, setActiveIndex] = useState(-1);
 
 	const searchContainerRef = useRef(null);
-	const navigate = useNavigate();
 
 	const {
 		data: apiResponse,
 		loading,
 		error,
-	} = useFetch("http://localhost:3000/api/services/v1");
+	} = useFetch(`${API_URL}/api/services/v1`);
 
 	useEffect(() => {
 		if (!apiResponse) return;

@@ -17,6 +17,8 @@ export default function BookingSuccess() {
 	const navigate = useNavigate();
 	const { state } = useLocation();
 
+	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 	if (!state?.success || !state?.booking || !state?.booking?.booking_id) {
 		return <Navigate to="/" replace />;
 	}
@@ -67,7 +69,7 @@ export default function BookingSuccess() {
 			console.log("Updating address for ID:", booking.booking_id);
 
 			const res = await fetch(
-				`http://localhost:3000/api/bookings/${booking.booking_id}/address`,
+				`${API_URL}/api/bookings/${booking.booking_id}/address`,
 				{
 					method: "PATCH",
 					headers: {
