@@ -9,7 +9,6 @@ const verifyRecaptcha = async (req, res, next) => {
 		}
 		const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
 
-		// Cloudflare requires form-data or x-www-form-urlencoded
 		const formData = new URLSearchParams();
 		formData.append("secret", process.env.TURNSTILE_SECRET_KEY);
 		formData.append("response", captchaToken);
