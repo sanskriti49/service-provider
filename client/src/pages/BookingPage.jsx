@@ -124,7 +124,7 @@ export default function BookingPage() {
 
 		setIsSubmitting(true);
 		try {
-			const res = await fetch("http://localhost:3000/api/bookings", {
+			const res = await fetch(`${API_URL}/api/bookings`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
