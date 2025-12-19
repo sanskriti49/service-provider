@@ -6,18 +6,14 @@ const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
 const { customAlphabet } = require("nanoid");
 
-// --- MIDDLEWARE ---
 const verifyToken = require("../middleware/verifyToken");
-// You only need to import this once. I renamed it to verifyTurnstile for clarity.
 const verifyTurnstile = require("../middleware/verifyRecaptcha");
 
-// --- UTILS ---
 const { formatName } = require("../utils/formatName");
 const { normalizeEmail } = require("../utils/normalizeEmail");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Helper to keep token payloads consistent across Login, Register, and Google
 const generateToken = (user) => {
 	return jwt.sign(
 		{
@@ -34,7 +30,6 @@ const generateToken = (user) => {
 };
 
 function generateCustomId(role) {
-	// ENSURE you are using nanoid@3.3.7 if using CommonJS (require)
 	const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 15);
 	if (role === "provider") return "SRV" + nano();
 	return "CUS" + nano();
@@ -52,8 +47,6 @@ const getSafeUser = (user) => {
 		isGoogleUser: user.password === "google_auth_user",
 	};
 };
-
-// --- ROUTES ---
 
 router.post("/google", async (req, res) => {
 	try {
@@ -85,7 +78,7 @@ router.post("/google", async (req, res) => {
 			user = result.rows[0];
 		}
 
-		const token = generateToken(user); // Used helper
+		const token = generateToken(user); 
 
 		res.json({ token, user: getSafeUser(user) });
 	} catch (err) {
