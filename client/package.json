@@ -24,6 +24,7 @@
 		"canvas-confetti": "^1.9.4",
 		"framer-motion": "^12.23.26",
 		"gsap": "^3.13.0",
+		"hamburger-react": "^2.5.2",
 		"jwt-decode": "^4.0.0",
 		"lucide-react": "^0.548.0",
 		"ogl": "^1.0.11",

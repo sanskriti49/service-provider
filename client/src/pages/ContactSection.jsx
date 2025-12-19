@@ -8,6 +8,7 @@ import {
 	Send,
 	MessageCircleQuestionMark,
 } from "lucide-react";
+import Alerts from "../ui/Alerts";
 
 export default function ContactSection() {
 	const [form, setForm] = useState({ name: "", email: "", message: "" });

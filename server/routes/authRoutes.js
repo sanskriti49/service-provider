@@ -5,6 +5,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
 const { customAlphabet } = require("nanoid");
+const crypto = require("crypto"); // Needed for generating tokens
+const sendEmail = require("../utils/sendEmail"); // Needed for sending the email
 
 const verifyToken = require("../middleware/verifyToken");
 const verifyTurnstile = require("../middleware/verifyRecaptcha");
@@ -204,6 +206,104 @@ router.post("/login", verifyTurnstile, async (req, res) => {
 		res.json({ message: "Login success", token, user: getSafeUser(user) });
 	} catch (err) {
 		res.status(500).json({ error: err.message });
+	}
+});
+
+router.post("/forgot-password", async (req, res) => {
+	const { email } = req.body;
+
+	try {
+		const result = await db.query("SELECT * FROM users WHERE email=$1", [
+			email,
+		]);
+		const user = result.rows[0];
+		if (!user) {
+			return res
+				.status(404)
+				.json({ error: "User with this email does not exist" });
+		}
+		const resetToken = crypto.randomBytes(20).toString("hex");
+
+		// hash token before saving it to db
+		const resetPasswordToken = crypto
+			.createHash("sha256")
+			.update(resetToken)
+			.digest("hex");
+
+		// set expiration (1hr from now)
+		const resetPasswordExpire = Date.now() + 3600000;
+
+		await db.query(
+			"UPDATE users SET reset_password_token=$1,reset_password_expires=$2 WHERE id=$3",
+			[resetPasswordToken, resetPasswordExpire, user.id]
+		);
+
+		// create reset url, which points to ui
+		const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+		const message = `You have requested a password reset for your TaskGenie account.
+            Please go to this link to reset your password:
+            
+            ${resetUrl}
+            
+            This link is valid for 1 hour.
+		`;
+		try {
+			await sendEmail({
+				email: user.email,
+				subject: "TaskGenie Password Reset Request",
+				message,
+			});
+			res.json({ message: "Email sent successfully!" });
+		} catch (emailError) {
+			// rollback DB changes if email fails
+			await db.query(
+				"UPDATE users SET reset_password_token = NULL, reset_password_expires = NULL WHERE id = $1",
+				[user.id]
+			);
+			return res.status(500).json({ error: "Email could not be sent" });
+		}
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: "Server error" });
+	}
+});
+
+router.put("/reset-password/:resetToken", async (req, res) => {
+	const { resetToken } = req.params;
+	const { password } = req.body;
+
+	if (!password || password.length < 6) {
+		return res
+			.status(400)
+			.json({ error: "Password must be at least 6 characters" });
+	}
+	try {
+		const resetPasswordToken = crypto
+			.createHash("sha256")
+			.update(resetToken)
+			.digest("hex");
+
+		const result = await db.query(
+			"SELECT * FROM users WHERE reset_password_token = $1 AND reset_password_expires > $2",
+			[resetPasswordToken, Date.now()]
+		);
+		const user = result.rows[0];
+		if (!user) {
+			return res.status(400).json({ error: "Invalid or expired token" });
+		}
+
+		const hashedPassword = await bcrypt.hash(password, 10);
+		await db.query(
+			`UPDATE users 
+             SET password = $1, reset_password_token = NULL, reset_password_expires = NULL 
+             WHERE id = $2`,
+			[hashedPassword, user.id]
+		);
+
+		res.json({ message: "Password updated successfully! You can now log in." });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: "Server error" });
 	}
 });
 

@@ -57,7 +57,7 @@ const SkeletonCard = () => (
 	<div className="h-96 w-full animate-pulse rounded-3xl bg-slate-200" />
 );
 
-const ServiceCard = ({ service, isActive = 2 }) => {
+const ServiceCard = ({ service, isActive = 3 }) => {
 	const serviceUrl = `/services/${service.slug || service.id}`;
 
 	return (
@@ -183,7 +183,7 @@ const ServicesSection = ({ searchQuery }) => {
 	return (
 		<section
 			id="services"
-			className="relative overflow-hidden mt-1 md:mt-14 xl:mt-22 py-20 sm:py-28"
+			className="relative overflow-hidden mt-0 md:-mt-10 lg:-mt-45 xl:-mt-0 py-20 "
 		>
 			<AuroraBackground />
 

@@ -15,6 +15,8 @@ import AllServices from "./pages/AllServices";
 import BookingSuccess from "./pages/BookingSuccess";
 import Unauthorized from "./pages/Unauthorized";
 import SettingsPage from "./pages/SettingsPage";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 const router = createBrowserRouter([
 	{
@@ -35,6 +37,8 @@ const router = createBrowserRouter([
 		children: [
 			{ path: "login", element: <SignIn /> },
 			{ path: "sign-up", element: <SignUp /> },
+			{ path: "forgot-password", element: <ForgotPassword /> },
+			{ path: "reset-password/:resetToken", element: <ResetPassword /> },
 			{ path: "/unauthorized", element: <Unauthorized /> },
 			{ path: "services/:slug", element: <ServiceDetails /> },
 			{ path: "/book/:customId", element: <BookingPage /> },

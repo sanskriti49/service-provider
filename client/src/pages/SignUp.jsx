@@ -20,6 +20,61 @@ const SignUp = () => {
 		role: "",
 	});
 
+	const HAIKUS = [
+		{
+			lines: [
+				"The to-do list grows",
+				"Weekend sun is shining bright",
+				"We handle the chores",
+			],
+			author: "Reclaim Your Saturday",
+		},
+		{
+			lines: [
+				"Drip drip goes the sink",
+				"Silence is a luxury",
+				"Fixed in just one click",
+			],
+			author: "Peace of Mind",
+		},
+		{
+			lines: [
+				"Dust bunnies attack",
+				"Guests arriving in an hour",
+				"Genie saves the day",
+			],
+			author: "The Clean Sweep",
+		},
+		{
+			lines: [
+				"Furniture in box",
+				"Instructions make zero sense",
+				"Help is on the way",
+			],
+			author: "Assembly Required",
+		},
+		{
+			lines: [
+				"Grass is getting tall",
+				"Allergies are kicking in",
+				"Lawn is looking green",
+			],
+			author: "Curb Appeal",
+		},
+		{
+			lines: [
+				"Tools are heavy weight",
+				"Skill is lighter than a feather",
+				"Job done perfectly",
+			],
+			author: "Expert Hands",
+		},
+	];
+
+	const [haiku, setHaiku] = useState(
+		HAIKUS[Math.floor(Math.random() * HAIKUS.length)]
+	);
+
 	const handleChange = (e) => {
 		setForm({ ...form, [e.target.name]: e.target.value });
 	};
@@ -144,14 +199,14 @@ const SignUp = () => {
 									<button
 										type="button"
 										className="
-											w-full flex items-center justify-center gap-2
-											text-gray-700 font-medium
-											py-2 rounded-lg transition cursor-pointer
-											bg-white border border-[#d4ceea]
-											shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
-											hover:shadow-[inset_0_3px_6px_#ddd6fe]         
-											active:shadow-[inset_0_0_6px_#ddd6fe]         
-										"
+                                            w-full flex items-center justify-center gap-2
+                                            text-gray-700 font-medium
+                                            py-2 rounded-lg transition cursor-pointer
+                                            bg-white border border-[#d4ceea]
+                                            shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
+                                            hover:shadow-[inset_0_3px_6px_#ddd6fe]         
+                                            active:shadow-[inset_0_0_6px_#ddd6fe]         
+                                    "
 									>
 										<img
 											src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
@@ -204,13 +259,13 @@ const SignUp = () => {
 										onChange={handleChange}
 										type="text"
 										className="capitalize
-											w-full rounded-lg px-3 py-2
-											border border-[#d4ceea]
-											shadow-sm
-											focus:outline-none
-											focus:border-violet-500
-											focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-										"
+                                            w-full rounded-lg px-3 py-2
+                                            border border-[#d4ceea]
+                                            shadow-sm
+                                            focus:outline-none
+                                            focus:border-violet-500
+                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                    "
 									/>
 
 									<label htmlFor="name">Email</label>
@@ -220,13 +275,13 @@ const SignUp = () => {
 										onChange={handleChange}
 										type="email"
 										className="
-											w-full rounded-lg px-3 py-2
-											border border-[#d4ceea]
-											shadow-sm
-											focus:outline-none
-											focus:border-violet-500
-											focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-										"
+                                            w-full rounded-lg px-3 py-2
+                                            border border-[#d4ceea]
+                                            shadow-sm
+                                            focus:outline-none
+                                            focus:border-violet-500
+                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                    "
 									/>
 
 									<label htmlFor="name">Password</label>
@@ -236,13 +291,13 @@ const SignUp = () => {
 										onChange={handleChange}
 										type="password"
 										className="
-											w-full rounded-lg px-3 py-2
-											border border-[#d4ceea]
-											shadow-sm
-											focus:outline-none
-											focus:border-violet-500
-											focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-										"
+                                            w-full rounded-lg px-3 py-2
+                                            border border-[#d4ceea]
+                                            shadow-sm
+                                            focus:outline-none
+                                            focus:border-violet-500
+                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                    "
 									/>
 
 									<div className="flex justify-center">
@@ -289,7 +344,6 @@ const SignUp = () => {
 							<a
 								className="text-navy underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
 								href="#"
-								//	target="_blank"
 							>
 								terms of service
 							</a>
@@ -297,7 +351,6 @@ const SignUp = () => {
 							<a
 								className="text-navy underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
 								href="#"
-								//	target="_blank"
 							>
 								privacy policy
 							</a>
@@ -313,15 +366,22 @@ const SignUp = () => {
 					className="absolute inset-0 max-w-none w-full h-full object-cover"
 					alt=""
 				/>
-				<blockquote className="relative z-20 text-xl font-heading text-purple-900">
-					<p className="leading-tight">A fresh start awaits</p>
 
-					<p className="leading-tight">Your tasks, your flow, your new space</p>
+				{/* 3. Applied P22Mackinac Font Here */}
+				<blockquote
+					className="relative z-20 text-xl text-purple-900 animate-in fade-in duration-1000 leading-snug"
+					style={{ fontFamily: '"P22Mackinac", serif' }}
+				>
+					{haiku.lines.map((line, index) => (
+						<p key={index}>{line}</p>
+					))}
 
-					<p className="leading-tight">Come create with us</p>
-
-					<cite className="block not-italic text-xl mt-6">
-						<span className="opacity-40">—</span>Your journey begins here
+					<cite
+						className="block not-italic text-xl mt-8 opacity-80"
+						style={{ fontFamily: '"P22Mackinac", serif' }}
+					>
+						<span className="opacity-40 mr-2">—</span>
+						{haiku.author}
 					</cite>
 				</blockquote>
 			</aside>

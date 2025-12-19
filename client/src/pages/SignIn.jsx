@@ -19,6 +19,60 @@ const SignIn = () => {
 		password: "",
 	});
 
+	const HAIKUS = [
+		{
+			lines: [
+				"The to-do list grows",
+				"Weekend sun is shining bright",
+				"We handle the chores",
+			],
+			author: "Reclaim Your Saturday",
+		},
+		{
+			lines: [
+				"Drip drip goes the sink",
+				"Silence is a luxury",
+				"Fixed in just one click",
+			],
+			author: "Peace of Mind",
+		},
+		{
+			lines: [
+				"Dust bunnies attack",
+				"Guests arriving in an hour",
+				"Genie saves the day",
+			],
+			author: "The Clean Sweep",
+		},
+		{
+			lines: [
+				"Furniture in box",
+				"Instructions make zero sense",
+				"Help is on the way",
+			],
+			author: "Assembly Required",
+		},
+		{
+			lines: [
+				"Grass is getting tall",
+				"Allergies are kicking in",
+				"Lawn is looking green",
+			],
+			author: "Curb Appeal",
+		},
+		{
+			lines: [
+				"Tools are heavy weight",
+				"Skill is lighter than a feather",
+				"Job done perfectly",
+			],
+			author: "Expert Hands",
+		},
+	];
+	const [haiku, setHaiku] = useState(
+		HAIKUS[Math.floor(Math.random() * HAIKUS.length)]
+	);
+
 	const handleChange = (e) => {
 		setForm({ ...form, [e.target.name]: e.target.value });
 	};
@@ -149,7 +203,7 @@ const SignIn = () => {
                                             shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
                                             hover:shadow-[inset_0_3px_6px_#ddd6fe]         
                                             active:shadow-[inset_0_0_6px_#ddd6fe]         
-                                        "
+                                    "
 									>
 										<img
 											src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
@@ -181,7 +235,7 @@ const SignIn = () => {
                                             focus:outline-none
                                             focus:border-violet-500
                                             focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                        "
+                                    "
 									/>
 
 									<label htmlFor="password">Password</label>
@@ -197,8 +251,26 @@ const SignIn = () => {
                                             focus:outline-none
                                             focus:border-violet-500
                                             focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                        "
+                                    "
 									/>
+
+									<div className="space-y-2">
+										{/* NEW: Flex container for Label + Forgot Password Link */}
+										<div className="flex items-center justify-between">
+											<label
+												htmlFor="password"
+												className="block text-gray-700 font-medium"
+											>
+												Password
+											</label>
+											<Link
+												to="/forgot-password"
+												className="text-sm text-violet-600 hover:text-violet-800 hover:underline transition-colors font-medium"
+											>
+												Forgot password?
+											</Link>
+										</div>
+									</div>
 
 									<div className="flex justify-center">
 										<Turnstile
@@ -261,12 +333,21 @@ const SignIn = () => {
 					className="absolute inset-0 max-w-none w-full h-full object-cover"
 					alt=""
 				/>
-				<blockquote className="relative z-20 text-2xl font-heading text-purple-900">
-					<p className="leading-tight">A gentle reminder</p>
-					<p className="leading-tight">Your tasks await your return</p>
-					<p className="leading-tight">Please sign in to start</p>
-					<cite className="block not-italic text-xl mt-6">
-						<span className="opacity-40">—</span>A welcoming haiku
+
+				<blockquote
+					className="relative z-20 text-xl text-purple-900 animate-in fade-in duration-1000 leading-snug"
+					style={{ fontFamily: '"P22Mackinac", serif' }}
+				>
+					{haiku.lines.map((line, index) => (
+						<p key={index}>{line}</p>
+					))}
+
+					<cite
+						className="block not-italic text-xl mt-8 opacity-80"
+						style={{ fontFamily: '"P22Mackinac", serif' }}
+					>
+						<span className="opacity-40 mr-2">—</span>
+						{haiku.author}
 					</cite>
 				</blockquote>
 			</aside>

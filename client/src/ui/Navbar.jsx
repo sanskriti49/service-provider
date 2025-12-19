@@ -15,6 +15,7 @@ const Navbar = () => {
 
 	const [isServicesHovered, setIsServicesHovered] = useState(false);
 	const [user, setUser] = useState(null);
+	const [isOpen, setOpen] = useState(false);
 
 	useEffect(() => {
 		const token = localStorage.getItem("token");
@@ -27,7 +28,6 @@ const Navbar = () => {
 					fetch(`${API_URL}/api/users/${decoded.custom_id}`)
 						.then((res) => {
 							if (res.status === 404) {
-								// User deleted → logout
 								localStorage.removeItem("token");
 								setUser(null);
 							}
@@ -43,9 +43,14 @@ const Navbar = () => {
 		}
 	}, []);
 
+	// Helper to close menu when a link is clicked
+	const handleLinkClick = () => {
+		setOpen(false);
+	};
+
 	return (
 		<div className="relative z-50">
-			<header className="flex items-center justify-self-center lg:px-35  h-64 w-full font-medium z-[9999] ">
+			<header className="flex items-center justify-self-center lg:px-35 h-64 w-full font-medium z-[9999]">
 				<div className="grad">
 					<svg
 						className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-full min-w-[80rem] h-auto"
@@ -113,7 +118,7 @@ const Navbar = () => {
 					</svg>
 				</div>
 
-				<div className="grid grid-cols-[auto_1fr_auto] w-full items-center -mt-40 mx-auto">
+				<div className="grid grid-cols-[auto_1fr_auto] w-full items-center -mt-40 mx-auto px-4 md:px-0">
 					<Link to="/" className="flex items-center">
 						<div className="h-13 w-12 flex items-center cursor-pointer">
 							<img
@@ -127,8 +132,9 @@ const Navbar = () => {
 						</p>
 					</Link>
 
+					{/* Desktop Nav */}
 					<nav className="flex justify-center">
-						<div className="bricolage-grotesque gap-4 -ml-15 hidden shrink-1 md:flex items-center rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-3 text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
+						<div className="hidden md:flex bricolage-grotesque gap-4 -ml-15 shrink-1 items-center rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-3 text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
 							<HashLink
 								smooth
 								to="/#hero"
@@ -211,48 +217,147 @@ const Navbar = () => {
 						</div>
 					</nav>
 
-					<div className="flex justify-self-end">
+					{/* Auth & Mobile Toggle */}
+					<div className="flex justify-self-end items-center">
 						{!user ? (
-							<div className="bricolage-grotesque  flex items-center shrink-1 rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-3 lg:text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
-								<Link
-									to="/sign-up"
-									className="flex-none group relative text-base sm:text-sm -ml-2 my-1 inline-flex items-center bg-clip-padding rounded-l-[20px] rounded-r-[8px] border h-8 pl-3 pr-[10px] bg-white/40 border-white/90 shadow hover:text-violet-600 hover:bg-violet-50/40 transition-colors duration-300 group ease-out active:scale-95 hover:scale-105"
+							<>
+								{/* desktop auth */}
+								<div className="hidden md:flex bricolage-grotesque items-center shrink-1 rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-3 lg:text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
+									<Link
+										to="/login"
+										className="flex-none group relative text-base sm:text-sm -ml-2 my-1 inline-flex items-center bg-clip-padding rounded-l-[20px] rounded-r-[8px] border h-8 pl-3 pr-[10px] bg-white/40 border-white/90 shadow hover:text-violet-600 hover:bg-violet-50/40 transition-colors duration-300 group ease-out active:scale-95 hover:scale-105"
+									>
+										Log in{" "}
+										<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
+											<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-400/20 to-transparent blur rounded-t-full"></span>
+										</span>
+									</Link>
+									<Link
+										to="/sign-up"
+										className="text-white group relative text-base sm:text-sm flex justify-center items-center ml-[5px] pl-2 -mr-2 my-1 h-8 pr-2 border-none rounded-r-[20px] rounded-l-[8px]
+                                    bg-[#7c3aed] bg-gradient-to-br from-[#A02BE4]  to-[#4f46e5]
+                                    hover:bg-[#6d28d9] transition-all duration-300  group ease-out active:scale-95 hover:scale-105"
+									>
+										Get Started{" "}
+									</Link>
+								</div>
+
+								{/* mobile toggle btn */}
+								<button
+									onClick={() => setOpen(!isOpen)}
+									className="cursor-pointer md:hidden z-50 p-2 rounded-full bg-white/40 backdrop-blur-md border border-white/50 text-gray-800 shadow-sm hover:bg-white/60 transition-all duration-300"
 								>
-									Sign in
-									<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
-										<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-400/20 to-transparent blur rounded-t-full"></span>
-									</span>
-								</Link>
-								<Link
-									to="/sign-in"
-									className="text-white group relative text-base sm:text-sm flex justify-center items-center ml-[5px] pl-2 -mr-2 my-1 h-8 pr-2 border-none rounded-r-[20px] rounded-l-[8px]
-											bg-[#7c3aed] bg-gradient-to-br from-[#A02BE4]  to-[#4f46e5]
-											hover:bg-[#6d28d9] transition-all duration-300  group ease-out active:scale-95 hover:scale-105"
-								>
-									Book a demo
-								</Link>
-							</div>
+									{isOpen ? (
+										// close icon
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="24"
+											height="24"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="2"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										>
+											<line x1="18" y1="6" x2="6" y2="18"></line>
+											<line x1="6" y1="6" x2="18" y2="18"></line>
+										</svg>
+									) : (
+										// hamburger
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="24"
+											height="24"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="2"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										>
+											<line x1="4" y1="12" x2="20" y2="12"></line>
+											<line x1="4" y1="6" x2="20" y2="6"></line>
+											<line x1="4" y1="18" x2="20" y2="18"></line>
+										</svg>
+									)}
+								</button>
+							</>
 						) : (
 							<AccountMenu user={user} />
 						)}
 					</div>
 				</div>
+
+				{/* mobile menu dropdown*/}
+				{isOpen && !user && (
+					<div className="bricolage-grotesque absolute top-[80px] left-0 w-full z-40 md:hidden px-4 animate-in fade-in slide-in-from-top-4 duration-300">
+						<div className="flex flex-col items-center gap-5 py-8 rounded-[2rem] bg-white/40 backdrop-blur-xl border border-white/40 shadow-2xl ring-1 ring-white/50">
+							<HashLink
+								smooth
+								to="/#hero"
+								onClick={handleLinkClick}
+								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
+							>
+								Home
+							</HashLink>
+							<HashLink
+								smooth
+								to="/#services"
+								onClick={handleLinkClick}
+								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
+							>
+								Services
+							</HashLink>
+							<HashLink
+								smooth
+								to="/#how-it-works"
+								onClick={handleLinkClick}
+								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
+							>
+								How It Works
+							</HashLink>
+							<HashLink
+								smooth
+								to="/#work-with-us"
+								onClick={handleLinkClick}
+								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
+							>
+								Become a Provider
+							</HashLink>
+							<HashLink
+								smooth
+								to="/#contact"
+								onClick={handleLinkClick}
+								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
+							>
+								Contact
+							</HashLink>
+
+							<div className="w-16 h-px bg-gray-300/50 my-1"></div>
+
+							<div className="flex flex-col gap-3 w-3/4 max-w-xs">
+								<Link
+									to="/sign-up"
+									onClick={handleLinkClick}
+									className="text-center w-full py-3 rounded-2xl border border-white/60 bg-white/50 shadow-sm text-gray-700 font-semibold hover:bg-white hover:text-violet-600 transition-all backdrop-blur-sm"
+								>
+									Log in
+								</Link>
+								<Link
+									to="/sign-in"
+									onClick={handleLinkClick}
+									className="text-center w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold shadow-lg hover:shadow-violet-500/30 transition-all transform active:scale-95"
+								>
+									Get Started
+								</Link>
+							</div>
+						</div>
+					</div>
+				)}
 			</header>
 		</div>
 	);
 };
-
-const NavLink = ({ to, children }) => (
-	<Link
-		to={to}
-		className="hover:text-violet-600 transition-colors duration-300 group relative px-3 py-2.5 cursor-pointer ease-out active:scale-95 hover:scale-105"
-	>
-		{children}
-		<span className="absolute inset-x-1 h-px bg-gradient-to-r from-violet-500/0 from-10% via-violet-400 to-violet-500/0 to-90% transition duration-300 -bottom-0.5 opacity-0 scale-x-0 group-hover:opacity-100 group-hover:scale-x-100"></span>
-		<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
-			<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-500/20 to-transparent blur rounded-t-full"></span>
-		</span>
-	</Link>
-);
 
 export default Navbar;

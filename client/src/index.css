@@ -29,7 +29,7 @@
 	font-family: "P22Mackinac";
 	src: url("/fonts/P22-Mackinac/P22MackinacPro-Medium_26.otf")
 		format("opentype");
-	font-weight: 400; /* or adjust as needed */
+	font-weight: 400;
 	font-style: normal;
 	font-display: swap;
 }
@@ -37,7 +37,7 @@
 	font-family: "P22Mackinac-B";
 	src: url("/fonts/P22-Mackinac/P22MackinacPro-Medium_26.otf")
 		format("opentype");
-	font-weight: 500; /* or adjust as needed */
+	font-weight: 500;
 	font-style: normal;
 	font-display: swap;
 }
@@ -45,7 +45,7 @@
 	font-family: "WhiteDream";
 	src: url("/fonts/white-dream-font/WhiteDreamPersonalUseOnlyRegular-L37Rn.otf")
 		format("opentype");
-	font-weight: 500; /* or adjust as needed */
+	font-weight: 500;
 	font-style: normal;
 	font-display: swap;
 }
