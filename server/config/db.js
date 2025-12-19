@@ -10,7 +10,7 @@ const isNeon =
 	(connectionString && connectionString.includes("neon.tech")) ||
 	(dbHost && dbHost.includes("neon.tech"));
 
-const poolConfig = isProduction
+const poolConfig = connectionString
 	? {
 			connectionString: connectionString,
 			ssl: isNeon ? { rejectUnauthorized: false } : false, // for neon
