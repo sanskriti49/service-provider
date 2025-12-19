@@ -42,12 +42,22 @@ export const SERVICE_NAMES = [
 	"Yoga Instructor",
 ];
 // Helpers
-export function slugify(serviceName) {
-	return serviceName
+// export function slugify(serviceName) {
+// 	return serviceName
+// 		.toString()
+// 		.toLowerCase()
+// 		.replace(/[^a-z0-9]+/g, "-")
+// 		.replace(/(^-|-$)/g, "");
+// }
+export const slugify = (text) =>
+	text
+		.toString()
 		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/(^-|-$)/g, "");
-}
+		.replace(/\s+/g, "-") // Replace spaces with -
+		.replace(/[^\w\-]+/g, "") // Remove all non-word chars
+		.replace(/\-\-+/g, "-") // Replace multiple - with single -
+		.replace(/^-+/, "") // Trim - from start of text
+		.replace(/-+$/, ""); // Trim - from end of text
 
 export function getDescriptionForService(serviceName) {
 	const descriptions = {

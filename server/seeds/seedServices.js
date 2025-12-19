@@ -10,13 +10,15 @@ async function seedServices() {
 			const category = SERVICE_CATEGORIES[s.name] || "General";
 			await db.query(
 				`INSERT INTO services (name, description, price, category, image_url, slug)
-                 VALUES($1, $2, $3,$4, $5, $6)`,
+                 VALUES($1, $2, $3,$4, $5, $6)
+				 ON CONFLICT (slug) DO UPDATE
+				 SET price = EXCLUDED.price, image_url = EXCLUDED.image_url`,
 				[s.name, s.description, price, category, s.image, s.slug]
 			);
 		}
 		console.log("Done seeding services!");
 	} catch (err) {
-		console.error(err);
+		console.error("❌ Service seeding failed:", err);
 	} finally {
 		db.end();
 	}

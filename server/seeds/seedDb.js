@@ -11,7 +11,7 @@ const { customAlphabet } = require("nanoid");
 const { generateAvailability } = require("../utils/generateAvailability");
 
 const PROVIDER_COUNT = 15;
-const RESET_TABLES = true;
+const RESET_TABLES = false;
 
 // indian cities
 const indianCities = [
@@ -252,7 +252,8 @@ const seedData = async () => {
 				for (const slot of masterSchedule) {
 					await client.query(
 						`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
-             VALUES ($1, $2, $3, $4)`,
+             VALUES ($1, $2, $3, $4)
+			 ON CONFLICT DO NOTHING`,
 						[userId, slot.day, slot.start, slot.end]
 					);
 				}
