@@ -1,4 +1,3 @@
-// -- public.users definition
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const { default: axios } = require("axios");
 const db = require("../config/db");
@@ -124,7 +123,6 @@ async function getUserByCustomId(req, res, next) {
 }
 
 async function updateUser(req, res, next) {
-	// 1. Validate input
 	const { error, value } = userUpdateSchema.validate(req.body);
 	if (error) {
 		return res.status(400).json({ error: error.details[0].message });
@@ -146,8 +144,8 @@ async function updateUser(req, res, next) {
 	} = value;
 
 	try {
-		// --- LOGIC BLOCK 1: FORWARD GEOCODING (Location Text -> Lat/Lng) ---
-		// If user provides a text location but NO coordinates, find the coordinates.
+		// FORWARD GEOCODING (location text -> lat/lng)
+		// if user provides a text location but NO coordinates find the coordinates
 		if (location && (!lat || !lng)) {
 			try {
 				const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
@@ -165,8 +163,8 @@ async function updateUser(req, res, next) {
 			}
 		}
 
-		// --- LOGIC BLOCK 2: REVERSE GEOCODING (Lat/Lng -> Location Text) ---
-		// If user provides coordinates but NO text location, find the address name.
+		// REVERSE GEOCODING (lat/lng -> location)
+		// if user provides coordinates but NO text location, find the address name.
 		else if (lat && lng && !location) {
 			try {
 				const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
@@ -175,11 +173,6 @@ async function updateUser(req, res, next) {
 				});
 
 				if (geoRes.data) {
-					// Option A: Use the full formatted address
-					//  location = geoRes.data.display_name;
-
-					// Option B: If you only want City/State (Cleaner)
-					// const addr = geoRes.data.address;
 					location = `${addr.city || addr.town || addr.village}, ${addr.state}`;
 				}
 			} catch (geoErr) {
@@ -187,10 +180,8 @@ async function updateUser(req, res, next) {
 			}
 		}
 
-		// 3. Handle Password Hashing
 		const hashed = password ? await hashIfPresent(password) : undefined;
 
-		// 4. Update Database
 		const query = `
             UPDATE users SET
                 name = COALESCE($1, name),
@@ -236,7 +227,6 @@ async function updateUser(req, res, next) {
 	}
 }
 
-// -------------------- DELETE USER --------------------
 async function deleteUser(req, res, next) {
 	try {
 		const id = req.params.id;

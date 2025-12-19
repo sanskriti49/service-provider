@@ -11,6 +11,7 @@ const verifyTurnstile = require("../middleware/verifyRecaptcha");
 
 const { formatName } = require("../utils/formatName");
 const { normalizeEmail } = require("../utils/normalizeEmail");
+const { default: axios } = require("axios");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -50,7 +51,7 @@ const getSafeUser = (user) => {
 
 router.post("/google", async (req, res) => {
 	try {
-		const { googleToken, lat, lng, location } = req.body;
+		let { googleToken, lat, lng, location } = req.body;
 
 		const ticket = await client.verifyIdToken({
 			idToken: googleToken,
@@ -61,6 +62,44 @@ router.post("/google", async (req, res) => {
 		const email = payload.email;
 		const name = formatName(payload.name);
 		const picture = payload.picture;
+
+		if (location && (!lat || !lng)) {
+			try {
+				const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+					location
+				)}`;
+				const geoRes = await axios.get(url, {
+					headers: { "User-Agent": "TaskGenie/1.0" },
+				});
+				if (geoRes.data && geoRes.data.length > 0) {
+					lat = parseFloat(geoRes.data[0].lat);
+					lng = parseFloat(geoRes.data[0].lon);
+				}
+			} catch (geoErr) {
+				console.error("Google Auth Geocoding failed:", geoErr.message);
+			}
+		} else if (lat && lng && !location) {
+			try {
+				const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+				const geoRes = await axios.get(url, {
+					headers: { "User-Agent": "TaskGenie/1.0" },
+				});
+				if (geoRes.data) {
+					const addr = geoRes.data.address;
+					const city =
+						addr.city || addr.town || addr.village || addr.county || "";
+					const state = addr.state || "";
+
+					if (city || state) {
+						location = `${city}, ${state}`;
+					} else {
+						location = geoRes.data.display_name;
+					}
+				}
+			} catch (geoErr) {
+				console.error("Google Auth Reverse Geocoding failed:", geoErr.message);
+			}
+		}
 
 		let result = await db.query(`SELECT * FROM users WHERE email=$1`, [email]);
 		let user;
@@ -78,11 +117,11 @@ router.post("/google", async (req, res) => {
 			user = result.rows[0];
 		}
 
-		const token = generateToken(user); 
+		const token = generateToken(user);
 
 		res.json({ token, user: getSafeUser(user) });
 	} catch (err) {
-		console.error(err);
+		console.error("Google Auth Error:", err);
 		res.status(401).json({ error: "Invalid Google token" });
 	}
 });
@@ -116,9 +155,8 @@ router.post("/register", verifyTurnstile, async (req, res) => {
 			[cleanName, cleanEmail, hashed, role, customId, phone]
 		);
 
-		const newUser = result.rows[0]; // FIX: Extract the user row first
+		const newUser = result.rows[0];
 
-		// FIX: Use the full payload helper so it matches /login
 		const token = generateToken(newUser);
 
 		res.status(201).json({
@@ -127,7 +165,6 @@ router.post("/register", verifyTurnstile, async (req, res) => {
 			user: getSafeUser(newUser),
 		});
 	} catch (err) {
-		// Handle unique constraint violation just in case race condition
 		if (err.code === "23505") {
 			return res.status(400).json({ error: "Email already exists" });
 		}
@@ -162,7 +199,7 @@ router.post("/login", verifyTurnstile, async (req, res) => {
 			return res.status(400).json({ error: "Incorrect password" });
 		}
 
-		const token = generateToken(user); // Used helper
+		const token = generateToken(user);
 
 		res.json({ message: "Login success", token, user: getSafeUser(user) });
 	} catch (err) {
@@ -202,7 +239,7 @@ router.post("/set-role", verifyToken, async (req, res) => {
 		);
 
 		const updatedUser = update.rows[0];
-		const newToken = generateToken(updatedUser); // Used helper
+		const newToken = generateToken(updatedUser);
 
 		res.json({
 			message: "Role updated!",
@@ -214,10 +251,6 @@ router.post("/set-role", verifyToken, async (req, res) => {
 		res.status(500).json({ error: err.message });
 	}
 });
-
-// ... Keep /me and /update-password as is ...
-// (You might want to add generateToken logic to /me if you refresh tokens there,
-// but usually /me just returns data)
 
 router.get("/me", verifyToken, async (req, res) => {
 	try {
