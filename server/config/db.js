@@ -1,15 +1,19 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 
-// checks if proj is in production (neon) or local
-const isProduction = !!process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL;
+const dbHost = process.env.DB_HOST;
+
+// check if we are using neon or local
+// check if the connection string OR the host variable contains "neon.tech"
+const isNeon =
+	(connectionString && connectionString.includes("neon.tech")) ||
+	(dbHost && dbHost.includes("neon.tech"));
 
 const poolConfig = isProduction
 	? {
-			connectionString: process.env.DATABASE_URL,
-			ssl: {
-				rejectUnauthorized: false, // for neon
-			},
+			connectionString: connectionString,
+			ssl: isNeon ? { rejectUnauthorized: false } : false, // for neon
 	  }
 	: {
 			// LOCAL CONFIG ( when DATABASE_URL is missing)
@@ -18,14 +22,16 @@ const poolConfig = isProduction
 			password: process.env.DB_PASSWORD,
 			port: parseInt(process.env.DB_PORT || "5432", 10),
 			database: process.env.DB_NAME,
-			ssl: false,
+			ssl: isNeon ? { rejectUnauthorized: false } : false,
 	  };
 
 const pool = new Pool(poolConfig);
 
 pool.on("connect", () => {
 	console.log(
-		isProduction ? "✅ Connected to NEON DB" : "✅ Connected to LOCAL DB"
+		isNeon
+			? "✅ Connected to NEON DB (SSL Enabled)"
+			: "✅ Connected to LOCAL DB"
 	);
 });
 
