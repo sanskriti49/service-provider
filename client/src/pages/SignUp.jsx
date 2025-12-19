@@ -84,8 +84,16 @@ const SignUp = () => {
 				...form,
 				captchaToken: token,
 			});
+			// get token and user data from the response
+			const { token: authToken, user } = res.data;
+			localStorage.setItem("token", authToken);
+
 			alert("Account created!");
-			navigate("/login");
+			if (form.role === "provider") {
+				navigate("/provider/dashboard");
+			} else {
+				navigate("/dashboard");
+			}
 		} catch (err) {
 			console.log(err);
 			alert(err.response?.data?.error || err.message);

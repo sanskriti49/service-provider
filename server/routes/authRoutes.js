@@ -3,16 +3,38 @@ const router = express.Router();
 const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const verifyToken = require("../middleware/verifyToken");
-const verifyRecaptcha = require("../middleware/verifyRecaptcha");
 const { OAuth2Client } = require("google-auth-library");
 const { customAlphabet } = require("nanoid");
+
+// --- MIDDLEWARE ---
+const verifyToken = require("../middleware/verifyToken");
+// You only need to import this once. I renamed it to verifyTurnstile for clarity.
+const verifyTurnstile = require("../middleware/verifyRecaptcha");
+
+// --- UTILS ---
 const { formatName } = require("../utils/formatName");
 const { normalizeEmail } = require("../utils/normalizeEmail");
-const verifyTurnstile = require("../middleware/verifyRecaptcha");
+
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// Helper to keep token payloads consistent across Login, Register, and Google
+const generateToken = (user) => {
+	return jwt.sign(
+		{
+			id: user.id,
+			role: user.role,
+			name: user.name,
+			email: user.email,
+			photo: user.photo,
+			custom_id: user.custom_id,
+		},
+		process.env.JWT_SECRET,
+		{ expiresIn: "7d" }
+	);
+};
+
 function generateCustomId(role) {
+	// ENSURE you are using nanoid@3.3.7 if using CommonJS (require)
 	const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 15);
 	if (role === "provider") return "SRV" + nano();
 	return "CUS" + nano();
@@ -31,6 +53,8 @@ const getSafeUser = (user) => {
 	};
 };
 
+// --- ROUTES ---
+
 router.post("/google", async (req, res) => {
 	try {
 		const { googleToken, lat, lng, location } = req.body;
@@ -48,32 +72,20 @@ router.post("/google", async (req, res) => {
 		let result = await db.query(`SELECT * FROM users WHERE email=$1`, [email]);
 		let user;
 
-		// If new user → create automatically
 		if (result.rows.length === 0) {
 			const insert = await db.query(
 				`INSERT INTO users 
-					(name, email, password, photo, custom_id, role, lat, lng, location)
-				 VALUES ($1, $2, $3, $4, NULL, NULL, $5, $6, $7)
-				 RETURNING *`,
+                 (name, email, password, photo, custom_id, role, lat, lng, location)
+                 VALUES ($1, $2, $3, $4, NULL, NULL, $5, $6, $7)
+                 RETURNING *`,
 				[name, email, "google_auth_user", picture, lat, lng, location]
 			);
-
 			user = insert.rows[0];
 		} else {
 			user = result.rows[0];
 		}
 
-		const token = jwt.sign(
-			{
-				id: user.id,
-				role: user.role,
-				name: user.name,
-				email: user.email,
-				photo: user.photo,
-				custom_id: user.custom_id,
-			},
-			process.env.JWT_SECRET
-		);
+		const token = generateToken(user); // Used helper
 
 		res.json({ token, user: getSafeUser(user) });
 	} catch (err) {
@@ -93,21 +105,39 @@ router.post("/register", verifyTurnstile, async (req, res) => {
 			return res.status(400).json({ error: "Invalid role selected" });
 		}
 
+		const existingCheck = await db.query(
+			"SELECT id FROM users WHERE email=$1",
+			[cleanEmail]
+		);
+		if (existingCheck.rows.length > 0) {
+			return res.status(400).json({ error: "Email already exists" });
+		}
+
 		const customId = generateCustomId(role);
 		const hashed = await bcrypt.hash(password, 10);
 
-		const user = await db.query(
+		const result = await db.query(
 			`INSERT INTO users (name, email, password, role, custom_id, phone)
              VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING *`,
 			[cleanName, cleanEmail, hashed, role, customId, phone]
 		);
 
-		res.json({
+		const newUser = result.rows[0]; // FIX: Extract the user row first
+
+		// FIX: Use the full payload helper so it matches /login
+		const token = generateToken(newUser);
+
+		res.status(201).json({
 			message: "User registered!",
-			user: getSafeUser(user.rows[0]),
+			token,
+			user: getSafeUser(newUser),
 		});
 	} catch (err) {
+		// Handle unique constraint violation just in case race condition
+		if (err.code === "23505") {
+			return res.status(400).json({ error: "Email already exists" });
+		}
 		res.status(500).json({ error: err.message });
 	}
 });
@@ -139,18 +169,7 @@ router.post("/login", verifyTurnstile, async (req, res) => {
 			return res.status(400).json({ error: "Incorrect password" });
 		}
 
-		const token = jwt.sign(
-			{
-				id: user.id,
-				role: user.role,
-				name: user.name,
-				email: user.email,
-				photo: user.photo,
-				custom_id: user.custom_id,
-			},
-			process.env.JWT_SECRET,
-			{ expiresIn: "7d" }
-		);
+		const token = generateToken(user); // Used helper
 
 		res.json({ message: "Login success", token, user: getSafeUser(user) });
 	} catch (err) {
@@ -163,18 +182,15 @@ router.post("/set-role", verifyToken, async (req, res) => {
 		const { role } = req.body;
 		const userId = req.user.id;
 
-		// validation
 		if (!["customer", "provider"].includes(role)) {
 			return res.status(400).json({ error: "Invalid role selected" });
 		}
 
-		// fetch full user to ensure they exist and check role
 		const userRes = await db.query("SELECT role FROM users WHERE id=$1", [
 			userId,
 		]);
 		const existingUser = userRes.rows[0];
 
-		// prevents overwriting role
 		if (existingUser.role) {
 			return res.status(403).json({
 				error:
@@ -193,19 +209,7 @@ router.post("/set-role", verifyToken, async (req, res) => {
 		);
 
 		const updatedUser = update.rows[0];
-
-		// issue new token
-		const newToken = jwt.sign(
-			{
-				id: updatedUser.id,
-				name: updatedUser.name,
-				email: updatedUser.email,
-				role: updatedUser.role,
-				custom_id: updatedUser.custom_id,
-				photo: updatedUser.photo,
-			},
-			process.env.JWT_SECRET
-		);
+		const newToken = generateToken(updatedUser); // Used helper
 
 		res.json({
 			message: "Role updated!",
@@ -217,6 +221,10 @@ router.post("/set-role", verifyToken, async (req, res) => {
 		res.status(500).json({ error: err.message });
 	}
 });
+
+// ... Keep /me and /update-password as is ...
+// (You might want to add generateToken logic to /me if you refresh tokens there,
+// but usually /me just returns data)
 
 router.get("/me", verifyToken, async (req, res) => {
 	try {
@@ -245,6 +253,7 @@ router.post("/update-password", verifyToken, async (req, res) => {
 				.status(400)
 				.json({ error: "Password must be at least 6 characters" });
 		}
+
 		const hashed = await bcrypt.hash(newPassword, 10);
 
 		await db.query("UPDATE users SET password = $1 WHERE id = $2", [
@@ -257,4 +266,5 @@ router.post("/update-password", verifyToken, async (req, res) => {
 		res.status(500).json({ error: "Server error" });
 	}
 });
+
 module.exports = router;
