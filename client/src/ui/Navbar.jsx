@@ -338,16 +338,16 @@ const Navbar = () => {
 
 							<div className="flex flex-col gap-3 w-3/4 max-w-xs">
 								<Link
-									to="/sign-up"
+									to="/login"
 									onClick={handleLinkClick}
-									className="text-center w-full py-3 rounded-2xl border border-white/60 bg-white/50 shadow-sm text-gray-700 font-semibold hover:bg-white hover:text-violet-600 transition-all backdrop-blur-sm"
+									className="text-center w-full py-3 rounded-2xl border border-white/60 bg-white/50 shadow-sm text-gray-700 font-semibold hover:bg-white hover:text-violet-600 transition-all duration-300 backdrop-blur-sm"
 								>
 									Log in
 								</Link>
 								<Link
-									to="/sign-in"
+									to="/sign-up"
 									onClick={handleLinkClick}
-									className="text-center w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold shadow-lg hover:shadow-violet-500/30 transition-all transform active:scale-95"
+									className="text-center w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold shadow-xl hover:bg-violet-300 transition-all duration-300 transform active:scale-95"
 								>
 									Get Started
 								</Link>

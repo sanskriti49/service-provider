@@ -26,15 +26,21 @@ export default function BookingPage() {
 	const [address, setAddress] = useState(
 		"Home • 12/B, Green Heights, Civil Lines, Kanpur"
 	);
+
+	// Initialize state from navigation state (if available)
+	const [selectedDate, setSelectedDate] = useState(
+		state?.selectedDateStr || null
+	);
+	const [selectedTime, setSelectedTime] = useState(state?.selectedTime || null);
+
 	const [isEditingAddress, setIsEditingAddress] = useState(false);
 	const [tempAddress, setTempAddress] = useState(address);
 
-	const [selectedDate, setSelectedDate] = useState(null);
-	const [selectedTime, setSelectedTime] = useState(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [loading, setLoading] = useState(!state?.provider);
 	const [alert, setAlert] = useState(null);
 
+	// Consistent time formatting logic
 	function formatTime(timeString) {
 		if (!timeString) return "";
 		const [hours, minutes] = timeString.split(":");
@@ -102,9 +108,14 @@ export default function BookingPage() {
 
 	function isSlotExpired(slotDate, slotTime) {
 		const now = new Date();
-		const todayStr = now.toISOString().split("T")[0];
+		const year = now.getFullYear();
+		const month = String(now.getMonth() + 1).padStart(2, "0");
+		const day = String(now.getDate()).padStart(2, "0"); // Fixed: getDay() returns day of week (0-6), use getDate() for day of month
+		const todayStr = `${year}-${month}-${day}`;
+
 		if (slotDate < todayStr) return true;
 		if (slotDate > todayStr) return false;
+
 		const [hours, minutes] = slotTime.split(":").map(Number);
 		const slotDateTime = new Date();
 		slotDateTime.setHours(hours, minutes, 0, 0);
@@ -259,7 +270,6 @@ export default function BookingPage() {
 						</div>
 					</div>
 
-					{/* RIGHT COLUMN: Selection & Address */}
 					<div className="lg:col-span-8 space-y-8">
 						{/* 1. Date Selection */}
 						<div className="bg-white/5 lg:bg-transparent rounded-3xl p-6 lg:p-0 border border-white/5 lg:border-none">
@@ -284,36 +294,48 @@ export default function BookingPage() {
                                     hover:[&::-webkit-scrollbar-thumb]:bg-violet-600 
                                     [&::-webkit-scrollbar-thumb]:rounded-full"
 								>
-									{Object.keys(groupedSlots).map((date) => (
-										<button
-											key={date}
-											onClick={() => {
-												setSelectedDate(date);
-												setSelectedTime(null);
-											}}
-											className={`min-w-[100px] lg:min-w-[120px] flex-shrink-0 snap-start p-4 cursor-pointer rounded-2xl flex flex-col items-center justify-center transition-all duration-300 border focus:outline-none focus:ring-0
+									{Object.keys(groupedSlots)
+										.sort()
+										.filter((date) => {
+											const now = new Date();
+											const year = now.getFullYear();
+											const month = String(now.getMonth() + 1).padStart(2, "0");
+											const day = String(now.getDate()).padStart(2, "0");
+											const todayStr = `${year}-${month}-${day}`;
+											return date >= todayStr;
+										})
+										.map((date) => (
+											<button
+												key={date}
+												onClick={() => {
+													setSelectedDate(date);
+													setSelectedTime(null);
+												}}
+												className={`min-w-[100px] lg:min-w-[120px] flex-shrink-0 snap-start p-4 cursor-pointer rounded-2xl flex flex-col items-center justify-center transition-all duration-300 border focus:outline-none focus:ring-0
                                                 ${
 																									selectedDate === date
 																										? "bg-violet-600 border-violet-500 shadow-[0_0_20px_rgba(124,58,237,0.3)] scale-105"
 																										: "bg-white/5 border-white/10 hover:bg-white/10 hover:border-violet-500/30"
 																								}`}
-										>
-											<span className="text-sm uppercase tracking-wider text-violet-200/70 font-medium">
-												{new Date(date).toLocaleDateString("en-US", {
-													weekday: "short",
-												})}
-											</span>
-											<span
-												className={`text-2xl font-bold mt-1 ${
-													selectedDate === date ? "text-white" : "text-gray-200"
-												}`}
 											>
-												{new Date(date).toLocaleDateString("en-US", {
-													day: "numeric",
-												})}
-											</span>
-										</button>
-									))}
+												<span className="text-sm uppercase tracking-wider text-violet-200/70 font-medium">
+													{new Date(date).toLocaleDateString("en-US", {
+														weekday: "short",
+													})}
+												</span>
+												<span
+													className={`text-2xl font-bold mt-1 ${
+														selectedDate === date
+															? "text-white"
+															: "text-gray-200"
+													}`}
+												>
+													{new Date(date).toLocaleDateString("en-US", {
+														day: "numeric",
+													})}
+												</span>
+											</button>
+										))}
 								</div>
 							)}
 						</div>
@@ -454,7 +476,7 @@ export default function BookingPage() {
 					<button
 						onClick={handleConfirm}
 						disabled={isSubmitting}
-						className="w-full py-4 rounded-2xl text-lg font-bold shadow-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white flex items-center justify-center gap-2"
+						className="cursor-pointer disabled:currsor-not-allowed w-full py-4 rounded-2xl text-lg font-bold shadow-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white flex items-center justify-center gap-2"
 					>
 						{isSubmitting ? (
 							"Confirming..."

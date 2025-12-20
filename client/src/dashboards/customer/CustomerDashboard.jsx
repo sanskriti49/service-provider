@@ -78,6 +78,16 @@ const QUICK_SERVICES = [
 	},
 ];
 
+const formatTimeForCard = (timeStr) => {
+	if (!timeStr) return "";
+	const [h, m] = timeStr.split(":");
+	return new Date(0, 0, 0, h, m).toLocaleTimeString("en-US", {
+		hour: "numeric",
+		minute: "2-digit",
+		hour12: true,
+	});
+};
+
 export default function CustomerDashboard() {
 	const navigate = useNavigate();
 	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -162,12 +172,10 @@ export default function CustomerDashboard() {
 										className="w-full h-full object-cover"
 									/>
 								) : (
-									// 2. Safe check: Use Optional Chaining (?.) to prevent crash
 									<span>{user?.name?.[0]?.toUpperCase() || "U"}</span>
 								)}
 							</div>
 							<div>
-								{/* 3. Fallback to "Guest" if name is missing */}
 								<h3 className="font-bold text-gray-800">
 									{user.name || "Guest"}
 								</h3>
@@ -198,7 +206,6 @@ export default function CustomerDashboard() {
 							/>
 						</nav>
 
-						{/* Support Banner */}
 						<div className="bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl p-5 text-white mt-4 shadow-lg shadow-indigo-500/20 relative overflow-hidden group cursor-pointer">
 							<div className="absolute top-0 right-0 p-3 opacity-20 transform group-hover:scale-110 transition-transform">
 								<Zap size={60} />
@@ -217,9 +224,7 @@ export default function CustomerDashboard() {
 					</div>
 				</motion.aside>
 
-				{/* --- RIGHT CONTENT AREA --- */}
 				<main className="space-y-8">
-					{/* Header */}
 					<motion.div
 						initial={{ y: -20, opacity: 0 }}
 						animate={{ y: 0, opacity: 1 }}
@@ -264,8 +269,6 @@ export default function CustomerDashboard() {
 	);
 }
 
-// --- SUB-COMPONENTS ---
-
 function OverviewTab({
 	totalServices,
 	upcoming,
@@ -287,7 +290,7 @@ function OverviewTab({
 				/>
 				<StatCard
 					label="Active Tasks"
-					value="1"
+					value={upcoming.length}
 					color="bg-orange-50 text-orange-600"
 				/>
 				<StatCard
@@ -303,51 +306,64 @@ function OverviewTab({
 			</div>
 
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-				{/* 2. Active Booking Card */}
-
-				{/* UPCOMING SECTION */}
-				<div className="bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-sm">
+				<div className="bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-sm flex flex-col h-full">
 					<div className="flex justify-between items-center mb-6">
-						<h3 className="font-bold text-lg flex items-center gap-2">
-							<Clock className="text-violet-500" size={20} /> Upcoming
+						<h3 className="font-bold text-lg flex items-center gap-2 text-gray-800">
+							<div className="p-2 bg-violet-100 rounded-lg text-violet-600">
+								<Clock size={18} />
+							</div>
+							Upcoming
 						</h3>
+						{upcoming.length > 1 && (
+							<button
+								onClick={() => setShowMoreUpcoming(!showMoreUpcoming)}
+								className="cursor-pointer text-xs font-medium text-violet-600 hover:text-violet-800 hover:bg-violet-50 px-3 py-1.5 rounded-lg transition-colors"
+							>
+								{showMoreUpcoming
+									? "Show Less"
+									: `View All (${upcoming.length})`}
+							</button>
+						)}
 					</div>
 
-					{upcoming.length === 0 && (
-						<p className="text-gray-500 text-sm">No upcoming bookings.</p>
-					)}
-
-					{upcoming.length > 0 && (
-						<>
-							{/* FIRST UPCOMING BOOKING */}
+					{upcoming.length === 0 ? (
+						<div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-gray-100 rounded-2xl">
+							<div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+								<Calendar className="text-gray-300" size={24} />
+							</div>
+							<p className="text-gray-900 font-medium">No upcoming bookings</p>
+							<p className="text-gray-400 text-sm mt-1">
+								Your scheduled services will appear here.
+							</p>
+						</div>
+					) : (
+						<div className="space-y-4">
+							{/* Always show the first one */}
 							<UpcomingCard booking={upcoming[0]} />
 
-							{/* VIEW MORE BUTTON */}
-							{upcoming.length > 1 && (
-								<button
-									onClick={() => setShowMoreUpcoming(!showMoreUpcoming)}
-									className="cursor-pointer px-2 py-1 rounded-xl m-2 text-violet-600 hover:bg-violet-700 hover:text-white float-right transition duration-200"
-								>
-									{showMoreUpcoming ? "Hide" : "View more"}
-								</button>
-							)}
-
-							{/* EXTRA UPCOMING LIST */}
+							{/* Show others if toggled */}
 							{showMoreUpcoming && (
-								<div className="mt-4 space-y-3">
+								<motion.div
+									initial={{ opacity: 0, height: 0 }}
+									animate={{ opacity: 1, height: "auto" }}
+									className="space-y-4 pt-2"
+								>
 									{upcoming.slice(1).map((b) => (
-										<UpcomingCard key={b.id} booking={b} />
+										<UpcomingCard key={b.booking_id || b.id} booking={b} />
 									))}
-								</div>
+								</motion.div>
 							)}
-						</>
+						</div>
 					)}
 				</div>
 
 				{/* 3. Quick Book Actions */}
-				<div className="bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-sm">
-					<h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-						<Zap className="text-yellow-500" size={20} /> Quick Book
+				<div className="bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-sm h-full">
+					<h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-gray-800">
+						<div className="p-2 bg-yellow-100 rounded-lg text-yellow-600">
+							<Zap size={18} />
+						</div>
+						Quick Book
 					</h3>
 					<p className="text-sm text-gray-500 mb-6">
 						Select a category to find a pro instantly.
@@ -357,15 +373,15 @@ function OverviewTab({
 						{QUICK_SERVICES.map((service) => (
 							<Link
 								key={service.slug}
-								to={`/services/${service.slug}`} // Assuming your app routes handle category searches or details
-								className="flex items-center gap-3 p-3 rounded-2xl border border-transparent hover:border-gray-200 hover:bg-white transition-all group"
+								to={`/services/${service.slug}`}
+								className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 bg-white hover:border-violet-200 hover:shadow-md hover:shadow-violet-100 transition-all group"
 							>
 								<div
 									className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${service.color} group-hover:scale-110 transition-transform`}
 								>
 									{service.icon}
 								</div>
-								<span className="font-medium text-gray-700">
+								<span className="font-medium text-gray-700 text-sm">
 									{service.name}
 								</span>
 							</Link>
@@ -376,21 +392,80 @@ function OverviewTab({
 		</motion.div>
 	);
 }
+
+// --- UPDATED UPCOMING CARD ---
 function UpcomingCard({ booking }) {
+	const navigate = useNavigate();
+
+	const providerName = booking.provider_name || "Unknown Provider";
+	const providerImage = booking.provider?.photo;
+
 	return (
-		<div className="flex gap-4 bg-gray-50 p-4 rounded-2xl">
-			<div className="flex-1">
-				<h4 className="font-bold text-lg text-gray-800">
-					{booking.service_name}
-				</h4>
-				<p className="text-gray-500 text-sm mb-3">
-					Provider: {booking.provider?.name}
-				</p>
-				<div className="flex flex-wrap gap-3">
-					<div className="flex items-center gap-1 text-xs text-gray-600 bg-white px-2 py-1 rounded-lg">
-						<Calendar size={12} /> {new Date(booking.date).toLocaleString()}
+		<div className="group bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-violet-100 transition-all duration-300 relative overflow-hidden">
+			{/* Left accent bar */}
+			<div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-500 rounded-l-2xl"></div>
+
+			<div className="flex justify-between items-start mb-4 pl-2">
+				<div>
+					<h4 className="font-bold text-gray-800 text-lg leading-tight">
+						{booking.service_name}
+					</h4>
+					<p className="text-xs text-gray-400 font-mono mt-1">
+						ID: #{booking.booking_id?.slice(0, 8).toUpperCase() || "..."}
+					</p>
+				</div>
+				<span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-600 border border-green-100 flex items-center gap-1">
+					<div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+					Confirmed
+				</span>
+			</div>
+
+			{/* Provider Info Pill */}
+			<div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl ml-2 group-hover:bg-violet-50/50 transition-colors">
+				<div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 overflow-hidden border border-white shadow-sm">
+					{providerImage ? (
+						<img
+							src={providerImage}
+							alt={providerName}
+							className="w-full h-full object-cover"
+						/>
+					) : (
+						providerName.charAt(0)
+					)}
+				</div>
+				<div className="flex-1">
+					<p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">
+						Provider
+					</p>
+					<p className="text-sm font-semibold text-gray-700">{providerName}</p>
+				</div>
+			</div>
+
+			{/* Date & Time Footer */}
+			<div className="flex items-center justify-between pt-3 border-t border-gray-100 ml-2">
+				<div className="flex items-center gap-4">
+					<div className="flex items-center gap-1.5 text-sm text-gray-600">
+						<Calendar size={14} className="text-violet-500" />
+						<span className="font-medium">
+							{new Date(booking.date).toLocaleDateString("en-US", {
+								month: "short",
+								day: "numeric",
+							})}
+						</span>
+					</div>
+					<div className="w-px h-3 bg-gray-300"></div>
+					<div className="flex items-center gap-1.5 text-sm text-gray-600">
+						<Clock size={14} className="text-violet-500" />
+						<span className="font-medium">
+							{formatTimeForCard(booking.start_time)}
+						</span>
 					</div>
 				</div>
+
+				{/* Optional: Action Button if you have a details page */}
+				{/* <button className="text-xs font-medium text-violet-600 hover:text-violet-800 transition-colors">
+                    View Details
+                </button> */}
 			</div>
 		</div>
 	);
@@ -499,7 +574,6 @@ const StatCard = ({ label, value, color }) => (
 	</div>
 );
 
-// --- Icons (Simple Wrappers) ---
 const DashboardIcon = () => (
 	<svg
 		xmlns="http://www.w3.org/2000/svg"

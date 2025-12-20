@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const sendEmail = require("../utils/sendEmail");
 
 BigInt.prototype.toJSON = function () {
 	return this.toString();
@@ -9,7 +10,6 @@ const TIME_LIMIT_MINUTES = 10;
 async function createBooking(req, res, next) {
 	console.log("--- New Booking Request ---");
 	console.log("User:", req.user);
-	console.log("Body:", req.body);
 
 	const { provider_id, service_id, date, start_time, end_time, address } =
 		req.body;
@@ -91,8 +91,63 @@ async function createBooking(req, res, next) {
 			address,
 		]);
 
+		const namesQ = `
+			SELECT
+			(SELECT name FROM users WHERE id=$1) as provider_name,
+			(SELECT name FROM services WHERE id=$2) as service_name
+		`;
+		const namesRes = await client.query(namesQ, [provider_id, service_id]);
+
+		const providerName = namesRes.rows[0]?.provider_name || "the Provider";
+		const serviceName = namesRes.rows[0]?.service_name || "Service";
+
 		await client.query("COMMIT");
 		console.log("Booking successful:", r.rows[0]);
+
+		const bookingDate = new Date(date).toLocaleDateString("en-IN", {
+			timeZone: "Asia/Kolkata",
+			weekday: "long",
+			year: "numeric",
+			month: "long",
+			day: "numeric",
+		});
+		const [hours, minutes] = start_time.split(":");
+		const timeObj = new Date();
+		timeObj.setHours(hours, minutes);
+
+		const formattedTime = timeObj.toLocaleTimeString("en-IN", {
+			hour: "numeric",
+			minute: "2-digit",
+			hour12: true,
+		});
+		const emailMessage = `Hello ${req.user.name || "Customer"},
+
+        Your booking has been confirmed!
+            
+		--------------------------------------------------
+		Service:  ${serviceName}
+		Provider: ${providerName}
+		Date:     ${bookingDate}
+		Time:     ${formattedTime}
+		Location: ${address}
+		--------------------------------------------------
+		
+		You can view or manage your booking in your dashboard.
+
+		Thank you for choosing TaskGenie!`;
+
+		try {
+			if (req.user && req.user.email) {
+				await sendEmail({
+					email: req.user.email,
+					subject: `Booking Confirmed: ${serviceName} with ${providerName}`,
+					message: emailMessage,
+				});
+				console.log(`Confirmation email sent to ${req.user.email}`);
+			}
+		} catch (emailErr) {
+			console.error("Failed to send confirmation email:", emailErr);
+		}
 
 		res.status(201).json({ booking: r.rows[0] });
 	} catch (err) {

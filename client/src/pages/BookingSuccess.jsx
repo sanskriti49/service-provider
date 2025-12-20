@@ -1,4 +1,4 @@
-import { useNavigate, useLocation, Navigate } from "react-router-dom";
+import { useNavigate, useLocation, Navigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
 	Check,
@@ -6,10 +6,10 @@ import {
 	Calendar,
 	Clock,
 	Navigation,
-	Pencil,
 	X,
 	Loader2,
 	AlertCircle,
+	Mail,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 
@@ -121,7 +121,7 @@ export default function BookingSuccess() {
 	}, []);
 
 	const formatDate = (dateStr) =>
-		new Date(dateStr).toLocaleDateString("en-US", {
+		new Date(dateStr).toLocaleDateString("en-IN", {
 			weekday: "short",
 			month: "short",
 			day: "numeric",
@@ -143,21 +143,27 @@ export default function BookingSuccess() {
 			<div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
 
 			<div className="relative z-10 w-full max-w-md animate-fade-in-up">
-				{/* Header */}
 				<div className="bg-white/10 backdrop-blur-2xl border border-white/10 rounded-t-3xl p-8 text-center relative overflow-hidden">
 					<div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500" />
 					<div className="w-20 h-20 mx-auto bg-gradient-to-tr from-green-400 to-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30 mb-6 animate-bounce-slow">
 						<Check className="w-10 h-10 text-white" strokeWidth={4} />
 					</div>
+
 					<h1 className="text-3xl font-bold text-white mb-2 tracking-tight">
 						Booking Confirmed!
 					</h1>
-					<p className="text-violet-200/70 text-sm">
+					<p className="text-violet-200/70 text-sm mb-6">
 						Your appointment is scheduled successfully.
 					</p>
+
+					<div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.15)] animate-pulse-slow">
+						<Mail className="w-4 h-4 text-emerald-400" />
+						<span className="text-emerald-100 text-xs font-medium">
+							Confirmation email sent!
+						</span>
+					</div>
 				</div>
 
-				{/* Ticket Body */}
 				<div className="relative bg-[#13112b]/80 backdrop-blur-xl border-x border-white/10 p-6">
 					<div className="absolute top-0 left-0 w-full flex justify-between transform -translate-y-1/2">
 						<div className="w-6 h-6 bg-[#0d0b21] rounded-full -ml-3" />
@@ -166,7 +172,6 @@ export default function BookingSuccess() {
 					</div>
 
 					<div className="space-y-6 pt-2">
-						{/* Time & Date */}
 						<div className="grid grid-cols-2 gap-4">
 							<div className="bg-white/5 rounded-2xl p-4 border border-white/5">
 								<div className="flex items-center gap-2 text-violet-300 mb-1">
@@ -192,7 +197,6 @@ export default function BookingSuccess() {
 							</div>
 						</div>
 
-						{/* --- DYNAMIC ADDRESS SECTION --- */}
 						<div
 							className={`rounded-2xl border transition-all duration-300 overflow-hidden ${
 								isEditing
