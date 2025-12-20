@@ -3,6 +3,7 @@ const router = express.Router();
 const {
 	createBooking,
 	updateBookingAddress,
+	getUserHistory,
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const db = require("../config/db");
@@ -15,7 +16,6 @@ function allowRoles(...roles) {
 		next();
 	};
 }
-
 // 1. CREATE BOOKING
 router.post("/", authMiddleware, allowRoles("customer"), createBooking);
 
@@ -37,27 +37,27 @@ router.get("/", authMiddleware, allowRoles("admin"), async (req, res) => {
 	}
 });
 
-// 3. CUSTOMER BOOKINGS (Specific paths first)
-router.get(
-	"/user",
-	authMiddleware,
-	allowRoles("customer"),
-	async (req, res) => {
-		try {
-			const q = `
-            SELECT b.*, pu.name AS provider_name
-            FROM bookings b
-            LEFT JOIN users pu ON pu.id = b.provider_id
-            WHERE b.user_id=$1
-            ORDER BY b.date ASC
-        `;
-			const result = await db.query(q, [req.user.id]);
-			res.json(result.rows);
-		} catch (err) {
-			res.status(500).json({ message: "Error fetching user bookings" });
-		}
-	}
-);
+// 3.
+// router.get(
+// 	"/user",
+// 	authMiddleware,
+// 	allowRoles("customer"),
+// 	async (req, res) => {
+// 		try {
+// 			const q = `
+//             SELECT b.*, pu.name AS provider_name
+//             FROM bookings b
+//             LEFT JOIN users pu ON pu.id = b.provider_id
+//             WHERE b.user_id=$1
+//             ORDER BY b.date ASC
+//         `;
+// 			const result = await db.query(q, [req.user.id]);
+// 			res.json(result.rows);
+// 		} catch (err) {
+// 			res.status(500).json({ message: "Error fetching user bookings" });
+// 		}
+// 	}
+// );
 
 router.get(
 	"/user/upcoming",
@@ -86,22 +86,28 @@ router.get(
 	"/user/history",
 	authMiddleware,
 	allowRoles("customer"),
-	async (req, res) => {
-		try {
-			const q = `
-            SELECT b.*, pu.name AS provider_name 
-            FROM bookings b
-            LEFT JOIN users pu ON pu.id = b.provider_id
-            WHERE b.user_id = $1 AND b.date < NOW()
-            ORDER BY b.date DESC
-        `;
-			const result = await db.query(q, [req.user.id]);
-			res.json(result.rows);
-		} catch (err) {
-			res.status(500).json({ message: "Error fetching history" });
-		}
-	}
+	getUserHistory
 );
+// router.get(
+// 	"/user/history",
+// 	authMiddleware,
+// 	allowRoles("customer"),
+// 	async (req, res) => {
+// 		try {
+// 			const q = `
+//             SELECT b.*, pu.name AS provider_name
+//             FROM bookings b
+//             LEFT JOIN users pu ON pu.id = b.provider_id
+//             WHERE b.user_id = $1 AND b.date < NOW()
+//             ORDER BY b.date DESC
+//         `;
+// 			const result = await db.query(q, [req.user.id]);
+// 			res.json(result.rows);
+// 		} catch (err) {
+// 			res.status(500).json({ message: "Error fetching history" });
+// 		}
+// 	}
+// );
 
 router.get(
 	"/provider",

@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 const MOCK_ACTIVE_BOOKING = {
 	id: "BK-7829",
 	service: "Deep House Cleaning",
@@ -90,14 +92,20 @@ const formatTimeForCard = (timeStr) => {
 
 export default function CustomerDashboard() {
 	const navigate = useNavigate();
-	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 	const [user, setUser] = useState({ name: "User" });
 	const [activeTab, setActiveTab] = useState("overview");
 	const [services, setServices] = useState([]);
-	const [bookings, setBookings] = useState([]);
+
 	const [upcoming, setUpcoming] = useState([]);
 	const [showMoreUpcoming, setShowMoreUpcoming] = useState(false);
+
+	const [dashboardStats, setDashboardStats] = useState({
+		total_spent: 0,
+		total_completed: 0,
+		active_tasks: 0,
+	});
+	const [nextBooking, setNextBooking] = useState(null);
 
 	const [loading, setLoading] = useState(true);
 	const totalServices = services.length;
@@ -130,6 +138,7 @@ export default function CustomerDashboard() {
 
 		fetchData();
 	}, []);
+
 	useEffect(() => {
 		const fetchBookings = async () => {
 			try {
@@ -151,6 +160,28 @@ export default function CustomerDashboard() {
 
 		fetchBookings();
 	}, []);
+
+	useEffect(() => {
+		const fetchDashboardData = async () => {
+			try {
+				const token = localStorage.getItem("token");
+				const res = await fetch(`${API_URL}/api/dashboard/customer`, {
+					headers: { Authorization: `Bearer ${token}` },
+				});
+
+				if (res.ok) {
+					const data = await res.json();
+					setDashboardStats(data.stats);
+					setNextBooking(data.next_booking);
+				}
+			} catch (err) {
+				console.error("Error loading dashboard", err);
+			} finally {
+				setLoading(false);
+			}
+		};
+		if (user.id) fetchDashboardData();
+	}, [user.id]); // runs when user is decoded
 
 	return (
 		<div className="lg:-mt-50 -mt-70 bricolage-grotesque min-h-screen bg-gray-50/50 relative overflow-hidden pt-24 pb-12 px-4 sm:px-8">
@@ -255,6 +286,8 @@ export default function CustomerDashboard() {
 					{/* Conditional Content based on Tab */}
 					{activeTab === "overview" && (
 						<OverviewTab
+							stats={dashboardStats}
+							nextBooking={nextBooking}
 							totalServices={totalServices}
 							upcoming={upcoming}
 							showMoreUpcoming={showMoreUpcoming}
@@ -269,12 +302,242 @@ export default function CustomerDashboard() {
 	);
 }
 
+// function OverviewTab({
+// 	stats,
+// 	nextBooking,
+// 	totalServices,
+// 	upcoming,
+// 	showMoreUpcoming,
+// 	setShowMoreUpcoming,
+// }) {
+// 	return (
+// 		<motion.div
+// 			initial={{ opacity: 0 }}
+// 			animate={{ opacity: 1 }}
+// 			className="space-y-8"
+// 		>
+// 			{/* 1. Quick Stats */}
+// 			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+// 				<StatCard
+// 					label="Total Services"
+// 					value={totalServices}
+// 					color="bg-blue-50 text-blue-600"
+// 				/>
+// 				<StatCard
+// 					label="Active Tasks"
+// 					value={stats.active_tasks}
+// 					color="bg-orange-50 text-orange-600"
+// 				/>
+// 				<StatCard
+// 					label="Total Spent"
+// 					value={`₹${stats.total_spent}`}
+// 					color="bg-green-50 text-green-600"
+// 				/>
+// 				{/* <StatCard
+// 					label="Jobs Done"
+// 					value={stats.total_completed} // Real Value
+// 					color="bg-orange-50 text-orange-600"
+// 				/> */}
+// 				<StatCard
+// 					label="Reviews Given"
+// 					value="-"
+// 					color="bg-purple-50 text-purple-600"
+// 				/>
+// 			</div>
+
+// 			<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+// 				<div className="bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-sm flex flex-col h-full">
+// 					<div className="flex justify-between items-center mb-6">
+// 						<h3 className="font-bold text-lg flex items-center gap-2 text-gray-800">
+// 							<div className="p-2 bg-violet-100 rounded-lg text-violet-600">
+// 								<Clock size={18} />
+// 							</div>
+// 							Up Next
+// 						</h3>
+// 						{upcoming.length > 1 && (
+// 							<button
+// 								onClick={() => setShowMoreUpcoming(!showMoreUpcoming)}
+// 								className="cursor-pointer text-xs font-medium text-violet-600 hover:text-violet-800 hover:bg-violet-50 px-3 py-1.5 rounded-lg transition-colors"
+// 							>
+// 								{showMoreUpcoming
+// 									? "Show Less"
+// 									: `View All (${upcoming.length})`}
+// 							</button>
+// 						)}
+// 						{!nextBooking ? (
+// 							<div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-gray-100 rounded-2xl">
+// 								<div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+// 									<Calendar className="text-gray-300" size={24} />
+// 								</div>
+// 								<p className="text-gray-900 font-medium">
+// 									No upcoming bookings
+// 								</p>
+// 							</div>
+// 						) : (
+// 							<div className="space-y-4">
+// 								{/* Pass the real DB object */}
+// 								<UpcomingCard booking={nextBooking} />
+// 							</div>
+// 						)}
+// 					</div>
+
+// 					{upcoming.length === 0 ? (
+// 						<div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-gray-100 rounded-2xl">
+// 							<div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+// 								<Calendar className="text-gray-300" size={24} />
+// 							</div>
+// 							<p className="text-gray-900 font-medium">No upcoming bookings</p>
+// 							<p className="text-gray-400 text-sm mt-1">
+// 								Your scheduled services will appear here.
+// 							</p>
+// 						</div>
+// 					) : (
+// 						<div className="space-y-4">
+// 							{/* Always show the first one */}
+// 							<UpcomingCard booking={upcoming[0]} />
+
+// 							{/* Show others if toggled */}
+// 							{showMoreUpcoming && (
+// 								<motion.div
+// 									initial={{ opacity: 0, height: 0 }}
+// 									animate={{ opacity: 1, height: "auto" }}
+// 									className="space-y-4 pt-2"
+// 								>
+// 									{upcoming.slice(1).map((b) => (
+// 										<UpcomingCard key={b.booking_id || b.id} booking={b} />
+// 									))}
+// 								</motion.div>
+// 							)}
+// 						</div>
+// 					)}
+// 				</div>
+
+// 				{/* 3. Quick Book Actions */}
+// 				<div className="bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-sm h-full">
+// 					<h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-gray-800">
+// 						<div className="p-2 bg-yellow-100 rounded-lg text-yellow-600">
+// 							<Zap size={18} />
+// 						</div>
+// 						Quick Book
+// 					</h3>
+// 					<p className="text-sm text-gray-500 mb-6">
+// 						Select a category to find a pro instantly.
+// 					</p>
+
+// 					<div className="grid grid-cols-2 gap-3">
+// 						{QUICK_SERVICES.map((service) => (
+// 							<Link
+// 								key={service.slug}
+// 								to={`/services/${service.slug}`}
+// 								className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 bg-white hover:border-violet-200 hover:shadow-md hover:shadow-violet-100 transition-all group"
+// 							>
+// 								<div
+// 									className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${service.color} group-hover:scale-110 transition-transform`}
+// 								>
+// 									{service.icon}
+// 								</div>
+// 								<span className="font-medium text-gray-700 text-sm">
+// 									{service.name}
+// 								</span>
+// 							</Link>
+// 						))}
+// 					</div>
+// 				</div>
+// 			</div>
+// 		</motion.div>
+// 	);
+// }
+
+// --- UPDATED UPCOMING CARD ---
+// function UpcomingCard({ booking }) {
+// 	const navigate = useNavigate();
+
+// 	const providerName = booking.provider_name || "Unknown Provider";
+// 	const providerImage = booking.provider?.photo;
+
+// 	return (
+// 		<div className="group bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-violet-100 transition-all duration-300 relative overflow-hidden">
+// 			{/* Left accent bar */}
+// 			<div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-500 rounded-l-2xl"></div>
+
+// 			<div className="flex justify-between items-start mb-4 pl-2">
+// 				<div>
+// 					<h4 className="font-bold text-gray-800 text-lg leading-tight">
+// 						{booking.service_name}
+// 					</h4>
+// 					<p className="text-xs text-gray-400 font-mono mt-1">
+// 						ID: #{booking.booking_id?.slice(0, 8).toUpperCase() || "..."}
+// 					</p>
+// 				</div>
+// 				<span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-600 border border-green-100 flex items-center gap-1">
+// 					<div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+// 					Confirmed
+// 				</span>
+// 			</div>
+
+// 			{/* Provider Info Pill */}
+// 			<div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl ml-2 group-hover:bg-violet-50/50 transition-colors">
+// 				<div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 overflow-hidden border border-white shadow-sm">
+// 					{providerImage ? (
+// 						<img
+// 							src={providerImage}
+// 							alt={providerName}
+// 							className="w-full h-full object-cover"
+// 						/>
+// 					) : (
+// 						providerName.charAt(0)
+// 					)}
+// 				</div>
+// 				<div className="flex-1">
+// 					<p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">
+// 						Provider
+// 					</p>
+// 					<p className="text-sm font-semibold text-gray-700">{providerName}</p>
+// 				</div>
+// 			</div>
+
+// 			{/* Date & Time Footer */}
+// 			<div className="flex items-center justify-between pt-3 border-t border-gray-100 ml-2">
+// 				<div className="flex items-center gap-4">
+// 					<div className="flex items-center gap-1.5 text-sm text-gray-600">
+// 						<Calendar size={14} className="text-violet-500" />
+// 						<span className="font-medium">
+// 							{new Date(booking.date).toLocaleDateString("en-US", {
+// 								month: "short",
+// 								day: "numeric",
+// 							})}
+// 						</span>
+// 					</div>
+// 					<div className="w-px h-3 bg-gray-300"></div>
+// 					<div className="flex items-center gap-1.5 text-sm text-gray-600">
+// 						<Clock size={14} className="text-violet-500" />
+// 						<span className="font-medium">
+// 							{formatTimeForCard(booking.start_time)}
+// 						</span>
+// 					</div>
+// 				</div>
+
+// 				{/* Optional: Action Button if you have a details page */}
+// 				{/* <button className="text-xs font-medium text-violet-600 hover:text-violet-800 transition-colors">
+//                     View Details
+//                 </button> */}
+// 			</div>
+// 		</div>
+// 	);
+// }
+
+// --- UPDATED OVERVIEW TAB ---
 function OverviewTab({
+	stats,
 	totalServices,
 	upcoming,
 	showMoreUpcoming,
 	setShowMoreUpcoming,
 }) {
+	// Logic: The first item is the "Hero", the rest are the list.
+	const mainBooking = upcoming.length > 0 ? upcoming[0] : null;
+	const remainingBookings = upcoming.slice(1);
+
 	return (
 		<motion.div
 			initial={{ opacity: 0 }}
@@ -290,71 +553,88 @@ function OverviewTab({
 				/>
 				<StatCard
 					label="Active Tasks"
-					value={upcoming.length}
+					value={stats.active_tasks}
 					color="bg-orange-50 text-orange-600"
 				/>
 				<StatCard
 					label="Total Spent"
-					value="$450"
+					value={`₹${stats.total_spent}`}
 					color="bg-green-50 text-green-600"
 				/>
 				<StatCard
 					label="Reviews Given"
-					value="5"
+					value="-"
 					color="bg-purple-50 text-purple-600"
 				/>
 			</div>
 
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-				<div className="bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-sm flex flex-col h-full">
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+				{/* 2. UP NEXT SECTION */}
+				<div className="bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-sm flex flex-col h-full min-h-[400px]">
 					<div className="flex justify-between items-center mb-6">
 						<h3 className="font-bold text-lg flex items-center gap-2 text-gray-800">
 							<div className="p-2 bg-violet-100 rounded-lg text-violet-600">
 								<Clock size={18} />
 							</div>
-							Upcoming
+							Up Next
 						</h3>
-						{upcoming.length > 1 && (
+						{remainingBookings.length > 0 && (
 							<button
 								onClick={() => setShowMoreUpcoming(!showMoreUpcoming)}
 								className="cursor-pointer text-xs font-medium text-violet-600 hover:text-violet-800 hover:bg-violet-50 px-3 py-1.5 rounded-lg transition-colors"
 							>
 								{showMoreUpcoming
 									? "Show Less"
-									: `View All (${upcoming.length})`}
+									: `+${remainingBookings.length} more`}
 							</button>
 						)}
 					</div>
 
-					{upcoming.length === 0 ? (
-						<div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-gray-100 rounded-2xl">
-							<div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
-								<Calendar className="text-gray-300" size={24} />
+					<div className="flex-1 flex flex-col gap-4">
+						{!mainBooking ? (
+							// EMPTY STATE
+							<div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-gray-100 rounded-2xl">
+								<div className="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+									<Calendar className="text-gray-300" size={28} />
+								</div>
+								<p className="text-gray-900 font-bold text-lg">
+									All caught up!
+								</p>
+								<p className="text-gray-500 text-sm mt-1 max-w-[200px]">
+									You have no upcoming scheduled services at the moment.
+								</p>
 							</div>
-							<p className="text-gray-900 font-medium">No upcoming bookings</p>
-							<p className="text-gray-400 text-sm mt-1">
-								Your scheduled services will appear here.
-							</p>
-						</div>
-					) : (
-						<div className="space-y-4">
-							{/* Always show the first one */}
-							<UpcomingCard booking={upcoming[0]} />
+						) : (
+							// LIST STATE
+							<>
+								{/* Main Hero Card */}
+								<div className="relative z-10">
+									<p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">
+										Happening Soon
+									</p>
+									<UpcomingCard booking={mainBooking} isHero={true} />
+								</div>
 
-							{/* Show others if toggled */}
-							{showMoreUpcoming && (
+								{/* Collapsible List for Remaining items */}
 								<motion.div
-									initial={{ opacity: 0, height: 0 }}
-									animate={{ opacity: 1, height: "auto" }}
-									className="space-y-4 pt-2"
+									initial={false}
+									animate={{
+										height: showMoreUpcoming ? "auto" : 0,
+										opacity: showMoreUpcoming ? 1 : 0,
+									}}
+									className="overflow-hidden space-y-3"
 								>
-									{upcoming.slice(1).map((b) => (
-										<UpcomingCard key={b.booking_id || b.id} booking={b} />
+									{remainingBookings.map((b) => (
+										<UpcomingCard
+											key={b.booking_id || b.id}
+											booking={b}
+											isHero={false}
+										/>
 									))}
 								</motion.div>
-							)}
-						</div>
-					)}
+							</>
+						)}
+					</div>
 				</div>
 
 				{/* 3. Quick Book Actions */}
@@ -374,7 +654,7 @@ function OverviewTab({
 							<Link
 								key={service.slug}
 								to={`/services/${service.slug}`}
-								className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 bg-white hover:border-violet-200 hover:shadow-md hover:shadow-violet-100 transition-all group"
+								className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-2xl border border-gray-100 bg-white hover:border-violet-200 hover:shadow-md hover:shadow-violet-100 transition-all group"
 							>
 								<div
 									className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${service.color} group-hover:scale-110 transition-transform`}
@@ -394,84 +674,137 @@ function OverviewTab({
 }
 
 // --- UPDATED UPCOMING CARD ---
-function UpcomingCard({ booking }) {
-	const navigate = useNavigate();
-
+function UpcomingCard({ booking, isHero = false }) {
 	const providerName = booking.provider_name || "Unknown Provider";
 	const providerImage = booking.provider?.photo;
+	const dateObj = new Date(booking.date);
+	const day = dateObj.getDate();
+	const month = dateObj.toLocaleDateString("en-US", { month: "short" });
 
 	return (
-		<div className="group bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-violet-100 transition-all duration-300 relative overflow-hidden">
-			{/* Left accent bar */}
-			<div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-500 rounded-l-2xl"></div>
-
-			<div className="flex justify-between items-start mb-4 pl-2">
-				<div>
-					<h4 className="font-bold text-gray-800 text-lg leading-tight">
-						{booking.service_name}
-					</h4>
-					<p className="text-xs text-gray-400 font-mono mt-1">
-						ID: #{booking.booking_id?.slice(0, 8).toUpperCase() || "..."}
-					</p>
-				</div>
-				<span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-600 border border-green-100 flex items-center gap-1">
-					<div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-					Confirmed
+		<div
+			className={`group bg-white rounded-2xl border transition-all duration-300 relative overflow-hidden flex flex-col sm:flex-row gap-4
+            ${
+							isHero
+								? "p-5 border-violet-100 shadow-md shadow-violet-100/50 hover:shadow-lg hover:border-violet-300"
+								: "p-4 border-gray-100 hover:border-gray-300 hover:shadow-sm"
+						}`}
+		>
+			{/* Left: Date Box */}
+			<div
+				className={`flex-shrink-0 flex flex-col items-center justify-center rounded-xl border w-16 h-16 sm:w-20 sm:h-auto
+                ${
+									isHero
+										? "bg-violet-50 border-violet-100 text-violet-700"
+										: "bg-gray-50 border-gray-100 text-gray-600"
+								}`}
+			>
+				<span className="text-xs font-bold uppercase">{month}</span>
+				<span className="text-2xl sm:text-3xl font-bold leading-none">
+					{day}
 				</span>
 			</div>
 
-			{/* Provider Info Pill */}
-			<div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl ml-2 group-hover:bg-violet-50/50 transition-colors">
-				<div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 overflow-hidden border border-white shadow-sm">
-					{providerImage ? (
-						<img
-							src={providerImage}
-							alt={providerName}
-							className="w-full h-full object-cover"
-						/>
-					) : (
-						providerName.charAt(0)
+			{/* Middle: Info */}
+			<div className="flex-1 min-w-0">
+				<div className="flex justify-between items-start">
+					<div>
+						<h4
+							className={`font-bold text-gray-900 truncate pr-2 ${
+								isHero ? "text-lg" : "text-base"
+							}`}
+						>
+							{booking.service_name}
+						</h4>
+						<div className="flex items-center gap-2 mt-1">
+							<Clock size={14} className="text-gray-400" />
+							<span className="text-sm font-medium text-gray-600">
+								{formatTimeForCard(booking.start_time)}
+							</span>
+						</div>
+					</div>
+					{isHero && (
+						<span className="hidden sm:inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-600 border border-green-100 items-center gap-1">
+							<div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+							Confirmed
+						</span>
 					)}
 				</div>
-				<div className="flex-1">
-					<p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">
-						Provider
-					</p>
-					<p className="text-sm font-semibold text-gray-700">{providerName}</p>
-				</div>
-			</div>
 
-			{/* Date & Time Footer */}
-			<div className="flex items-center justify-between pt-3 border-t border-gray-100 ml-2">
-				<div className="flex items-center gap-4">
-					<div className="flex items-center gap-1.5 text-sm text-gray-600">
-						<Calendar size={14} className="text-violet-500" />
-						<span className="font-medium">
-							{new Date(booking.date).toLocaleDateString("en-US", {
-								month: "short",
-								day: "numeric",
-							})}
-						</span>
+				<div className="mt-4 flex items-center justify-between">
+					{/* Provider Info */}
+					<div className="flex items-center gap-2">
+						<div className="w-6 h-6 rounded-full bg-gray-200 border border-white shadow-sm overflow-hidden">
+							{providerImage ? (
+								<img
+									src={providerImage}
+									alt={providerName}
+									className="w-full h-full object-cover"
+								/>
+							) : (
+								<div className="w-full h-full flex items-center justify-center text-[10px] text-gray-500 font-bold">
+									{providerName.charAt(0)}
+								</div>
+							)}
+						</div>
+						<p className="text-sm text-gray-500 truncate max-w-[120px]">
+							<span className="font-medium text-gray-700">{providerName}</span>
+						</p>
 					</div>
-					<div className="w-px h-3 bg-gray-300"></div>
-					<div className="flex items-center gap-1.5 text-sm text-gray-600">
-						<Clock size={14} className="text-violet-500" />
-						<span className="font-medium">
-							{formatTimeForCard(booking.start_time)}
-						</span>
+
+					{/* Price Tag */}
+					<div className="font-bold text-gray-900 bg-gray-50 px-2 py-1 rounded-lg text-sm border border-gray-100">
+						Rs. {booking.price ? booking.price : "$--"}
 					</div>
 				</div>
-
-				{/* Optional: Action Button if you have a details page */}
-				{/* <button className="text-xs font-medium text-violet-600 hover:text-violet-800 transition-colors">
-                    View Details
-                </button> */}
 			</div>
 		</div>
 	);
 }
-
 function BookingsTab() {
+	const [history, setHistory] = useState([]);
+	const [loading, setLoading] = useState(true);
+	const [meta, setMeta] = useState({
+		current_page: 1,
+		total_pages: 1,
+		has_next_page: false,
+	});
+
+	useEffect(() => {
+		const fetchHistory = async () => {
+			setLoading(true);
+			try {
+				const token = localStorage.getItem("token");
+				const res = await fetch(
+					`${API_URL}/api/bookings/user/history?page=${meta.current_page}&limit=5`,
+					{ headers: { Authorization: `Bearer ${token}` } }
+				);
+				if (res.ok) {
+					const responseData = await res.json();
+					setHistory(responseData.data);
+					setMeta(responseData.meta);
+				}
+			} catch (err) {
+				console.error("Error fetching history", err);
+			} finally {
+				setLoading(false);
+			}
+		};
+		fetchHistory();
+	}, [meta.current_page]);
+
+	const handleNext = () => {
+		if (meta.has_next_page) {
+			setMeta((prev) => ({ ...prev, current_page: prev.current_page + 1 }));
+		}
+	};
+
+	const handlePrev = () => {
+		if (meta.current_page > 1) {
+			setMeta((prev) => ({ ...prev, current_page: prev.current_page - 1 }));
+		}
+	};
+
 	return (
 		<motion.div
 			initial={{ opacity: 0 }}
@@ -480,54 +813,81 @@ function BookingsTab() {
 		>
 			<div className="p-6 border-b border-gray-100 flex justify-between items-center">
 				<h3 className="font-bold text-lg">Booking History</h3>
-				<button className="cursor-pointer text-sm text-violet-600 font-medium hover:underline">
-					Download Report
-				</button>
+				<span className="text-xs text-gray-500 font-mono">
+					Page {meta.current_page} of {meta.total_pages}
+				</span>
 			</div>
-			<div className="overflow-x-auto">
-				<table className="w-full text-left">
-					<thead className="bg-gray-50/50 text-gray-500 text-sm">
-						<tr>
-							<th className="p-4 font-medium">Service</th>
-							<th className="p-4 font-medium">Date</th>
-							<th className="p-4 font-medium">Price</th>
-							<th className="p-4 font-medium">Status</th>
-							<th className="p-4 font-medium">Action</th>
-						</tr>
-					</thead>
-					<tbody className="divide-y divide-gray-100">
-						{MOCK_HISTORY.map((item) => (
-							<tr
-								key={item.id}
-								className="hover:bg-gray-50/50 transition-colors"
-							>
-								<td className="p-4 font-medium text-gray-800">
-									{item.service}
-								</td>
-								<td className="p-4 text-gray-500 text-sm">{item.date}</td>
-								<td className="p-4 text-gray-700 font-medium">{item.price}</td>
-								<td className="p-4">
-									<span
-										className={`px-2 py-1 rounded-md text-xs font-bold border ${
-											item.status === "Completed"
-												? "bg-green-50 text-green-700 border-green-200"
-												: item.status === "Cancelled"
-												? "bg-red-50 text-red-700 border-red-200"
-												: "bg-gray-50 text-gray-700"
-										}`}
-									>
-										{item.status}
-									</span>
-								</td>
-								<td className="p-4">
-									<button className="cursor-pointer text-sm text-gray-500 hover:text-violet-600 transition-colors">
-										View
-									</button>
-								</td>
+
+			<div className="overflow-x-auto min-h-[300px]">
+				{loading ? (
+					<div className="flex items-center justify-center h-48 text-gray-400">
+						Loading history...
+					</div>
+				) : history.length === 0 ? (
+					<div className="flex items-center justify-center h-48 text-gray-400">
+						No past bookings found.
+					</div>
+				) : (
+					<table className="w-full text-left">
+						<thead className="bg-gray-50/50 text-gray-500 text-sm">
+							<tr>
+								<th className="p-4 font-medium">Service</th>
+								<th className="p-4 font-medium">Date</th>
+								<th className="p-4 font-medium">Price</th>
+								<th className="p-4 font-medium">Status</th>
 							</tr>
-						))}
-					</tbody>
-				</table>
+						</thead>
+						<tbody className="divide-y divide-gray-100">
+							{history.map((item) => (
+								<tr
+									key={item.booking_id}
+									className="hover:bg-gray-50/50 transition-colors"
+								>
+									<td className="p-4 font-medium text-gray-800">
+										{item.service_name || "Service"}
+									</td>
+									<td className="p-4 text-gray-500 text-sm">
+										{new Date(item.date).toLocaleDateString()}
+									</td>
+									<td className="p-4 text-gray-700 font-medium">
+										${item.price}
+									</td>
+									<td className="p-4">
+										<span
+											className={`px-2 py-1 rounded-md text-xs font-bold border ${
+												item.status === "completed"
+													? "bg-green-50 text-green-700 border-green-200"
+													: item.status === "cancelled"
+													? "bg-red-50 text-red-700 border-red-200"
+													: "bg-gray-50 text-gray-700"
+											}`}
+										>
+											{item.status}
+										</span>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				)}
+			</div>
+
+			{/* Pagination Footer */}
+			<div className="p-4 border-t border-gray-100 flex justify-end gap-2">
+				<button
+					onClick={handlePrev}
+					disabled={meta.current_page === 1 || loading}
+					className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					Previous
+				</button>
+				<button
+					onClick={handleNext}
+					disabled={!meta.has_next_page || loading}
+					className="px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					Next
+				</button>
 			</div>
 		</motion.div>
 	);

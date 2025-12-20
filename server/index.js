@@ -20,6 +20,7 @@ const availabilityRoutes = require("./routes/availabilityRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const authRoutes = require("./routes/authRoutes");
 const usersRoutes = require("./routes/usersRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
 const errorHandler = require("./middleware/errorHandler");
 
@@ -27,6 +28,7 @@ app.use("/api/providers", providerRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api", availabilityRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 
