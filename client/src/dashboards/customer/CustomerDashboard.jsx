@@ -149,10 +149,36 @@ export default function CustomerDashboard() {
 					`${API_URL}/api/bookings/user/upcoming`,
 					{ headers }
 				);
-				const upcomingData = await upcomingRes.json();
-				console.log(upcomingData);
 
-				setUpcoming(upcomingData);
+				if (upcomingRes.ok) {
+					const upcomingData = await upcomingRes.json();
+
+					console.log("Raw API Data:", upcomingData); // Check your console for this!
+
+					const sortedData = upcomingData.sort((a, b) => {
+						// 1. Create Date objects from the date string only
+						const dateA = new Date(a.date);
+						const dateB = new Date(b.date);
+
+						// 2. Compare the Dates first (Milliseconds)
+						const timeA = dateA.getTime();
+						const timeB = dateB.getTime();
+
+						if (timeA !== timeB) {
+							return timeA - timeB; // Sort by date
+						}
+
+						// 3. If Dates are equal (Same Day), compare start_time strings
+						// This works because "09:00" comes before "14:00" alphabetically
+						const startTimeA = a.start_time || "";
+						const startTimeB = b.start_time || "";
+
+						return startTimeA.localeCompare(startTimeB);
+					});
+
+					console.log("Sorted Upcoming:", sortedData);
+					setUpcoming(sortedData);
+				}
 			} catch (err) {
 				console.error(err);
 			}

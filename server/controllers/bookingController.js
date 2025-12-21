@@ -387,14 +387,13 @@ async function getUserHistory(req, res) {
 			LEFT JOIN users pu ON pu.id=b.provider_id
 			LEFT JOIN services s ON s.id=b.service_id
 			WHERE b.user_id=$1
-			AND b.date<NOW()
-			ORDER BY b.date DESC
+			ORDER BY b.date DESC, b.start_time DESC
 			LIMIT $2 OFFSET $3`;
 
 		const countQuery = `
 			SELECT COUNT(*)
 			FROM bookings
-			WHERE user_id=$1 AND date<NOW()`;
+			WHERE user_id=$1`;
 
 		// tun both queries in parallel for performance (Promise.all)
 		const [dataResult, countResult] = await Promise.all([
