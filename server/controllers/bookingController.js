@@ -206,22 +206,37 @@ async function updateBookingStatus(req, res) {
 		}
 
 		if (userRole === "customer") {
-			if (status !== "cancelled") {
+			if (status === "no_show") {
+				const bookingDateTime = new Date(currentBooking.date);
+				const [hours, minutes] = currentBooking.start_time.split(":");
+				bookingDateTime.setHours(hours, minutes);
+
+				const now = new Date();
+
+				const allowedReportTime = new Date(
+					bookingDateTime.getTime() + 20 * 60000
+				);
+				if (now < allowedReportTime) {
+					await client.query("ROLLBACK");
+					return res.status(400).json({
+						message:
+							"You can only report a No-Show 20 minutes after the scheduled start time.",
+					});
+				}
+			} else if (status !== "cancelled") {
 				await client.query("ROLLBACK");
 				return res
 					.status(400)
-					.json({ message: "Customers can only cancel bookings." });
+					.json({ message: "Customers can only Cancel or report No-Show." });
 			}
 
 			if (
-				["in_progress", "completed", "cancelled"].includes(
-					currentBooking.status
-				)
+				["no_show", "completed", "cancelled"].includes(currentBooking.status)
 			) {
 				await client.query("ROLLBACK");
 				return res
 					.status(400)
-					.json({ message: "Cannot cancel this booking at this stage." });
+					.json({ message: "Cannot change status of a finalized booking." });
 			}
 		} else if (userRole === "provider") {
 			// providers move from Booked -> In Progress -> Completed
@@ -232,7 +247,12 @@ async function updateBookingStatus(req, res) {
 					.status(400)
 					.json({ message: "Invalid status transition for provider." });
 			}
-			if (status === "cancelled") {
+			if (status === "no_show") {
+				await client.query("ROLLBACK");
+				return res
+					.status(403)
+					.json({ message: "Providers cannot report No-Show." });
+			} else if (status === "cancelled") {
 				const jobDate = new Date(currentBooking.date);
 				const [hours, minutes] = currentBooking.start_time.split(":");
 				jobDate.setHours(hours, minutes);
@@ -267,6 +287,14 @@ async function updateBookingStatus(req, res) {
 				service_name,
 			} = currentBooking;
 
+			if (status === "no_show") {
+				//notify provider they were marked as no show
+				await sendEmail({
+					email: provider_email,
+					subject: `Alert: Customer Reported No-Show - ${service_name}`,
+					message: `Hi ${provider_name},\n\nThe customer, ${user_name}, has reported that you did not arrive for the scheduled service: ${service_name}.\n\nThis will affect your reliability score. If this is a mistake, please contact support immediately.\n\n- Team TaskGenie`,
+				});
+			}
 			if (status === "cancelled") {
 				const isCancelledByProvider = userRole === "provider";
 
@@ -285,7 +313,6 @@ async function updateBookingStatus(req, res) {
 				}
 			}
 
-			// booking completed
 			if (status === "completed") {
 				// to Customer
 				await sendEmail({
@@ -360,6 +387,14 @@ async function getUserHistory(req, res) {
 	const userId = req.user.id;
 
 	try {
+		const autoExpireQuery = `
+			UPDATE bookings
+			SET status='expired'
+			WHERE status='booked'
+			AND user_id=$1
+			AND (date + end_time) < (NOW()- INTERVAL '15 HOURS')
+		`;
+		await db.query(autoExpireQuery, [userId]);
 		const dataQuery = `
 			SELECT b.booking_id, b.service_id, b.date, b.status, b.price, b.start_time, b.address,
 				   pu.name AS provider_name,

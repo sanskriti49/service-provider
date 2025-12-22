@@ -1,28 +1,42 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion, time } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
 	Calendar,
 	Clock,
 	MapPin,
-	Plus,
 	Search,
 	Settings,
-	Star,
-	User,
-	Zap,
 	CheckCircle2,
 	AlertCircle,
 } from "lucide-react";
 import BookingDetailsSheet from "./BookingDetailsSheet";
 
-const StatusBadge = ({ status, isPast }) => {
+const StatusBadge = ({ status, date, startTime }) => {
 	let displayStatus = status.toLowerCase();
 
-	if (displayStatus === "booked" && isPast) {
-		displayStatus = "expired";
+	const BUFFER_TIME = 15 * 60 * 60 * 1000;
+	const dateObj = new Date(date);
+
+	if (startTime) {
+		const [hours, minutes] = startTime.split(":");
+		dateObj.setHours(hours, minutes);
+	}
+
+	const now = new Date();
+
+	if (displayStatus === "booked") {
+		if (now > dateObj) {
+			const timeDiff = now - dateObj;
+			if (timeDiff < BUFFER_TIME) {
+				displayStatus = "awaiting completion";
+			} else {
+				displayStatus = "expired";
+			}
+		}
 	}
 	let styles = "bg-gray-100 text-gray-600 border-gray-200";
 	let icon = null;
+
 	switch (displayStatus) {
 		case "completed":
 			styles = "bg-emerald-50 text-emerald-700 border-emerald-200";
@@ -32,13 +46,21 @@ const StatusBadge = ({ status, isPast }) => {
 			styles = "bg-red-50 text-red-700 border-red-200";
 			icon = <AlertCircle size={12} />;
 			break;
+		case "no_show":
+			styles = "bg-red-100 text-red-800 border-red-200";
+			icon = <AlertCircle size={12} />;
+			break;
 		case "in progress":
 			styles = "bg-blue-50 text-blue-700 border-blue-200";
 			icon = <Clock size={12} />;
 			break;
+		case "awaiting completion":
+			styles = "bg-yellow-50 text-yellow-700 border-yellow-200";
+			icon = <Clock size={12} />;
+			break;
 		case "booked":
 		case "confirmed":
-			styles = "bg-violet-50 text-violet-700 border-violet-200"; // Changed to Violet for active
+			styles = "bg-violet-50 text-violet-700 border-violet-200";
 			icon = <Clock size={12} />;
 			break;
 		case "expired":
@@ -46,12 +68,15 @@ const StatusBadge = ({ status, isPast }) => {
 			icon = <AlertCircle size={12} />;
 			break;
 	}
+
 	return (
 		<span
 			className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border flex items-center gap-1.5 w-fit ${styles}`}
 		>
 			{icon}
-			{displayStatus}
+			{displayStatus === "awaiting completion"
+				? "Awaiting"
+				: displayStatus}{" "}
 		</span>
 	);
 };
@@ -95,10 +120,18 @@ export default function AllBookings() {
 		fetchHistory();
 	}, [meta.current_page]);
 
-	const handleCancelBooking = async (bookingId) => {
-		if (!window.confirm("Are you sure you want to cancel this booking?")) {
-			return;
+	const handleStatusUpdate = async (bookingId, newStatus) => {
+		let confirmMsg = "Are you sure you want to update this booking?";
+
+		if (newStatus === "cancelled") {
+			confirmMsg = "Are you sure you want to cancel this booking?";
+		} else if (newStatus === "no_show") {
+			confirmMsg =
+				"⚠️ Confirm reporting Provider No-Show? \n\nThis marks that the provider did not arrive. This action cannot be undone.";
 		}
+
+		if (!window.confirm(confirmMsg)) return;
+
 		setActionLoading(bookingId);
 		try {
 			const token = localStorage.getItem("token");
@@ -108,7 +141,7 @@ export default function AllBookings() {
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${token}`,
 				},
-				body: JSON.stringify({ status: "cancelled" }),
+				body: JSON.stringify({ status: newStatus }),
 			});
 			const data = await res.json();
 
@@ -116,15 +149,20 @@ export default function AllBookings() {
 				setHistory((prev) =>
 					prev.map((item) =>
 						item.booking_id === bookingId
-							? { ...item, status: "cancelled" }
+							? { ...item, status: newStatus }
 							: item
 					)
 				);
+
+				if (selectedBooking && selectedBooking.booking_id === bookingId) {
+					setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
+				}
 			} else {
-				setAlertMsg(data.message);
+				alert(data.message || "Failed to update status");
 			}
 		} catch (err) {
-			console.error("Error cancelling:", err);
+			console.error("Error updating status:", err);
+			alert("Network error occurred.");
 		} finally {
 			setActionLoading(null);
 		}
@@ -142,8 +180,6 @@ export default function AllBookings() {
 		}
 	};
 
-	console.log("history", history);
-
 	return (
 		<div className="relative">
 			<motion.div
@@ -160,7 +196,6 @@ export default function AllBookings() {
 						</p>
 					</div>
 
-					{/* Visual Search Bar - makes it look like a pro dashboard */}
 					<div className="flex items-center gap-2">
 						<div className="relative">
 							<Search
@@ -176,7 +211,7 @@ export default function AllBookings() {
 							/>
 						</div>
 						<button className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors">
-							<Settings size={18} /> {/* Filter Icon placeholder */}
+							<Settings size={18} />
 						</button>
 					</div>
 				</div>
@@ -213,7 +248,17 @@ export default function AllBookings() {
 								</thead>
 								<tbody className="divide-y divide-gray-100">
 									{history.map((item) => {
-										const dateObj = new Date(item.date);
+										const rawDate = new Date(item.date);
+										const year = rawDate.getFullYear();
+										const month = String(rawDate.getMonth() + 1).padStart(
+											2,
+											"0"
+										);
+										const day = String(rawDate.getDate()).padStart(2, "0");
+
+										const dateObj = new Date(
+											`${year}-${month}-${day}T00:00:00`
+										);
 
 										if (item.start_time) {
 											const [hours, minutes] = item.start_time.split(":");
@@ -243,7 +288,6 @@ export default function AllBookings() {
 												key={item.booking_id}
 												className="group hover:bg-gray-50/50 transition-colors"
 											>
-												{/* Service Name & ID */}
 												<td className="p-5">
 													<div className="flex flex-col">
 														<span className="font-semibold text-gray-900 text-sm">
@@ -255,7 +299,6 @@ export default function AllBookings() {
 													</div>
 												</td>
 
-												{/* Provider Info */}
 												<td className="p-5">
 													<div className="flex items-center gap-3">
 														<div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
@@ -267,7 +310,6 @@ export default function AllBookings() {
 													</div>
 												</td>
 
-												{/* Stacked Date */}
 												<td className="p-5">
 													<div className="flex flex-col">
 														<span className="text-sm font-medium text-gray-900">
@@ -279,7 +321,6 @@ export default function AllBookings() {
 													</div>
 												</td>
 
-												{/* Price */}
 												<td className="p-5">
 													<span className="font-mono text-sm font-medium text-gray-700">
 														{new Intl.NumberFormat("en-IN", {
@@ -291,7 +332,11 @@ export default function AllBookings() {
 												</td>
 
 												<td className="p-5">
-													<StatusBadge status={item.status} isPast={isPast} />
+													<StatusBadge
+														status={item.status}
+														date={item.date}
+														startTime={item.start_time}
+													/>
 												</td>
 
 												<td className="p-5 text-right">
@@ -308,7 +353,10 @@ export default function AllBookings() {
 															<button
 																onClick={(e) => {
 																	e.stopPropagation();
-																	handleCancelBooking(item.booking_id);
+																	handleStatusUpdate(
+																		item.booking_id,
+																		"cancelled"
+																	);
 																}}
 																disabled={actionLoading === item.booking_id}
 																className="text-xs font-medium text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-100 transition-colors"
@@ -359,12 +407,14 @@ export default function AllBookings() {
 					</div>
 				</div>
 			</motion.div>
+
+			{/* Sheet for Details */}
 			<AnimatePresence>
 				{selectedBooking && (
 					<BookingDetailsSheet
-						history={history}
 						booking={selectedBooking}
 						onClose={() => setSelectedBooking(null)}
+						onUpdateStatus={handleStatusUpdate}
 					/>
 				)}
 			</AnimatePresence>
