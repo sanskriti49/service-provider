@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, time } from "framer-motion";
+import { AnimatePresence, motion, time } from "framer-motion";
 import {
 	Calendar,
 	Clock,
@@ -13,6 +13,7 @@ import {
 	CheckCircle2,
 	AlertCircle,
 } from "lucide-react";
+import BookingDetailsSheet from "./BookingDetailsSheet";
 
 const StatusBadge = ({ status, isPast }) => {
 	let displayStatus = status.toLowerCase();
@@ -61,6 +62,7 @@ export default function AllBookings() {
 	const [searchTerm, setSearchTerm] = useState("");
 	const [actionLoading, setActionLoading] = useState(null);
 	const [alertMsg, setAlertMsg] = useState("");
+	const [selectedBooking, setSelectedBooking] = useState(null);
 
 	const [meta, setMeta] = useState({
 		current_page: 1,
@@ -140,227 +142,232 @@ export default function AllBookings() {
 		}
 	};
 
+	console.log("history", history);
+
 	return (
-		<motion.div
-			initial={{ opacity: 0, y: 10 }}
-			animate={{ opacity: 1, y: 0 }}
-			className="space-y-6"
-		>
-			{/* 1. Header & Toolbar */}
-			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-				<div>
-					<h2 className="text-xl font-bold text-gray-900">Booking History</h2>
-					<p className="text-sm text-gray-500">
-						Track your past services and payments.
-					</p>
-				</div>
-
-				{/* Visual Search Bar - makes it look like a pro dashboard */}
-				<div className="flex items-center gap-2">
-					<div className="relative">
-						<Search
-							className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-							size={16}
-						/>
-						<input
-							type="text"
-							placeholder="Search bookings..."
-							value={searchTerm}
-							onChange={(e) => setSearchTerm(e.target.value)}
-							className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all w-full sm:w-64"
-						/>
+		<div className="relative">
+			<motion.div
+				initial={{ opacity: 0, y: 10 }}
+				animate={{ opacity: 1, y: 0 }}
+				className="space-y-6"
+			>
+				{/* 1. Header & Toolbar */}
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+					<div>
+						<h2 className="text-xl font-bold text-gray-900">Booking History</h2>
+						<p className="text-sm text-gray-500">
+							Track your past services and payments.
+						</p>
 					</div>
-					<button className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors">
-						<Settings size={18} /> {/* Filter Icon placeholder */}
-					</button>
-				</div>
-			</div>
 
-			{/* 2. The Table Card */}
-			<div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-				<div className="overflow-x-auto">
-					{loading ? (
-						<div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
-							<div className="w-8 h-8 border-2 border-violet-200 border-t-violet-600 rounded-full animate-spin"></div>
-							<span className="text-sm font-medium">Syncing history...</span>
+					{/* Visual Search Bar - makes it look like a pro dashboard */}
+					<div className="flex items-center gap-2">
+						<div className="relative">
+							<Search
+								className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+								size={16}
+							/>
+							<input
+								type="text"
+								placeholder="Search bookings..."
+								value={searchTerm}
+								onChange={(e) => setSearchTerm(e.target.value)}
+								className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all w-full sm:w-64"
+							/>
 						</div>
-					) : history.length === 0 ? (
-						<div className="flex flex-col items-center justify-center h-64 text-gray-400">
-							<div className="p-4 bg-gray-50 rounded-full mb-3">
-								<Calendar size={24} className="text-gray-300" />
+						<button className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+							<Settings size={18} /> {/* Filter Icon placeholder */}
+						</button>
+					</div>
+				</div>
+
+				{/* 2. The Table Card */}
+				<div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+					<div className="overflow-x-auto">
+						{loading ? (
+							<div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
+								<div className="w-8 h-8 border-2 border-violet-200 border-t-violet-600 rounded-full animate-spin"></div>
+								<span className="text-sm font-medium">Syncing history...</span>
 							</div>
-							<p className="font-medium text-gray-900">No bookings yet</p>
-							<p className="text-sm">
-								Your completed services will appear here.
-							</p>
-						</div>
-					) : (
-						<table className="w-full text-left border-collapse">
-							<thead>
-								<tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-									<th className="p-5">Service Details</th>
-									<th className="p-5">Provider</th>
-									<th className="p-5">Date & Time</th>
-									<th className="p-5">Amount</th>
-									<th className="p-5">Status</th>
-									<th className="p-5 text-right">Action</th>
-								</tr>
-							</thead>
-							<tbody className="divide-y divide-gray-100">
-								{history.map((item) => {
-									const dateObj = new Date(item.date);
+						) : history.length === 0 ? (
+							<div className="flex flex-col items-center justify-center h-64 text-gray-400">
+								<div className="p-4 bg-gray-50 rounded-full mb-3">
+									<Calendar size={24} className="text-gray-300" />
+								</div>
+								<p className="font-medium text-gray-900">No bookings yet</p>
+								<p className="text-sm">
+									Your completed services will appear here.
+								</p>
+							</div>
+						) : (
+							<table className="w-full text-left border-collapse">
+								<thead>
+									<tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+										<th className="p-5">Service Details</th>
+										<th className="p-5">Provider</th>
+										<th className="p-5">Date & Time</th>
+										<th className="p-5">Amount</th>
+										<th className="p-5">Status</th>
+										<th className="p-5 text-right">Action</th>
+									</tr>
+								</thead>
+								<tbody className="divide-y divide-gray-100">
+									{history.map((item) => {
+										const dateObj = new Date(item.date);
 
-									if (item.start_time) {
-										const [hours, minutes] = item.start_time.split(":");
-										dateObj.setHours(hours, minutes);
-									}
-									const now = new Date();
-									const isPast = dateObj < now;
+										if (item.start_time) {
+											const [hours, minutes] = item.start_time.split(":");
+											dateObj.setHours(hours, minutes);
+										}
+										const now = new Date();
+										const isPast = dateObj < now;
 
-									const dateStr = dateObj.toLocaleDateString("en-IN", {
-										month: "short",
-										day: "numeric",
-										year: "numeric",
-									});
-									const timeStr = dateObj.toLocaleTimeString("en-IN", {
-										hour: "2-digit",
-										minute: "2-digit",
-										hour12: true,
-									});
-									const weekday = dateObj.toLocaleDateString("en-IN", {
-										weekday: "short",
-									});
+										const dateStr = dateObj.toLocaleDateString("en-IN", {
+											month: "short",
+											day: "numeric",
+											year: "numeric",
+										});
+										const timeStr = dateObj.toLocaleTimeString("en-IN", {
+											hour: "2-digit",
+											minute: "2-digit",
+											hour12: true,
+										});
+										const weekday = dateObj.toLocaleDateString("en-IN", {
+											weekday: "short",
+										});
 
-									const pName = item.provider_name || "Agency";
+										const pName = item.provider_name || "Agency";
 
-									return (
-										<tr
-											key={item.booking_id}
-											className="group hover:bg-gray-50/50 transition-colors"
-										>
-											{/* Service Name & ID */}
-											<td className="p-5">
-												<div className="flex flex-col">
-													<span className="font-semibold text-gray-900 text-sm">
-														{item.service_name || "Service"}
-													</span>
-													<span className="text-xs text-gray-400 font-mono mt-0.5">
-														#{item.booking_id.slice(0, 8).toUpperCase()}
-													</span>
-												</div>
-											</td>
-
-											{/* Provider Info */}
-											<td className="p-5">
-												<div className="flex items-center gap-3">
-													<div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
-														{pName[0]}
+										return (
+											<tr
+												key={item.booking_id}
+												className="group hover:bg-gray-50/50 transition-colors"
+											>
+												{/* Service Name & ID */}
+												<td className="p-5">
+													<div className="flex flex-col">
+														<span className="font-semibold text-gray-900 text-sm">
+															{item.service_name || "Service"}
+														</span>
+														<span className="text-xs text-gray-400 font-mono mt-0.5">
+															#{item.booking_id.slice(0, 8).toUpperCase()}
+														</span>
 													</div>
-													<span className="text-sm text-gray-600 font-medium">
-														{pName}
+												</td>
+
+												{/* Provider Info */}
+												<td className="p-5">
+													<div className="flex items-center gap-3">
+														<div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
+															{pName[0]}
+														</div>
+														<span className="text-sm text-gray-600 font-medium">
+															{pName}
+														</span>
+													</div>
+												</td>
+
+												{/* Stacked Date */}
+												<td className="p-5">
+													<div className="flex flex-col">
+														<span className="text-sm font-medium text-gray-900">
+															{dateStr}
+														</span>
+														<span className="text-xs text-gray-500 mt-0.5">
+															{weekday} • {timeStr}
+														</span>
+													</div>
+												</td>
+
+												{/* Price */}
+												<td className="p-5">
+													<span className="font-mono text-sm font-medium text-gray-700">
+														{new Intl.NumberFormat("en-IN", {
+															style: "currency",
+															currency: "INR",
+															minimumFractionDigits: 0,
+														}).format(item.price)}
 													</span>
-												</div>
-											</td>
+												</td>
 
-											{/* Stacked Date */}
-											<td className="p-5">
-												<div className="flex flex-col">
-													<span className="text-sm font-medium text-gray-900">
-														{dateStr}
-													</span>
-													<span className="text-xs text-gray-500 mt-0.5">
-														{weekday} • {timeStr}
-													</span>
-												</div>
-											</td>
+												<td className="p-5">
+													<StatusBadge status={item.status} isPast={isPast} />
+												</td>
 
-											{/* Price */}
-											<td className="p-5">
-												<span className="font-mono text-sm font-medium text-gray-700">
-													{new Intl.NumberFormat("en-IN", {
-														style: "currency",
-														currency: "INR",
-														minimumFractionDigits: 0,
-													}).format(item.price)}
-												</span>
-											</td>
-
-											<td className="p-5">
-												<StatusBadge status={item.status} isPast={isPast} />
-											</td>
-
-											<td className="p-5 text-right">
-												<div className="flex items-center justify-end gap-2">
-													{(item.status === "booked" ||
-														item.status === "confirmed") &&
-														!isPast && (
-															<button
-																onClick={() =>
-																	handleCancelBooking(item.booking_id)
-																}
-																disabled={actionLoading === item.booking_id}
-																title="Cancel Booking"
-																className="p-2 cursor-pointer text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-															>
-																{actionLoading === item.booking_id ? (
-																	<div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-																) : (
-																	<svg
-																		xmlns="http://www.w3.org/2000/svg"
-																		width="18"
-																		height="18"
-																		viewBox="0 0 24 24"
-																		fill="none"
-																		stroke="currentColor"
-																		strokeWidth="2"
-																		strokeLinecap="round"
-																		strokeLinejoin="round"
-																	>
-																		<circle cx="12" cy="12" r="10" />
-																		<line x1="15" y1="9" x2="9" y2="15" />
-																		<line x1="9" y1="9" x2="15" y2="15" />
-																	</svg>
-																)}
+												<td className="p-5 text-right">
+													<div className="flex items-center justify-end gap-2">
+														{item.status === "completed" ? (
+															<button className="text-xs font-medium bg-violet-50 text-violet-600 px-3 py-1.5 rounded-lg border border-violet-100 hover:bg-violet-100 transition-colors">
+																Rate Provider
 															</button>
-														)}
+														) : item.status === "cancelled" ? (
+															<button className="text-xs font-medium bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+																Book Again
+															</button>
+														) : !isPast ? (
+															<button
+																onClick={(e) => {
+																	e.stopPropagation();
+																	handleCancelBooking(item.booking_id);
+																}}
+																disabled={actionLoading === item.booking_id}
+																className="text-xs font-medium text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-100 transition-colors"
+															>
+																{actionLoading === item.booking_id
+																	? "..."
+																	: "Cancel"}
+															</button>
+														) : null}
 
-													{/* DETAILS BUTTON */}
-													<button className=" cursor-pointer flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-violet-600 hover:bg-violet-50 px-3 py-1.5 rounded-lg transition-colors">
-														Details
-													</button>
-												</div>
-											</td>
-										</tr>
-									);
-								})}
-							</tbody>
-						</table>
-					)}
-				</div>
+														<button
+															onClick={() => setSelectedBooking(item)}
+															className="cursor-pointer text-sm font-medium text-gray-500 hover:text-gray-900 p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+														>
+															Details
+														</button>
+													</div>
+												</td>
+											</tr>
+										);
+									})}
+								</tbody>
+							</table>
+						)}
+					</div>
 
-				{/* Pagination */}
-				<div className="p-4 border-t border-gray-100 bg-gray-50/30 flex justify-between items-center">
-					<span className="text-xs text-gray-500 font-medium">
-						Showing page {meta.current_page} of {meta.total_pages}
-					</span>
-					<div className="flex gap-2">
-						<button
-							onClick={handlePrev}
-							disabled={meta.current_page === 1 || loading}
-							className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-						>
-							Previous
-						</button>
-						<button
-							onClick={handleNext}
-							disabled={!meta.has_next_page || loading}
-							className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-						>
-							Next
-						</button>
+					{/* Pagination */}
+					<div className="p-4 border-t border-gray-100 bg-gray-50/30 flex justify-between items-center">
+						<span className="text-xs text-gray-500 font-medium">
+							Showing page {meta.current_page} of {meta.total_pages}
+						</span>
+						<div className="flex gap-2">
+							<button
+								onClick={handlePrev}
+								disabled={meta.current_page === 1 || loading}
+								className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+							>
+								Previous
+							</button>
+							<button
+								onClick={handleNext}
+								disabled={!meta.has_next_page || loading}
+								className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+							>
+								Next
+							</button>
+						</div>
 					</div>
 				</div>
-			</div>
-		</motion.div>
+			</motion.div>
+			<AnimatePresence>
+				{selectedBooking && (
+					<BookingDetailsSheet
+						history={history}
+						booking={selectedBooking}
+						onClose={() => setSelectedBooking(null)}
+					/>
+				)}
+			</AnimatePresence>
+		</div>
 	);
 }

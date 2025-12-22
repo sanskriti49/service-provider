@@ -361,8 +361,10 @@ async function getUserHistory(req, res) {
 
 	try {
 		const dataQuery = `
-			SELECT b.booking_id, b.service_id, b.date, b.status, b.price,
+			SELECT b.booking_id, b.service_id, b.date, b.status, b.price, b.start_time, b.address,
 				   pu.name AS provider_name,
+				   pu.email AS provider_email,
+				   pu.phone AS provider_phone,
 			       s.name AS service_name
 			FROM bookings b
 			LEFT JOIN users pu ON pu.id=b.provider_id
