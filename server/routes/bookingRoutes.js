@@ -4,6 +4,7 @@ const {
 	createBooking,
 	updateBookingAddress,
 	getUserHistory,
+	updateBookingStatus,
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const db = require("../config/db");
@@ -37,28 +38,6 @@ router.get("/", authMiddleware, allowRoles("admin"), async (req, res) => {
 	}
 });
 
-// 3.
-// router.get(
-// 	"/user",
-// 	authMiddleware,
-// 	allowRoles("customer"),
-// 	async (req, res) => {
-// 		try {
-// 			const q = `
-//             SELECT b.*, pu.name AS provider_name
-//             FROM bookings b
-//             LEFT JOIN users pu ON pu.id = b.provider_id
-//             WHERE b.user_id=$1
-//             ORDER BY b.date ASC
-//         `;
-// 			const result = await db.query(q, [req.user.id]);
-// 			res.json(result.rows);
-// 		} catch (err) {
-// 			res.status(500).json({ message: "Error fetching user bookings" });
-// 		}
-// 	}
-// );
-
 router.get(
 	"/user/upcoming",
 	authMiddleware,
@@ -70,7 +49,7 @@ router.get(
             FROM bookings b
             LEFT JOIN services s on s.id = b.service_id
             LEFT JOIN users pu ON pu.id = b.provider_id
-            WHERE b.user_id = $1 AND b.date >= NOW()
+            WHERE b.user_id = $1 AND b.date >= NOW() AND b.status != 'cancelled'
             ORDER BY b.date ASC
         `;
 			const result = await db.query(q, [req.user.id]);
@@ -88,26 +67,8 @@ router.get(
 	allowRoles("customer"),
 	getUserHistory
 );
-// router.get(
-// 	"/user/history",
-// 	authMiddleware,
-// 	allowRoles("customer"),
-// 	async (req, res) => {
-// 		try {
-// 			const q = `
-//             SELECT b.*, pu.name AS provider_name
-//             FROM bookings b
-//             LEFT JOIN users pu ON pu.id = b.provider_id
-//             WHERE b.user_id = $1 AND b.date < NOW()
-//             ORDER BY b.date DESC
-//         `;
-// 			const result = await db.query(q, [req.user.id]);
-// 			res.json(result.rows);
-// 		} catch (err) {
-// 			res.status(500).json({ message: "Error fetching history" });
-// 		}
-// 	}
-// );
+
+router.put("/:bookingId/status", authMiddleware, updateBookingStatus);
 
 router.get(
 	"/provider",

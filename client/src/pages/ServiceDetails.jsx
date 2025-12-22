@@ -212,7 +212,7 @@ const ServiceDetails = () => {
 							<h1 className="text-5xl md:text-6xl lg:text-7xl bricolage-grotesque text-white font-bold [text-shadow:_0_2px_10px_rgb(0_0_0_/_0.5)]">
 								{service.name}
 							</h1>
-							<p className="inter mt-4 max-w-xl text-gray-300 text-base md:text-lg [text-shadow:_0_1px_5px_rgb(0_0_0_/_0.5)]">
+							<p className="mt-4 max-w-xl text-gray-300 text-base md:text-lg [text-shadow:_0_1px_5px_rgb(0_0_0_/_0.5)]">
 								{service.description}
 							</p>
 						</div>
@@ -231,7 +231,7 @@ const ServiceDetails = () => {
 
 				<div
 					ref={contentRef}
-					className="inter relative z-20 bg-[#191034] max-w-7xl mt-10 mx-auto py-16 sm:py-10 px-4 sm:px-6 lg:px-8 rounded-t-3xl border-t border-violet-800/50 shadow-2xl shadow-black/50"
+					className="plus-jakarta-sans relative z-20 bg-[#191034] max-w-7xl mt-10 mx-auto py-16 sm:py-10 px-4 sm:px-6 lg:px-8 rounded-t-3xl border-t border-violet-800/50 shadow-2xl shadow-black/50"
 				>
 					<div className="text-center mb-12">
 						<h2 className="text-3xl sm:text-4xl font-bold text-gray-200 bricolage-grotesque">
@@ -393,7 +393,6 @@ const ProviderCard = ({ provider, isExpanded, onToggleExpand }) => {
 				<button
 					onClick={handleViewAvailability}
 					disabled={loadingSlots}
-					//className="cursor-pointer w-full text-center bg-violet-800/50 text-violet-200 px-4 py-2 rounded-lg hover:bg-violet-800 transition-colors font-semibold disabled:opacity-50"
 					className={`cursor-pointer w-full text-center px-4 py-2.5 rounded-xl font-semibold transition-all duration-300 border 
                     ${
 											isExpanded
@@ -471,7 +470,7 @@ const ProviderCard = ({ provider, isExpanded, onToggleExpand }) => {
 													<div
 														key={time}
 														onClick={() => setSelectedTime(time)}
-														className={`text-xs px-2 py-2 cursor-pointer rounded-md transition-colors
+														className={`tabular-nums text-xs px-2 py-2 cursor-pointer rounded-md transition-colors
                                                 ${
 																									isSelected
 																										? "bg-violet-600 text-white font-bold shadow-lg shadow-violet-900/50 scale-101 border border-violet-500"

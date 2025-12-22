@@ -5,7 +5,7 @@ const getCustomerDashboardStats = async (req, res) => {
 
 	try {
 		const [statsRes, upcomingRes, historyRes] = await Promise.all([
-			// 1. Get Stats (Total Spent & Count of completed jobs)
+			// get stats (total spent & count of completed jobs)
 			db.query(
 				`
                 SELECT 
@@ -16,7 +16,7 @@ const getCustomerDashboardStats = async (req, res) => {
 				[userId]
 			),
 
-			// 2. Get ONE next upcoming booking (For the "Upcoming" card)
+			// get 1 next upcoming booking (for the "upcoming" card)
 			db.query(
 				`
                 SELECT b.booking_id, b.date, b.start_time, s.name AS service_name, u.name AS provider_name, u.photo AS provider_photo

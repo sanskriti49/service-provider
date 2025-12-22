@@ -201,7 +201,7 @@ export default function BookingPage() {
 	}
 
 	return (
-		<div className="bricolage-grotesque min-h-screen bg-[#0f0c29] text-white font-sans selection:bg-violet-500/30">
+		<div className="bricolage-grotesque min-h-screen bg-[#0f0c29] text-white selection:bg-violet-500/30">
 			{alert && (
 				<Alerts
 					message={alert.message}
@@ -271,7 +271,6 @@ export default function BookingPage() {
 					</div>
 
 					<div className="lg:col-span-8 space-y-8">
-						{/* 1. Date Selection */}
 						<div className="bg-white/5 lg:bg-transparent rounded-3xl p-6 lg:p-0 border border-white/5 lg:border-none">
 							<div className="flex items-center gap-2 mb-4">
 								<Calendar className="w-5 h-5 text-violet-400" />
@@ -340,7 +339,6 @@ export default function BookingPage() {
 							)}
 						</div>
 
-						{/* 2. Time Selection */}
 						{selectedDate && (
 							<div className="animate-fade-in-up bg-white/5 lg:bg-transparent rounded-3xl p-6 lg:p-0 border border-white/5 lg:border-none">
 								<div className="flex items-center gap-2 mb-4">
@@ -356,7 +354,7 @@ export default function BookingPage() {
 											<button
 												key={t}
 												onClick={() => setSelectedTime(t)}
-												className={`relative p-3 lg:p-4 rounded-xl border text-sm font-semibold transition-all duration-200 focus:outline-none
+												className={`tabular-nums relative p-3 lg:p-4 rounded-xl border text-md font-semibold transition-all duration-200 focus:outline-none
                                                     ${
 																											selectedTime === t
 																												? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/50 scale-[1.03]"
@@ -374,15 +372,72 @@ export default function BookingPage() {
 									</div>
 								) : (
 									<div className="text-center py-10 bg-white/5 rounded-2xl border border-dashed border-white/10">
-										<p className="text-gray-400">
+										{/* <p className="text-gray-400">
 											No available slots remaining for this date.
-										</p>
+										</p> */}
+										{(() => {
+											const today = new Date();
+											const checkDate = new Date(selectedDate);
+											const isToday =
+												today.getDate() === checkDate.getDate() &&
+												today.getMonth() === checkDate.getMonth() &&
+												today.getFullYear() === checkDate.getFullYear();
+
+											const currentHour = today.getHours();
+											const closingHour = 20;
+
+											if (isToday && currentHour >= closingHour) {
+												return (
+													<div className="space-y-2">
+														<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-500/10 mb-2">
+															<Clock className="w-6 h-6 text-violet-400" />
+														</div>
+														<h3 className="text-white font-semibold text-lg">
+															Service Hours Ended
+														</h3>
+														<p className="text-gray-400 text-sm max-w-xs mx-auto leading-relaxed">
+															Our experts operate between{" "}
+															<span className="text-violet-200">
+																10:00 AM and 7:00 PM
+															</span>
+															. Please select a slot for tomorrow.
+														</p>
+													</div>
+												);
+											} else if (isToday) {
+												return (
+													<div className="space-y-2">
+														<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-500/10 mb-2">
+															<Calendar className="w-6 h-6 text-orange-400" />
+														</div>
+														<h3 className="text-white font-semibold text-lg">
+															Fully Booked for Today
+														</h3>
+														<p className="text-gray-400 text-sm max-w-xs mx-auto">
+															We are completely booked for the rest of the day.
+															Please check the next available date.
+														</p>
+													</div>
+												);
+											} else {
+												// SCENARIO 3: Future date with no slots
+												return (
+													<div className="space-y-2">
+														<p className="text-gray-400 text-sm">
+															No slots available for this specific date. <br />
+															<span className="text-xs text-gray-500 mt-1 block">
+																(Provider might be on leave)
+															</span>
+														</p>
+													</div>
+												);
+											}
+										})()}
 									</div>
 								)}
 							</div>
 						)}
 
-						{/* 3. Address / Location Section */}
 						<div className="bg-white/5 rounded-3xl p-6 border border-white/10">
 							<div className="flex items-center justify-between mb-4">
 								<div className="flex items-center gap-2">
