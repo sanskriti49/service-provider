@@ -5,8 +5,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
 const { customAlphabet } = require("nanoid");
-const crypto = require("crypto"); // Needed for generating tokens
-const sendEmail = require("../utils/sendEmail"); // Needed for sending the email
+const crypto = require("crypto");
+const sendEmail = require("../utils/sendEmail");
 
 const verifyToken = require("../middleware/verifyToken");
 const verifyTurnstile = require("../middleware/verifyRecaptcha");
@@ -50,6 +50,87 @@ const getSafeUser = (user) => {
 		isGoogleUser: user.password === "google_auth_user",
 	};
 };
+
+router.post("/request-email-change", verifyToken, async (req, res) => {
+	try {
+		const { newEmail } = req.body;
+		const userId = req.user.id;
+
+		if (!newEmail || !newEmail.includes("@")) {
+			return res.status(400).json({ error: "Invalid email" });
+		}
+
+		const takenCheck = await db.query("SELECT id FROM users WHERE email=$1", [
+			newEmail,
+		]);
+		if (takenCheck.rows.length > 0) {
+			return res
+				.status(400)
+				.json({ error: "This email is already in use by another account" });
+		}
+
+		const otp = Math.floor(100000 + Math.random() * 900000).toString();
+		const otpExpires = Date.now() + 15 * 60 * 1000;
+
+		const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+		await db.query(
+			`UPDATE users
+		SET temp_email=$1, temp_email_otp=$2, temp_email_expires=$3
+		WHERE id=$4`,
+			[newEmail, hashedOtp, otpExpires, userId]
+		);
+
+		await sendEmail({
+			email: newEmail,
+			subject: "Verify your new email address",
+			message: `You requested to change your email to this address. \n\n Your verification code is: ${otp} \n\n If this wasn't you, ignore this.`,
+		});
+		res.json({ message: "Verification code sent to new email!" });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: "Server error" });
+	}
+});
+
+router.post("/verify-email-change", verifyToken, async (req, res) => {
+	try {
+		const { otp } = req.body;
+		const userId = req.user.id;
+
+		const result = await db.query("SELECT * FROM users WHERE id=$1", [userId]);
+		const user = result.rows[0];
+
+		if (!user.temp_email || !user.temp_email_otp) {
+			return res.status(400).json({ error: "No pending email change found" });
+		}
+
+		if (Date.now() > parseInt(user.temp_email_expires)) {
+			return res.status(400).json({ error: "OTP has expired" });
+		}
+
+		const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+		if (hashedOtp !== user.temp_email_otp) {
+			return res.status(400).json({ error: "Invalid OTP" });
+		}
+		await db.query(
+			`UPDATE users 
+             SET email = temp_email, 
+                 temp_email = NULL, 
+                 temp_email_otp = NULL, 
+                 temp_email_expires = NULL 
+             WHERE id = $1`,
+			[userId]
+		);
+
+		res.json({
+			message: "Email updated successfully!",
+			user: { ...getSafeUser(user), email: user.temp_email },
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: "Server error" });
+	}
+});
 
 router.post("/google", async (req, res) => {
 	try {
@@ -371,19 +452,47 @@ router.get("/me", verifyToken, async (req, res) => {
 
 router.post("/update-password", verifyToken, async (req, res) => {
 	try {
-		const { newPassword } = req.body;
+		const { currentPassword, newPassword } = req.body;
 		const userId = req.user.id;
 
-		if (!newPassword || newPassword.length < 6) {
+		if (!newPassword || newPassword.length < 8) {
 			return res
 				.status(400)
-				.json({ error: "Password must be at least 6 characters" });
+				.json({ error: "Password must be at least 8 characters" });
 		}
+		const userResult = await db.query(
+			"SELECT password FROM users WHERE id = $1",
+			[userId]
+		);
 
-		const hashed = await bcrypt.hash(newPassword, 10);
+		if (userResult.rows.length === 0) {
+			return res.status(404).json({ error: "User not found" });
+		}
+		const user = userResult.rows[0];
+		const isGoogleUser = user.password === "google_auth_user";
+
+		if (!isGoogleUser) {
+			if (!currentPassword) {
+				return res.status(400).json({ error: "Current password is required" });
+			}
+
+			const isMatch = await bcrypt.compare(currentPassword, user.password);
+			if (!isMatch) {
+				return res.status(401).json({ error: "Incorrect current password" });
+			}
+
+			const isSameAsOld = await bcrypt.compare(newPassword, user.password);
+			if (isSameAsOld) {
+				return res.status(400).json({
+					error: "New password cannot be the same as your current password",
+				});
+			}
+		}
+		const salt = await bcrypt.genSalt(10);
+		const hashedPassword = await bcrypt.hash(newPassword, salt);
 
 		await db.query("UPDATE users SET password = $1 WHERE id = $2", [
-			hashed,
+			hashedPassword,
 			userId,
 		]);
 		res.json({ message: "Password updated successfully" });

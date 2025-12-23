@@ -173,7 +173,6 @@ export default function CustomerDashboard() {
 							return timeA - timeB;
 						}
 
-						// if Dates are equal (Same Day), compare start_time strings
 						const startTimeA = a.start_time || "";
 						const startTimeB = b.start_time || "";
 
@@ -214,7 +213,7 @@ export default function CustomerDashboard() {
 	}, [user.id]); // runs when user is decoded
 
 	return (
-		<div className="lg:-mt-50 -mt-70 bricolage-grotesque min-h-screen bg-gray-50/50 relative overflow-hidden pt-24 pb-12 px-4 sm:px-8">
+		<div className="lg:-mt-50 -mt-70 bricolage-grotesque min-h-screen relative overflow-hidden pt-24 pb-12 px-4 sm:px-8">
 			<div className="max-w-7xl mx-auto relative z-10 grid grid-cols-1  lg:grid-cols-[280px_1fr] gap-8">
 				<motion.aside
 					initial={{ x: -50, opacity: 0 }}
@@ -394,7 +393,6 @@ function OverviewTab({
 
 					<div className="flex-1 flex flex-col gap-4">
 						{showEmptyState ? (
-							// EMPTY STATE
 							<div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-gray-100 rounded-2xl">
 								<div className="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mb-4">
 									<Calendar className="text-gray-300" size={28} />
@@ -407,7 +405,6 @@ function OverviewTab({
 								</p>
 							</div>
 						) : (
-							// LIST STATE
 							<>
 								<div className="relative z-10">
 									<p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">
@@ -474,7 +471,6 @@ function OverviewTab({
 	);
 }
 
-// --- UPDATED UPCOMING CARD ---
 function UpcomingCard({ booking, isHero = false }) {
 	const providerName = booking.provider_name || "Unknown Provider";
 	const providerImage = booking.provider?.photo;

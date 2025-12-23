@@ -10,7 +10,6 @@ const CATEGORIES = [
 	"Personal Care",
 	"Child Services",
 	"Fitness / Health",
-	"Repairs",
 ];
 
 export default function AllServices() {
@@ -20,7 +19,7 @@ export default function AllServices() {
 		data: services,
 		loading,
 		error,
-	} = useFetch(`${API_UR}/api/services/v1`);
+	} = useFetch(`${API_URL}/api/services/v1`);
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCategory, setSelectedCategory] = useState("All");

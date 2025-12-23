@@ -9,11 +9,22 @@ const TIME_LIMIT_MINUTES = 10;
 
 async function createBooking(req, res, next) {
 	console.log("--- New Booking Request ---");
-	const { provider_id, service_id, date, start_time, end_time, address } =
+	let { provider_id, service_id, date, start_time, end_time, address } =
 		req.body;
 
 	if (!provider_id || !service_id || !date || !start_time) {
 		return res.status(400).json({ message: "Missing fields" });
+	}
+
+	if (!end_time || end_time === start_time) {
+		const [hours, minutes] = start_time.split(":").map(Number);
+		const dateObj = new Date();
+		dateObj.setHours(hours, minutes);
+		dateObj.setHours(dateObj.getHours() + 1);
+
+		const newH = String(dateObj.getHours()).padStart(2, "0");
+		const newM = String(dateObj.getMinutes()).padStart(2, "0");
+		end_time = `${newH}:${newM}`;
 	}
 
 	const user_id = req.user ? req.user.id : null;
@@ -381,10 +392,16 @@ async function updateBookingAddress(req, res) {
 async function getUserHistory(req, res) {
 	const page = parseInt(req.query.page) || 1;
 	const limit = parseInt(req.query.limit) || 10;
-
 	// "Offset" (How many rows to skip)
 	const offset = (page - 1) * limit; // Page 1: skip 0. Page 2: skip 10. Page 3: skip 20.
 	const userId = req.user.id;
+
+	const type = req.query.type || "upcoming";
+	const search = (req.query.search || "").trim();
+
+	const dateFilter = req.query.data_filter || "All Time";
+	const minPrice = req.query.min_price;
+	const serviceFilter = (req.query.service_filter || "").trim();
 
 	try {
 		const autoExpireQuery = `
@@ -395,6 +412,71 @@ async function getUserHistory(req, res) {
 			AND (date + end_time) < (NOW()- INTERVAL '15 HOURS')
 		`;
 		await db.query(autoExpireQuery, [userId]);
+
+		//	const queryParams = [userId, limit, offset];
+
+		// const baseParams = [userId];
+		// let whereClause = "WHERE b.user_id=$1";
+
+		const queryParams = [userId];
+		let paramCounter = 1; // Start counting from $1
+
+		// 2. Start building WHERE clause
+		let whereClause = `WHERE b.user_id=$${paramCounter}`;
+		paramCounter++;
+
+		if (type === "upcoming") {
+			// UPCOMING: only active bookings, sorted by SOONEST date
+			whereClause += " AND b.status IN ('booked','in_progress')";
+		} else {
+			// HISTORY: only finished bookings, sorted by NEWEST date
+			whereClause +=
+				" AND b.status IN ('booked','in_progress','completed','cancelled','no_show','expired')";
+		}
+
+		if (search) {
+			// baseParams.push(`%${search}%`);
+			// const searchIndex = baseParams.length;
+			queryParams.push(`%${search}%`);
+
+			whereClause += `
+			AND (
+				s.name ILIKE $${paramCounter} OR
+				pu.name ILIKE $${paramCounter} OR
+				b.booking_id::text ILIKE $${paramCounter}
+			)`;
+			paramCounter++;
+		}
+
+		if (serviceFilter) {
+			queryParams.push(`%${serviceFilter}%`);
+			whereClause += ` AND s.name ILIKE $${paramCounter}`;
+			paramCounter++;
+		}
+
+		// 6. Minimum Price Filter
+		if (minPrice) {
+			queryParams.push(minPrice);
+			whereClause += ` AND b.price >= $${paramCounter}`;
+			paramCounter++;
+		}
+
+		// 7. Date Range Logic (PostgreSQL specific)
+		if (dateFilter === "This Month") {
+			// Postgres: check if date is in current month
+			whereClause += ` AND date_trunc('month', b.date) = date_trunc('month', CURRENT_DATE)`;
+		} else if (dateFilter === "Last 3 Months") {
+			// Postgres: check if date is within last 3 months
+			whereClause += ` AND b.date >= (CURRENT_DATE - INTERVAL '3 months')`;
+		}
+
+		const countQuery = `
+			SELECT COUNT(*)
+			FROM bookings b
+			LEFT JOIN users pu ON pu.id=b.provider_id
+            LEFT JOIN services s ON s.id=b.service_id
+            ${whereClause}`;
+
 		const dataQuery = `
 			SELECT b.booking_id, b.service_id, b.date, b.status, b.price, b.start_time, b.address,
 				   pu.name AS provider_name,
@@ -404,19 +486,41 @@ async function getUserHistory(req, res) {
 			FROM bookings b
 			LEFT JOIN users pu ON pu.id=b.provider_id
 			LEFT JOIN services s ON s.id=b.service_id
-			WHERE b.user_id=$1
-			ORDER BY b.date DESC, b.start_time DESC
-			LIMIT $2 OFFSET $3`;
+			${whereClause}
+			${
+				type === "upcoming"
+					? "ORDER BY b.date ASC, b.start_time ASC"
+					: "ORDER BY b.date DESC, b.start_time DESC"
+			}
+            LIMIT $${paramCounter} OFFSET $${paramCounter + 1};`;
 
-		const countQuery = `
-			SELECT COUNT(*)
-			FROM bookings
-			WHERE user_id=$1`;
+		//	const dataParams = [...queryParams, limit, offset];
+		// const limitIndex = dataParams.length - 1;
+		// const offsetIndex = dataParams.length;
+
+		// const orderClause =
+		// 	type === "upcoming"
+		// 		? "ORDER BY b.date ASC, b.start_time ASC"
+		// 		: "ORDER BY b.date DESC, b.start_time DESC";
+
+		// const countParams = [userId];
+		// if (search) countParams.push(`%${search}`);
+
+		// let countWhere = "WHERE user_id=$1";
+		// if (type === "upcoming") {
+		// 	countWhere +=
+		// 		" AND status IN ('booked', 'in_progress', 'awaiting_completion')";
+		// } else {
+		// 	countWhere +=
+		// 		" AND status IN ('completed', 'cancelled', 'no_show', 'expired', 'lapsed')";
+		// }
+
+		const dataParams = [...queryParams, limit, offset];
 
 		// tun both queries in parallel for performance (Promise.all)
 		const [dataResult, countResult] = await Promise.all([
-			db.query(dataQuery, [userId, limit, offset]),
-			db.query(countQuery, [userId]),
+			db.query(dataQuery, dataParams),
+			db.query(countQuery, queryParams),
 		]);
 
 		const totalRows = parseInt(countResult.rows[0].count);

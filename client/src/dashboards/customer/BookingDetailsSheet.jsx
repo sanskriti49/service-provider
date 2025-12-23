@@ -64,7 +64,6 @@ export default function BookingDetailsSheet({
 			statusHelperText = "Provider is currently working on this task.";
 			break;
 		case "expired":
-		case "lapsed":
 			displayStatus = "Booking Lapsed";
 			statusColor = "bg-orange-50 text-orange-700";
 			statusHelperText = "This booking ended without a confirmation.";

@@ -8,11 +8,16 @@ async function seedServices() {
 		for (const s of SERVICES) {
 			const price = getPriceForService(s.name);
 			const category = SERVICE_CATEGORIES[s.name] || "General";
+
 			await db.query(
 				`INSERT INTO services (name, description, price, category, image_url, slug)
                  VALUES($1, $2, $3,$4, $5, $6)
 				 ON CONFLICT (slug) DO UPDATE
-				 SET price = EXCLUDED.price, image_url = EXCLUDED.image_url`,
+				 SET 
+                    price = EXCLUDED.price, 
+                    image_url = EXCLUDED.image_url,
+                    category = EXCLUDED.category, 
+                    name = EXCLUDED.name`,
 				[s.name, s.description, price, category, s.image, s.slug]
 			);
 		}

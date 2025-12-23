@@ -17,6 +17,7 @@ import Unauthorized from "./pages/Unauthorized";
 import SettingsPage from "./pages/SettingsPage";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import UserProfile from "./dashboards/customer/UserProfile";
 
 const router = createBrowserRouter([
 	{
@@ -56,6 +57,14 @@ const router = createBrowserRouter([
 				element: (
 					<ProtectedRoute allowed={["customer"]}>
 						<CustomerDashboard />
+					</ProtectedRoute>
+				),
+			},
+			{
+				path: "/profile",
+				element: (
+					<ProtectedRoute allowed={["customer"]}>
+						<UserProfile />
 					</ProtectedRoute>
 				),
 			},

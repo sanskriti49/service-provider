@@ -3,19 +3,26 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
 	Calendar,
 	Clock,
-	MapPin,
 	Search,
 	Settings,
 	CheckCircle2,
+	ListFilter,
 	AlertCircle,
+	History as HistoryIcon,
+	X,
 } from "lucide-react";
 import BookingDetailsSheet from "./BookingDetailsSheet";
+import { useNavigate } from "react-router-dom";
 
 const StatusBadge = ({ status, date, startTime }) => {
 	let displayStatus = status.toLowerCase();
-
 	const BUFFER_TIME = 15 * 60 * 60 * 1000;
-	const dateObj = new Date(date);
+
+	const rawDate = new Date(date);
+	const year = rawDate.getFullYear();
+	const month = String(rawDate.getMonth() + 1).padStart(2, "0");
+	const day = String(rawDate.getDate()).padStart(2, "0");
+	const dateObj = new Date(`${year}-${month}-${day}T00:00:00`);
 
 	if (startTime) {
 		const [hours, minutes] = startTime.split(":");
@@ -34,39 +41,45 @@ const StatusBadge = ({ status, date, startTime }) => {
 			}
 		}
 	}
-	let styles = "bg-gray-100 text-gray-600 border-gray-200";
+
+	let styles = "cursor-default bg-gray-100 text-gray-600 border-gray-200";
 	let icon = null;
 
 	switch (displayStatus) {
 		case "completed":
-			styles = "bg-emerald-50 text-emerald-700 border-emerald-200";
+			styles =
+				"cursor-default bg-emerald-50 text-emerald-700 border-emerald-200";
 			icon = <CheckCircle2 size={12} />;
 			break;
 		case "cancelled":
-			styles = "bg-red-50 text-red-700 border-red-200";
+			styles = "cursor-default bg-red-50 text-red-700 border-red-200";
 			icon = <AlertCircle size={12} />;
 			break;
 		case "no_show":
-			styles = "bg-red-100 text-red-800 border-red-200";
+			styles = "cursor-default bg-red-100 text-red-800 border-red-200";
 			icon = <AlertCircle size={12} />;
 			break;
 		case "in progress":
-			styles = "bg-blue-50 text-blue-700 border-blue-200";
+		case "in_progress":
+			styles = "cursor-default bg-blue-50 text-blue-700 border-blue-200";
 			icon = <Clock size={12} />;
 			break;
 		case "awaiting completion":
-			styles = "bg-yellow-50 text-yellow-700 border-yellow-200";
+		case "awaiting_completion":
+			styles = "cursor-default bg-yellow-50 text-yellow-700 border-yellow-200";
 			icon = <Clock size={12} />;
 			break;
 		case "booked":
 		case "confirmed":
-			styles = "bg-violet-50 text-violet-700 border-violet-200";
+			styles = "cursor-default bg-violet-50 text-violet-700 border-violet-200";
 			icon = <Clock size={12} />;
 			break;
 		case "expired":
-			styles = "bg-orange-50 text-orange-700 border-orange-200";
+			styles = "cursor-default bg-orange-50 text-orange-700 border-orange-200";
 			icon = <AlertCircle size={12} />;
 			break;
+		default:
+			icon = <Clock size={12} />;
 	}
 
 	return (
@@ -74,20 +87,22 @@ const StatusBadge = ({ status, date, startTime }) => {
 			className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border flex items-center gap-1.5 w-fit ${styles}`}
 		>
 			{icon}
-			{displayStatus === "awaiting completion"
-				? "Awaiting"
-				: displayStatus}{" "}
+			{displayStatus.replace(/_/g, " ")}
 		</span>
 	);
 };
 
 export default function AllBookings() {
+	const navigate = useNavigate();
+
+	const [activeTab, setActiveTab] = useState("upcoming");
 	const [history, setHistory] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [searchTerm, setSearchTerm] = useState("");
+	const [debouncedSearch, setDebouncedSearch] = useState("");
 	const [actionLoading, setActionLoading] = useState(null);
-	const [alertMsg, setAlertMsg] = useState("");
 	const [selectedBooking, setSelectedBooking] = useState(null);
+	const [showFilters, setShowFilters] = useState(false);
 
 	const [meta, setMeta] = useState({
 		current_page: 1,
@@ -97,14 +112,53 @@ export default function AllBookings() {
 
 	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+	// controls the inputs in the UI
+	const [tempFilters, setTempFilters] = useState({
+		dateRange: "All Time",
+		serviceName: "",
+		minPrice: "",
+	});
+
+	//  what actually triggers the API call
+	const [activeFilters, setActiveFilters] = useState({
+		dateRange: "All Time",
+		serviceName: "",
+		minPrice: "",
+	});
+
 	useEffect(() => {
+		const timer = setTimeout(() => {
+			setDebouncedSearch(searchTerm);
+			setMeta((prev) => ({
+				...prev,
+				current_page: 1,
+			}));
+		}, 500);
+
+		return () => clearTimeout(timer);
+	}, [searchTerm]);
+
+	useEffect(() => {
+		const controller = new AbortController();
+		const signal = controller.signal;
+
 		const fetchHistory = async () => {
 			setLoading(true);
 			try {
 				const token = localStorage.getItem("token");
+
+				const params = new URLSearchParams({
+					page: meta.current_page,
+					limit: 5,
+					type: activeTab,
+					search: debouncedSearch,
+					date_filter: activeFilters.dateRange,
+					min_price: activeFilters.minPrice,
+					service_filter: activeFilters.serviceName,
+				});
 				const res = await fetch(
-					`${API_URL}/api/bookings/user/history?page=${meta.current_page}&limit=5`,
-					{ headers: { Authorization: `Bearer ${token}` } }
+					`${API_URL}/api/bookings/user/history?${params.toString()}`,
+					{ headers: { Authorization: `Bearer ${token}` }, signal: signal }
 				);
 				if (res.ok) {
 					const responseData = await res.json();
@@ -112,13 +166,42 @@ export default function AllBookings() {
 					setMeta(responseData.meta);
 				}
 			} catch (err) {
-				console.error("Error fetching history", err);
+				if (err.name !== "AbortError") {
+					console.error("Error fetching history", err);
+				}
 			} finally {
-				setLoading(false);
+				// only turn off loading if the request wasn't aborted
+				if (!signal.aborted) {
+					setLoading(false);
+				}
 			}
 		};
 		fetchHistory();
-	}, [meta.current_page]);
+		return () => controller.abort();
+	}, [meta.current_page, activeTab, debouncedSearch, activeFilters]);
+
+	const handleApplyFilters = () => {
+		setActiveFilters(tempFilters);
+		setMeta((prev) => ({ ...prev, current_page: 1 }));
+		setShowFilters(false);
+	};
+
+	const handleClearFilters = () => {
+		const defaultFilters = {
+			dateRange: "All Time",
+			serviceName: "",
+			minPrice: "",
+		};
+		setTempFilters(defaultFilters);
+		setActiveFilters(defaultFilters);
+		setMeta((prev) => ({ ...prev, current_page: 1 }));
+		setShowFilters(false);
+	};
+
+	const handleTabChange = (tab) => {
+		setActiveTab(tab);
+		setMeta((prev) => ({ ...prev, current_page: 1 }));
+	};
 
 	const handleStatusUpdate = async (bookingId, newStatus) => {
 		let confirmMsg = "Are you sure you want to update this booking?";
@@ -146,6 +229,7 @@ export default function AllBookings() {
 			const data = await res.json();
 
 			if (res.ok) {
+				// Update local list
 				setHistory((prev) =>
 					prev.map((item) =>
 						item.booking_id === bookingId
@@ -153,7 +237,6 @@ export default function AllBookings() {
 							: item
 					)
 				);
-
 				if (selectedBooking && selectedBooking.booking_id === bookingId) {
 					setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
 				}
@@ -187,7 +270,6 @@ export default function AllBookings() {
 				animate={{ opacity: 1, y: 0 }}
 				className="space-y-6"
 			>
-				{/* 1. Header & Toolbar */}
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 					<div>
 						<h2 className="text-xl font-bold text-gray-900">Booking History</h2>
@@ -210,14 +292,145 @@ export default function AllBookings() {
 								className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all w-full sm:w-64"
 							/>
 						</div>
-						<button className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors">
-							<Settings size={18} />
+						<button
+							onClick={() => setShowFilters(!showFilters)}
+							className={`p-2 border rounded-xl transition-colors ${
+								showFilters
+									? "bg-violet-50 text-violet-600 border-violet-200"
+									: "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+							}`}
+						>
+							{showFilters ? <X size={18} /> : <ListFilter size={18} />}
+						</button>
+					</div>
+
+					<AnimatePresence>
+						{showFilters && (
+							<motion.div
+								initial={{ opacity: 0, y: -10 }}
+								animate={{ opacity: 1, y: 0 }}
+								exit={{ opacity: 0, y: -10 }}
+								className="absolute right-0 top-16 z-10 w-72 bg-white border border-gray-100 shadow-xl rounded-2xl p-4"
+							>
+								<div className="space-y-4">
+									<div>
+										<label className="text-xs font-semibold text-gray-500 uppercase">
+											Filter by Date
+										</label>
+										<select
+											className="mt-1 w-full p-2 text-sm border border-gray-200 rounded-lg"
+											value={tempFilters.dateRange}
+											onChange={(e) =>
+												setTempFilters({
+													...tempFilters,
+													dateRange: e.target.value,
+												})
+											}
+										>
+											<option value="All Time">All Time</option>
+											<option value="This Month">This Month</option>
+											<option value="Last 3 Months">Last 3 Months</option>
+										</select>
+									</div>
+
+									<div>
+										<label className="text-xs font-semibold text-gray-500 uppercase">
+											Service
+										</label>
+										<input
+											type="text"
+											value={tempFilters.serviceName}
+											placeholder="e.g. Cleaning"
+											onChange={(e) =>
+												setTempFilters({
+													...tempFilters,
+													serviceName: e.target.value,
+												})
+											}
+											className="mt-1 w-full p-2 text-sm border border-gray-200 rounded-lg outline-0 hover:border-violet-400 duration-200"
+										/>
+									</div>
+
+									<div>
+										<label className="text-xs font-semibold text-gray-500 uppercase">
+											Min Price
+										</label>
+										<input
+											type="number"
+											placeholder="₹ 100"
+											pattern="[0-9]*"
+											className="mt-1 w-full p-2 text-sm border border-gray-200 rounded-lg outline-0 hover:border-violet-400 duration-200"
+											value={tempFilters.minPrice}
+											onChange={(e) =>
+												setTempFilters({
+													...tempFilters,
+													minPrice: e.target.value,
+												})
+											}
+										/>
+									</div>
+
+									<div className="flex gap-2 pt-2">
+										<button
+											onClick={handleClearFilters}
+											className="flex-1 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+										>
+											Clear
+										</button>
+										<button
+											onClick={handleApplyFilters}
+											className="flex-1 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 transition-colors"
+										>
+											Apply
+										</button>
+									</div>
+								</div>
+							</motion.div>
+						)}
+					</AnimatePresence>
+				</div>
+
+				<div className="border-b border-gray-200">
+					<div className="flex gap-8">
+						<button
+							onClick={() => handleTabChange("upcoming")}
+							className={`cursor-pointer pb-3 text-sm font-medium transition-colors relative flex items-center gap-2 ${
+								activeTab === "upcoming"
+									? "text-violet-600"
+									: "text-gray-500 hover:text-gray-700"
+							}`}
+						>
+							<Clock size={16} />
+							Upcoming
+							{activeTab === "upcoming" && (
+								<motion.div
+									layoutId="activeTab"
+									className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600 rounded-t-full"
+								/>
+							)}
+						</button>
+
+						<button
+							onClick={() => handleTabChange("history")}
+							className={`cursor-pointer pb-3 text-sm font-medium transition-colors relative flex items-center gap-2 ${
+								activeTab === "history"
+									? "text-violet-600"
+									: "text-gray-500 hover:text-gray-700"
+							}`}
+						>
+							<HistoryIcon size={16} />
+							History
+							{activeTab === "history" && (
+								<motion.div
+									layoutId="activeTab"
+									className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600 rounded-t-full"
+								/>
+							)}
 						</button>
 					</div>
 				</div>
 
-				{/* 2. The Table Card */}
-				<div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+				<div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden min-h-[300px]">
 					<div className="overflow-x-auto">
 						{loading ? (
 							<div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
@@ -229,9 +442,10 @@ export default function AllBookings() {
 								<div className="p-4 bg-gray-50 rounded-full mb-3">
 									<Calendar size={24} className="text-gray-300" />
 								</div>
-								<p className="font-medium text-gray-900">No bookings yet</p>
-								<p className="text-sm">
-									Your completed services will appear here.
+								<p className="font-medium text-gray-900">
+									{activeTab === "upcoming"
+										? "No upcoming bookings"
+										: "No booking history"}
 								</p>
 							</div>
 						) : (
@@ -255,7 +469,6 @@ export default function AllBookings() {
 											"0"
 										);
 										const day = String(rawDate.getDate()).padStart(2, "0");
-
 										const dateObj = new Date(
 											`${year}-${month}-${day}T00:00:00`
 										);
@@ -280,7 +493,6 @@ export default function AllBookings() {
 										const weekday = dateObj.toLocaleDateString("en-IN", {
 											weekday: "short",
 										});
-
 										const pName = item.provider_name || "Agency";
 
 										return (
@@ -298,7 +510,6 @@ export default function AllBookings() {
 														</span>
 													</div>
 												</td>
-
 												<td className="p-5">
 													<div className="flex items-center gap-3">
 														<div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
@@ -309,7 +520,6 @@ export default function AllBookings() {
 														</span>
 													</div>
 												</td>
-
 												<td className="p-5">
 													<div className="flex flex-col">
 														<span className="text-sm font-medium text-gray-900">
@@ -320,7 +530,6 @@ export default function AllBookings() {
 														</span>
 													</div>
 												</td>
-
 												<td className="p-5">
 													<span className="font-mono text-sm font-medium text-gray-700">
 														{new Intl.NumberFormat("en-IN", {
@@ -330,7 +539,6 @@ export default function AllBookings() {
 														}).format(item.price)}
 													</span>
 												</td>
-
 												<td className="p-5">
 													<StatusBadge
 														status={item.status}
@@ -338,7 +546,6 @@ export default function AllBookings() {
 														startTime={item.start_time}
 													/>
 												</td>
-
 												<td className="p-5 text-right">
 													<div className="flex items-center justify-end gap-2">
 														{item.status === "completed" ? (
@@ -346,10 +553,15 @@ export default function AllBookings() {
 																Rate Provider
 															</button>
 														) : item.status === "cancelled" ? (
-															<button className="text-xs font-medium bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+															<button
+																onClick={() =>
+																	navigate(`/book/${item.service_id}`)
+																}
+																className="text-xs font-medium bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+															>
 																Book Again
 															</button>
-														) : !isPast ? (
+														) : !isPast && item.status === "booked" ? (
 															<button
 																onClick={(e) => {
 																	e.stopPropagation();
@@ -359,7 +571,7 @@ export default function AllBookings() {
 																	);
 																}}
 																disabled={actionLoading === item.booking_id}
-																className="text-xs font-medium text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-100 transition-colors"
+																className="text-xs font-medium text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100 hover:bg-red-100 transition-colors disabled:opacity-50"
 															>
 																{actionLoading === item.booking_id
 																	? "..."

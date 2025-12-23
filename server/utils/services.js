@@ -1,4 +1,10 @@
-// List
+const CATEGORIES = {
+	HOME: "Home Services",
+	PERSONAL: "Personal Care",
+	CHILD: "Child Services",
+	FITNESS: "Fitness / Health",
+};
+
 export const SERVICE_NAMES = [
 	// Home Services
 	"House Cleaning",
@@ -41,24 +47,59 @@ export const SERVICE_NAMES = [
 	"Nutritionist",
 	"Yoga Instructor",
 ];
-// Helpers
-// export function slugify(serviceName) {
-// 	return serviceName
-// 		.toString()
-// 		.toLowerCase()
-// 		.replace(/[^a-z0-9]+/g, "-")
-// 		.replace(/(^-|-$)/g, "");
-// }
+
+export const SERVICE_CATEGORIES = {
+	// --- Home Services ---
+	"House Cleaning": CATEGORIES.HOME,
+	Laundry: CATEGORIES.HOME,
+	Plumbing: CATEGORIES.HOME,
+	"Pest Control": CATEGORIES.HOME,
+	"Electrical Repair": CATEGORIES.HOME,
+	"Tech Support": CATEGORIES.HOME,
+	"Cooking Help": CATEGORIES.HOME,
+	Gardening: CATEGORIES.HOME,
+	Massage: CATEGORIES.PERSONAL,
+	"Moving Help": CATEGORIES.HOME,
+	Painting: CATEGORIES.HOME,
+	"Appliance Repair": CATEGORIES.HOME,
+	"Driver Service": CATEGORIES.HOME,
+
+	// --- Personal Care ---
+	Haircut: CATEGORIES.PERSONAL,
+	Shaving: CATEGORIES.PERSONAL,
+	"Bridal Makeup": CATEGORIES.PERSONAL,
+	"Eyebrow Threading": CATEGORIES.PERSONAL,
+	Facial: CATEGORIES.PERSONAL,
+	"Hair Spa": CATEGORIES.PERSONAL,
+	Makeup: CATEGORIES.PERSONAL,
+	"Hand Spa": CATEGORIES.PERSONAL,
+	"Nail Art": CATEGORIES.PERSONAL,
+	"Foot Spa": CATEGORIES.PERSONAL,
+	"Full Body Glow": CATEGORIES.PERSONAL,
+	"Arm Smoothening": CATEGORIES.PERSONAL,
+	"Leg Smoothening": CATEGORIES.PERSONAL,
+	Mehndi: CATEGORIES.PERSONAL,
+
+	// --- Child Services ---
+	Babysitting: CATEGORIES.CHILD,
+	"Child Tutoring": CATEGORIES.CHILD,
+
+	// --- Fitness / Health ---
+	Nutritionist: CATEGORIES.FITNESS,
+	"Yoga Instructor": CATEGORIES.FITNESS,
+};
+
 export const slugify = (text) =>
 	text
 		.toString()
 		.toLowerCase()
-		.replace(/\s+/g, "-") // Replace spaces with -
-		.replace(/[^\w\-]+/g, "") // Remove all non-word chars
-		.replace(/\-\-+/g, "-") // Replace multiple - with single -
-		.replace(/^-+/, "") // Trim - from start of text
-		.replace(/-+$/, ""); // Trim - from end of text
+		.replace(/\s+/g, "-")
+		.replace(/[^\w\-]+/g, "")
+		.replace(/\-\-+/g, "-")
+		.replace(/^-+/, "")
+		.replace(/-+$/, "");
 
+// 5. Helper: Get Description
 export function getDescriptionForService(serviceName) {
 	const descriptions = {
 		// Home Services
@@ -78,11 +119,9 @@ export function getDescriptionForService(serviceName) {
 		"Driver Service": "Trained drivers for travel or local errands.",
 		Massage: "Therapeutic massage for relaxation and stress relief.",
 
-		// Beauty & Personal Care – Men
+		// Beauty & Personal Care
 		Haircut: "Clean and stylish haircut by a trained professional.",
 		Shaving: "Smooth and comfortable shaving at home.",
-
-		// Beauty & Personal Care – Women
 		"Bridal Makeup": "Elegant and long-lasting bridal makeup service.",
 		"Eyebrow Threading": "Perfectly shaped brows with minimal discomfort.",
 		Facial: "Glowing skin with deep-cleansing and nourishing facials.",
@@ -124,13 +163,10 @@ export function getImageForService(serviceName) {
 		Painting: "/images/painting.jpg",
 		"Driver Service": "/images/drive.jpg",
 		Massage: "/images/massagee.jpg",
+
+		// Beauty
 		Haircut: "/images/haircut-all.jpg",
-
-		// Child Services
-		Babysitting: "/images/baby-sit.jpg",
-		"Child Tutoring": "/images/child-tutor.jpg",
-
-		// Beauty & Personal Care - Women
+		Shaving: "/images/shave.jpg",
 		Makeup: "/images/makeup2.jpg",
 		"Bridal Makeup": "/images/makeup1.jpg",
 		"Eyebrow Threading": "/images/threading.jpg",
@@ -141,74 +177,27 @@ export function getImageForService(serviceName) {
 		"Arm Smoothening": "/images/wax.jpg",
 		"Leg Smoothening": "/images/wax.jpg",
 		"Hair Spa": "/images/hair.jpg",
-
-		//"Color & Highlights"
 		"Nail Art": "/images/nail-art.jpg",
 		Mehndi: "/images/mehendii.jpg",
 
-		// Beauty & Personal Care - Men
-		Shaving: "/images/shave.jpg",
+		// Child
+		Babysitting: "/images/baby-sit.jpg",
+		"Child Tutoring": "/images/child-tutor.jpg",
 
-		// Fitness / Health
+		// Fitness
 		"Yoga Instructor": "/images/yogaaa.jpg",
 		Nutritionist: "/images/nutrition.jpg",
 	};
 
 	const img = images[serviceName];
-	if (!img) {
-		console.warn(`No image found for service: "${serviceName}"`);
-	}
-	return img || null;
+	// if (!img) console.warn(`No image found for service: "${serviceName}"`);
+	return img || "/images/default-service.jpg";
 }
 
-// utils/serviceCategories.js
-export const SERVICE_CATEGORIES = {
-	// Home Services
-	"House Cleaning": "Home Services",
-	Laundry: "Home Services",
-	Plumbing: "Home Services",
-	"Pest Control": "Home Services",
-	"Electrical Repair": "Home Services",
-	"Tech Support": "Home Services",
-	"Cooking Help": "Home Services",
-	Gardening: "Home Services",
-	Massage: "Home Services",
-	"Moving Help": "Home Services",
-	Painting: "Home Services",
-	"Appliance Repair": "Home Services",
-	"Driver Service": "Home Services",
-
-	// Beauty – Men
-	Haircut: "Beauty & Personal Care",
-	Shaving: "Beauty & Personal Care",
-
-	// Beauty – Women
-	"Bridal Makeup": "Beauty & Personal Care",
-	"Eyebrow Threading": "Beauty & Personal Care",
-	Facial: "Beauty & Personal Care",
-	"Hair Spa": "Beauty & Personal Care",
-	Makeup: "Beauty & Personal Care",
-	"Hand Spa": "Beauty & Personal Care",
-	"Foot Spa": "Beauty & Personal Care",
-	"Full Body Glow": "Beauty & Personal Care",
-	"Arm Smoothening": "Beauty & Personal Care",
-	"Leg Smoothening": "Beauty & Personal Care",
-	"Nail Art": "Beauty & Personal Care",
-	Mehndi: "Beauty & Personal Care",
-
-	// Child
-	Babysitting: "Child Services",
-	"Child Tutoring": "Child Services",
-
-	// Fitness
-	Nutritionist: "Fitness / Health",
-	"Yoga Instructor": "Fitness / Health",
-};
-
-// Services with metadata
 export const SERVICES = SERVICE_NAMES.map((name) => ({
 	name,
 	slug: slugify(name),
 	description: getDescriptionForService(name),
 	image: getImageForService(name),
+	category: SERVICE_CATEGORIES[name] || "General",
 }));
