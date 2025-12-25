@@ -295,7 +295,7 @@ const SettingsPage = () => {
 	};
 
 	return (
-		<div className="bricolage-grotesque min-h-screen bg-[#faf9ff] text-[#191034] p-6 md:p-12 font-sans pt-24 md:pt-32">
+		<div className="bricolage-grotesque min-h-screen -mt-60 text-[#191034] p-6 md:p-12 font-sans pt-24 md:pt-32">
 			{alert && (
 				<Alerts
 					message={alert.message}
@@ -317,7 +317,6 @@ const SettingsPage = () => {
 				</div>
 
 				<div className="grid lg:grid-cols-12 gap-8 items-start">
-					{/* LEFT COLUMN: Profile Card (Sticky) */}
 					<div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
 						<div className="bg-white border border-gray-100 p-8 rounded-3xl flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow duration-300">
 							<div className="relative w-32 h-32 mb-6 group">
@@ -346,7 +345,6 @@ const SettingsPage = () => {
 							</div>
 
 							<div className="w-full space-y-5">
-								{/* Name Input */}
 								<div className="text-left group">
 									<label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">
 										Display Name
@@ -363,7 +361,7 @@ const SettingsPage = () => {
 									<button
 										onClick={() => updateProfile({ name }, setNameLoading)}
 										disabled={name === user.name || nameLoading}
-										className={`w-full mt-3 flex items-center justify-center gap-2 text-sm font-bold py-2 rounded-lg transition-all ${
+										className={`cursor-pointer w-full mt-3 flex items-center justify-center gap-2 text-sm font-bold py-2 rounded-lg transition-all ${
 											name === user.name
 												? "opacity-0 h-0 overflow-hidden py-0"
 												: "opacity-100 bg-violet-600 text-white hover:bg-violet-700 shadow-lg shadow-violet-200"
@@ -381,7 +379,6 @@ const SettingsPage = () => {
 
 								<div className="h-px bg-gray-100 w-full" />
 
-								{/* Email Section */}
 								<div className="text-left">
 									<label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">
 										Email Address
@@ -398,7 +395,7 @@ const SettingsPage = () => {
 											</div>
 											<button
 												onClick={() => setIsEditingEmail(true)}
-												className="text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
+												className="cursor-pointer text-sm font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 btn py-1.5 rounded-lg transition-colors"
 											>
 												Edit
 											</button>
@@ -428,7 +425,7 @@ const SettingsPage = () => {
 														setOtpSent(false);
 														setEmail(user.email);
 													}}
-													className="flex-1 py-2 text-xs font-bold text-gray-600 hover:bg-gray-200/50 rounded-lg transition-colors"
+													className="cursor-pointer flex-1 py-2 text-xs font-bold text-gray-600 hover:bg-gray-200/50 rounded-lg transition-colors"
 												>
 													Cancel
 												</button>
@@ -436,7 +433,7 @@ const SettingsPage = () => {
 													<button
 														onClick={handleSendOtp}
 														disabled={emailLoading || email === user.email}
-														className="flex-1 py-2 text-xs font-bold bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-all shadow-md shadow-violet-200"
+														className="cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-violet-600 flex-1 py-2 text-xs font-bold bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-all shadow-md shadow-violet-200"
 													>
 														{emailLoading ? "Sending..." : "Send OTP"}
 													</button>
@@ -444,7 +441,7 @@ const SettingsPage = () => {
 													<button
 														onClick={handleVerifyAndChangeEmail}
 														disabled={emailLoading || !otp}
-														className="flex-1 py-2 text-xs font-bold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md shadow-emerald-200"
+														className="cursor-pointer disabled:cursor-not-allowed flex-1 py-2 text-xs font-bold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md shadow-emerald-200"
 													>
 														{emailLoading ? "Verifying..." : "Verify"}
 													</button>
@@ -457,9 +454,7 @@ const SettingsPage = () => {
 						</div>
 					</div>
 
-					{/* RIGHT COLUMN: Details & Security */}
 					<div className="lg:col-span-8 space-y-6">
-						{/* Location Card */}
 						<div className="bg-white border border-gray-100 p-8 rounded-3xl shadow-sm">
 							<h3 className="text-xl font-bold text-[#191034] mb-8 flex items-center gap-3">
 								<div className="bg-blue-50 p-2.5 rounded-xl text-blue-600">
@@ -538,7 +533,7 @@ const SettingsPage = () => {
 									<button
 										onClick={() => updateProfile({ address })}
 										disabled={addressLoading}
-										className="disabled:cursor-not-allowed text-sm font-bold bg-violet-600 text-white px-6 py-2.5 rounded-xl hover:bg-violet-700 shadow-lg shadow-violet-200 transition-all"
+										className="disabled:cursor-not-allowed btn-dark text-violet-800 cursor-pointer text-sm font-bold px-6 py-2.5 rounded-xl hover:bg-violet-700 shadow-lg shadow-violet-200 transition-all"
 									>
 										{addressLoading ? "Processing..." : "Update Address"}
 									</button>
@@ -546,7 +541,6 @@ const SettingsPage = () => {
 							</div>
 						</div>
 
-						{/* Security Section */}
 						<div className="bg-white border border-gray-100 p-8 rounded-3xl shadow-sm">
 							<h3 className="text-xl font-bold text-[#191034] mb-8 flex items-center gap-3">
 								<div className="bg-amber-50 p-2.5 rounded-xl text-amber-600">
@@ -593,7 +587,7 @@ const SettingsPage = () => {
 										<button
 											onClick={handlePasswordUpdate}
 											disabled={passwordLoading || !newPassword}
-											className="w-full bg-violet-600 text-white font-bold py-3.5 rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200 disabled:opacity-50 disabled:shadow-none mt-2"
+											className="w-full btn-dark disabled:cursor-not-allowed  bg-violet-600 text-white font-bold py-3.5 rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200 disabled:opacity-50 disabled:shadow-none mt-2"
 										>
 											{passwordLoading ? "Updating..." : "Update Password"}
 										</button>

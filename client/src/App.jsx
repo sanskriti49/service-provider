@@ -1,4 +1,8 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import {
+	createBrowserRouter,
+	RouterProvider,
+	useLocation,
+} from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import PlainLayout from "./layouts/PlainLayout";
 

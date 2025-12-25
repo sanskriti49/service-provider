@@ -479,6 +479,8 @@ async function getUserHistory(req, res) {
 
 		const dataQuery = `
 			SELECT b.booking_id, b.service_id, b.date, b.status, b.price, b.start_time, b.address,
+				   pu.id AS provider_id,
+				   pu.custom_id AS custom_id,
 				   pu.name AS provider_name,
 				   pu.email AS provider_email,
 				   pu.phone AS provider_phone,
@@ -493,27 +495,6 @@ async function getUserHistory(req, res) {
 					: "ORDER BY b.date DESC, b.start_time DESC"
 			}
             LIMIT $${paramCounter} OFFSET $${paramCounter + 1};`;
-
-		//	const dataParams = [...queryParams, limit, offset];
-		// const limitIndex = dataParams.length - 1;
-		// const offsetIndex = dataParams.length;
-
-		// const orderClause =
-		// 	type === "upcoming"
-		// 		? "ORDER BY b.date ASC, b.start_time ASC"
-		// 		: "ORDER BY b.date DESC, b.start_time DESC";
-
-		// const countParams = [userId];
-		// if (search) countParams.push(`%${search}`);
-
-		// let countWhere = "WHERE user_id=$1";
-		// if (type === "upcoming") {
-		// 	countWhere +=
-		// 		" AND status IN ('booked', 'in_progress', 'awaiting_completion')";
-		// } else {
-		// 	countWhere +=
-		// 		" AND status IN ('completed', 'cancelled', 'no_show', 'expired', 'lapsed')";
-		// }
 
 		const dataParams = [...queryParams, limit, offset];
 

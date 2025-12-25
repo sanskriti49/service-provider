@@ -36,6 +36,7 @@
 		"react-multi-carousel": "^2.8.5",
 		"react-router-dom": "^6.30.0",
 		"react-router-hash-link": "^2.4.3",
+		"react-spinners": "^0.17.0",
 		"tailwindcss": "^4.1.7"
 	},
 	"devDependencies": {

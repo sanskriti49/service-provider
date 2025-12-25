@@ -174,17 +174,72 @@ html {
 .btn-lg,
 .btn-xl,
 .btn-2xl {
-	--btn-inner-shadow: inset 0 -3px 6px -2px #e7e6f4;
-	--btn-inner-shadow-active: inset 0 0 6px #ddd6fe;
-	--btn-shadow: 0 0 transparent;
+	--btn-inner-shadow: inset 0 -3px 6px -2px #ddd6fe;
+
+	--btn-inner-shadow-active: inset 0 0 6px #c4b5fd;
+
+	--btn-shadow: 0 2px 4px rgb(124 58 237 / 0.05); /* Added subtle outer violet glow */
 	--btn-shadow-active: 0 0 transparent;
-	--btn-text-color: #281950;
-	--btn-text-color-active: #7c3aed;
-	--btn-bg-color: white;
-	--btn-bg-color-active: #f9f9fd;
-	--btn-border-color: rgb(91 33 182 / 0.125);
-	--btn-border-color-active: rgb(167 139 250 / 0.4);
-	--btn-ring-color: rgb(221 214 254 / 0.75);
+
+	--btn-text-color: #2e1065; /* violet-950 */
+	--btn-text-color-active: #6d28d9; /* violet-700 */
+
+	--btn-bg-color: #fbfaff;
+	--btn-bg-color-active: #f5f3ff; /* violet-50 */
+
+	--btn-border-color: rgb(139 92 246 / 0.25);
+	--btn-border-color-active: rgb(124 58 237 / 0.5);
+
+	--btn-ring-color: rgb(139 92 246 / 0.4);
+
+	align-items: center;
+	background-clip: padding-box;
+	background-color: var(--btn-bg-color);
+	border-color: var(--btn-border-color);
+	border-radius: 9999px;
+	border-width: 1px;
+	box-shadow: var(--btn-inner-shadow), var(--btn-shadow);
+	display: inline-flex;
+	font-weight: 500; /* Bumped weight slightly for better legibility on violet */
+	justify-content: center;
+	letter-spacing: 0em;
+	white-space: nowrap;
+	transition: 0.2s all ease-in-out;
+}
+
+/* Optional: Add a hover state for better interactivity */
+.btn:hover {
+	--btn-bg-color: #f5f3ff;
+	--btn-border-color: rgb(124 58 237 / 0.35);
+	--btn-text-color: #5b21b6;
+	transform: translateY(-1px);
+}
+
+.btn-dark {
+	/* Background: Deep rich violet */
+	--btn-bg-color: #774bbd; /* violet-800 */
+	--btn-bg-color-active: #4c1d95; /* violet-900 */
+
+	/* Text: White with a slight lavender tint */
+	--btn-text-color: #f5f3ff;
+	--btn-text-color-active: #ddd6fe;
+
+	/* Shadow: Darker depth at the bottom, slight highlight at top */
+	--btn-inner-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.15),
+		inset 0 -3px 0px -1px rgb(0 0 0 / 0.2);
+	--btn-inner-shadow-active: inset 0 3px 6px rgb(0 0 0 / 0.3);
+
+	/* Outer glow */
+	--btn-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2), 0 2px 4px -1px rgb(0 0 0 / 0.1);
+	--btn-shadow-active: 0 0 transparent;
+
+	/* Border: Subtle lighter violet to define edges */
+	--btn-border-color: rgb(139 92 246 / 0.5); /* violet-500 */
+	--btn-border-color-active: rgb(139 92 246 / 0.3);
+
+	--btn-ring-color: rgb(124 58 237 / 0.5);
+
+	/* --- Shared Structural Styles (Same as light version) --- */
 	align-items: center;
 	background-clip: padding-box;
 	background-color: var(--btn-bg-color);
@@ -194,12 +249,29 @@ html {
 	box-shadow: var(--btn-inner-shadow), var(--btn-shadow);
 	color: var(--btn-text-color) !important;
 	display: inline-flex;
-	font-weight: 450;
+	font-weight: 500;
 	justify-content: center;
-	letter-spacing: 0em;
+	letter-spacing: 0.025em;
 	white-space: nowrap;
-	transition: 0.2s all;
+	transition: 0.2s all ease-in-out;
 }
+
+/* Hover Effect for Dark Button */
+.btn-dark:hover {
+	--btn-bg-color: #7e45da; /* Lighter violet on hover */
+	--btn-border-color: rgb(167 139 250 / 0.6);
+	transform: translateY(-1px);
+	box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.2),
+		0 6px 12px -2px rgb(0 0 0 / 0.3);
+}
+
+/* Active / Pressed State */
+.btn-dark:active {
+	transform: translateY(1px);
+	--btn-bg-color: #4c1d95;
+	box-shadow: var(--btn-inner-shadow-active);
+}
+
 .btn-danger {
 	--btn-bg-color: #ffe4e6;
 	--btn-bg-color-active: #fecdd3;

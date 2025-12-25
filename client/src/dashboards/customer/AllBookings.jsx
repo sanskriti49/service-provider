@@ -262,6 +262,7 @@ export default function AllBookings() {
 			setMeta((prev) => ({ ...prev, current_page: prev.current_page - 1 }));
 		}
 	};
+	console.log("HISTORY: ", history);
 
 	return (
 		<div className="relative">
@@ -555,7 +556,13 @@ export default function AllBookings() {
 														) : item.status === "cancelled" ? (
 															<button
 																onClick={() =>
-																	navigate(`/book/${item.service_id}`)
+																	navigate(`/book/${item.custom_id}`, {
+																		provider: {
+																			user_id: item.provider_id,
+																			custom_id: item.custom_id,
+																			name: item.provider_name,
+																		},
+																	})
 																}
 																className="text-xs font-medium bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
 															>

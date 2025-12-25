@@ -8,6 +8,22 @@ const {
 async function getAvailability(req, res, next) {
 	try {
 		const providerId = req.params.providerId;
+
+		const isUUID =
+			/^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/.test(
+				providerId
+			);
+		if (!isUUID) {
+			const userRes = await db.query(
+				`SELECT id FROM users WHERE custom_id = $1`,
+				[providerId]
+			);
+			if (userRes.rows.length === 0) {
+				return res.status(404).json({ message: "Provider not found" });
+			}
+			providerId = userRes.rows[0].id;
+		}
+
 		const from = req.query.from ? new Date(req.query.from) : new Date();
 		from.setHours(0, 0, 0, 0);
 

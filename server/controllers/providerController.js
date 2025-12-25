@@ -7,7 +7,6 @@ const { generateAvailability } = require("../utils/generateAvailability");
 const { generateDailySlots } = require("../utils/timeUtils");
 const { normalizeEmail } = require("../utils/normalizeEmail");
 
-// -------------------- VALIDATION --------------------
 const providerSchema = Joi.object({
 	name: Joi.string().min(3).max(100).required(),
 	email: Joi.string().email().lowercase().required(),
@@ -20,7 +19,7 @@ const providerSchema = Joi.object({
 	location: Joi.string().optional(),
 	photo: Joi.string().uri().optional(),
 	bio: Joi.string().max(500).optional(),
-	service: Joi.string().required(), // this is the slug (like "plumbing")
+	service: Joi.string().required(),
 	price: Joi.number().min(0).optional(),
 	rating: Joi.number().min(0).max(5).optional(),
 	availability: Joi.object().optional(),
@@ -45,7 +44,6 @@ const providerUpdateSchema = Joi.object({
 	availability: Joi.object().optional(),
 });
 
-// -------------------- CREATE PROVIDER --------------------
 async function createProvider(req, res, next) {
 	const { error, value } = providerSchema.validate(req.body);
 	if (error) return res.status(400).json({ error: error.details[0].message });
@@ -69,7 +67,6 @@ async function createProvider(req, res, next) {
 	try {
 		await client.query("BEGIN");
 
-		// 1️⃣ Convert service slug ➝ service_id
 		const serviceRow = await client.query(
 			"SELECT id FROM services WHERE slug = $1",
 			[service]
@@ -81,7 +78,7 @@ async function createProvider(req, res, next) {
 
 		const serviceId = serviceRow.rows[0].id;
 
-		// 2️⃣ Insert user
+		// insert user
 		const hashed = await hashIfPresent(password);
 		const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20);
 		const customId = "SRV" + nano();
@@ -95,7 +92,7 @@ async function createProvider(req, res, next) {
 
 		const userId = userInsert.rows[0].id;
 
-		// 3️⃣ Insert provider record
+		// insert provider record
 		await client.query(
 			`INSERT INTO providers (user_id, service_id, price, rating, availability)
              VALUES ($1,$2,$3,$4,$5)`,
@@ -112,7 +109,7 @@ async function createProvider(req, res, next) {
 			{ day: 6, start: "10:00:00", end: "19:00:00" }, // Saturday
 		];
 
-		// 4️⃣ Create availability slots
+		// create availability slots
 		for (const schedule of defaultSchedule) {
 			await client.query(
 				`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
@@ -120,15 +117,6 @@ async function createProvider(req, res, next) {
 				[userId, schedule.day, schedule.start, schedule.end]
 			);
 		}
-
-		// const slots = generateAvailability();
-		// for (const s of slots) {
-		// 	await client.query(
-		// 		`INSERT INTO availability_slots (provider_id, date, start_time, end_time)
-		//          VALUES ($1,$2,$3,$4)`,
-		// 		[userId, s.date, s.start_time, s.end_time]
-		// 	);
-		// }
 
 		await client.query("COMMIT");
 
@@ -145,7 +133,6 @@ async function createProvider(req, res, next) {
 	}
 }
 
-// -------------------- GET ALL PROVIDERS --------------------
 async function getProviders(req, res, next) {
 	try {
 		const { service } = req.query;
@@ -186,7 +173,6 @@ async function getProviders(req, res, next) {
 	}
 }
 
-// -------------------- GET PROVIDER BY CUSTOM ID --------------------
 async function getProviderById(req, res, next) {
 	try {
 		const { custom_id } = req.params;
@@ -249,7 +235,6 @@ async function getProviderById(req, res, next) {
 			[providerId, today, nextWeek]
 		);
 
-		// create a set of booked slots: "2025-12-18_10:00:00"'
 		const bookedSet = new Set();
 		bookingsRes.rows.forEach((b) => {
 			bookedSet.add(`${b.date}_${b.start_time}`);
@@ -284,38 +269,10 @@ async function getProviderById(req, res, next) {
 			}
 		}
 
-		// const slotsQ = `
-		// SELECT
-		// 	to_char(a.date, 'YYYY-MM-DD') as date,
-		// 	a.start_time, a.end_time,
-		// 	CASE
-		// 		WHEN b.id IS NOT NULL THEN true
-		// 		ELSE false
-		// 	END AS "isBooked"
-		// FROM availability_slots a
-		// LEFT JOIN bookings b
-		// 	ON a.provider_id=b.provider_id
-		// 	AND a.date=b.date
-		// 	AND a.start_time=b.start_time
-		// 	AND b.status='booked'
-		// WHERE a.provider_id=$1
-		// ORDER BY a.date ASC, a.start_time ASC
-		// `;
-
-		// const slotsRes = await db.query(
-		// 	// `SELECT date, start_time, end_time
-		// 	//  FROM availability_slots
-		// 	//  WHERE provider_id = $1
-		// 	//  ORDER BY date, start_time`,
-		// 	slotsQ,
-		// 	[providerId]
-		// );
-
 		res.json({
 			message: "Provider fetched",
 			provider: {
 				...providerRes.rows[0],
-				//availability: slotsRes.rows,
 				availability: dynamicAvailability,
 			},
 		});
@@ -324,7 +281,6 @@ async function getProviderById(req, res, next) {
 	}
 }
 
-// -------------------- UPDATE PROVIDER --------------------
 async function updateProvider(req, res, next) {
 	const { error, value } = providerUpdateSchema.validate(req.body);
 	if (error) return res.status(400).json({ error: error.details[0].message });
@@ -418,10 +374,9 @@ const addMinutes = (timeStr, minutesToAdd) => {
 	const date = new Date();
 	date.setHours(hours, minutes, 0, 0);
 	date.setMinutes(date.getMinutes() + minutesToAdd);
-	return date.toTimeString().split(" ")[0]; // Returns "HH:MM:SS"
+	return date.toTimeString().split(" ")[0]; // returns "HH:MM:SS"
 };
 
-// -------------------- GET SPECIFIC PROVIDER AVAILABILITY --------------------
 async function getProviderAvailability(req, res, next) {
 	try {
 		const { id } = req.params;
@@ -510,7 +465,6 @@ async function getProviderAvailability(req, res, next) {
 	}
 }
 
-// -------------------- DELETE PROVIDER --------------------
 async function deleteProvider(req, res, next) {
 	try {
 		const id = req.params.id;

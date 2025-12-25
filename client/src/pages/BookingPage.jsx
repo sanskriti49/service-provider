@@ -10,6 +10,7 @@ import {
 	Navigation,
 } from "lucide-react";
 import Alerts from "../ui/Alerts";
+import { FadeLoader } from "react-spinners";
 
 export default function BookingPage() {
 	const { customId } = useParams();
@@ -27,7 +28,6 @@ export default function BookingPage() {
 		"Home • 12/B, Green Heights, Civil Lines, Kanpur"
 	);
 
-	// Initialize state from navigation state (if available)
 	const [selectedDate, setSelectedDate] = useState(
 		state?.selectedDateStr || null
 	);
@@ -40,7 +40,6 @@ export default function BookingPage() {
 	const [loading, setLoading] = useState(!state?.provider);
 	const [alert, setAlert] = useState(null);
 
-	// Consistent time formatting logic
 	function formatTime(timeString) {
 		if (!timeString) return "";
 		const [hours, minutes] = timeString.split(":");
@@ -74,10 +73,10 @@ export default function BookingPage() {
 					setProvider(currentProvider);
 				}
 
-				if (currentProvider && currentProvider.user_id) {
+				if (currentProvider && currentProvider.id) {
 					if (availability.length === 0) setLoading(true);
 					const slotsRes = await fetch(
-						`${API_URL}/api/providers/v1/${currentProvider.user_id}/availability`
+						`${API_URL}/api/providers/v1/${currentProvider.id}/availability`
 					);
 					if (slotsRes.ok) {
 						const slotsData = await slotsRes.json();
@@ -189,16 +188,19 @@ export default function BookingPage() {
 
 	if (loading || !provider) {
 		return (
-			<div className="min-h-screen bg-[#0f0c29] text-white flex items-center justify-center">
+			<div className="bricolage-grotesque min-h-screen bg-[#0f0c29] text-white flex items-center justify-center">
 				<div className="flex flex-col items-center gap-4">
-					<div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-					<p className="text-violet-200 animate-pulse">
+					{/* <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div> */}
+					<FadeLoader />
+					<p className="text-violet-200 text-xl animate-pulse">
 						Finding availability...
 					</p>
 				</div>
 			</div>
 		);
 	}
+	console.log("object: ", groupedSlots);
+	console.log("PROVIDER: ", provider);
 
 	return (
 		<div className="bricolage-grotesque min-h-screen bg-[#0f0c29] text-white selection:bg-violet-500/30">
