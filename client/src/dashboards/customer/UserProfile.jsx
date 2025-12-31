@@ -75,7 +75,7 @@ const MenuItem = ({
 		animate={{ opacity: 1, x: 0 }}
 		transition={{ delay }}
 		onClick={onClick}
-		className={`w-full group flex items-center justify-between p-3 rounded-2xl transition-all duration-200 border border-transparent
+		className={`cursor-pointer w-full group flex items-center justify-between p-3 rounded-2xl transition-all duration-200 border border-transparent
         ${
 					isDanger
 						? "hover:bg-red-50 hover:border-red-100"
@@ -175,10 +175,10 @@ export default function UserProfile() {
 						</h1>
 					</div>
 
-					<div className="flex gap-3">
+					<div className="cursor-pointer flex gap-3">
 						<button
 							onClick={() => navigate("/settings")}
-							className={`h-12 px-6 rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 ${TEXT_MAIN} font-bold hover:bg-white hover:border-violet-200 hover:shadow-lg hover:shadow-violet-100/50 transition-all flex items-center gap-2`}
+							className={` h-12 px-6 rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 ${TEXT_MAIN} font-bold hover:bg-white hover:border-violet-200 hover:shadow-lg hover:shadow-violet-100/50 transition-all flex items-center gap-2`}
 						>
 							<Settings size={18} />
 							<span>Settings</span>
@@ -236,7 +236,7 @@ export default function UserProfile() {
 									</div>
 								</div>
 							</div>
-							<button className="absolute top-6 right-6 text-gray-400 hover:text-[#281950] transition-colors">
+							<button className="cursor-pointer absolute top-6 right-6 text-gray-400 hover:text-[#281950] transition-colors">
 								<Edit3 size={18} />
 							</button>
 						</BentoCard>
@@ -286,14 +286,17 @@ export default function UserProfile() {
 								<div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10 mb-6">
 									<Zap className="text-yellow-300 fill-yellow-300" size={24} />
 								</div>
-								<h3 className="text-2xl font-bold mb-2" style={SERIF_FONT}>
+								<h3
+									className="text-violet-900 text-2xl font-bold mb-2"
+									style={SERIF_FONT}
+								>
 									Upgrade to Genie+
 								</h3>
-								<p className="text-gray-300 text-sm leading-relaxed mb-6">
+								<p className="text-violet-800 text-sm leading-relaxed mb-6">
 									Unlock priority support, 0% service fees, and exclusive
 									premium themes.
 								</p>
-								<button className="w-full py-3 bg-white text-[#281950] rounded-xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-white/10 mt-auto">
+								<button className="cursor-pointer w-full py-3 bg-white text-[#281950] rounded-xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-white/10 mt-auto">
 									Try Free Trial
 								</button>
 							</div>
