@@ -1,23 +1,24 @@
-// layouts/AppLayout.jsx
 import Navbar from "../ui/Navbar";
 import { Outlet, useLocation } from "react-router-dom";
 import Footer from "../pages/Footer";
 import { AnimatePresence, motion } from "framer-motion";
 
-export default function AppLayout() {
+export default function HomeLayout() {
 	const location = useLocation();
 
 	return (
 		<div
-			// ADDED overflow-x-hidden HERE
-			className="relative min-h-screen flex flex-col bg-cover bg-center bg-no-repeat bg-fixed overflow-x-hidden w-full"
+			className="relative min-h-screen flex flex-col bg-cover bg-center bg-no-repeat bg-fixed"
 			style={{ backgroundImage: "url('/images/background.webp')" }}
 		>
+			{/* 2. Restored the overlay so you can see the BG 'nicely' (tinted) */}
+			{/* Added pointer-events-none so you can still click things underneath if z-index fails */}
 			<div className="absolute inset-0 -z-10 pointer-events-none" />
 
 			<Navbar />
 
-			<main className="flex-grow flex flex-col w-full max-w-[100vw]">
+			{/* 3. Main container takes remaining space */}
+			<main className="flex-grow flex flex-col">
 				<AnimatePresence mode="wait">
 					<motion.div
 						key={location.pathname}

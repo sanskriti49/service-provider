@@ -206,26 +206,43 @@ export default function ContactSection() {
 										name="subject"
 										onChange={handleChange}
 										defaultValue=""
-										className={`w-full pl-10 py-4 rounded-xl bg-white/70 border border-gray-200 outline-none appearance-none transition-all cursor-pointer focus:border-purple-400 focus:ring-4 focus:ring-purple-100
-									${form.subject ? "text-purple-700 font-semibold" : "text-gray-400"}
+										/* 1. Added bricolage-grotesque here to force the selected value font */
+										className={`bricolage-grotesque w-full pl-10 py-4 rounded-xl bg-white/70 border border-gray-200 outline-none appearance-none transition-all cursor-pointer focus:border-purple-400 focus:ring-4 focus:ring-purple-100
+        ${form.subject ? "text-purple-700 font-semibold" : "text-gray-400"}
         `}
 									>
-										<option value="" disabled>
+										{/* 2. Added bricolage-grotesque class to EVERY option */}
+										<option value="" disabled className="bricolage-grotesque">
 											What brings you here?
 										</option>
-										<option value="support" className="text-gray-900">
+										<option
+											value="support"
+											className="text-gray-900 bricolage-grotesque"
+										>
 											I need help / Support
 										</option>
-										<option value="bug" className="text-gray-900">
+										<option
+											value="bug"
+											className="text-gray-900 bricolage-grotesque"
+										>
 											I found a bug
 										</option>
-										<option value="feature" className="text-gray-900">
+										<option
+											value="feature"
+											className="text-gray-900 bricolage-grotesque"
+										>
 											I have a feature request
 										</option>
-										<option value="love" className="text-gray-900">
+										<option
+											value="love"
+											className="text-gray-900 bricolage-grotesque"
+										>
 											Just sending some love!
 										</option>
-										<option value="other" className="text-gray-900">
+										<option
+											value="other"
+											className="text-gray-900 bricolage-grotesque"
+										>
 											Something else
 										</option>
 									</select>

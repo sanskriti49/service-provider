@@ -5,6 +5,7 @@ import {
 } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import PlainLayout from "./layouts/PlainLayout";
+import HomeLayout from "./layouts/HomeLayout";
 
 import Home from "./pages/Home";
 import SignIn from "./pages/SignIn";

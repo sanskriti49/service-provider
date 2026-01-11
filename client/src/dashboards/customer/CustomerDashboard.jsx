@@ -301,9 +301,8 @@ export default function CustomerDashboard() {
 							</p>
 						</div>
 
-						{/* Global Book Button */}
 						<Link
-							to="/#services"
+							to="/services"
 							className="cursor-pointer hidden sm:flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-5 py-3 rounded-xl font-medium shadow-lg shadow-gray-900/20 transition-all active:scale-95"
 						>
 							<Plus size={18} /> Book New Service

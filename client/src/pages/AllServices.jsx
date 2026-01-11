@@ -97,7 +97,7 @@ export default function AllServices() {
 						<button
 							key={cat}
 							onClick={() => setSelectedCategory(cat)}
-							className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 border ${
+							className={`cursor-pointer px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 border ${
 								selectedCategory === cat
 									? "bg-violet-900 text-white border-violet-900 shadow-lg scale-105"
 									: "bg-white text-slate-600 border-gray-200 hover:bg-violet-50 hover:border-violet-300"

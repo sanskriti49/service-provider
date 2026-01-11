@@ -1,15 +1,17 @@
+// layouts/PlainLayout.jsx
 import { AnimatePresence, motion } from "framer-motion";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom"; // Added useLocation import
 
 export default function PlainLayout() {
+	const location = useLocation(); // Hook was missing in your snippet
+
 	return (
 		<AnimatePresence mode="wait">
 			<div
-				className="min-h-screen w-full bg-cover bg-center bg-no-repeat bg-fixed"
+				className="min-h-screen w-full bg-cover bg-center bg-no-repeat bg-fixed overflow-x-hidden"
 				style={{ backgroundImage: "url('/images/background.webp')" }}
 			>
 				<motion.div
-					// Key is vital! It tells Framer "this is a different page"
 					key={location.pathname}
 					initial={{ opacity: 0, y: 15 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -17,7 +19,6 @@ export default function PlainLayout() {
 					transition={{ duration: 0.3 }}
 					className="w-full h-full"
 				>
-					{/* Outlet renders the child route (Home, Dashboard, etc.) */}
 					<Outlet />
 				</motion.div>
 			</div>
