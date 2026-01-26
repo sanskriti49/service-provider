@@ -1,12 +1,14 @@
 import { useRef, useState } from "react";
 import emailjs from "@emailjs/browser";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import {
 	Mail,
 	User,
 	MessageSquare,
 	Send,
 	MessageCircleQuestionMark,
+	ArrowRight,
 } from "lucide-react";
 import Alerts from "../ui/Alerts";
 
@@ -37,17 +39,15 @@ export default function ContactSection() {
 		setStatus(null);
 
 		const SERVICE_ID = "service_umuz4f3";
-		const TEMPLATE_ADMIN = "template_tsbhnim"; // Sends message to YOU
-		const TEMPLATE_USER = "template_44pf72s"; // Auto-reply to USER
+		const TEMPLATE_ADMIN = "template_tsbhnim";
+		const TEMPLATE_USER = "template_44pf72s";
 		const PUBLIC_KEY = "VSuB8cLKQ6u5BQFuj";
 
-		// SEND MESSAGE TO ADMIN
 		emailjs
 			.sendForm(SERVICE_ID, TEMPLATE_ADMIN, formRef.current, {
 				publicKey: PUBLIC_KEY,
 			})
 			.then(() => {
-				// SEND AUTO-REPLY TO USER
 				emailjs.send(SERVICE_ID, TEMPLATE_USER, {
 					name: form.name,
 					email: form.email,
@@ -73,8 +73,8 @@ export default function ContactSection() {
 		status === "success"
 			? "Message sent!"
 			: status === "error"
-			? "Failed to send message"
-			: null;
+				? "Failed to send message"
+				: null;
 
 	return (
 		<>
@@ -92,6 +92,7 @@ export default function ContactSection() {
 				<div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000" />
 
 				<div className="relative z-10 w-full max-w-6xl grid lg:grid-cols-2 gap-12 items-start">
+					{/* --- LEFT COLUMN --- */}
 					<motion.div
 						initial={{ opacity: 0, x: -50 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -106,13 +107,14 @@ export default function ContactSection() {
 								</span>
 							</h2>
 
-							<p className="text-lg text-slate-600 max-w-md">
+							<p className="text-lg text-slate-600 max-w-md mb-8">
 								From daily fixes to major makeovers — find trusted professionals
 								ready to take care of your home with comfort, safety, and
 								confidence.
 							</p>
 						</div>
 
+						{/* LIST CONTAINER WITH SVGS */}
 						<div className="w-full lg:w-auto">
 							<ul className="relative text-lg text-slate-800 font-medium py-10">
 								<svg
@@ -178,6 +180,7 @@ export default function ContactSection() {
 						</div>
 					</motion.div>
 
+					{/* --- RIGHT COLUMN (FORM) --- */}
 					<motion.div
 						initial={{ opacity: 0, x: 50 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -206,12 +209,10 @@ export default function ContactSection() {
 										name="subject"
 										onChange={handleChange}
 										defaultValue=""
-										/* 1. Added bricolage-grotesque here to force the selected value font */
 										className={`bricolage-grotesque w-full pl-10 py-4 rounded-xl bg-white/70 border border-gray-200 outline-none appearance-none transition-all cursor-pointer focus:border-purple-400 focus:ring-4 focus:ring-purple-100
         ${form.subject ? "text-purple-700 font-semibold" : "text-gray-400"}
         `}
 									>
-										{/* 2. Added bricolage-grotesque class to EVERY option */}
 										<option value="" disabled className="bricolage-grotesque">
 											What brings you here?
 										</option>
@@ -312,6 +313,39 @@ export default function ContactSection() {
 									)}{" "}
 								</button>
 							</form>
+						</div>
+
+						<div className="flex items-center w-full my-6">
+							<div className="h-px bg-gray-300 flex-1 opacity-50" />
+							<span className="px-4 text-gray-500 text-sm font-semibold tracking-wider">
+								OR
+							</span>
+							<div className="h-px bg-gray-300 flex-1 opacity-50" />
+						</div>
+
+						{/* --- HELP CENTER BLOCK (Moved here) --- */}
+						<div className="w-full bg-white/60 backdrop-blur-md border border-white/50 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 relative z-20">
+							<div className="flex items-start gap-4">
+								<div className="p-3 bg-violet-100 rounded-xl shrink-0">
+									<MessageCircleQuestionMark className="w-6 h-6 text-violet-600" />
+								</div>
+								<div>
+									<h3 className="font-bold text-slate-900 text-lg">
+										Have a question?
+									</h3>
+									<p className="text-slate-600 text-sm mt-1 mb-3 leading-relaxed">
+										Check FAQs from our Help Center for instant answers about
+										payments, refunds, and bookings.
+									</p>
+									<Link
+										to="/help"
+										className="inline-flex items-center gap-2 text-sm font-bold text-violet-700 hover:text-violet-900 transition-colors group"
+									>
+										Visit Help Center
+										<ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+									</Link>
+								</div>
+							</div>
 						</div>
 					</motion.div>
 				</div>

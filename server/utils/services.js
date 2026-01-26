@@ -5,14 +5,14 @@ const CATEGORIES = {
 	FITNESS: "Fitness / Health",
 };
 
-export const SERVICE_NAMES = [
-	// Home Services
+const SERVICE_NAMES = [
+	// --- Home Services ---
 	"House Cleaning",
 	"Laundry",
 	"Plumbing",
 	"Pest Control",
 	"Electrical Repair",
-	"Tech Support",
+	"Computer & Tech Repair",
 	"Cooking Help",
 	"Gardening",
 	"Massage",
@@ -21,41 +21,36 @@ export const SERVICE_NAMES = [
 	"Appliance Repair",
 	"Driver Service",
 
-	// Beauty & Personal Care - Men
-	"Haircut",
+	// --- Men's Grooming ---
+	"Men's Haircut",
+	"Men's Hair Spa",
 	"Shaving",
 
-	// Beauty & Personal Care - Women
+	// --- Women's Beauty ---
+	"Women's Haircut",
+	"Women's Hair Spa",
 	"Bridal Makeup",
 	"Eyebrow Threading",
 	"Facial",
-	"Hair Spa",
 	"Makeup",
-	"Hand Spa",
-	"Nail Art",
-	"Foot Spa",
-	"Full Body Glow",
-	"Arm Smoothening",
-	"Leg Smoothening",
 	"Mehndi",
+	"Waxing",
+	"Nail Studio",
 
-	// Child Services
+	// --- Child & Health ---
 	"Babysitting",
 	"Child Tutoring",
-
-	// Fitness / Health
 	"Nutritionist",
 	"Yoga Instructor",
 ];
 
-export const SERVICE_CATEGORIES = {
-	// --- Home Services ---
+const SERVICE_CATEGORIES = {
 	"House Cleaning": CATEGORIES.HOME,
 	Laundry: CATEGORIES.HOME,
 	Plumbing: CATEGORIES.HOME,
 	"Pest Control": CATEGORIES.HOME,
 	"Electrical Repair": CATEGORIES.HOME,
-	"Tech Support": CATEGORIES.HOME,
+	"Computer & Tech Repair": CATEGORIES.HOME,
 	"Cooking Help": CATEGORIES.HOME,
 	Gardening: CATEGORIES.HOME,
 	Massage: CATEGORIES.PERSONAL,
@@ -64,140 +59,123 @@ export const SERVICE_CATEGORIES = {
 	"Appliance Repair": CATEGORIES.HOME,
 	"Driver Service": CATEGORIES.HOME,
 
-	// --- Personal Care ---
-	Haircut: CATEGORIES.PERSONAL,
+	"Men's Haircut": CATEGORIES.PERSONAL,
+	"Men's Hair Spa": CATEGORIES.PERSONAL,
 	Shaving: CATEGORIES.PERSONAL,
+	"Women's Haircut": CATEGORIES.PERSONAL,
+	"Women's Hair Spa": CATEGORIES.PERSONAL,
 	"Bridal Makeup": CATEGORIES.PERSONAL,
 	"Eyebrow Threading": CATEGORIES.PERSONAL,
 	Facial: CATEGORIES.PERSONAL,
-	"Hair Spa": CATEGORIES.PERSONAL,
 	Makeup: CATEGORIES.PERSONAL,
-	"Hand Spa": CATEGORIES.PERSONAL,
-	"Nail Art": CATEGORIES.PERSONAL,
-	"Foot Spa": CATEGORIES.PERSONAL,
-	"Full Body Glow": CATEGORIES.PERSONAL,
-	"Arm Smoothening": CATEGORIES.PERSONAL,
-	"Leg Smoothening": CATEGORIES.PERSONAL,
 	Mehndi: CATEGORIES.PERSONAL,
+	Waxing: CATEGORIES.PERSONAL,
+	"Nail Studio": CATEGORIES.PERSONAL,
 
-	// --- Child Services ---
 	Babysitting: CATEGORIES.CHILD,
 	"Child Tutoring": CATEGORIES.CHILD,
-
-	// --- Fitness / Health ---
 	Nutritionist: CATEGORIES.FITNESS,
 	"Yoga Instructor": CATEGORIES.FITNESS,
 };
 
-export const slugify = (text) =>
+const slugify = (text) =>
 	text
 		.toString()
 		.toLowerCase()
 		.replace(/\s+/g, "-")
 		.replace(/[^\w\-]+/g, "")
 		.replace(/\-\-+/g, "-")
+		.replace(/&/g, "and")
 		.replace(/^-+/, "")
 		.replace(/-+$/, "");
 
-// 5. Helper: Get Description
-export function getDescriptionForService(serviceName) {
+function getDescriptionForService(serviceName) {
 	const descriptions = {
-		// Home Services
-		"House Cleaning": "Professional and thorough cleaning for a spotless home.",
+		"House Cleaning":
+			"Come home to a sparkling clean space. We handle deep cleaning so you can relax.",
 		Laundry:
-			"Convenient and hygienic laundry service including washing, drying, and folding—right at your doorstep.",
-		Plumbing: "Expert plumbing solutions for leaks, clogs, and installations.",
+			"Fresh, crisp clothes without the chore. Wash, dry, and fold service right at your doorstep.",
+		Plumbing:
+			"Expert fixes for leaks, clogs, and fittings to keep your day flowing smoothly.",
+		"Pest Control":
+			"Safe and effective treatments to keep your home bug-free and peaceful.",
 		"Electrical Repair":
-			"Certified electricians for safe home electrical fixes.",
-		Gardening: "Plant care, lawn maintenance, and landscaping by pros.",
-		"Pest Control": "Safe and effective pest removal and prevention.",
-		"Appliance Repair": "Quick and reliable repair for household appliances.",
-		"Cooking Help": "Daily meal prep and kitchen assistance by skilled cooks.",
-		"Tech Support": "On-demand help with gadgets, Wi-Fi, and computer issues.",
-		"Moving Help": "Efficient packing, lifting, and moving assistance.",
-		Painting: "Smooth and clean wall painting by professionals.",
-		"Driver Service": "Trained drivers for travel or local errands.",
-		Massage: "Therapeutic massage for relaxation and stress relief.",
-
-		// Beauty & Personal Care
-		Haircut: "Clean and stylish haircut by a trained professional.",
-		Shaving: "Smooth and comfortable shaving at home.",
-		"Bridal Makeup": "Elegant and long-lasting bridal makeup service.",
-		"Eyebrow Threading": "Perfectly shaped brows with minimal discomfort.",
-		Facial: "Glowing skin with deep-cleansing and nourishing facials.",
-		"Hair Spa": "Deep conditioning hair spa to nourish and restore.",
-		Makeup: "Flawless makeup for daily wear or special events.",
-		"Hand Spa": "Relaxing hand spa with exfoliation and moisturization.",
-		"Nail Art": "Stylish and creative nail designs at home.",
-		"Foot Spa": "Soothing foot spa for relaxation and soft skin.",
-		"Full Body Glow": "Skin-brightening and exfoliating full-body treatment.",
-		"Arm Smoothening": "Gentle exfoliation and smoothening treatment for arms.",
-		"Leg Smoothening": "Smoothening and exfoliation treatment for legs.",
-		Mehndi: "Beautiful mehndi designs for weddings and occasions.",
-
-		// Child Services
-		Babysitting: "Trusted babysitters to care for your little ones.",
-		"Child Tutoring": "Personalized tutoring in core school subjects.",
-
-		// Fitness / Health
-		Nutritionist: "Personal diet plans for better health and lifestyle.",
-		"Yoga Instructor": "Guided personal yoga sessions for mind and body.",
+			"Certified electricians to keep your lights on and your home safe.",
+		"Computer & Tech Repair":
+			"Frustrated with tech? We fix laptops, Wi-Fi, and smart devices right at your desk.",
+		"Cooking Help":
+			"Delicious, home-cooked meals prepared in your own kitchen, just the way you like.",
+		Gardening:
+			"Keep your green space blooming with expert care for your lawn and plants.",
+		Massage:
+			"Unwind and de-stress with a therapeutic massage in the comfort of your home.",
+		"Moving Help":
+			"Heavy lifting handled with care. We make your move smooth and stress-free.",
+		Painting:
+			"Refresh your walls with vibrant colors and a flawless, mess-free finish.",
+		"Appliance Repair":
+			"Quick fixes for your AC, fridge, or washing machine to get life back to normal.",
+		"Driver Service":
+			"Reliable chauffeurs for your own car, whether for a daily commute or a weekend trip.",
+		"Men's Haircut":
+			"Sharp cuts, fades, and classic styling delivered by skilled barbers at your convenience.",
+		Shaving:
+			"Experience a clean, professional shave or beard trim without leaving the house.",
+		"Men's Hair Spa":
+			"Revitalize your scalp and relax with a deep-conditioning treatment designed for men.",
+		"Women's Haircut":
+			"Refresh your look with a stylish cut, trim, or complete restyle from top stylists.",
+		"Women's Hair Spa":
+			"Deep nourishment and steam treatments to bring shine and softness back to your hair.",
+		"Bridal Makeup":
+			"Radiant, long-lasting makeup to make you look and feel breathtaking on your big day.",
+		"Eyebrow Threading":
+			"Precise shaping for perfect brows, done gently and hygienically.",
+		Facial:
+			"Restore your natural glow with refreshing facials tailored to your specific skin type.",
+		Makeup:
+			"Get party-ready with flawless makeup application for any special occasion or event.",
+		Mehndi:
+			"Beautiful, intricate henna designs for weddings, festivals, or just because.",
+		Waxing:
+			"Smooth, silky skin with gentle and hygienic waxing services for arms, legs, and body.",
+		"Nail Studio":
+			"Pamper your hands and feet with manicures, pedicures, and creative nail art.",
+		Babysitting:
+			"Reliable, verified babysitters providing safe and attentive childcare at home.",
+		"Child Tutoring":
+			"Personalized support to help your child grasp concepts and boost their confidence.",
+		Nutritionist:
+			"Achieve your health goals with personalized diet plans that actually fit your lifestyle.",
+		"Yoga Instructor":
+			"Find your balance and strength with guided yoga sessions tailored to your fitness level.",
 	};
-
-	return descriptions[serviceName] || "High-quality service at your doorstep.";
+	return (
+		descriptions[serviceName] ||
+		"High-quality professional service at your doorstep."
+	);
 }
 
-export function getImageForService(serviceName) {
-	const images = {
-		// Home Services
-		"House Cleaning": "/images/clean.jpg",
-		Laundry: "/images/laundryy.jpg",
-		Plumbing: "/images/plumbi.jpg",
-		"Electrical Repair": "/images/electr.jpg",
-		Gardening: "/images/gardenn.jpg",
-		"Pest Control": "/images/pestt.jpg",
-		"Appliance Repair": "/images/repai.jpg",
-		"Cooking Help": "/images/cookk.jpg",
-		"Tech Support": "/images/tech.jpg",
-		"Moving Help": "/images/moving.jpg",
-		Painting: "/images/painting.jpg",
-		"Driver Service": "/images/drive.jpg",
-		Massage: "/images/massagee.jpg",
-
-		// Beauty
-		Haircut: "/images/haircut-all.jpg",
-		Shaving: "/images/shave.jpg",
-		Makeup: "/images/makeup2.jpg",
-		"Bridal Makeup": "/images/makeup1.jpg",
-		"Eyebrow Threading": "/images/threading.jpg",
-		Facial: "/images/faciall.jpg",
-		"Hand Spa": "/images/manicureee.jpg",
-		"Foot Spa": "/images/pedicuree.jpg",
-		"Full Body Glow": "/images/wax.jpg",
-		"Arm Smoothening": "/images/wax.jpg",
-		"Leg Smoothening": "/images/wax.jpg",
-		"Hair Spa": "/images/hair.jpg",
-		"Nail Art": "/images/nail-art.jpg",
-		Mehndi: "/images/mehendii.jpg",
-
-		// Child
-		Babysitting: "/images/baby-sit.jpg",
-		"Child Tutoring": "/images/child-tutor.jpg",
-
-		// Fitness
-		"Yoga Instructor": "/images/yogaaa.jpg",
-		Nutritionist: "/images/nutrition.jpg",
-	};
-
-	const img = images[serviceName];
-	// if (!img) console.warn(`No image found for service: "${serviceName}"`);
-	return img || "/images/default-service.jpg";
+// NOTE: This function is for FALLBACK only.
+function getImageForService(serviceName) {
+	const slug = slugify(serviceName);
+	return `/images/${slug}.jpg`;
 }
 
-export const SERVICES = SERVICE_NAMES.map((name) => ({
+const SERVICES = SERVICE_NAMES.map((name) => ({
 	name,
 	slug: slugify(name),
 	description: getDescriptionForService(name),
 	image: getImageForService(name),
 	category: SERVICE_CATEGORIES[name] || "General",
 }));
+
+module.exports = {
+	CATEGORIES,
+	SERVICE_NAMES,
+	SERVICE_CATEGORIES,
+	SERVICES,
+	slugify,
+	getDescriptionForService,
+	getImageForService,
+};

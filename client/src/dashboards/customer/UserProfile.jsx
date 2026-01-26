@@ -17,6 +17,7 @@ import {
 	Sun,
 	Moon,
 	Zap,
+	MessageSquare,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -121,9 +122,34 @@ const MenuItem = ({
 
 export default function UserProfile() {
 	const navigate = useNavigate();
-	const [user] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
+	const [user, setUser] = useState(
+		JSON.parse(localStorage.getItem("user") || "{}"),
+	);
+
+	console.log(user);
 	const [greeting, setGreeting] = useState("");
 	const [imageError, setImageError] = useState(false);
+
+	useEffect(() => {
+		const refreshUserData = async () => {
+			try {
+				const token = localStorage.getItem("token");
+				if (!token) return;
+
+				const res = await axios.get("/api/auth/me", {
+					headers: { Authorization: `Bearer ${token}` },
+				});
+				if (res.data.user) {
+					console.log(res.data.user);
+					setUser(res.data.user);
+					localStorage.setItem("user", JSON.stringify(res.data.user));
+				}
+			} catch (err) {
+				console.error("Failed to refresh user data:", err);
+			}
+		};
+		refreshUserData();
+	}, []);
 
 	useEffect(() => {
 		const hour = new Date().getHours();
@@ -140,11 +166,16 @@ export default function UserProfile() {
 
 	const handleLogout = () => {
 		localStorage.removeItem("token");
+		localStorage.removeItem("user");
 		navigate("/login");
 	};
 
+	const formattedDate = user.created_at
+		? new Date(user.created_at).getFullYear()
+		: "2025";
+
 	return (
-		<div className="min-h-screen relative overflow-hidden bricolage-grotesque -mt-45 pb-20">
+		<div className="min-h-screen relative overflow-hidden bricolage-grotesque mt-20 pb-20">
 			<div className="fixed inset-0 pointer-events-none overflow-hidden">
 				<div className="absolute top-0 right-0 w-[500px] h-[500px] bg-violet-200/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/4"></div>
 				<div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-fuchsia-200/20 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/4"></div>
@@ -155,7 +186,7 @@ export default function UserProfile() {
 				<motion.div
 					initial={{ opacity: 0, y: -20 }}
 					animate={{ opacity: 1, y: 0 }}
-					className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8"
+					className="relative-30 flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8"
 				>
 					<div>
 						<div className="flex items-center gap-2 text-violet-700 font-bold text-sm tracking-wide uppercase mb-1">
@@ -178,7 +209,7 @@ export default function UserProfile() {
 					<div className="cursor-pointer flex gap-3">
 						<button
 							onClick={() => navigate("/settings")}
-							className={` h-12 px-6 rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 ${TEXT_MAIN} font-bold hover:bg-white hover:border-violet-200 hover:shadow-lg hover:shadow-violet-100/50 transition-all flex items-center gap-2`}
+							className={`cursor-pointer h-12 px-6 rounded-2xl bg-white/80 backdrop-blur-md border border-gray-200 ${TEXT_MAIN} font-bold hover:bg-white hover:border-violet-200 hover:shadow-lg hover:shadow-violet-100/50 transition-all flex items-center gap-2`}
 						>
 							<Settings size={18} />
 							<span>Settings</span>
@@ -187,7 +218,6 @@ export default function UserProfile() {
 				</motion.div>
 
 				<div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-					{/* Main Profile Card */}
 					<div className="md:col-span-8 flex flex-col gap-6">
 						<BentoCard className="p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
 							<div className="relative shrink-0 group">
@@ -221,9 +251,9 @@ export default function UserProfile() {
 									</div>
 									<div className="flex items-center justify-center md:justify-start gap-1.5 text-gray-500 text-sm font-medium">
 										<MapPin size={14} />
-										{user.location || "Kanpur, India"}
+										{user.location || "India"}
 										<span className="w-1 h-1 bg-gray-300 rounded-full mx-1" />
-										<span>Joined 2024</span>
+										<span>Joined {formattedDate}</span>
 									</div>
 								</div>
 
@@ -349,9 +379,9 @@ export default function UserProfile() {
 									iconColorClass="bg-indigo-100 text-indigo-700"
 								/>
 								<MenuItem
-									icon={Star}
-									title="Rate Us"
-									desc="On App Store"
+									icon={MessageSquare}
+									title="Feedback"
+									desc="Share your thoughts"
 									iconColorClass="bg-amber-100 text-amber-700"
 								/>
 							</div>

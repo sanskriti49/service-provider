@@ -1,19 +1,17 @@
+require("dotenv").config({ path: "../.env" });
 const { fakerEN_IN: faker } = require("@faker-js/faker");
 const db = require("../config/db");
-const { getPriceForService } = require("../utils/getPriceForService");
-const {
-	SERVICES,
-	slugify,
-	getDescriptionForService,
-} = require("../utils/services");
+const { getPriceDetails } = require("../utils/pricing");
 const { hashIfPresent } = require("../utils/hash");
 const { customAlphabet } = require("nanoid");
-const { generateAvailability } = require("../utils/generateAvailability");
+const {
+	generateMasterSchedule,
+	generateRealSlots,
+} = require("../utils/timeUtils");
 
-const PROVIDER_COUNT = 15;
-const RESET_TABLES = false;
+const PROVIDER_COUNT = 50;
+const RESET_PROVIDERS_ONLY = true;
 
-// indian cities
 const indianCities = [
 	{ city: "Mumbai", state: "Maharashtra", lat: 19.076, lng: 72.8777 },
 	{ city: "Delhi", state: "Delhi", lat: 28.7041, lng: 77.1025 },
@@ -108,102 +106,70 @@ const indianCities = [
 
 function getRandomRating() {
 	const raw = Math.random();
-	let rating;
-	if (raw < 0.1) rating = (Math.random() * 1.9 + 1).toFixed(1);
-	else if (raw < 0.4) rating = (Math.random() * 0.9 + 3).toFixed(1);
-	else if (raw < 0.85) rating = (Math.random() * 0.6 + 4).toFixed(1);
-	else rating = (Math.random() * 0.3 + 4.7).toFixed(1);
-	return parseFloat(rating);
+	if (raw < 0.1) return (Math.random() * 1.9 + 1).toFixed(1);
+	if (raw < 0.4) return (Math.random() * 0.9 + 3).toFixed(1);
+	return (Math.random() * 0.6 + 4.3).toFixed(1);
 }
+
 const seedData = async () => {
 	const client = await db.connect();
 
 	try {
-		console.log("✅ Connected to the DB for seeding...");
+		console.log("✅ Connected to the DB for seeding Providers...");
 
-		if (RESET_TABLES) {
-			console.log("🔄 Resetting tables...");
+		if (RESET_PROVIDERS_ONLY) {
+			console.log("🔄 Clearing old Providers & Users...");
 			await client.query(
-				"TRUNCATE availability_slots, provider_master_availability, providers, services, users RESTART IDENTITY CASCADE"
+				"TRUNCATE availability_slots, provider_master_availability, providers, users RESTART IDENTITY CASCADE",
 			);
 		}
 		await client.query("BEGIN");
-
-		console.log("🛠  Seeding Services...");
-		for (const service of SERVICES) {
-			const slug = slugify(service.name);
-			await client.query(
-				`INSERT INTO services (name, description, price, category, slug, image_url)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (slug) DO NOTHING`,
-				[
-					service.name,
-					getDescriptionForService(service.name),
-					getPriceForService(service.name),
-					service.category || "General",
-					slug,
-					service.image || null,
-				]
-			);
-		}
 
 		console.log("📥 Fetching live services from DB...");
 		const dbServicesResult = await client.query("SELECT * FROM services");
 		const dbServices = dbServicesResult.rows;
 
 		if (dbServices.length === 0) {
-			throw new Error("No services found in DB. Cannot seed providers.");
+			throw new Error(
+				"❌ No services found! Run 'node seed-cloud-services.js' first.",
+			);
 		}
 
-		console.log(`👨‍🔧 Seeding ${PROVIDER_COUNT} Providers...`);
+		console.log(`👨‍🔧 Creating ${PROVIDER_COUNT} Fake Providers...`);
+
 		for (let i = 0; i < PROVIDER_COUNT; i++) {
-			const dbService = dbServices[i % dbServices.length];
-			const serviceId = dbService.id;
-			const serviceSlug = dbService.slug;
-			const serviceName = dbService.name;
+			const dbService = faker.helpers.arrayElement(dbServices);
 
 			const firstName = faker.person.firstName();
 			const lastName = faker.person.lastName();
 			const name = `${firstName} ${lastName}`;
 			const phone =
-				"+91 " +
+				"+91" +
 				faker.helpers.arrayElement(["6", "7", "8", "9"]) +
 				faker.string.numeric(9);
-
-			const safeEmail = faker.internet
-				.email({
-					firstName: firstName.toLowerCase(),
-					lastName: lastName.toLowerCase(),
-					provider: "example.com",
-				})
-				.replace(/_/g, ".");
-
-			const email = safeEmail.toLowerCase();
-
-			const password = await hashIfPresent(faker.internet.password());
+			const email = faker.internet
+				.email({ firstName, lastName, provider: "gmail.com" })
+				.toLowerCase();
+			const password = await hashIfPresent("password123");
 			const photo = faker.image.avatar();
 			const bio = faker.person.bio();
 
 			const cityObj = faker.helpers.arrayElement(indianCities);
 			const formattedLocation = `${cityObj.city}, ${cityObj.state}`;
-
 			const [lat, lng] = faker.location.nearbyGPSCoordinate({
 				origin: [cityObj.lat, cityObj.lng],
 				radius: 5,
 			});
 
-			const nanoid = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20);
-			const customId = "SRV" + nanoid();
+			const customId =
+				"SRV" + customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 12)();
 
 			const userRes = await client.query(
-				`INSERT INTO users 
-        (name, email, role, custom_id, password, photo, location, lat, lng, bio, phone) 
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) 
-        RETURNING id`,
+				`INSERT INTO users (name, email, role, custom_id, password, photo, location, lat, lng, bio, phone) 
+                 VALUES ($1, $2, 'provider', $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
 				[
 					name,
 					email,
-					"provider",
 					customId,
 					password,
 					photo,
@@ -212,68 +178,75 @@ const seedData = async () => {
 					lng,
 					bio,
 					phone,
-				]
+				],
 			);
 			const userId = userRes.rows[0].id;
 
-			const slots = generateAvailability();
-			const availabilityJson = JSON.stringify(slots, null, 2);
+			const pricingInfo = getPriceDetails(dbService.name);
+			const basePrice = Number(pricingInfo.price);
+			const variance = Math.floor(basePrice * 0.2);
+			const randomVariance =
+				Math.floor(Math.random() * (variance * 2 + 1)) - variance;
+
+			let finalPrice = Math.ceil((basePrice + randomVariance) / 10) * 10;
+			if (finalPrice < 50) finalPrice = 50;
+
 			const rating = getRandomRating();
-			const price = dbService.price || getPriceForService(serviceName);
-			const description =
-				dbService.description || getDescriptionForService(serviceName);
+
+			// a realistic Persona
+			const masterSchedule = generateMasterSchedule();
+
+			// store the "Master Schedule" intent as JSON for quick reference in frontend cards
+			const availabilityJson = JSON.stringify(masterSchedule);
 
 			await client.query(
 				`INSERT INTO providers 
-        (user_id, service_id, slug, description, price, rating, availability) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                (user_id, service_id, slug, description, price, rating, availability, price_unit) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 				[
 					userId,
-					serviceId,
-					serviceSlug,
-					description,
-					price,
+					dbService.id,
+					dbService.slug,
+					dbService.description,
+					finalPrice,
 					rating,
 					availabilityJson,
-				]
+					pricingInfo.unit,
+				],
 			);
 
-			try {
-				const masterSchedule = [
-					{ day: 1, start: "09:00:00", end: "19:00:00" },
-					{ day: 2, start: "09:00:00", end: "19:00:00" },
-					{ day: 3, start: "09:00:00", end: "19:00:00" },
-					{ day: 4, start: "09:00:00", end: "19:00:00" },
-					{ day: 5, start: "09:00:00", end: "19:00:00" },
-					{ day: 6, start: "10:00:00", end: "16:00:00" },
-					{ day: 0, start: "10:00:00", end: "14:00:00" },
-				];
-
-				for (const slot of masterSchedule) {
-					await client.query(
-						`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
-             VALUES ($1, $2, $3, $4)
-			 ON CONFLICT DO NOTHING`,
-						[userId, slot.day, slot.start, slot.end]
-					);
-				}
-			} catch (e) {
-				if (e.code !== "42P01")
-					console.error("⚠️ Master availability error:", e.message);
+			// insert Master Availability (The Rules)
+			for (const slot of masterSchedule) {
+				await client.query(
+					`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
+                     VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+					[userId, slot.day, slot.start, slot.end],
+				);
 			}
 
-			console.log(`👤 Provider #${i + 1} inserted (${name})`);
+			// generate and insert real slots ( calendar for next 30 days)
+			const realSlots = generateRealSlots(masterSchedule);
+			for (const s of realSlots) {
+				await client.query(
+					`INSERT INTO availability_slots (provider_id, date, start_time, end_time)
+                     VALUES ($1, $2, $3, $4)`,
+					[userId, s.date, s.start_time, s.end_time],
+				);
+			}
+
+			console.log(
+				`👤 Provider created: ${name} -> ${dbService.name} (₹${finalPrice} ${pricingInfo.unit}) - ${realSlots.length} slots generated`,
+			);
 		}
 
 		await client.query("COMMIT");
-		console.log(`🎉 Seeded ${PROVIDER_COUNT} providers successfully!`);
+		console.log(`🎉 Successfully seeded ${PROVIDER_COUNT} providers!`);
 	} catch (err) {
-		console.error("❌ Error during seeding:", err);
+		console.error("❌ Error during provider seeding:", err);
 		await client.query("ROLLBACK");
 	} finally {
 		client.release();
 		await db.end();
-		console.log("🔌 DB connection closed.");
 	}
 };
 

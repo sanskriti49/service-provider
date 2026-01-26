@@ -1,5 +1,5 @@
 import { useLocation, useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
 	ArrowLeft,
 	Calendar,
@@ -8,8 +8,11 @@ import {
 	MapPin,
 	Pencil,
 	Navigation,
+	Star,
+	ShieldCheck,
+	Sparkles,
 } from "lucide-react";
-import Alerts from "../ui/Alerts";
+import Alerts from "../ui/Alerts"; // Assuming this path exists based on your code
 import { FadeLoader } from "react-spinners";
 
 export default function BookingPage() {
@@ -17,19 +20,21 @@ export default function BookingPage() {
 	const navigate = useNavigate();
 	const { state } = useLocation();
 
+	console.log(state);
+
 	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 	const [provider, setProvider] = useState(state?.provider || null);
 	const [availability, setAvailability] = useState(
-		state?.preloadedAvailability || state?.provider?.availability || []
+		state?.preloadedAvailability || state?.provider?.availability || [],
 	);
 
 	const [address, setAddress] = useState(
-		"Home • 12/B, Green Heights, Civil Lines, Kanpur"
+		state?.address || "Home • 12/B, Green Heights, Civil Lines, Kanpur",
 	);
 
 	const [selectedDate, setSelectedDate] = useState(
-		state?.selectedDateStr || null
+		state?.selectedDateStr || null,
 	);
 	const [selectedTime, setSelectedTime] = useState(state?.selectedTime || null);
 
@@ -39,6 +44,8 @@ export default function BookingPage() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [loading, setLoading] = useState(!state?.provider);
 	const [alert, setAlert] = useState(null);
+
+	// --- Helpers ---
 
 	function formatTime(timeString) {
 		if (!timeString) return "";
@@ -53,10 +60,21 @@ export default function BookingPage() {
 		});
 	}
 
-	const handleSaveAddress = () => {
-		setAddress(tempAddress);
-		setIsEditingAddress(false);
-	};
+	function formatDateDisplay(dateString) {
+		const date = new Date(dateString);
+		return {
+			day: date.getDate(),
+			weekday: date.toLocaleDateString("en-US", { weekday: "short" }),
+			month: date.toLocaleDateString("en-US", { month: "short" }),
+			full: date.toLocaleDateString("en-US", {
+				weekday: "long",
+				month: "long",
+				day: "numeric",
+			}),
+		};
+	}
+
+	// --- Effects ---
 
 	useEffect(() => {
 		const fetchData = async () => {
@@ -65,7 +83,7 @@ export default function BookingPage() {
 				if (!currentProvider) {
 					setLoading(true);
 					const provRes = await fetch(
-						`${API_URL}/api/providers/v1/${customId}`
+						`${API_URL}/api/providers/v1/${customId}`,
 					);
 					if (!provRes.ok) throw new Error("Provider not found");
 					const provData = await provRes.json();
@@ -76,7 +94,7 @@ export default function BookingPage() {
 				if (currentProvider && currentProvider.id) {
 					if (availability.length === 0) setLoading(true);
 					const slotsRes = await fetch(
-						`${API_URL}/api/providers/v1/${currentProvider.id}/availability`
+						`${API_URL}/api/providers/v1/${currentProvider.id}/availability`,
 					);
 					if (slotsRes.ok) {
 						const slotsData = await slotsRes.json();
@@ -96,21 +114,33 @@ export default function BookingPage() {
 		fetchData();
 	}, [customId]);
 
-	const groupedSlots = availability.reduce((acc, slot) => {
-		if (!acc[slot.date]) acc[slot.date] = [];
-		if (!acc[slot.date].includes(slot.start_time)) {
-			acc[slot.date].push(slot.start_time);
+	// --- Logic ---
+
+	const groupedSlots = useMemo(() => {
+		return availability.reduce((acc, slot) => {
+			if (!acc[slot.date]) acc[slot.date] = [];
+			if (!acc[slot.date].includes(slot.start_time)) {
+				acc[slot.date].push(slot.start_time);
+			}
+			acc[slot.date].sort();
+			return acc;
+		}, {});
+	}, [availability]);
+
+	// Auto-select first date if not selected
+	useEffect(() => {
+		if (!selectedDate && Object.keys(groupedSlots).length > 0) {
+			const sortedDates = Object.keys(groupedSlots).sort();
+			const validDate = sortedDates.find(
+				(d) => d >= new Date().toISOString().split("T")[0],
+			);
+			if (validDate) setSelectedDate(validDate);
 		}
-		acc[slot.date].sort();
-		return acc;
-	}, {});
+	}, [groupedSlots, selectedDate]);
 
 	function isSlotExpired(slotDate, slotTime) {
 		const now = new Date();
-		const year = now.getFullYear();
-		const month = String(now.getMonth() + 1).padStart(2, "0");
-		const day = String(now.getDate()).padStart(2, "0"); // Fixed: getDay() returns day of week (0-6), use getDate() for day of month
-		const todayStr = `${year}-${month}-${day}`;
+		const todayStr = now.toISOString().split("T")[0];
 
 		if (slotDate < todayStr) return true;
 		if (slotDate > todayStr) return false;
@@ -121,12 +151,30 @@ export default function BookingPage() {
 		return now >= slotDateTime;
 	}
 
+	const visibleSlots = useMemo(() => {
+		if (!selectedDate || !groupedSlots[selectedDate]) return [];
+
+		return groupedSlots[selectedDate].filter((t) => {
+			const slotObj = availability.find(
+				(s) =>
+					s.date === selectedDate && s.start_time.startsWith(t.substring(0, 5)),
+			);
+			const isBooked = slotObj ? slotObj.isBooked : false;
+			const isExpired = isSlotExpired(selectedDate, t);
+			return !isBooked && !isExpired;
+		});
+	}, [selectedDate, groupedSlots, availability]);
+
+	const handleSaveAddress = () => {
+		setAddress(tempAddress);
+		setIsEditingAddress(false);
+	};
+
 	async function handleConfirm() {
 		if (!selectedDate || !selectedTime)
 			return setAlert({ message: "Please select a slot.", type: "error" });
 
 		const token = localStorage.getItem("token");
-
 		if (!token) {
 			setAlert({ message: "You must be logged in to book.", type: "error" });
 			return;
@@ -145,7 +193,7 @@ export default function BookingPage() {
 					service_id: provider.service_id,
 					date: selectedDate,
 					start_time: selectedTime,
-					end_time: selectedTime,
+					end_time: selectedTime, // Backend likely calculates end time based on service duration
 					address: address,
 				}),
 			});
@@ -161,6 +209,7 @@ export default function BookingPage() {
 					message: "Slot already booked! Please choose another time.",
 					type: "error",
 				});
+				// Optionally refresh availability here
 			} else {
 				setAlert({ message: data.message || "Booking failed.", type: "error" });
 			}
@@ -172,38 +221,31 @@ export default function BookingPage() {
 		}
 	}
 
-	const visibleSlots =
-		selectedDate && groupedSlots[selectedDate]
-			? groupedSlots[selectedDate].filter((t) => {
-					const slotObj = availability.find(
-						(s) =>
-							s.date === selectedDate &&
-							s.start_time.startsWith(t.substring(0, 5))
-					);
-					const isBooked = slotObj ? slotObj.isBooked : false;
-					const isExpired = isSlotExpired(selectedDate, t);
-					return !isBooked && !isExpired;
-			  })
-			: [];
+	// --- Render ---
 
 	if (loading || !provider) {
 		return (
-			<div className="bricolage-grotesque min-h-screen bg-[#0f0c29] text-white flex items-center justify-center">
-				<div className="flex flex-col items-center gap-4">
-					{/* <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div> */}
-					<FadeLoader />
-					<p className="text-violet-200 text-xl animate-pulse">
-						Finding availability...
+			<div className="min-h-screen bg-[#191034] text-white flex items-center justify-center">
+				<div className="flex flex-col items-center gap-6">
+					<FadeLoader color="#8b5cf6" />
+					<p className="text-violet-200/70 animate-pulse font-medium tracking-wide">
+						Preparing your experience...
 					</p>
 				</div>
 			</div>
 		);
 	}
-	console.log("object: ", groupedSlots);
-	console.log("PROVIDER: ", provider);
+
+	const dateDisplay = selectedDate ? formatDateDisplay(selectedDate) : null;
 
 	return (
-		<div className="bricolage-grotesque min-h-screen bg-[#0f0c29] text-white selection:bg-violet-500/30">
+		<div className="min-h-screen bg-[#191034] text-white selection:bg-violet-500/30 pb-24 lg:pb-0">
+			{/* Background Ambience */}
+			<div className="fixed inset-0 pointer-events-none overflow-hidden">
+				<div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-900/20 rounded-full blur-[120px]" />
+				<div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-900/20 rounded-full blur-[100px]" />
+			</div>
+
 			{alert && (
 				<Alerts
 					message={alert.message}
@@ -212,73 +254,100 @@ export default function BookingPage() {
 				/>
 			)}
 
-			<div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-				<div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-violet-900/20 rounded-full blur-[100px]" />
-				<div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-900/20 rounded-full blur-[100px]" />
-			</div>
-
-			<div className="relative z-10 max-w-6xl mx-auto pb-32 lg:pb-12 px-4 sm:px-6">
-				<div className="sticky top-0 bg-[#0f0c29]/80 backdrop-blur-md py-6 z-20 flex items-center gap-4 border-b border-white/5 mb-8">
+			{/* Header */}
+			<div className="sticky top-0 z-40 bg-[#191034]/80 backdrop-blur-xl border-b border-white/5">
+				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
 					<button
 						onClick={() => navigate(-1)}
-						className="cursor-pointer p-2 rounded-full hover:bg-white/10 transition text-violet-200"
+						className="p-2 rounded-full hover:bg-white/10 transition-colors text-gray-300 hover:text-white"
 					>
-						<ArrowLeft size={20} />
+						<ArrowLeft size={22} />
 					</button>
-					<span className="font-semibold text-lg tracking-wide">
-						New Booking
-					</span>
+					<h1 className="text-xl font-bold bricolage-grotesque tracking-tight">
+						Complete Booking
+					</h1>
 				</div>
+			</div>
 
-				<div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-					<div className="lg:col-span-4">
-						<div className="lg:sticky lg:top-32 space-y-6">
-							<div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 shadow-xl flex lg:flex-col items-center lg:items-start gap-6 group hover:border-violet-500/30 transition-all duration-300">
+			<div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+				<div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+					{/* LEFT COLUMN: Provider Card (Sticky) */}
+					<div className="lg:col-span-4 lg:sticky lg:top-28">
+						<div className="bg-[#22194A] rounded-3xl p-6 border border-white/5 shadow-2xl shadow-black/20 overflow-hidden relative group">
+							{/* Card Decoration */}
+							<div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 opacity-80" />
+
+							<div className="flex flex-row lg:flex-col items-center lg:items-start gap-5">
 								<div className="relative shrink-0">
-									<div className="w-20 h-20 lg:w-32 lg:h-32 rounded-2xl overflow-hidden border-2 border-white/10 shadow-lg group-hover:scale-105 transition-transform duration-300">
-										{provider.photo ? (
-											<img
-												src={provider.photo}
-												alt={provider.name}
-												className="w-full h-full object-cover"
-											/>
-										) : (
-											<div className="w-full h-full bg-violet-600 flex items-center justify-center text-3xl font-bold">
-												{provider.name?.charAt(0)}
-											</div>
-										)}
+									<div className="w-20 h-20 lg:w-32 lg:h-32 rounded-2xl overflow-hidden border-2 border-white/10 shadow-lg group-hover:border-violet-500/50 transition-all duration-500">
+										<img
+											src={
+												provider.photo ||
+												`https://ui-avatars.com/api/?name=${provider.name}&background=6d28d9&color=fff`
+											}
+											alt={provider.name}
+											className="w-full h-full object-cover"
+										/>
 									</div>
-									<div className="absolute -bottom-2 -right-2 bg-green-500 w-6 h-6 lg:w-8 lg:h-8 rounded-full border-4 border-[#0f0c29]" />
+									<div className="absolute -bottom-2 -right-2 bg-[#1a103f] border border-violet-500/30 px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-md">
+										<Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+										<span className="text-xs font-bold">
+											{provider.rating || "5.0"}
+										</span>
+									</div>
 								</div>
 
-								<div>
-									<h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">
+								<div className="flex-1 text-left">
+									<h2 className="mackinac text-[24px] font-bold leading-tight text-white mb-1">
 										{provider.name}
-									</h1>
-									<div className="flex items-center gap-2 mt-2">
-										<span className="text-2xl lg:text-3xl font-semibold text-violet-300">
-											₹{provider.price}
-										</span>
-										<span className="text-sm text-gray-400 font-medium bg-white/5 px-2 py-0.5 rounded-md">
-											per session
-										</span>
+									</h2>
+									<div className="inter flex items-center gap-1.5 text-xs text-violet-300/80 mb-3">
+										<ShieldCheck size={14} className="text-green-400" />
+										<span>Verified Expert</span>
 									</div>
-									<div className="mt-4 text-sm text-gray-400 hidden lg:block leading-relaxed">
-										Select a date and time to secure your slot with{" "}
-										{provider.name.split(" ")[0]}.
+
+									<div className="inter inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-100">
+										<span className="text-lg font-bold">₹{provider.price}</span>
+										<span className="text-xs opacity-60">/ session</span>
 									</div>
+								</div>
+							</div>
+
+							{/* Order Summary Preview */}
+							<div className="inter mt-8 pt-6 border-t border-white/5 space-y-3 hidden lg:block">
+								<div className="flex justify-between text-sm">
+									<span className="text-gray-400">Date</span>
+									<span className="font-medium text-white">
+										{dateDisplay?.full || "--"}
+									</span>
+								</div>
+								<div className="flex justify-between text-sm">
+									<span className="text-gray-400">Time</span>
+									<span className="font-medium text-white">
+										{selectedTime ? formatTime(selectedTime) : "--"}
+									</span>
+								</div>
+								<div className="flex justify-between text-sm pt-2">
+									<span className="text-gray-400">Total</span>
+									<span className="font-bold text-violet-300 text-lg">
+										₹{provider.price}
+									</span>
 								</div>
 							</div>
 						</div>
 					</div>
 
-					<div className="lg:col-span-8 space-y-8">
-						<div className="bg-white/5 lg:bg-transparent rounded-3xl p-6 lg:p-0 border border-white/5 lg:border-none">
-							<div className="flex items-center gap-2 mb-4">
-								<Calendar className="w-5 h-5 text-violet-400" />
-								<h2 className="text-lg font-semibold text-violet-100">
+					{/* RIGHT COLUMN: Booking Form */}
+					<div className="inter lg:col-span-8 space-y-8">
+						{/* Step 1: Date Selection */}
+						<div className="space-y-4">
+							<div className="flex items-center gap-2 px-1">
+								<div className="p-1.5 rounded-lg bg-violet-500/20">
+									<Calendar className="w-5 h-5 text-violet-300" />
+								</div>
+								<h3 className="text-lg font-semibold text-white">
 									Select Date
-								</h2>
+								</h3>
 							</div>
 
 							{Object.keys(groupedSlots).length === 0 ? (
@@ -286,265 +355,234 @@ export default function BookingPage() {
 									<p className="text-gray-400">No available dates found.</p>
 								</div>
 							) : (
-								<div
-									className="flex gap-3 overflow-x-auto pb-4 snap-x flex-nowrap max-h-100
-                                    [&::-webkit-scrollbar]:h-1.5 
-                                    cursor-pointer
-                                    [&::-webkit-scrollbar-track]:bg-white/5 
-                                    [&::-webkit-scrollbar-thumb]:bg-violet-600/50 
-                                    hover:[&::-webkit-scrollbar-thumb]:bg-violet-600 
-                                    [&::-webkit-scrollbar-thumb]:rounded-full"
-								>
-									{Object.keys(groupedSlots)
-										.sort()
-										.filter((date) => {
-											const now = new Date();
-											const year = now.getFullYear();
-											const month = String(now.getMonth() + 1).padStart(2, "0");
-											const day = String(now.getDate()).padStart(2, "0");
-											const todayStr = `${year}-${month}-${day}`;
-											return date >= todayStr;
-										})
-										.map((date) => (
-											<button
-												key={date}
-												onClick={() => {
-													setSelectedDate(date);
-													setSelectedTime(null);
-												}}
-												className={`min-w-[100px] lg:min-w-[120px] flex-shrink-0 snap-start p-4 cursor-pointer rounded-2xl flex flex-col items-center justify-center transition-all duration-300 border focus:outline-none focus:ring-0
-                                                ${
-																									selectedDate === date
-																										? "bg-violet-600 border-violet-500 shadow-[0_0_20px_rgba(124,58,237,0.3)] scale-105"
-																										: "bg-white/5 border-white/10 hover:bg-white/10 hover:border-violet-500/30"
-																								}`}
-											>
-												<span className="text-sm uppercase tracking-wider text-violet-200/70 font-medium">
-													{new Date(date).toLocaleDateString("en-US", {
-														weekday: "short",
-													})}
-												</span>
-												<span
-													className={`text-2xl font-bold mt-1 ${
-														selectedDate === date
-															? "text-white"
-															: "text-gray-200"
-													}`}
-												>
-													{new Date(date).toLocaleDateString("en-US", {
-														day: "numeric",
-													})}
-												</span>
-											</button>
-										))}
+								<div className="relative group/scroll">
+									<div className="flex gap-3 overflow-x-auto pb-4 pt-1 snap-x flex-nowrap px-1 custom-scrollbar-x momentum-scroll">
+										{Object.keys(groupedSlots)
+											.sort()
+											.filter(
+												(date) =>
+													date >= new Date().toISOString().split("T")[0],
+											)
+											.map((date) => {
+												const isSelected = selectedDate === date;
+												const d = formatDateDisplay(date);
+												return (
+													<button
+														key={date}
+														onClick={() => {
+															setSelectedDate(date);
+															setSelectedTime(null);
+														}}
+														className={`snap-start flex-shrink-0 min-w-[90px] p-3 rounded-2xl border transition-all duration-300 flex flex-col items-center justify-center gap-1 group
+                                    ${
+																			isSelected
+																				? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/50 scale-[1.02]"
+																				: "bg-[#22194A] border-white/5 text-gray-400 hover:bg-[#2a1f5a] hover:border-violet-500/30 hover:text-white"
+																		}`}
+													>
+														<span
+															className={`text-xs uppercase tracking-wider font-medium ${isSelected ? "text-violet-200" : "text-gray-500 group-hover:text-gray-300"}`}
+														>
+															{d.weekday}
+														</span>
+														<span className="text-2xl font-bold">{d.day}</span>
+														<span className="text-[10px] opacity-60">
+															{d.month}
+														</span>
+													</button>
+												);
+											})}
+									</div>
 								</div>
 							)}
 						</div>
 
+						{/* Time Selection */}
 						{selectedDate && (
-							<div className="animate-fade-in-up bg-white/5 lg:bg-transparent rounded-3xl p-6 lg:p-0 border border-white/5 lg:border-none">
-								<div className="flex items-center gap-2 mb-4">
-									<Clock className="w-5 h-5 text-violet-400" />
-									<h2 className="text-lg font-semibold text-violet-100">
-										Select Start Time
-									</h2>
+							<div className="space-y-4 animate-fade-in-up">
+								<div className="flex items-center justify-between px-1">
+									<div className="flex items-center gap-2">
+										<div className="p-1.5 rounded-lg bg-violet-500/20">
+											<Clock className="w-5 h-5 text-violet-300" />
+										</div>
+										<h3 className="text-lg font-semibold text-white">
+											Select Time
+										</h3>
+									</div>
+									{visibleSlots.length > 0 && (
+										<span className="text-xs text-violet-300/70 bg-violet-500/10 px-2 py-1 rounded-md">
+											{visibleSlots.length} slots available
+										</span>
+									)}
 								</div>
 
 								{visibleSlots.length > 0 ? (
 									<div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-										{visibleSlots.map((t) => (
-											<button
-												key={t}
-												onClick={() => setSelectedTime(t)}
-												className={`tabular-nums relative p-3 lg:p-4 rounded-xl border text-md font-semibold transition-all duration-200 focus:outline-none
-                                                    ${
-																											selectedTime === t
-																												? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/50 scale-[1.03]"
-																												: "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-violet-500/30 hover:text-white"
-																										}`}
-											>
-												{formatTime(t)}
-												{selectedTime === t && (
-													<div className="absolute -top-1 -right-1">
-														<CheckCircle2 className="w-4 h-4 text-white fill-green-500 bg-black rounded-full" />
-													</div>
-												)}
-											</button>
-										))}
+										{visibleSlots.map((t) => {
+											const isSelected = selectedTime === t;
+											return (
+												<button
+													key={t}
+													onClick={() => setSelectedTime(t)}
+													className={`relative py-3 px-2 rounded-xl border text-sm font-semibold transition-all duration-200
+                                        ${
+																					isSelected
+																						? "bg-white text-violet-900 border-white shadow-md shadow-violet-900/20 scale-[1.02]"
+																						: "bg-[#22194A] border-white/5 text-gray-300 hover:bg-[#2a1f5a] hover:border-violet-500/30 hover:text-white"
+																				}`}
+												>
+													{formatTime(t)}
+													{isSelected && (
+														<div className="absolute -top-1.5 -right-1.5 bg-green-500 text-white rounded-full p-0.5 shadow-sm">
+															<CheckCircle2
+																size={12}
+																fill="currentColor"
+																className="text-white"
+															/>
+														</div>
+													)}
+												</button>
+											);
+										})}
 									</div>
 								) : (
-									<div className="text-center py-10 bg-white/5 rounded-2xl border border-dashed border-white/10">
-										{/* <p className="text-gray-400">
-											No available slots remaining for this date.
-										</p> */}
-										{(() => {
-											const today = new Date();
-											const checkDate = new Date(selectedDate);
-											const isToday =
-												today.getDate() === checkDate.getDate() &&
-												today.getMonth() === checkDate.getMonth() &&
-												today.getFullYear() === checkDate.getFullYear();
-
-											const currentHour = today.getHours();
-											const closingHour = 20;
-
-											if (isToday && currentHour >= closingHour) {
-												return (
-													<div className="space-y-2">
-														<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-violet-500/10 mb-2">
-															<Clock className="w-6 h-6 text-violet-400" />
-														</div>
-														<h3 className="text-white font-semibold text-lg">
-															Service Hours Ended
-														</h3>
-														<p className="text-gray-400 text-sm max-w-xs mx-auto leading-relaxed">
-															Our experts operate between{" "}
-															<span className="text-violet-200">
-																10:00 AM and 7:00 PM
-															</span>
-															. Please select a slot for tomorrow.
-														</p>
-													</div>
-												);
-											} else if (isToday) {
-												return (
-													<div className="space-y-2">
-														<div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-500/10 mb-2">
-															<Calendar className="w-6 h-6 text-orange-400" />
-														</div>
-														<h3 className="text-white font-semibold text-lg">
-															Fully Booked for Today
-														</h3>
-														<p className="text-gray-400 text-sm max-w-xs mx-auto">
-															We are completely booked for the rest of the day.
-															Please check the next available date.
-														</p>
-													</div>
-												);
-											} else {
-												// SCENARIO 3: Future date with no slots
-												return (
-													<div className="space-y-2">
-														<p className="text-gray-400 text-sm">
-															No slots available for this specific date. <br />
-															<span className="text-xs text-gray-500 mt-1 block">
-																(Provider might be on leave)
-															</span>
-														</p>
-													</div>
-												);
-											}
-										})()}
+									<div className="bg-[#22194A] border border-dashed border-white/10 rounded-2xl p-8 text-center">
+										<div className="inline-flex p-3 rounded-full bg-orange-500/10 mb-3">
+											<Clock className="w-6 h-6 text-orange-400" />
+										</div>
+										<h4 className="text-white font-medium mb-1">
+											No slots available
+										</h4>
+										<p className="text-sm text-gray-400">
+											Please select a different date.
+										</p>
 									</div>
 								)}
 							</div>
 						)}
 
-						<div className="bg-white/5 rounded-3xl p-6 border border-white/10">
-							<div className="flex items-center justify-between mb-4">
+						{/* Step 3: Address */}
+						<div className="space-y-4">
+							<div className="flex items-center justify-between px-1">
 								<div className="flex items-center gap-2">
-									<MapPin className="w-5 h-5 text-violet-400" />
-									<h2 className="text-lg font-semibold text-violet-100">
-										Service Location
-									</h2>
+									<div className="p-1.5 rounded-lg bg-violet-500/20">
+										<MapPin className="w-5 h-5 text-violet-300" />
+									</div>
+									<h3 className="text-lg font-semibold text-white">Location</h3>
 								</div>
 								{!isEditingAddress && (
 									<button
 										onClick={() => setIsEditingAddress(true)}
-										className="text-xs cursor-pointer text-violet-300 hover:text-violet-100 flex items-center gap-1 transition-colors duration-200"
+										className="text-xs text-violet-300 hover:text-white flex items-center gap-1 transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
 									>
 										<Pencil size={12} /> Edit
 									</button>
 								)}
 							</div>
 
-							{isEditingAddress ? (
-								<div className="space-y-3">
-									<textarea
-										value={tempAddress}
-										onChange={(e) => setTempAddress(e.target.value)}
-										className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all resize-none h-24"
-										placeholder="Enter full address..."
-									/>
-									<div className="flex gap-2 justify-end">
-										<button
-											onClick={() => {
-												setTempAddress(address);
-												setIsEditingAddress(false);
-											}}
-											className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:bg-white/5 transition"
-										>
-											Cancel
-										</button>
-										<button
-											onClick={handleSaveAddress}
-											className="px-4 py-2 rounded-lg text-sm bg-violet-600 text-white hover:bg-violet-500 font-medium transition"
-										>
-											Save Address
-										</button>
+							<div className="bg-[#22194A] border border-white/5 rounded-2xl p-1 overflow-hidden">
+								{isEditingAddress ? (
+									<div className="p-4 space-y-3">
+										<textarea
+											value={tempAddress}
+											onChange={(e) => setTempAddress(e.target.value)}
+											className="w-full bg-[#191034] border border-white/10 rounded-xl p-4 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all resize-none h-28"
+											placeholder="Enter your full address here..."
+											autoFocus
+										/>
+										<div className="flex justify-end gap-2">
+											<button
+												onClick={() => {
+													setTempAddress(address);
+													setIsEditingAddress(false);
+												}}
+												className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+											>
+												Cancel
+											</button>
+											<button
+												onClick={handleSaveAddress}
+												className="px-6 py-2 rounded-lg text-sm font-medium bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/20 transition-all"
+											>
+												Save Address
+											</button>
+										</div>
 									</div>
-								</div>
-							) : (
-								<div className="flex items-start gap-4 p-4 bg-black/20 rounded-2xl border border-white/5">
-									<div className="p-2 bg-violet-500/10 rounded-lg shrink-0">
-										<Navigation className="w-5 h-5 text-violet-400" />
+								) : (
+									<div className="flex items-start gap-4 p-5 relative">
+										<div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-violet-600 to-indigo-600 opacity-50" />
+										<div className="p-2.5 bg-[#191034] rounded-xl shrink-0 border border-white/5">
+											<Navigation className="w-5 h-5 text-violet-400" />
+										</div>
+										<div>
+											<p className="text-white font-medium leading-relaxed">
+												{address}
+											</p>
+											<div className="flex items-center gap-2 mt-2">
+												<span className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full border border-green-400/20">
+													<CheckCircle2 size={10} /> Serviceable Area
+												</span>
+											</div>
+										</div>
 									</div>
-									<div>
-										<p className="text-xs text-gray-400 mb-1 uppercase tracking-wider">
-											Provider will arrive at
-										</p>
-										<p className="text-white font-medium leading-relaxed">
-											{address}
-										</p>
-										<p className="text-xs text-green-400/70 mt-2 flex items-center gap-1">
-											<CheckCircle2 size={12} /> Within service area
-										</p>
-									</div>
-								</div>
-							)}
+								)}
+							</div>
 						</div>
 
 						{/* Desktop Confirm Button */}
-						<div className="hidden lg:block pt-4">
+						<div className="hidden lg:block pt-6">
 							<button
 								onClick={handleConfirm}
 								disabled={isSubmitting || !selectedTime}
-								className={`cursor-pointer w-full py-5 rounded-2xl text-xl font-bold shadow-xl transition-all duration-300 border border-white/10 flex items-center justify-center gap-3
-                                    ${
-																			selectedTime
-																				? "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-900/40 hover:scale-[1.01]"
-																				: "bg-gray-800/50 text-gray-500 cursor-not-allowed border-none"
-																		}`}
+								className={`w-full py-4 rounded-xl text-lg font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-3 group
+                    ${
+											selectedTime
+												? "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-violet-900/40 transform hover:-translate-y-1"
+												: "bg-[#22194A] text-gray-500 cursor-not-allowed border border-white/5"
+										}`}
 							>
-								{isSubmitting ? "Confirming..." : "Confirm Booking"}
+								{isSubmitting ? (
+									<div className="flex items-center gap-2">
+										<div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+										<span>Processing...</span>
+									</div>
+								) : (
+									<>
+										<span>Confirm Booking</span>
+										<Sparkles
+											size={18}
+											className={`transition-transform duration-300 ${selectedTime ? "group-hover:rotate-12 text-yellow-300" : "opacity-0"}`}
+										/>
+									</>
+								)}
 							</button>
 						</div>
 					</div>
 				</div>
 			</div>
 
-			{/* Mobile Footer */}
+			{/* Mobile Sticky Footer */}
 			<div
-				className={`lg:hidden fixed bottom-0 left-0 right-0 p-6 bg-[#0f0c29] border-t border-white/10 z-30 transition-transform duration-300 ${
-					selectedTime ? "translate-y-0" : "translate-y-full"
-				}`}
+				className={`lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-[#191034]/90 backdrop-blur-xl border-t border-white/10 z-50 transition-transform duration-500 ease-out ${selectedTime ? "translate-y-0" : "translate-y-full"}`}
 			>
-				<div className="max-w-2xl mx-auto">
+				<div className="flex items-center gap-4">
+					<div className="flex-1">
+						<p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">
+							Total
+						</p>
+						<div className="flex items-baseline gap-1">
+							<span className="text-xl font-bold text-white">
+								₹{provider.price}
+							</span>
+							<span className="text-xs text-violet-300">/ session</span>
+						</div>
+					</div>
 					<button
 						onClick={handleConfirm}
 						disabled={isSubmitting}
-						className="cursor-pointer disabled:currsor-not-allowed w-full py-4 rounded-2xl text-lg font-bold shadow-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white flex items-center justify-center gap-2"
+						className="flex-[2] py-3.5 rounded-xl bg-violet-600 text-white font-bold text-lg shadow-lg shadow-violet-900/40 active:scale-95 transition-all flex items-center justify-center gap-2"
 					>
-						{isSubmitting ? (
-							"Confirming..."
-						) : (
-							<>
-								<span>Confirm</span>
-								<span className="bg-white/20 px-2 py-0.5 rounded text-sm">
-									{selectedTime ? formatTime(selectedTime) : ""}
-								</span>
-							</>
-						)}
+						{isSubmitting ? "Book..." : "Confirm"}
 					</button>
 				</div>
 			</div>

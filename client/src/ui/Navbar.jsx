@@ -1,363 +1,329 @@
-import { Link } from "react-router-dom";
-import { HashLink } from "react-router-hash-link";
-import NavServices from "./NavServices";
 import { useEffect, useState } from "react";
-import gsap from "gsap";
-import { ScrollToPlugin } from "gsap/ScrollToPlugin";
+import { Link, useLocation } from "react-router-dom";
+import { HashLink } from "react-router-hash-link";
 import { jwtDecode } from "jwt-decode";
-import { Avatar } from "@mui/material";
+import { motion, AnimatePresence } from "framer-motion";
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 import AccountMenu from "./AccountMenu";
+import NavServices from "./NavServices";
 
-gsap.registerPlugin(ScrollToPlugin);
+// --- UTILS ---
+function cn(...inputs) {
+	return twMerge(clsx(inputs));
+}
+
+// --- ICONS ---
+const ChevronDown = ({ open }) => (
+	<motion.svg
+		animate={{ rotate: open ? 180 : 0 }}
+		transition={{ duration: 0.2 }}
+		xmlns="http://www.w3.org/2000/svg"
+		width="16"
+		height="16"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		strokeWidth="2.5"
+		strokeLinecap="round"
+		strokeLinejoin="round"
+		className="ml-1 text-violet-500"
+	>
+		<path d="m6 9 6 6 6-6" />
+	</motion.svg>
+);
 
 const Navbar = () => {
 	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
-	const [isServicesHovered, setIsServicesHovered] = useState(false);
 	const [user, setUser] = useState(null);
-	const [isOpen, setOpen] = useState(false);
+	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+	const [hoveredTab, setHoveredTab] = useState(null);
+	const [isDropdownOpen, setDropdownOpen] = useState(false);
+	const location = useLocation();
 
+	// 1. Auth Logic
 	useEffect(() => {
 		const token = localStorage.getItem("token");
-
 		if (token) {
 			try {
 				const decoded = jwtDecode(token);
 				setUser(decoded);
-				if (decoded.custom_id) {
-					fetch(`${API_URL}/api/users/${decoded.custom_id}`)
-						.then((res) => {
-							if (res.status === 404) {
-								localStorage.removeItem("token");
-								setUser(null);
-							}
-						})
-						.catch(() => {
-							localStorage.removeItem("token");
-							setUser(null);
-						});
-				}
 			} catch (e) {
 				localStorage.removeItem("token");
 			}
 		}
-	}, []);
+	}, [API_URL]);
 
-	// Helper to close menu when a link is clicked
-	const handleLinkClick = () => {
-		setOpen(false);
-	};
+	// 2. Close menus on route change
+	useEffect(() => {
+		setMobileMenuOpen(false);
+		setDropdownOpen(false);
+	}, [location]);
 
 	return (
-		<div className="relative z-50">
-			<header className="flex items-center justify-self-center lg:px-35 h-64 w-full font-medium z-[9999]">
-				<div className="grad">
-					<svg
-						className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-full min-w-[80rem] h-auto"
-						width="1171"
-						height="241"
-						viewBox="0 0 1171 241"
-						fill="none"
+		/* CHANGED: 'fixed' -> 'absolute' so it scrolls away */
+		<div className="absolute top-0 left-0 w-full z-50 pt-4 sm:pt-6 px-4 pointer-events-none">
+			{/* Main Container */}
+			<div className="max-w-7xl mx-auto relative flex items-center justify-between">
+				{/* 1. LOGO (LEFT) */}
+				<div className="pointer-events-auto flex-none z-50">
+					<Link
+						to="/"
+						className="flex items-center gap-2 group"
+						onMouseEnter={() => setHoveredTab(null)}
 					>
-						<g opacity=".195" filter="url(#filter0_f)">
-							<path
-								d="M731.735 -179.55C596.571 -157.762 516.36 -74.1815 552.576 7.13199C588.793 88.4455 727.724 136.701 862.887 114.913C998.051 93.1247 1078.26 9.54454 1042.05 -71.769C1005.83 -153.082 866.898 -201.337 731.735 -179.55Z"
-								fill="url(#paint0_linear)"
-							></path>
-							<path
-								d="M378 114.106C520.489 114.106 636 45.8883 636 -38.2623C636 -122.413 520.489 -190.63 378 -190.63C235.511 -190.63 120 -122.413 120 -38.2623C120 45.8883 235.511 114.106 378 114.106Z"
-								fill="url(#paint1_linear)"
-							></path>
-						</g>
-						<defs>
-							<filter
-								id="filter0_f"
-								x="0"
-								y="-310.63"
-								width="1170.74"
-								height="550.775"
-								filterUnits="userSpaceOnUse"
-								colorInterpolationFilters="sRGB"
-							>
-								<feFlood floodOpacity="0" result="BackgroundImageFix"></feFlood>
-								<feBlend
-									mode="normal"
-									in="SourceGraphic"
-									in2="BackgroundImageFix"
-									result="shape"
-								></feBlend>
-								<feGaussianBlur
-									stdDeviation="60"
-									result="effect1_foregroundBlur"
-								></feGaussianBlur>
-							</filter>
-							<linearGradient
-								id="paint0_linear"
-								x1="567.5"
-								y1="1.03997"
-								x2="1029.02"
-								y2="64.6468"
-								gradientUnits="userSpaceOnUse"
-							>
-								<stop stopColor="#001AFF"></stop>
-								<stop offset="1" stopColor="#6EE5C2"></stop>
-							</linearGradient>
-							<linearGradient
-								id="paint1_linear"
-								x1="155"
-								y1="-11.0234"
-								x2="511.855"
-								y2="-162.127"
-								gradientUnits="userSpaceOnUse"
-							>
-								<stop stopColor="#FFC83A"></stop>
-								<stop offset="0.504191" stopColor="#FF008A"></stop>
-								<stop offset="1" stopColor="#6100FF"></stop>
-							</linearGradient>
-						</defs>
-					</svg>
-				</div>
-
-				<div className="grid grid-cols-[auto_1fr_auto] w-full items-center -mt-40 mx-auto px-4 md:px-0">
-					<Link to="/" className="flex items-center">
-						<div className="h-13 w-12 flex items-center cursor-pointer">
+						<div className="h-12 w-12 overflow-hidden drop-shadow-sm">
 							<img
 								src="/images/la.png"
-								className="h-full w-full"
+								className="h-full w-full object-contain"
 								alt="TaskGenie Logo"
 							/>
 						</div>
-						<p className="text-3xl lobster font-bold bg-gradient-to-r from-violet-700 via-fuchsia-700 to-fuchsia-700 bg-clip-text text-transparent drop-shadow-md tracking-tight cursor-pointer hover:scale-105 transition-transform">
+						<span className="text-3xl lobster font-bold bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent pb-1 drop-shadow-sm">
 							TaskGenie
-						</p>
+						</span>
 					</Link>
+				</div>
 
-					{/* Desktop Nav */}
-					<nav className="flex justify-center">
-						<div className="hidden md:flex bricolage-grotesque gap-4 -ml-15 shrink-1 items-center rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-3 text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
-							<HashLink
-								smooth
+				{/* 2. NAVBAR (CENTER) */}
+				<div className="pointer-events-auto absolute left-1/2 -translate-x-1/2 hidden md:block z-40">
+					<motion.header
+						className={cn(
+							"flex items-center justify-center rounded-full border transition-all duration-500 backdrop-blur-xl",
+							"bg-purple-100/60 border-white/60 py-2 px-6 shadow-xl shadow-indigo-500/10",
+						)}
+					>
+						<nav
+							className="flex items-center gap-1 font-medium text-sm text-gray-600"
+							onMouseLeave={() => setHoveredTab(null)}
+						>
+							<NavPath
 								to="/#hero"
-								className="nav-link group relative px-3 py-2.5 cursor-pointer"
+								label="Home"
+								setHoveredTab={setHoveredTab}
+								hoveredTab={hoveredTab}
+							/>
+
+							{/* Services Dropdown */}
+							<div
+								className="bricolage-grotesque text-[16px] relative px-3 py-2 cursor-pointer z-10"
+								onMouseEnter={() => {
+									setDropdownOpen(true);
+									setHoveredTab("services");
+								}}
+								onMouseLeave={() => {
+									setDropdownOpen(false);
+									setHoveredTab(null);
+								}}
 							>
-								Home
-								<span className="absolute inset-x-1 h-px bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0 transition-all duration-300 -bottom-0.5 opacity-0 scale-x-0 group-hover:opacity-100 group-hover:scale-x-100"></span>
-								<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
-									<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-500/20 to-transparent blur rounded-t-full"></span>
-								</span>
-							</HashLink>
-
-							<div className="relative group">
-								<HashLink
-									smooth
-									to="/#services"
-									className="nav-link group relative px-3 py-2.5 cursor-pointer flex items-center gap-1"
-								>
-									Services
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="12"
-										height="12"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										className="transition-transform duration-300 group-hover:rotate-180"
-									>
-										<polyline points="6 9 12 15 18 9"></polyline>
-									</svg>
-									<span className="absolute inset-x-1 h-px bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0 transition-all duration-300 -bottom-0.5 opacity-0 scale-x-0 group-hover:opacity-100 group-hover:scale-x-100"></span>
-									<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
-										<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-500/20 to-transparent blur rounded-t-full"></span>
-									</span>
-								</HashLink>
-
-								<div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-in-out">
-									<NavServices />
-								</div>
+								{hoveredTab === "services" && (
+									<motion.div
+										layoutId="nav-bg"
+										className="absolute inset-0 bg-violet-200/70 rounded-full -z-10"
+										transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+									/>
+								)}
+								<button className="flex items-center gap-1 relative z-20 outline-none">
+									Services <ChevronDown open={isDropdownOpen} />
+								</button>
+								<AnimatePresence>
+									{isDropdownOpen && (
+										<motion.div
+											initial={{ opacity: 0, y: 10, scale: 0.95 }}
+											animate={{ opacity: 1, y: 0, scale: 1 }}
+											exit={{ opacity: 0, y: 10, scale: 0.95 }}
+											transition={{ duration: 0.2 }}
+											className="absolute top-full left-1/2 -translate-x-1/2 pt-4"
+										>
+											<div className="bg-white/80 backdrop-blur-2xl rounded-2xl border border-white/50 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] p-1 min-w-[260px] overflow-hidden ring-1 ring-black/5">
+												<NavServices />
+											</div>
+										</motion.div>
+									)}
+								</AnimatePresence>
 							</div>
 
-							<HashLink
-								smooth
+							<NavPath
 								to="/#how-it-works"
-								className="nav-link group relative px-3 py-2.5 cursor-pointer"
+								label="How It Works"
+								setHoveredTab={setHoveredTab}
+								hoveredTab={hoveredTab}
+							/>
+							<NavPath
+								to="/#work-with-us"
+								label="Provider"
+								setHoveredTab={setHoveredTab}
+								hoveredTab={hoveredTab}
+							/>
+							<NavPath
+								to="/#contact"
+								label="Contact"
+								setHoveredTab={setHoveredTab}
+								hoveredTab={hoveredTab}
+							/>
+						</nav>
+					</motion.header>
+				</div>
+
+				{/* 3. ACTIONS (RIGHT) */}
+				<div className="bricolage-grotesque pointer-events-auto flex-none flex items-center gap-3 z-50">
+					{!user ? (
+						<div className="hidden md:flex flex-none items-center rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-1.5 py-1 text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
+							<Link
+								to="/login"
+								className="flex-none group relative text-sm inline-flex items-center justify-center bg-clip-padding rounded-l-[20px] rounded-r-[10px] border h-9 px-4 bg-white/40 border-white/90 shadow-sm hover:text-violet-600 hover:bg-violet-50/60 transition-colors duration-300"
+							>
+								Log In
+								<span className="absolute left-4 right-1 -bottom-px h-px bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0 transition duration-300 opacity-0 scale-x-0 group-hover:opacity-100 group-hover:scale-x-100" />
+								<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100 rounded-l-[20px] rounded-r-[10px]">
+									<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-500/20 to-transparent blur-sm rounded-t-full" />
+								</span>
+							</Link>
+
+							<Link
+								to="/sign-up"
+								className="flex-none group relative text-sm ml-1 h-9 px-5 flex items-center justify-center bg-violet-600 text-white font-semibold shadow-md shadow-violet-200 rounded-r-[20px] rounded-l-[10px] hover:bg-violet-700 transition-all"
+							>
+								Get Started
+							</Link>
+						</div>
+					) : (
+						<AccountMenu user={user} />
+					)}
+
+					{/* Mobile Menu Toggle */}
+					<button
+						onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
+						className="md:hidden p-2 rounded-full bg-white/80 border border-white/60 text-gray-600 shadow-sm hover:bg-gray-100 hover:text-violet-600 active:scale-95 transition-all"
+					>
+						{isMobileMenuOpen ? (
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
+								<path d="M18 6 6 18" />
+								<path d="m6 6 18 18" />
+							</svg>
+						) : (
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
+								<line x1="4" x2="20" y1="12" y2="12" />
+								<line x1="4" x2="20" y1="6" y2="6" />
+								<line x1="4" x2="20" y1="18" y2="18" />
+							</svg>
+						)}
+					</button>
+				</div>
+			</div>
+
+			{/* Mobile Menu Overlay */}
+			<AnimatePresence>
+				{isMobileMenuOpen && (
+					<motion.div
+						initial={{ opacity: 0, y: -20, scale: 0.95 }}
+						animate={{ opacity: 1, y: 0, scale: 1 }}
+						exit={{ opacity: 0, y: -10, scale: 0.95 }}
+						transition={{ duration: 0.2 }}
+						className="absolute top-[calc(100%+12px)] inset-x-4 md:hidden pointer-events-auto"
+					>
+						<div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] border border-white/50 shadow-2xl p-6 flex flex-col gap-2">
+							<MobileLink to="/#hero" onClick={() => setMobileMenuOpen(false)}>
+								Home
+							</MobileLink>
+							<MobileLink
+								to="/#services"
+								onClick={() => setMobileMenuOpen(false)}
+							>
+								Services
+							</MobileLink>
+							<MobileLink
+								to="/#how-it-works"
+								onClick={() => setMobileMenuOpen(false)}
 							>
 								How It Works
-								<span className="absolute inset-x-1 h-px bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0 transition-all duration-300 -bottom-0.5 opacity-0 scale-x-0 group-hover:opacity-100 group-hover:scale-x-100"></span>
-								<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
-									<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-500/20 to-transparent blur rounded-t-full"></span>
-								</span>
-							</HashLink>
-
-							<HashLink
-								smooth
+							</MobileLink>
+							<MobileLink
 								to="/#work-with-us"
-								className="nav-link group relative px-3 py-2.5 cursor-pointer"
+								onClick={() => setMobileMenuOpen(false)}
 							>
-								Become a Provider{" "}
-								<span className="absolute inset-x-1 h-px bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0 transition-all duration-300 -bottom-0.5 opacity-0 scale-x-0 group-hover:opacity-100 group-hover:scale-x-100"></span>
-								<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
-									<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-500/20 to-transparent blur rounded-t-full"></span>
-								</span>
-							</HashLink>
-
-							<HashLink
-								smooth
+								Become a Provider
+							</MobileLink>
+							<MobileLink to="/help" onClick={() => setMobileMenuOpen(false)}>
+								Help & Support
+							</MobileLink>
+							<MobileLink
 								to="/#contact"
-								className="nav-link group relative px-3 py-2.5 cursor-pointer"
+								onClick={() => setMobileMenuOpen(false)}
 							>
 								Contact
-								<span className="absolute inset-x-1 h-px bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0 transition-all duration-300 -bottom-0.5 opacity-0 scale-x-0 group-hover:opacity-100 group-hover:scale-x-100"></span>
-								<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
-									<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-500/20 to-transparent blur rounded-t-full"></span>
-								</span>
-							</HashLink>
-						</div>
-					</nav>
-
-					{/* Auth & Mobile Toggle */}
-					<div className="flex justify-self-end items-center">
-						{!user ? (
-							<>
-								{/* desktop auth */}
-								<div className="hidden md:flex bricolage-grotesque items-center shrink-1 rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-3 lg:text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
+							</MobileLink>
+							{!user && (
+								<div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-100">
 									<Link
 										to="/login"
-										className="flex-none group relative text-base sm:text-sm -ml-2 my-1 inline-flex items-center bg-clip-padding rounded-l-[20px] rounded-r-[8px] border h-8 pl-3 pr-[10px] bg-white/40 border-white/90 shadow hover:text-violet-600 hover:bg-violet-50/40 transition-colors duration-300 group ease-out active:scale-95 hover:scale-105"
+										className="py-3 rounded-xl text-center font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100"
 									>
-										Log in{" "}
-										<span className="overflow-hidden absolute inset-0 transition origin-bottom duration-300 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100">
-											<span className="absolute inset-x-4 -bottom-2 h-full bg-gradient-to-t from-violet-400/20 to-transparent blur rounded-t-full"></span>
-										</span>
+										Log in
 									</Link>
 									<Link
 										to="/sign-up"
-										className="text-white group relative text-base sm:text-sm flex justify-center items-center ml-[5px] pl-2 -mr-2 my-1 h-8 pr-2 border-none rounded-r-[20px] rounded-l-[8px]
-                                    bg-[#7c3aed] bg-gradient-to-br from-[#A02BE4]  to-[#4f46e5]
-                                    hover:bg-[#6d28d9] transition-all duration-300  group ease-out active:scale-95 hover:scale-105"
+										className="py-3 rounded-xl text-center font-semibold text-white bg-violet-600 shadow-md shadow-violet-200"
 									>
-										Get Started{" "}
+										Get Started
 									</Link>
 								</div>
-
-								{/* mobile toggle btn */}
-								<button
-									onClick={() => setOpen(!isOpen)}
-									className="cursor-pointer md:hidden z-50 p-2 rounded-full bg-white/40 backdrop-blur-md border border-white/50 text-gray-800 shadow-sm hover:bg-white/60 transition-all duration-300"
-								>
-									{isOpen ? (
-										// close icon
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											width="24"
-											height="24"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<line x1="18" y1="6" x2="6" y2="18"></line>
-											<line x1="6" y1="6" x2="18" y2="18"></line>
-										</svg>
-									) : (
-										// hamburger
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											width="24"
-											height="24"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<line x1="4" y1="12" x2="20" y2="12"></line>
-											<line x1="4" y1="6" x2="20" y2="6"></line>
-											<line x1="4" y1="18" x2="20" y2="18"></line>
-										</svg>
-									)}
-								</button>
-							</>
-						) : (
-							<AccountMenu user={user} />
-						)}
-					</div>
-				</div>
-
-				{/* mobile menu dropdown*/}
-				{isOpen && !user && (
-					<div className="bricolage-grotesque absolute top-[80px] left-0 w-full z-40 md:hidden px-4 animate-in fade-in slide-in-from-top-4 duration-300">
-						<div className="flex flex-col items-center gap-5 py-8 rounded-[2rem] bg-white/40 backdrop-blur-xl border border-white/40 shadow-2xl ring-1 ring-white/50">
-							<HashLink
-								smooth
-								to="/#hero"
-								onClick={handleLinkClick}
-								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
-							>
-								Home
-							</HashLink>
-							<HashLink
-								smooth
-								to="/#services"
-								onClick={handleLinkClick}
-								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
-							>
-								Services
-							</HashLink>
-							<HashLink
-								smooth
-								to="/#how-it-works"
-								onClick={handleLinkClick}
-								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
-							>
-								How It Works
-							</HashLink>
-							<HashLink
-								smooth
-								to="/#work-with-us"
-								onClick={handleLinkClick}
-								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
-							>
-								Become a Provider
-							</HashLink>
-							<HashLink
-								smooth
-								to="/#contact"
-								onClick={handleLinkClick}
-								className="text-gray-800 text-lg font-medium hover:text-violet-600 transition-colors"
-							>
-								Contact
-							</HashLink>
-
-							<div className="w-16 h-px bg-gray-300/50 my-1"></div>
-
-							<div className="flex flex-col gap-3 w-3/4 max-w-xs">
-								<Link
-									to="/login"
-									onClick={handleLinkClick}
-									className="text-center w-full py-3 rounded-2xl border border-white/60 bg-white/50 shadow-sm text-gray-700 font-semibold hover:bg-white hover:text-violet-600 transition-all duration-300 backdrop-blur-sm"
-								>
-									Log in
-								</Link>
-								<Link
-									to="/sign-up"
-									onClick={handleLinkClick}
-									className="text-center w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold shadow-xl hover:bg-violet-300 transition-all duration-300 transform active:scale-95"
-								>
-									Get Started
-								</Link>
-							</div>
+							)}
 						</div>
-					</div>
+					</motion.div>
 				)}
-			</header>
+			</AnimatePresence>
 		</div>
 	);
 };
+
+const NavPath = ({ to, label, setHoveredTab, hoveredTab }) => (
+	<HashLink
+		smooth
+		to={to}
+		className="bricolage-grotesque relative px-4 py-2 text-[16px] rounded-full z-10 transition-colors duration-200 hover:text-violet-700"
+		onMouseEnter={() => setHoveredTab(label)}
+	>
+		{hoveredTab === label && (
+			<motion.div
+				layoutId="nav-bg"
+				className="absolute inset-0 bg-violet-200/70 rounded-full -z-10"
+				transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+			/>
+		)}
+		<span className="relative z-20">{label}</span>
+	</HashLink>
+);
+
+const MobileLink = ({ to, children, onClick }) => (
+	<HashLink
+		smooth
+		to={to}
+		onClick={onClick}
+		className="bricolage-grotesque block w-full p-3 rounded-xl text-lg font-medium text-gray-600 hover:bg-violet-50 hover:text-violet-700 transition-all"
+	>
+		{children}
+	</HashLink>
+);
 
 export default Navbar;

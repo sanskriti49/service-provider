@@ -12,7 +12,7 @@ const userSchema = Joi.object({
 	phone: Joi.string()
 		.pattern(/^\+91 ?[6-9]\d{9}$/)
 		.message(
-			"Phone must be a valid Indian number (+91 followed by 10 digits starting with 6-9)"
+			"Phone must be a valid Indian number (+91 followed by 10 digits starting with 6-9)",
 		)
 		.required(),
 	password: Joi.string().min(6).required(),
@@ -31,7 +31,7 @@ const userUpdateSchema = Joi.object({
 	phone: Joi.string()
 		.pattern(/^\+91 ?[6-9]\d{9}$/)
 		.message(
-			"Phone must be a valid Indian number (+91 followed by 10 digits starting with 6-9)"
+			"Phone must be a valid Indian number (+91 followed by 10 digits starting with 6-9)",
 		)
 		.optional(),
 	password: Joi.string().min(6).optional(),
@@ -82,7 +82,7 @@ async function createUser(req, res, next) {
 				bio,
 				lat,
 				lng,
-			]
+			],
 		);
 
 		res.status(201).json({
@@ -96,7 +96,7 @@ async function createUser(req, res, next) {
 async function getUsers(req, res, next) {
 	try {
 		const result = await db.query(
-			`SELECT id,name,email,phone,role,custom_id,photo,bio,location,lat,lng FROM users`
+			`SELECT id,name,email,phone,role,custom_id,photo,bio,location,lat,lng,created_at FROM users`,
 		);
 		res.json(result.rows);
 	} catch (err) {
@@ -109,9 +109,9 @@ async function getUserByCustomId(req, res, next) {
 		const { custom_id } = req.params;
 
 		const result = await db.query(
-			`SELECT id, name, email,phone, role, custom_id, photo, bio, location, lat, lng
+			`SELECT id, name, email,phone, role, custom_id, photo, bio, location, lat, lng, created_at
             FROM users WHERE custom_id=$1`,
-			[custom_id]
+			[custom_id],
 		);
 		if (result.rows.length === 0) {
 			return res.status(404).json({ error: "User not found" });
@@ -149,7 +149,7 @@ async function updateUser(req, res, next) {
 		if (location && (!lat || !lng)) {
 			try {
 				const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-					location
+					location,
 				)}`;
 				const geoRes = await axios.get(url, {
 					headers: { "User-Agent": "TaskGenie/1.0" },
@@ -196,7 +196,7 @@ async function updateUser(req, res, next) {
                 phone = COALESCE($10, phone),
                 address = COALESCE($11, address)
             WHERE id = $12
-            RETURNING id, name, email, role, location, lat, lng, address
+            RETURNING id, name, email, role, location, lat, lng, address, created_at
         `;
 
 		const result = await db.query(query, [

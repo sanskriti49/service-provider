@@ -13,18 +13,19 @@ import "./ServicesCarousel.css";
 import AuroraBackground from "../ui/AuroraBackground";
 import { Link } from "react-router-dom";
 
+// --- CAROUSEL CONFIG ---
 const responsive = {
 	desktop: {
 		breakpoint: { max: 4000, min: 1280 },
 		items: 3,
 		partialVisibilityGutter: 20,
-		slidesToScroll: 3,
+		slidesToScroll: 1, // Changed to 1 for smoother scrolling
 	},
 	laptop: {
 		breakpoint: { max: 1280, min: 768 },
 		items: 2,
 		partialVisibilityGutter: 30,
-		slidesToScroll: 2,
+		slidesToScroll: 1,
 	},
 	mobile: {
 		breakpoint: { max: 768, min: 0 },
@@ -41,12 +42,8 @@ const CustomArrow = ({ onClick, direction }) => {
 			onClick={onClick}
 			aria-label={direction === "left" ? "Previous" : "Next"}
 			className={`cursor-pointer absolute top-1/2 z-20 flex items-center justify-center w-12 h-12 rounded-full bg-white/70 backdrop-blur-md shadow-lg
-        -translate-y-1/2 transition-all duration-200 ease-in-out
-        ${
-					direction === "left"
-						? "left-0 translate-x-1/2"
-						: "right-0 -translate-x-1/2"
-				}`}
+        -translate-y-1/2 transition-all duration-200 ease-in-out hover:bg-white hover:scale-110
+        ${direction === "left" ? "left-4" : "right-4"}`}
 		>
 			<Icon className="h-6 w-6 text-slate-700" />
 		</button>
@@ -54,56 +51,83 @@ const CustomArrow = ({ onClick, direction }) => {
 };
 
 const SkeletonCard = () => (
-	<div className="h-96 w-full animate-pulse rounded-3xl bg-slate-200" />
+	<div className="h-[450px] w-full animate-pulse rounded-3xl bg-slate-200" />
 );
 
-const ServiceCard = ({ service, isActive = 3 }) => {
+// --- SERVICE CARD COMPONENT ---
+const ServiceCard = ({ service, isActive }) => {
 	const serviceUrl = `/services/${service.slug || service.id}`;
+
+	// ✅ DIRECT CLOUD IMAGE
+	// Your DB now has the full Cloudinary URL, so we just use it.
+	const imageUrl = service.image_url || "/images/default-service.jpg";
 
 	return (
 		<motion.a
 			href={serviceUrl}
-			className="group relative block h-[420px] w-full overflow-hidden rounded-2xl shadow-md"
+			className="group relative block h-[450px] w-full overflow-hidden rounded-3xl shadow-lg border border-white/20"
 			initial={{ scale: 0.9, opacity: 0.5 }}
 			animate={{
-				scale: isActive ? 1 : 0.9,
-				opacity: isActive ? 1 : 0.5,
+				scale: isActive ? 1 : 0.95,
+				opacity: isActive ? 1 : 0.7,
 				filter: isActive
 					? "grayscale(0%) brightness(1)"
-					: "grayscale(50%) brightness(0.8)",
+					: "grayscale(30%) brightness(0.9)",
 			}}
-			transition={{ duration: 0.5, ease: "easeInOut" }}
+			transition={{ duration: 0.4, ease: "easeInOut" }}
 		>
-			<img
-				src={service.image}
-				alt={service.name}
-				loading="lazy"
-				className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-			/>
-			<div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-			<div className="relative z-10 flex h-full flex-col justify-end p-6 text-white">
+			{/* Image Layer */}
+			<div className="absolute inset-0 h-full w-full bg-slate-200">
+				<img
+					src={imageUrl}
+					alt={service.name}
+					loading="lazy"
+					className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+				/>
+			</div>
+
+			{/* Gradient Overlay */}
+			<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-90" />
+
+			{/* Content Layer */}
+			<div className="relative z-10 flex h-full flex-col justify-end p-8 text-white">
+				<div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-md text-white/90 w-fit">
+					{service.category || "General"}
+				</div>
+
 				<h3
-					className="text-2xl font-semibold tracking-tight"
+					className="text-3xl font-bold tracking-tight text-white mb-2"
 					style={{ fontFamily: "P22Mackinac, serif" }}
 				>
 					{service.name}
 				</h3>
 
-				<p className="mt-2 text-sm text-gray-200 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+				{/* ✅ PRICE DISPLAY */}
+				{service.price && (
+					<p className="text-violet-300 font-semibold mb-2">
+						₹{service.price}
+						<span className="text-sm font-normal text-gray-300 ml-1">
+							{service.price_unit !== "fixed" ? service.price_unit : ""}
+						</span>
+					</p>
+				)}
+
+				<p className="inter line-clamp-2 text-sm text-gray-300 opacity-90 transition-opacity duration-300 group-hover:text-white">
 					{service.description}
 				</p>
 
-				<div className="group/cta mt-4 flex items-center gap-2 text-violet-200 opacity-0 transition-all duration-300 group-hover:opacity-100">
-					<span className="text-sm font-medium group-hover/cta:text-violet-500 duration-200 group-hover/cta:scale-110">
-						Explore Service
+				<div className="inter group/cta mt-6 flex items-center gap-2 text-violet-300 font-medium">
+					<span className="transition-colors duration-200 group-hover/cta:text-violet-400">
+						View Providers
 					</span>
-					<ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1 group-hover/cta:text-violet-400 group-hover/cta:scale-110" />
+					<ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1 group-hover/cta:text-violet-400" />
 				</div>
 			</div>
 		</motion.a>
 	);
 };
 
+// --- CAROUSEL LOGIC ---
 const ServicesCarousel = ({ services }) => {
 	const [activeIndex, setActiveIndex] = useState(0);
 
@@ -116,35 +140,36 @@ const ServicesCarousel = ({ services }) => {
 
 	useEffect(() => {
 		const visible = getVisibleItems();
-		const initialCenter = Math.floor(visible / 2);
-		setActiveIndex(initialCenter);
+		setActiveIndex(Math.floor(visible / 2));
 	}, []);
 
 	return (
-		<div className="relative mt-16 w-full cursor-grab pb-16 active:cursor-grabbing">
+		<div className="relative mt-12 w-full cursor-grab pb-12 active:cursor-grabbing select-none">
 			<Carousel
 				responsive={responsive}
-				partialVisible={window.innerWidth >= 1280}
+				infinite={true}
+				centerMode={window.innerWidth >= 1024}
 				afterChange={(previousSlide, { currentSlide }) => {
 					const visible = getVisibleItems();
-					const center = currentSlide + Math.floor(visible / 2);
+					const center =
+						(currentSlide + Math.floor(visible / 2)) % services.length;
 					setActiveIndex(center);
 				}}
 				keyBoardControl
 				swipeable
 				draggable
 				pauseOnHover
-				containerClass="w-full"
-				itemClass="px-2 md:px-3"
+				containerClass="w-full py-10"
+				itemClass="px-3"
 				showDots={false}
 				customLeftArrow={<CustomArrow direction="left" />}
 				customRightArrow={<CustomArrow direction="right" />}
 			>
-				{services.map((service, index) => (
+				{services.map((service) => (
 					<ServiceCard
 						key={service.slug || service.id}
 						service={service}
-						isActive={index === activeIndex}
+						isActive={true}
 					/>
 				))}
 			</Carousel>
@@ -152,95 +177,78 @@ const ServicesCarousel = ({ services }) => {
 	);
 };
 
-const ServicesSection = ({ searchQuery }) => {
-	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// --- MAIN SECTION ---
+const ServicesSection = () => {
+	const API_URL = "http://localhost:3000";
 
 	const {
 		data: apiResponse,
 		loading,
 		error,
 	} = useFetch(`${API_URL}/api/services/v1`);
-	const services = apiResponse || [];
 
-	useEffect(() => {
-		if (!services || services.length === 0) return;
-
-		const preloadNearby = (idx) => {
-			const range = 4;
-			for (
-				let i = Math.max(0, idx - range);
-				i <= Math.min(services.length - 1, idx + range);
-				i++
-			) {
-				const img = new Image();
-				img.src = services[i].image;
-			}
-		};
-
-		preloadNearby(0);
-	}, [services]);
+	const services = Array.isArray(apiResponse)
+		? apiResponse
+		: apiResponse?.data || [];
+	console.log("API Data:", services);
 
 	return (
-		<section
-			id="services"
-			className="relative overflow-hidden mt-0 md:-mt-10 lg:-mt-45 xl:-mt-0 py-20 "
-		>
+		<section id="services" className="relative overflow-hidden py-24 ">
 			<AuroraBackground />
 
-			<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
 				<motion.div
-					className="text-center"
 					initial={{ opacity: 0, y: 20 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true, amount: 0.5 }}
 					transition={{ duration: 0.6 }}
 				>
-					<div className="bricolage-grotesque inline-block rounded-full bg-violet-100 px-4 py-1.5 text-sm font-semibold text-violet-700">
-						Our Services
-					</div>
-					<h2 className="bricolage-grotesque mt-4 text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-						Whatever you need, we've got a pro.
+					<span className="bricolage-grotesque inline-block rounded-full bg-violet-100 px-4 py-1.5 text-sm font-semibold text-violet-700 mb-4">
+						Expert Services
+					</span>
+					<h2 className="bricolage-grotesque text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl mb-6">
+						Find the right pro for every job.
 					</h2>
-					<p className="inter mx-auto mt-5 max-w-2xl text-lg text-slate-600 tracking-wide leading-relaxed">
-						From quick fixes to major projects, find the perfect help in
-						minutes.
+					<p className="inter mx-auto max-w-2xl text-lg text-slate-600">
+						From home repairs to personal wellness, connect with trusted
+						professionals in your area instantly.
 					</p>
 				</motion.div>
 			</div>
 
-			{/* Carousel */}
-			<div className="w-full">
+			{/* Carousel Content */}
+			<div className="w-full relative z-10">
 				{loading && (
-					<div className="mt-16 grid grid-cols-1 gap-8 px-4 md:grid-cols-2 lg:grid-cols-3 xl:max-w-7xl xl:mx-auto">
+					<div className="mt-16 grid grid-cols-1 gap-8 px-4 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
 						<SkeletonCard />
 						<SkeletonCard />
 						<SkeletonCard />
 					</div>
 				)}
+
 				{error && (
-					<div className="mt-16 max-w-2xl mx-auto flex flex-col items-center gap-4 rounded-lg border border-red-200 bg-red-50 p-8 text-center text-red-700">
-						<AlertTriangle className="h-10 w-10" />
-						<h3 className="text-xl font-semibold">Something went wrong</h3>
-						<p>{error}</p>
+					<div className="mt-12 flex justify-center">
+						<div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">
+							<AlertTriangle className="h-6 w-6" />
+							<div>
+								<h3 className="font-semibold">Unable to load services</h3>
+								<p className="text-sm opacity-90">{error}</p>
+							</div>
+						</div>
 					</div>
 				)}
+
 				{!loading && !error && services.length > 0 && (
 					<ServicesCarousel services={services} />
 				)}
 			</div>
 
-			{!loading && !error && services.length > 0 && (
-				<div className=" text-center">
+			{!loading && !error && (
+				<div className="text-center mt-8 relative z-10">
 					<Link to="/services">
-						<button
-							type="button"
-							className="cursor-pointer text-white group/btn inline-flex justify-center items-center h-12 border-none rounded-full px-6
-						bg-violet-600 bg-gradient-to-br from-[#b369de] to-[#4f46e5]
-						active:scale-95 hover:scale-105 hover:shadow-lg hover:shadow-violet-400/50 
-						transition-all duration-300 ease-in-out"
-						>
-							<span className="inter mr-2">View All Services</span>{" "}
-							<ArrowRight className="h-4 w-4" />
+						<button className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-slate-900 px-8 py-3 text-white transition-all hover:bg-slate-800 hover:scale-105 active:scale-95 shadow-xl shadow-slate-200">
+							<span className="font-medium">View All Categories</span>
+							<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
 						</button>
 					</Link>
 				</div>

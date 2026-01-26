@@ -11,8 +11,6 @@ export default function HomeLayout() {
 			className="relative min-h-screen flex flex-col bg-cover bg-center bg-no-repeat bg-fixed"
 			style={{ backgroundImage: "url('/images/background.webp')" }}
 		>
-			{/* 2. Restored the overlay so you can see the BG 'nicely' (tinted) */}
-			{/* Added pointer-events-none so you can still click things underneath if z-index fails */}
 			<div className="absolute inset-0 -z-10 pointer-events-none" />
 
 			<Navbar />

@@ -11,11 +11,31 @@ import {
 	CheckCircle2,
 	Eye,
 	EyeOff,
-	Camera,
 	Save,
 } from "lucide-react";
 import Alerts from "../ui/Alerts";
 import api from "../api/axios";
+
+// Helper component for consistent buttons
+const SaveButton = ({ loading, disabled, onClick, label, loadingLabel }) => (
+	<button
+		onClick={onClick}
+		disabled={disabled || loading}
+		className={`w-full flex items-center justify-center gap-2 text-sm font-bold py-3 px-6 rounded-xl transition-all duration-200 ${
+			disabled || loading
+				? "bg-gray-100 text-gray-400 cursor-not-allowed"
+				: "bg-violet-700 text-white hover:bg-violet-800 shadow-lg shadow-violet-200 cursor-pointer hover:-translate-y-0.5"
+		}`}
+	>
+		{loading ? (
+			loadingLabel || "Saving..."
+		) : (
+			<>
+				<Save size={18} /> {label || "Save Changes"}
+			</>
+		)}
+	</button>
+);
 
 const PasswordInput = ({
 	value,
@@ -49,7 +69,7 @@ const SettingsPage = () => {
 	const navigate = useNavigate();
 
 	const [user, setUser] = useState(
-		JSON.parse(localStorage.getItem("user") || "{}")
+		JSON.parse(localStorage.getItem("user") || "{}"),
 	);
 
 	const [name, setName] = useState(user.name || "");
@@ -104,7 +124,7 @@ const SettingsPage = () => {
 			await api.post(
 				"/api/auth/update-password",
 				{ currentPassword, newPassword },
-				{ headers: { Authorization: `Bearer ${token}` } }
+				{ headers: { Authorization: `Bearer ${token}` } },
 			);
 			setAlert({ type: "success", message: "Password updated successfully!" });
 			setCurrentPassword("");
@@ -170,7 +190,7 @@ const SettingsPage = () => {
 			await api.post(
 				"/api/auth/request-email-change",
 				{ newEmail: email },
-				{ headers: { Authorization: `Bearer ${token}` } }
+				{ headers: { Authorization: `Bearer ${token}` } },
 			);
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			setOtpSent(true);
@@ -189,7 +209,7 @@ const SettingsPage = () => {
 			await api.post(
 				"/api/auth/verify-email-change",
 				{ email, otp },
-				{ headers: { Authorization: `Bearer ${token}` } }
+				{ headers: { Authorization: `Bearer ${token}` } },
 			);
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			const updatedUser = { ...user, email: email };
@@ -224,7 +244,7 @@ const SettingsPage = () => {
 
 				try {
 					const response = await fetch(
-						`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+						`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
 					);
 					const data = await response.json();
 
@@ -234,7 +254,7 @@ const SettingsPage = () => {
 							lng: longitude,
 							location: data.display_name || `${latitude}, ${longitude}`,
 						},
-						setAddressLoading
+						setAddressLoading,
 					);
 				} catch (err) {
 					updateProfile(
@@ -243,7 +263,7 @@ const SettingsPage = () => {
 							lng: longitude,
 							location: `${latitude}, ${longitude}`,
 						},
-						setAddressLoading
+						setAddressLoading,
 					);
 				}
 			},
@@ -255,7 +275,7 @@ const SettingsPage = () => {
 				if (error.code === 3) msg = "Location request timed out.";
 				setAlert({ type: "error", message: msg });
 			},
-			options
+			options,
 		);
 	};
 
@@ -295,7 +315,7 @@ const SettingsPage = () => {
 	};
 
 	return (
-		<div className="bricolage-grotesque min-h-screen -mt-60 text-[#191034] p-6 md:p-12 font-sans pt-24 md:pt-32">
+		<div className="bricolage-grotesque min-h-screen text-[#191034] p-6 md:p-12 font-sans pt-24 md:pt-32">
 			{alert && (
 				<Alerts
 					message={alert.message}
@@ -317,6 +337,7 @@ const SettingsPage = () => {
 				</div>
 
 				<div className="grid lg:grid-cols-12 gap-8 items-start">
+					{/* Left Column: Avatar & Basic Info */}
 					<div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
 						<div className="bg-white border border-gray-100 p-8 rounded-3xl flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow duration-300">
 							<div className="relative w-32 h-32 mb-6 group">
@@ -345,11 +366,12 @@ const SettingsPage = () => {
 							</div>
 
 							<div className="w-full space-y-5">
+								{/* Name Input */}
 								<div className="text-left group">
 									<label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">
 										Display Name
 									</label>
-									<div className="relative">
+									<div className="relative mb-3">
 										<User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
 										<input
 											type="text"
@@ -358,27 +380,17 @@ const SettingsPage = () => {
 											className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all font-semibold text-gray-700 bg-gray-50/50 focus:bg-white"
 										/>
 									</div>
-									<button
+									<SaveButton
+										loading={nameLoading}
+										disabled={name === user.name}
 										onClick={() => updateProfile({ name }, setNameLoading)}
-										disabled={name === user.name || nameLoading}
-										className={`cursor-pointer w-full mt-3 flex items-center justify-center gap-2 text-sm font-bold py-2 rounded-lg transition-all ${
-											name === user.name
-												? "opacity-0 h-0 overflow-hidden py-0"
-												: "opacity-100 bg-violet-600 text-white hover:bg-violet-700 shadow-lg shadow-violet-200"
-										}`}
-									>
-										{nameLoading ? (
-											"Saving..."
-										) : (
-											<>
-												<Save size={16} /> Save Changes
-											</>
-										)}
-									</button>
+										label="Save Name"
+									/>
 								</div>
 
 								<div className="h-px bg-gray-100 w-full" />
 
+								{/* Email Input */}
 								<div className="text-left">
 									<label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">
 										Email Address
@@ -395,7 +407,7 @@ const SettingsPage = () => {
 											</div>
 											<button
 												onClick={() => setIsEditingEmail(true)}
-												className="cursor-pointer text-sm font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 px-2 btn py-1.5 rounded-lg transition-colors"
+												className="cursor-pointer text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
 											>
 												Edit
 											</button>
@@ -433,7 +445,7 @@ const SettingsPage = () => {
 													<button
 														onClick={handleSendOtp}
 														disabled={emailLoading || email === user.email}
-														className="cursor-pointer disabled:cursor-not-allowed disabled:hover:bg-violet-600 flex-1 py-2 text-xs font-bold bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-all shadow-md shadow-violet-200"
+														className="cursor-pointer disabled:cursor-not-allowed flex-1 py-2 text-xs font-bold bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-all shadow-md"
 													>
 														{emailLoading ? "Sending..." : "Send OTP"}
 													</button>
@@ -441,7 +453,7 @@ const SettingsPage = () => {
 													<button
 														onClick={handleVerifyAndChangeEmail}
 														disabled={emailLoading || !otp}
-														className="cursor-pointer disabled:cursor-not-allowed flex-1 py-2 text-xs font-bold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md shadow-emerald-200"
+														className="cursor-pointer disabled:cursor-not-allowed flex-1 py-2 text-xs font-bold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md"
 													>
 														{emailLoading ? "Verifying..." : "Verify"}
 													</button>
@@ -454,6 +466,7 @@ const SettingsPage = () => {
 						</div>
 					</div>
 
+					{/* Right Column: Contact, Address, Security */}
 					<div className="lg:col-span-8 space-y-6">
 						<div className="bg-white border border-gray-100 p-8 rounded-3xl shadow-sm">
 							<h3 className="text-xl font-bold text-[#191034] mb-8 flex items-center gap-3">
@@ -464,11 +477,12 @@ const SettingsPage = () => {
 							</h3>
 
 							<div className="grid md:grid-cols-2 gap-8">
+								{/* Phone Number */}
 								<div className="space-y-2">
 									<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">
 										Phone Number
 									</label>
-									<div className="relative group">
+									<div className="relative group mb-3">
 										<Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
 										<input
 											type="text"
@@ -481,29 +495,23 @@ const SettingsPage = () => {
 											className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50/30 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all font-medium"
 										/>
 									</div>
-									<div className="h-6 flex justify-end">
-										<button
-											onClick={() => updateProfile({ phone }, setPhoneLoading)}
-											disabled={phoneLoading || phone === user.phone}
-											className={`text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-4 py-1.5 rounded-full transition-all ${
-												phone === user.phone
-													? "opacity-0 translate-y-2"
-													: "opacity-100 translate-y-0"
-											}`}
-										>
-											{phoneLoading ? "Saving..." : "Save Change"}
-										</button>
-									</div>
+									<SaveButton
+										loading={phoneLoading}
+										disabled={phone === (user.phone || "")}
+										onClick={() => updateProfile({ phone }, setPhoneLoading)}
+										label="Save Phone"
+									/>
 								</div>
 
-								<div className="flex flex-col justify-center">
-									<div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 text-center space-y-3">
+								{/* Auto Detect Button */}
+								<div className="flex flex-col justify-end">
+									<div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 text-center space-y-3 h-full flex flex-col justify-center">
 										<p className="text-sm text-gray-500 font-medium">
 											Need to update your address quickly?
 										</p>
 										<button
 											onClick={handleCurrentLocation}
-											className="cursor-pointer w-full flex items-center justify-center gap-2 text-sm font-bold text-white bg-gray-900 hover:bg-gray-800 px-4 py-3 rounded-xl transition-all shadow-lg shadow-gray-200"
+											className="cursor-pointer w-full flex items-center justify-center gap-2 text-sm font-bold text-white bg-gray-900 hover:bg-gray-800 px-4 py-3 rounded-xl transition-all shadow-lg shadow-gray-200 hover:-translate-y-0.5"
 										>
 											<MapPin size={16} />
 											Auto-Detect Location
@@ -512,7 +520,8 @@ const SettingsPage = () => {
 								</div>
 							</div>
 
-							<div className="mt-2">
+							{/* Address Text Area */}
+							<div className="mt-8">
 								<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 mb-2 block">
 									Permanent Address
 								</label>
@@ -521,26 +530,19 @@ const SettingsPage = () => {
 									onChange={(e) => setAddress(e.target.value)}
 									placeholder="Enter your full address details..."
 									rows="3"
-									className="w-full px-5 py-4 rounded-2xl border border-gray-200 bg-gray-50/30 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all resize-none leading-relaxed"
+									className="w-full px-5 py-4 rounded-2xl border border-gray-200 bg-gray-50/30 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all resize-none leading-relaxed mb-4"
 								/>
-								<div
-									className={`mt-3 flex justify-end transition-all duration-300 ${
-										address === user.location
-											? "opacity-0 h-0"
-											: "opacity-100 h-auto"
-									}`}
-								>
-									<button
-										onClick={() => updateProfile({ address })}
-										disabled={addressLoading}
-										className="disabled:cursor-not-allowed btn-dark text-violet-800 cursor-pointer text-sm font-bold px-6 py-2.5 rounded-xl hover:bg-violet-700 shadow-lg shadow-violet-200 transition-all"
-									>
-										{addressLoading ? "Processing..." : "Update Address"}
-									</button>
-								</div>
+								{/* FIX: Button is always visible, but disabled/greyed until change */}
+								<SaveButton
+									loading={addressLoading}
+									disabled={address === (user.location || user.address || "")}
+									onClick={() => updateProfile({ address }, setAddressLoading)}
+									label="Update Address"
+								/>
 							</div>
 						</div>
 
+						{/* Security Section */}
 						<div className="bg-white border border-gray-100 p-8 rounded-3xl shadow-sm">
 							<h3 className="text-xl font-bold text-[#191034] mb-8 flex items-center gap-3">
 								<div className="bg-amber-50 p-2.5 rounded-xl text-amber-600">
@@ -567,30 +569,28 @@ const SettingsPage = () => {
 												toggleShow={setShowCurrent}
 											/>
 										)}
-										<div className="space-y-2">
-											<PasswordInput
-												value={newPassword}
-												onChange={(e) => setNewPassword(e.target.value)}
-												placeholder="New Password (min 6 chars)"
-												show={showNew}
-												toggleShow={setShowNew}
-											/>
-											<PasswordInput
-												value={confirmPassword}
-												onChange={(e) => setConfirmPassword(e.target.value)}
-												placeholder="Confirm New Password"
-												show={showNew}
-												toggleShow={setShowNew}
-											/>
-										</div>
+										<PasswordInput
+											value={newPassword}
+											onChange={(e) => setNewPassword(e.target.value)}
+											placeholder="New Password (min 6 chars)"
+											show={showNew}
+											toggleShow={setShowNew}
+										/>
+										<PasswordInput
+											value={confirmPassword}
+											onChange={(e) => setConfirmPassword(e.target.value)}
+											placeholder="Confirm New Password"
+											show={showNew}
+											toggleShow={setShowNew}
+										/>
 
-										<button
+										<SaveButton
+											loading={passwordLoading}
+											disabled={!newPassword || passwordLoading}
 											onClick={handlePasswordUpdate}
-											disabled={passwordLoading || !newPassword}
-											className="w-full btn-dark disabled:cursor-not-allowed  bg-violet-600 text-white font-bold py-3.5 rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200 disabled:opacity-50 disabled:shadow-none mt-2"
-										>
-											{passwordLoading ? "Updating..." : "Update Password"}
-										</button>
+											label="Update Password"
+											loadingLabel="Updating..."
+										/>
 									</div>
 								</div>
 

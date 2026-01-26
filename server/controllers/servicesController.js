@@ -1,17 +1,23 @@
 const pool = require("../config/db");
 
+// Helper to format the DB row into a clean JSON object
 const formatService = (row) => ({
 	id: row.id,
 	name: row.name,
 	slug: row.slug,
 	description: row.description,
 	price: row.price,
-	image: row.image_url,
+	price_unit: row.price_unit, // ✅ Added: Sends "per hr", "fixed", etc.
+	image_url: row.image_url, // ✅ Fixed: Kept as 'image_url' to match Frontend
 	category: row.category,
 });
+
 async function getAllServices(req, res, next) {
 	try {
-		const result = await pool.query("SELECT * FROM services");
+		// improved query: Sort by category so they appear grouped
+		const result = await pool.query(
+			"SELECT * FROM services ORDER BY category, name",
+		);
 
 		const serviceList = result.rows.map(formatService);
 

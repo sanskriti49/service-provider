@@ -10,10 +10,13 @@
 		"lint": "eslint ."
 	},
 	"dependencies": {
+		"@cloudinary/react": "^1.14.3",
+		"@cloudinary/url-gen": "^1.22.0",
 		"@emailjs/browser": "^4.4.1",
 		"@emotion/cache": "^11.14.0",
 		"@emotion/react": "^11.14.0",
 		"@emotion/styled": "^11.14.1",
+		"@headlessui/react": "^2.2.9",
 		"@heroicons/react": "^2.2.0",
 		"@marsidev/react-turnstile": "^1.4.0",
 		"@mui/icons-material": "^7.3.6",
@@ -22,7 +25,8 @@
 		"@tailwindcss/vite": "^4.1.7",
 		"axios": "^1.13.2",
 		"canvas-confetti": "^1.9.4",
-		"framer-motion": "^12.23.26",
+		"clsx": "^2.1.1",
+		"framer-motion": "^12.29.0",
 		"gsap": "^3.13.0",
 		"hamburger-react": "^2.5.2",
 		"jwt-decode": "^4.0.0",
@@ -37,6 +41,7 @@
 		"react-router-dom": "^6.30.0",
 		"react-router-hash-link": "^2.4.3",
 		"react-spinners": "^0.17.0",
+		"tailwind-merge": "^3.4.0",
 		"tailwindcss": "^4.1.7"
 	},
 	"devDependencies": {

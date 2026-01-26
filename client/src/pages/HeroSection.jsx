@@ -6,13 +6,12 @@ const popularSearches = ["Plumbing", "House Cleaning", "Painting", "Haircut"];
 
 export const HeroSection = () => {
 	return (
-		<main className="relative w-full -mt-34 pb-36 md:-mt-38 md:pb-68 lg:-mt-40 lg:pb-105 xl:-mt-40 xl:pb-75  overflow-hidden">
+		<main className="relative w-full pb-36 md:-mt-38 md:pb-68 lg:-mt-40 lg:pb-105 xl:-mt-40 xl:pb-75  overflow-hidden">
 			<div className="absolute inset-0 w-full h-full mt-35 md:mt-50 lg:mt-70 xl:mt-40">
 				<BackgroundPattern />
 			</div>
 
-			{/* <div className="mt-15 relative max-w-4xl mx-auto px-4 sm:px-6"> */}
-			<div className="relative z-10 mt-15 max-w-4xl mx-auto px-4 sm:px-6">
+			<div className="relative z-10 mt-80 max-w-4xl mx-auto px-4 sm:px-6">
 				<div className="flex flex-col items-center text-center bricolage-grotesque">
 					<p className="font-medium text-violet-800/80  text-sm md:text-base tracking-wide">
 						"Your Wish, Our Command" —{" "}

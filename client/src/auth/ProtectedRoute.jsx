@@ -9,11 +9,6 @@ export default function ProtectedRoute({ children, allowed }) {
 		const decoded = jwtDecode(token);
 		const userRole = decoded.role;
 
-		// if (!allowed.includes(decoded.role)) {
-		// 	return <Navigate to="/unauthorized" />;
-		// }
-		// 4. Check if Role is allowed
-		// (allowed is an array like ["customer"] or ["provider"])
 		if (allowed && !allowed.includes(userRole)) {
 			// If user has NO role yet (google login), send to choose role
 			if (!userRole) {

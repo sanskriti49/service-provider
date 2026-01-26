@@ -5,7 +5,6 @@ import {
 } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import PlainLayout from "./layouts/PlainLayout";
-import HomeLayout from "./layouts/HomeLayout";
 
 import Home from "./pages/Home";
 import SignIn from "./pages/SignIn";
@@ -23,6 +22,9 @@ import SettingsPage from "./pages/SettingsPage";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import UserProfile from "./dashboards/customer/UserProfile";
+import DashboardOverview from "./dashboards/customer/DashboardOverview";
+import AllBookings from "./dashboards/customer/AllBookings";
+import HelpCenter from "./pages/HelpCenter";
 
 const router = createBrowserRouter([
 	{
@@ -35,6 +37,7 @@ const router = createBrowserRouter([
 				element: <ChooseRole />,
 			},
 			{ path: "/services", element: <AllServices /> },
+			{ path: "/help", element: <HelpCenter /> },
 		],
 	},
 
@@ -64,6 +67,20 @@ const router = createBrowserRouter([
 						<CustomerDashboard />
 					</ProtectedRoute>
 				),
+				children: [
+					{
+						index: true,
+						element: <DashboardOverview />,
+					},
+					{
+						path: "bookings", // This renders at /dashboard/bookings
+						element: <AllBookings />,
+					},
+					// {
+					// 	path: "settings", // This renders at /dashboard/settings
+					// 	element: <SettingsPage />,
+					// },
+				],
 			},
 			{
 				path: "/profile",

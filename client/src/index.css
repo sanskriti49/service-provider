@@ -30,7 +30,7 @@
 	font-family: "P22Mackinac";
 	src: url("/fonts/P22-Mackinac/P22MackinacPro-Medium_26.otf")
 		format("opentype");
-	font-weight: 400;
+	font-weight: 800;
 	font-style: normal;
 	font-display: swap;
 }
@@ -63,9 +63,12 @@ html {
 	scroll-behavior: smooth;
 }
 
+.mackinac {
+	font-family: "P22Mackinac", sans-serif;
+}
 .transition-colors {
-	transition-property: color, background-color, border-color,
-		text-decoration-color, fill, stroke;
+	transition-property:
+		color, background-color, border-color, text-decoration-color, fill, stroke;
 	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 	transition-duration: 150ms;
 }
@@ -115,6 +118,58 @@ html {
 	font-family: "Inter", sans-serif;
 	font-style: normal;
 	font-display: swap;
+}
+
+.momentum-scroll {
+	-webkit-overflow-scrolling: touch; /* iOS + trackpad momentum */
+	scroll-behavior: smooth;
+}
+
+/* Horizontal scrollbar for date selector */
+.custom-scrollbar-x {
+	--thumb-color: rgba(255, 255, 255, 0.18);
+}
+
+.custom-scrollbar-x::-webkit-scrollbar {
+	height: 6px;
+}
+
+.custom-scrollbar-x::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.custom-scrollbar-x::-webkit-scrollbar-thumb {
+	background-color: var(--thumb-color);
+	border-radius: 999px;
+}
+
+/* Firefox */
+.custom-scrollbar-x {
+	scrollbar-width: thin;
+	scrollbar-color: var(--thumb-color) transparent;
+}
+
+/* ===== Custom Vertical Scrollbar ===== */
+.custom-scrollbar-y {
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.custom-scrollbar-y::-webkit-scrollbar {
+	width: 6px;
+}
+
+.custom-scrollbar-y::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.custom-scrollbar-y::-webkit-scrollbar-thumb {
+	background-color: rgba(255, 255, 255, 0.18);
+	border-radius: 999px;
+}
+
+.custom-scrollbar-y::-webkit-scrollbar-thumb:hover {
+	background-color: rgba(139, 92, 246, 0.6);
 }
 
 .arrow {
@@ -225,12 +280,14 @@ html {
 	--btn-text-color-active: #ddd6fe;
 
 	/* Shadow: Darker depth at the bottom, slight highlight at top */
-	--btn-inner-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.15),
+	--btn-inner-shadow:
+		inset 0 1px 0 0 rgb(255 255 255 / 0.15),
 		inset 0 -3px 0px -1px rgb(0 0 0 / 0.2);
 	--btn-inner-shadow-active: inset 0 3px 6px rgb(0 0 0 / 0.3);
 
 	/* Outer glow */
-	--btn-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2), 0 2px 4px -1px rgb(0 0 0 / 0.1);
+	--btn-shadow:
+		0 4px 6px -1px rgb(0 0 0 / 0.2), 0 2px 4px -1px rgb(0 0 0 / 0.1);
 	--btn-shadow-active: 0 0 transparent;
 
 	/* Border: Subtle lighter violet to define edges */
@@ -261,7 +318,8 @@ html {
 	--btn-bg-color: #7e45da; /* Lighter violet on hover */
 	--btn-border-color: rgb(167 139 250 / 0.6);
 	transform: translateY(-1px);
-	box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.2),
+	box-shadow:
+		inset 0 1px 0 0 rgb(255 255 255 / 0.2),
 		0 6px 12px -2px rgb(0 0 0 / 0.3);
 }
 
@@ -365,7 +423,9 @@ html {
 	color: var(--btn-text-color-active);
 	background-color: var(--btn-bg-color-active);
 	border-color: var(--btn-border-color-active);
-	box-shadow: 0 0 0 3px var(--btn-ring-color), var(--btn-inner-shadow-active);
+	box-shadow:
+		0 0 0 3px var(--btn-ring-color),
+		var(--btn-inner-shadow-active);
 	transition: none;
 }
 .btn-xs:disabled,
@@ -400,10 +460,10 @@ html {
 	outline: none !important;
 }
 .btn-shadow {
-	--btn-shadow: 0 5px 5px -2px rgb(91 33 182 / 0.1),
-		0 2px 4px -2px rgb(91 33 182 / 0.1);
-	--btn-shadow-active: 0 7px 7px -4px rgb(91 33 182 / 0.15),
-		0 2px 4px -2px rgb(91 33 182 / 0.15);
+	--btn-shadow:
+		0 5px 5px -2px rgb(91 33 182 / 0.1), 0 2px 4px -2px rgb(91 33 182 / 0.1);
+	--btn-shadow-active:
+		0 7px 7px -4px rgb(91 33 182 / 0.15), 0 2px 4px -2px rgb(91 33 182 / 0.15);
 	background-clip: padding-box;
 	outline: none !important;
 }
@@ -468,27 +528,34 @@ html {
 	height: 50%;
 }
 :where(
-		.bubble,
-		.bubble-tl,
-		.bubble-t,
-		.bubble-tr,
-		.bubble-lt,
-		.bubble-rt,
-		.bubble-l,
-		.bubble-r,
-		.bubble-lb,
-		.bubble-rb,
-		.bubble-bl,
-		.bubble-b,
-		.bubble-br
-	) {
+	.bubble,
+	.bubble-tl,
+	.bubble-t,
+	.bubble-tr,
+	.bubble-lt,
+	.bubble-rt,
+	.bubble-l,
+	.bubble-r,
+	.bubble-lb,
+	.bubble-rb,
+	.bubble-bl,
+	.bubble-b,
+	.bubble-br
+) {
 	background-color: white;
 	position: absolute;
 	pointer-events: none;
 	border-radius: 0.5rem;
 	font-size: 0.75rem;
-	font-family: Bricolage Grotesque, ui-sans-serif, system-ui, sans-serif,
-		"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+	font-family:
+		Bricolage Grotesque,
+		ui-sans-serif,
+		system-ui,
+		sans-serif,
+		"Apple Color Emoji",
+		"Segoe UI Emoji",
+		"Segoe UI Symbol",
+		"Noto Color Emoji";
 	font-weight: 500;
 	line-height: 1.5;
 	text-align: left;
@@ -496,7 +563,9 @@ html {
 	color: #191034;
 	white-space: normal;
 	opacity: 0;
-	transition: 0.2s opacity, 0.2s transform;
+	transition:
+		0.2s opacity,
+		0.2s transform;
 	width: -moz-max-content;
 	width: max-content;
 	top: calc(var(--t) + var(--offset-b));
@@ -512,20 +581,20 @@ html {
 		drop-shadow(1px 0 hsl(265 35% 60% / 0.1));
 }
 :where(
-		.bubble,
-		.bubble-tl,
-		.bubble-t,
-		.bubble-tr,
-		.bubble-lt,
-		.bubble-rt,
-		.bubble-l,
-		.bubble-r,
-		.bubble-lb,
-		.bubble-rb,
-		.bubble-bl,
-		.bubble-b,
-		.bubble-br
-	)::before {
+	.bubble,
+	.bubble-tl,
+	.bubble-t,
+	.bubble-tr,
+	.bubble-lt,
+	.bubble-rt,
+	.bubble-l,
+	.bubble-r,
+	.bubble-lb,
+	.bubble-rb,
+	.bubble-bl,
+	.bubble-b,
+	.bubble-br
+)::before {
 	content: "";
 	position: absolute;
 	min-width: 100%;
@@ -814,7 +883,8 @@ text-container {
 	--color4: 134, 168, 231; /* Soft green */
 	--color5: 255, 193, 193; /* Light red */
 
-	--color-interactive: 165, 105, 255; /* Vibrant violet-pink blend for interactivity */
+	--color-interactive:
+		165, 105, 255; /* Vibrant violet-pink blend for interactivity */
 
 	--circle-size: 70%;
 	--blending: hard-light;

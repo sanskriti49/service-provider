@@ -1,9 +1,8 @@
-// layouts/PlainLayout.jsx
 import { AnimatePresence, motion } from "framer-motion";
-import { Outlet, useLocation } from "react-router-dom"; // Added useLocation import
+import { Outlet, useLocation } from "react-router-dom";
 
 export default function PlainLayout() {
-	const location = useLocation(); // Hook was missing in your snippet
+	const location = useLocation();
 
 	return (
 		<AnimatePresence mode="wait">

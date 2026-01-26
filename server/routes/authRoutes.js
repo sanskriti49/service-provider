@@ -28,7 +28,7 @@ const generateToken = (user) => {
 			custom_id: user.custom_id,
 		},
 		process.env.JWT_SECRET,
-		{ expiresIn: "7d" }
+		{ expiresIn: "7d" },
 	);
 };
 
@@ -48,6 +48,7 @@ const getSafeUser = (user) => {
 		custom_id: user.custom_id,
 		phone: user.phone,
 		isGoogleUser: user.password === "google_auth_user",
+		created_at: user.created_at,
 	};
 };
 
@@ -77,7 +78,7 @@ router.post("/request-email-change", verifyToken, async (req, res) => {
 			`UPDATE users
 		SET temp_email=$1, temp_email_otp=$2, temp_email_expires=$3
 		WHERE id=$4`,
-			[newEmail, hashedOtp, otpExpires, userId]
+			[newEmail, hashedOtp, otpExpires, userId],
 		);
 
 		await sendEmail({
@@ -119,7 +120,7 @@ router.post("/verify-email-change", verifyToken, async (req, res) => {
                  temp_email_otp = NULL, 
                  temp_email_expires = NULL 
              WHERE id = $1`,
-			[userId]
+			[userId],
 		);
 
 		res.json({
@@ -149,7 +150,7 @@ router.post("/google", async (req, res) => {
 		if (location && (!lat || !lng)) {
 			try {
 				const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-					location
+					location,
 				)}`;
 				const geoRes = await axios.get(url, {
 					headers: { "User-Agent": "TaskGenie/1.0" },
@@ -193,7 +194,7 @@ router.post("/google", async (req, res) => {
                  (name, email, password, photo, custom_id, role, lat, lng, location)
                  VALUES ($1, $2, $3, $4, NULL, NULL, $5, $6, $7)
                  RETURNING *`,
-				[name, email, "google_auth_user", picture, lat, lng, location]
+				[name, email, "google_auth_user", picture, lat, lng, location],
 			);
 			user = insert.rows[0];
 		} else {
@@ -222,7 +223,7 @@ router.post("/register", verifyTurnstile, async (req, res) => {
 
 		const existingCheck = await db.query(
 			"SELECT id FROM users WHERE email=$1",
-			[cleanEmail]
+			[cleanEmail],
 		);
 		if (existingCheck.rows.length > 0) {
 			return res.status(400).json({ error: "Email already exists" });
@@ -235,7 +236,7 @@ router.post("/register", verifyTurnstile, async (req, res) => {
 			`INSERT INTO users (name, email, password, role, custom_id, phone)
              VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING *`,
-			[cleanName, cleanEmail, hashed, role, customId, phone]
+			[cleanName, cleanEmail, hashed, role, customId, phone],
 		);
 
 		const newUser = result.rows[0];
@@ -316,7 +317,7 @@ router.post("/forgot-password", async (req, res) => {
 
 		await db.query(
 			"UPDATE users SET reset_password_token=$1,reset_password_expires=$2 WHERE id=$3",
-			[resetPasswordToken, resetPasswordExpire, user.id]
+			[resetPasswordToken, resetPasswordExpire, user.id],
 		);
 
 		// create reset url, which points to ui
@@ -339,7 +340,7 @@ router.post("/forgot-password", async (req, res) => {
 			// rollback DB changes if email fails
 			await db.query(
 				"UPDATE users SET reset_password_token = NULL, reset_password_expires = NULL WHERE id = $1",
-				[user.id]
+				[user.id],
 			);
 			return res.status(500).json({ error: "Email could not be sent" });
 		}
@@ -366,7 +367,7 @@ router.put("/reset-password/:resetToken", async (req, res) => {
 
 		const result = await db.query(
 			"SELECT * FROM users WHERE reset_password_token = $1 AND reset_password_expires > $2",
-			[resetPasswordToken, Date.now()]
+			[resetPasswordToken, Date.now()],
 		);
 		const user = result.rows[0];
 		if (!user) {
@@ -378,7 +379,7 @@ router.put("/reset-password/:resetToken", async (req, res) => {
 			`UPDATE users 
              SET password = $1, reset_password_token = NULL, reset_password_expires = NULL 
              WHERE id = $2`,
-			[hashedPassword, user.id]
+			[hashedPassword, user.id],
 		);
 
 		res.json({ message: "Password updated successfully! You can now log in." });
@@ -416,7 +417,7 @@ router.post("/set-role", verifyToken, async (req, res) => {
              SET role = $1, custom_id = $2 
              WHERE id = $3 
              RETURNING *`,
-			[role, customId, userId]
+			[role, customId, userId],
 		);
 
 		const updatedUser = update.rows[0];
@@ -462,7 +463,7 @@ router.post("/update-password", verifyToken, async (req, res) => {
 		}
 		const userResult = await db.query(
 			"SELECT password FROM users WHERE id = $1",
-			[userId]
+			[userId],
 		);
 
 		if (userResult.rows.length === 0) {
