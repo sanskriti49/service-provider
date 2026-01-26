@@ -225,8 +225,6 @@ function ServiceCard({ service }) {
 	const imageUrl = service.image_url || "/images/default-service.jpg";
 
 	return (
-		// ✅ CHANGED: Soft Lavender Aesthetic (Light Mode)
-		// Background: White blending into a soft lavender (#ede9fe)
 		<div className="service-card group flex flex-col rounded-3xl bg-gradient-to-br from-white to-[#ede9fe] overflow-hidden shadow-sm hover:shadow-xl hover:shadow-purple-200/60 transition-all duration-300 hover:-translate-y-2 border border-violet-100 hover:border-violet-300">
 			<Link
 				to={`/services/${service.slug || service.id}`}

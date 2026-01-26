@@ -1,7 +1,7 @@
 import { useState } from "react";
-import api from "../api/axios"; // Your axios instance
+import api from "../api/axios";
 import { Link } from "react-router-dom";
-import logoImg from "/images/la.png"; // Assuming same path
+import logoImg from "/images/la.png";
 
 const ForgotPassword = () => {
 	const [email, setEmail] = useState("");

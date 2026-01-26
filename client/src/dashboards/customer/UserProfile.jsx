@@ -22,6 +22,7 @@ import {
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import api from "../../api/axiosInstance";
 
 const SERIF_FONT = { fontFamily: "P22Mackinac, Cambria, sans-serif" };
 const TEXT_MAIN = "text-[#281950]";
@@ -136,9 +137,7 @@ export default function UserProfile() {
 				const token = localStorage.getItem("token");
 				if (!token) return;
 
-				const res = await axios.get("/api/auth/me", {
-					headers: { Authorization: `Bearer ${token}` },
-				});
+				const res = await api.get("/api/auth/me");
 				if (res.data.user) {
 					console.log(res.data.user);
 					setUser(res.data.user);

@@ -12,7 +12,7 @@ import {
 	ShieldCheck,
 	Sparkles,
 } from "lucide-react";
-import Alerts from "../ui/Alerts"; // Assuming this path exists based on your code
+import Alerts from "../ui/Alerts";
 import { FadeLoader } from "react-spinners";
 
 export default function BookingPage() {
@@ -45,8 +45,6 @@ export default function BookingPage() {
 	const [loading, setLoading] = useState(!state?.provider);
 	const [alert, setAlert] = useState(null);
 
-	// --- Helpers ---
-
 	function formatTime(timeString) {
 		if (!timeString) return "";
 		const [hours, minutes] = timeString.split(":");
@@ -73,8 +71,6 @@ export default function BookingPage() {
 			}),
 		};
 	}
-
-	// --- Effects ---
 
 	useEffect(() => {
 		const fetchData = async () => {
@@ -114,8 +110,6 @@ export default function BookingPage() {
 		fetchData();
 	}, [customId]);
 
-	// --- Logic ---
-
 	const groupedSlots = useMemo(() => {
 		return availability.reduce((acc, slot) => {
 			if (!acc[slot.date]) acc[slot.date] = [];
@@ -127,7 +121,6 @@ export default function BookingPage() {
 		}, {});
 	}, [availability]);
 
-	// Auto-select first date if not selected
 	useEffect(() => {
 		if (!selectedDate && Object.keys(groupedSlots).length > 0) {
 			const sortedDates = Object.keys(groupedSlots).sort();
@@ -193,7 +186,7 @@ export default function BookingPage() {
 					service_id: provider.service_id,
 					date: selectedDate,
 					start_time: selectedTime,
-					end_time: selectedTime, // Backend likely calculates end time based on service duration
+					end_time: selectedTime,
 					address: address,
 				}),
 			});
@@ -209,7 +202,6 @@ export default function BookingPage() {
 					message: "Slot already booked! Please choose another time.",
 					type: "error",
 				});
-				// Optionally refresh availability here
 			} else {
 				setAlert({ message: data.message || "Booking failed.", type: "error" });
 			}
@@ -220,8 +212,6 @@ export default function BookingPage() {
 			setIsSubmitting(false);
 		}
 	}
-
-	// --- Render ---
 
 	if (loading || !provider) {
 		return (

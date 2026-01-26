@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link, Outlet, NavLink, useNavigate } from "react-router-dom"; // Added Outlet, NavLink
+import { Link, Outlet, NavLink, useNavigate } from "react-router-dom";
 import {
 	Zap,
 	LayoutDashboard,
@@ -61,11 +61,10 @@ export default function CustomerDashboard() {
 							</div>
 						</div>
 
-						{/* Navigation Links - using NavLink for auto-active state */}
 						<nav className="flex flex-col gap-2">
 							<SidebarLink
 								to="/dashboard"
-								end // Ensures this is only active on exact match
+								end
 								icon={<LayoutDashboard size={20} />}
 								label="Overview"
 							/>
@@ -116,7 +115,6 @@ export default function CustomerDashboard() {
 	);
 }
 
-// Helper Component for Sidebar Links
 function SidebarLink({ to, icon, label, end = false }) {
 	return (
 		<NavLink

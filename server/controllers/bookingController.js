@@ -37,7 +37,7 @@ async function createBooking(req, res, next) {
 
 		const priceRes = await client.query(
 			"SELECT price FROM providers WHERE user_id = $1",
-			[provider_id]
+			[provider_id],
 		);
 
 		if (priceRes.rows.length === 0) {
@@ -225,7 +225,7 @@ async function updateBookingStatus(req, res) {
 				const now = new Date();
 
 				const allowedReportTime = new Date(
-					bookingDateTime.getTime() + 20 * 60000
+					bookingDateTime.getTime() + 20 * 60000,
 				);
 				if (now < allowedReportTime) {
 					await client.query("ROLLBACK");
@@ -325,7 +325,6 @@ async function updateBookingStatus(req, res) {
 			}
 
 			if (status === "completed") {
-				// to Customer
 				await sendEmail({
 					email: user_email,
 					subject: `Service Completed: ${service_name}`,
@@ -358,7 +357,7 @@ async function updateBookingAddress(req, res) {
 	try {
 		const checkRes = await db.query(
 			"SELECT created_at FROM bookings WHERE booking_id=$1",
-			[bookingId]
+			[bookingId],
 		);
 		if (checkRes.rows.length === 0) {
 			return res.status(404).json({ message: "Booking not found" });
@@ -377,7 +376,7 @@ async function updateBookingAddress(req, res) {
 
 		const updateRes = await db.query(
 			"UPDATE bookings SET address = $1 WHERE booking_id = $2 RETURNING address",
-			[address, bookingId]
+			[address, bookingId],
 		);
 		res.json({
 			message: "Address updated succesfully",
@@ -413,15 +412,9 @@ async function getUserHistory(req, res) {
 		`;
 		await db.query(autoExpireQuery, [userId]);
 
-		//	const queryParams = [userId, limit, offset];
-
-		// const baseParams = [userId];
-		// let whereClause = "WHERE b.user_id=$1";
-
 		const queryParams = [userId];
-		let paramCounter = 1; // Start counting from $1
+		let paramCounter = 1;
 
-		// 2. Start building WHERE clause
 		let whereClause = `WHERE b.user_id=$${paramCounter}`;
 		paramCounter++;
 
@@ -435,8 +428,6 @@ async function getUserHistory(req, res) {
 		}
 
 		if (search) {
-			// baseParams.push(`%${search}%`);
-			// const searchIndex = baseParams.length;
 			queryParams.push(`%${search}%`);
 
 			whereClause += `
@@ -454,19 +445,16 @@ async function getUserHistory(req, res) {
 			paramCounter++;
 		}
 
-		// 6. Minimum Price Filter
+		// minimum Price Filter
 		if (minPrice) {
 			queryParams.push(minPrice);
 			whereClause += ` AND b.price >= $${paramCounter}`;
 			paramCounter++;
 		}
 
-		// 7. Date Range Logic (PostgreSQL specific)
 		if (dateFilter === "This Month") {
-			// Postgres: check if date is in current month
 			whereClause += ` AND date_trunc('month', b.date) = date_trunc('month', CURRENT_DATE)`;
 		} else if (dateFilter === "Last 3 Months") {
-			// Postgres: check if date is within last 3 months
 			whereClause += ` AND b.date >= (CURRENT_DATE - INTERVAL '3 months')`;
 		}
 
@@ -507,7 +495,7 @@ async function getUserHistory(req, res) {
 		const totalRows = parseInt(countResult.rows[0].count);
 		const totalPages = Math.ceil(totalRows / limit);
 
-		// return the "Meta" object (Standard API Response Structure)
+		// return the "meta" obj
 		res.json({
 			meta: {
 				current_page: page,

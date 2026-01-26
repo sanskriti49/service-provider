@@ -8,12 +8,10 @@ import { twMerge } from "tailwind-merge";
 import AccountMenu from "./AccountMenu";
 import NavServices from "./NavServices";
 
-// --- UTILS ---
 function cn(...inputs) {
 	return twMerge(clsx(inputs));
 }
 
-// --- ICONS ---
 const ChevronDown = ({ open }) => (
 	<motion.svg
 		animate={{ rotate: open ? 180 : 0 }}
@@ -41,7 +39,6 @@ const Navbar = () => {
 	const [isDropdownOpen, setDropdownOpen] = useState(false);
 	const location = useLocation();
 
-	// 1. Auth Logic
 	useEffect(() => {
 		const token = localStorage.getItem("token");
 		if (token) {
@@ -54,7 +51,6 @@ const Navbar = () => {
 		}
 	}, [API_URL]);
 
-	// 2. Close menus on route change
 	useEffect(() => {
 		setMobileMenuOpen(false);
 		setDropdownOpen(false);

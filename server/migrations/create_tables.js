@@ -1,8 +1,6 @@
 const db = require("../config/db");
 
-// We split the queries into an array to run them one by one
 const queries = [
-	// 1. Users
 	`CREATE TABLE IF NOT EXISTS public.users (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     "name" text NOT NULL,
@@ -27,12 +25,12 @@ const queries = [
     CONSTRAINT users_role_check CHECK ((role = ANY (ARRAY['customer'::text, 'provider'::text])))
   )`,
 
-	// 2. Services
 	`CREATE TABLE IF NOT EXISTS public.services (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     "name" text NOT NULL,
     description text NOT NULL,
     price numeric NOT NULL,
+    price_unit text DEFAULT 'fixed'::text NULL,
     category text NULL,
     image_url text NULL,
     slug text NULL,

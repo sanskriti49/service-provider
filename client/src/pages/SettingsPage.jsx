@@ -16,7 +16,6 @@ import {
 import Alerts from "../ui/Alerts";
 import api from "../api/axios";
 
-// Helper component for consistent buttons
 const SaveButton = ({ loading, disabled, onClick, label, loadingLabel }) => (
 	<button
 		onClick={onClick}

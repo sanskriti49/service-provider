@@ -36,7 +36,6 @@ export default function DashboardOverview() {
 	// Get user from the parent Layout
 	const { user } = useOutletContext();
 
-	// --- 1. DEFINE ALL HOOKS AT THE TOP ---
 	const [isLoading, setIsLoading] = useState(true);
 	const [services, setServices] = useState([]);
 	const [upcoming, setUpcoming] = useState([]);
@@ -45,10 +44,8 @@ export default function DashboardOverview() {
 		total_completed: 0,
 		active_tasks: 0,
 	});
-	// MOVED THIS UP:
 	const [showMoreUpcoming, setShowMoreUpcoming] = useState(false);
 
-	// --- Helper Functions ---
 	const formatCurrency = (amount) =>
 		new Intl.NumberFormat("en-IN", {
 			style: "currency",
@@ -66,7 +63,6 @@ export default function DashboardOverview() {
 		});
 	};
 
-	// --- Fetch Logic ---
 	useEffect(() => {
 		const loadData = async () => {
 			const token = localStorage.getItem("token");
@@ -103,7 +99,6 @@ export default function DashboardOverview() {
 		loadData();
 	}, []);
 
-	// --- 2. NOW YOU CAN DO CONDITIONAL RETURNS ---
 	if (isLoading) return <DashboardSkeleton />;
 
 	const mainBooking = upcoming[0] || null;
@@ -256,7 +251,6 @@ export default function DashboardOverview() {
 	);
 }
 
-// Sub Components
 const StatCard = ({ label, value, color }) => (
 	<div
 		className={`p-5 rounded-2xl ${color} bg-opacity-20 border border-opacity-30 flex flex-col justify-between h-28`}

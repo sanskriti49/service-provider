@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { jwtDecode } from "jwt-decode"; // Make sure to install this: npm install jwt-decode
+import { jwtDecode } from "jwt-decode";
 import {
 	Search,
 	MessageCircle,
@@ -13,7 +13,6 @@ import {
 	IndianRupee,
 } from "lucide-react";
 
-// --- COMPONENT: Retro Perspective Grid ---
 const RetroGrid = () => {
 	return (
 		<div className="absolute top-0 inset-x-0 h-[600px] overflow-hidden pointer-events-none select-none z-0">
@@ -40,7 +39,6 @@ const RetroGrid = () => {
 	);
 };
 
-// --- DATA ---
 const quickLinks = [
 	{
 		title: "Track Booking",
@@ -134,19 +132,17 @@ const allFaqs = {
 const HelpCenter = () => {
 	const [activeTab, setActiveTab] = useState("customer");
 	const [searchQuery, setSearchQuery] = useState("");
-	const [userRole, setUserRole] = useState(null); // 'customer', 'provider', or null (guest)
+	const [userRole, setUserRole] = useState(null);
 
-	// --- TIME LOGIC ---
 	const currentHour = new Date().getHours();
 	const isSupportOnline = currentHour >= 9 && currentHour < 23;
 
-	// --- AUTH LOGIC (Auto-detect Role) ---
 	useEffect(() => {
 		const token = localStorage.getItem("token");
 		if (token) {
 			try {
 				const decoded = jwtDecode(token);
-				// If token is valid, set role and force the tab to match
+
 				if (decoded.role === "customer" || decoded.role === "provider") {
 					setUserRole(decoded.role);
 					setActiveTab(decoded.role);
@@ -158,17 +154,12 @@ const HelpCenter = () => {
 		}
 	}, []);
 
-	// --- SEARCH LOGIC ---
 	const filteredFaqs = useMemo(() => {
-		// 1. Determine which FAQs to search based on user status
-		// If Logged in: Search ONLY their role's FAQs
-		// If Guest: Search BOTH (so they can explore)
 		let categoriesToSearch = [];
 
 		if (userRole) {
 			categoriesToSearch = allFaqs[userRole] || [];
 		} else {
-			// Guest mode: Combine both but prioritize the active tab if not searching
 			if (!searchQuery) {
 				categoriesToSearch = allFaqs[activeTab] || [];
 			} else {

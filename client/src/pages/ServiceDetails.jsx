@@ -49,8 +49,7 @@ const ServiceDetails = () => {
 	const [providers, setProviders] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
-	//const [expandedProviderId, setExpandedProviderId] = useState(null);
-	const [expandedIndex, setExpandedIndex] = useState(-1); // -1 means nothing is open
+	const [expandedIndex, setExpandedIndex] = useState(-1);
 	const mainRef = useRef(null);
 	const headerRef = useRef(null);
 	const contentRef = useRef(null);

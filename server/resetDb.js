@@ -1,4 +1,3 @@
-// resetDb.js
 const db = require("./config/db");
 
 async function resetDatabase() {
@@ -7,7 +6,7 @@ async function resetDatabase() {
 
 		await db.query("BEGIN");
 		await db.query(
-			"TRUNCATE availability_slots, providers, users RESTART IDENTITY CASCADE"
+			"TRUNCATE availability_slots, providers, users RESTART IDENTITY CASCADE",
 		);
 		await db.query("COMMIT");
 
