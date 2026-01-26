@@ -20,26 +20,22 @@ async function seedServices() {
 		console.log("🔥 STARTING FRESH SEED...");
 
 		console.log("🗑️  Truncating services table...");
-		// This deletes everything and resets the table
 		await client.query("TRUNCATE services CASCADE");
 
 		const seedImagesDir = path.join(__dirname, "../seed_images");
 		console.log(`🚀 Processing ${SERVICES.length} services...`);
 
 		for (const service of SERVICES) {
-			// A. Get Price & Unit
 			const pricingInfo = getPriceDetails(service.name) || {
 				price: 500,
 				unit: "fixed",
 			};
 			const { price, unit } = pricingInfo;
 
-			// B. Get Category & Slug
 			const category = SERVICE_CATEGORIES[service.name] || "General";
 			const slug = service.slug;
 
-			// C. Upload Image logic
-			let finalImageUrl = service.image; // Fallback
+			let finalImageUrl = service.image;
 			const localImagePath = path.join(seedImagesDir, `${slug}.jpg`);
 
 			if (fs.existsSync(localImagePath)) {
@@ -63,7 +59,6 @@ async function seedServices() {
 				console.log(`   ⚠️  Image not found: ${slug}.jpg`);
 			}
 
-			// D. Insert into DB (with UUID handling)
 			try {
 				await client.query(
 					`INSERT INTO services (name, description, price, price_unit, category, image_url, slug)
