@@ -85,7 +85,7 @@ export default function DashboardOverview() {
 				if (upcomingRes.ok) {
 					const data = await upcomingRes.json();
 					const valid = data.filter((b) =>
-						["booked", "confirmed", "in_progress"].includes(b.status)
+						["booked", "confirmed", "in_progress"].includes(b.status),
 					);
 					setUpcoming(valid);
 				}

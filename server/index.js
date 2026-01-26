@@ -5,7 +5,13 @@ const app = express();
 
 app.use(
 	cors({
-		origin: ["http://localhost:5173", process.env.CLIENT_URL],
+		origin: [
+			"http://localhost:5173",
+			process.env.CLIENT_URL,
+			"https://taskgenieee.vercel.app",
+			"https://service-provider-git-main-sanskriti49s-projects.vercel.app",
+		],
+
 		credentials: true,
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 		allowedHeaders: ["Content-Type", "Authorization"],

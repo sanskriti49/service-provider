@@ -14,7 +14,7 @@ import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
-const API_URL = "http://localhost:3000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const formatDate = (dateString) => {
 	const date = new Date(dateString);

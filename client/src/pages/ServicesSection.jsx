@@ -13,13 +13,12 @@ import "./ServicesCarousel.css";
 import AuroraBackground from "../ui/AuroraBackground";
 import { Link } from "react-router-dom";
 
-// --- CAROUSEL CONFIG ---
 const responsive = {
 	desktop: {
 		breakpoint: { max: 4000, min: 1280 },
 		items: 3,
 		partialVisibilityGutter: 20,
-		slidesToScroll: 1, // Changed to 1 for smoother scrolling
+		slidesToScroll: 1,
 	},
 	laptop: {
 		breakpoint: { max: 1280, min: 768 },
@@ -54,12 +53,9 @@ const SkeletonCard = () => (
 	<div className="h-[450px] w-full animate-pulse rounded-3xl bg-slate-200" />
 );
 
-// --- SERVICE CARD COMPONENT ---
 const ServiceCard = ({ service, isActive }) => {
 	const serviceUrl = `/services/${service.slug || service.id}`;
 
-	// ✅ DIRECT CLOUD IMAGE
-	// Your DB now has the full Cloudinary URL, so we just use it.
 	const imageUrl = service.image_url || "/images/default-service.jpg";
 
 	return (
@@ -127,7 +123,6 @@ const ServiceCard = ({ service, isActive }) => {
 	);
 };
 
-// --- CAROUSEL LOGIC ---
 const ServicesCarousel = ({ services }) => {
 	const [activeIndex, setActiveIndex] = useState(0);
 
@@ -177,9 +172,8 @@ const ServicesCarousel = ({ services }) => {
 	);
 };
 
-// --- MAIN SECTION ---
 const ServicesSection = () => {
-	const API_URL = "http://localhost:3000";
+	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 	const {
 		data: apiResponse,

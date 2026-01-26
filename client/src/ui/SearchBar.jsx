@@ -14,7 +14,6 @@ export const SearchBar = () => {
 	const [allServices, setAllServices] = useState([]);
 	const [activeIndex, setActiveIndex] = useState(-1);
 
-	// New States for Error Handling
 	const [showError, setShowError] = useState(false);
 	const [isShaking, setIsShaking] = useState(false);
 
@@ -38,14 +37,13 @@ export const SearchBar = () => {
 	}, [apiResponse]);
 
 	useEffect(() => {
-		// Reset error state when user types
 		if (showError) setShowError(false);
 
 		if (query.length > 1 && allServices.length > 0) {
 			const filtered = allServices.filter((service) =>
 				(service.name || service.title || service.serviceName)
 					?.toLowerCase()
-					.includes(query.toLowerCase())
+					.includes(query.toLowerCase()),
 			);
 			setSuggestions(filtered);
 		} else {
@@ -60,7 +58,7 @@ export const SearchBar = () => {
 				!searchContainerRef.current.contains(e.target)
 			) {
 				setSuggestions([]);
-				setShowError(false); // Hide error if clicking outside
+				setShowError(false);
 			}
 		};
 		document.addEventListener("mousedown", handler);
@@ -76,7 +74,7 @@ export const SearchBar = () => {
 	const triggerError = () => {
 		setShowError(true);
 		setIsShaking(true);
-		// Remove shake class after animation finishes (500ms)
+
 		setTimeout(() => setIsShaking(false), 500);
 	};
 
@@ -85,13 +83,12 @@ export const SearchBar = () => {
 		if (!query.trim()) return;
 
 		const exact = allServices.find(
-			(s) => s.name.toLowerCase() === query.toLowerCase()
+			(s) => s.name.toLowerCase() === query.toLowerCase(),
 		);
 
 		if (exact) return handleSelectService(exact);
 		if (suggestions[0]) return handleSelectService(suggestions[0]);
 
-		// IF NO MATCH FOUND:
 		triggerError();
 	};
 
@@ -105,7 +102,7 @@ export const SearchBar = () => {
 			case "ArrowUp":
 				e.preventDefault();
 				setActiveIndex(
-					(i) => (i - 1 + suggestions.length) % suggestions.length
+					(i) => (i - 1 + suggestions.length) % suggestions.length,
 				);
 				break;
 			case "Enter":
