@@ -38,28 +38,6 @@ const router = createBrowserRouter([
 			},
 			{ path: "/services", element: <AllServices /> },
 			{ path: "/help", element: <HelpCenter /> },
-		],
-	},
-
-	{
-		element: <PlainLayout />,
-		children: [
-			{ path: "login", element: <SignIn /> },
-			{ path: "sign-up", element: <SignUp /> },
-			{ path: "forgot-password", element: <ForgotPassword /> },
-			{ path: "reset-password/:resetToken", element: <ResetPassword /> },
-			{ path: "/unauthorized", element: <Unauthorized /> },
-			{ path: "services/:slug", element: <ServiceDetails /> },
-			{ path: "/book/:customId", element: <BookingPage /> },
-			{
-				path: "/booking-success",
-				element: <BookingSuccess />,
-			},
-		],
-	},
-	{
-		element: <AppLayout />,
-		children: [
 			{
 				path: "/dashboard",
 				element: (
@@ -73,13 +51,9 @@ const router = createBrowserRouter([
 						element: <DashboardOverview />,
 					},
 					{
-						path: "bookings", // This renders at /dashboard/bookings
+						path: "bookings",
 						element: <AllBookings />,
 					},
-					// {
-					// 	path: "settings", // This renders at /dashboard/settings
-					// 	element: <SettingsPage />,
-					// },
 				],
 			},
 			{
@@ -97,6 +71,23 @@ const router = createBrowserRouter([
 						<SettingsPage />
 					</ProtectedRoute>
 				),
+			},
+		],
+	},
+
+	{
+		element: <PlainLayout />,
+		children: [
+			{ path: "login", element: <SignIn /> },
+			{ path: "sign-up", element: <SignUp /> },
+			{ path: "forgot-password", element: <ForgotPassword /> },
+			{ path: "reset-password/:resetToken", element: <ResetPassword /> },
+			{ path: "/unauthorized", element: <Unauthorized /> },
+			{ path: "services/:slug", element: <ServiceDetails /> },
+			{ path: "/book/:customId", element: <BookingPage /> },
+			{
+				path: "/booking-success",
+				element: <BookingSuccess />,
 			},
 		],
 	},

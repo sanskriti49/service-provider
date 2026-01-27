@@ -131,7 +131,6 @@ export default function AccountMenu({ user }) {
 
 					<div className="h-px bg-gray-100 my-1 mx-2" />
 
-					{/* === COMMON ITEMS === */}
 					<div className="p-1">
 						<MenuLink to="/settings" icon={Settings}>
 							Settings
@@ -143,7 +142,6 @@ export default function AccountMenu({ user }) {
 
 					<div className="h-px bg-gray-100 my-1 mx-2" />
 
-					{/* === LOGOUT === */}
 					<div className="p-1">
 						<Menu.Item>
 							{({ active }) => (

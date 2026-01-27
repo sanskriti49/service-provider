@@ -25,24 +25,12 @@ export default function AppLayout() {
 
 			<Navbar />
 
-			{/* 1. Removed 'min-h-screen' from main. 
-               The parent 'min-h-screen' + 'flex-grow' handles the footer positioning perfectly.
-               Adding min-h-screen here forces a scrollbar unnecessarily.
-            */}
 			<main className="flex-grow flex flex-col w-full max-w-[100vw]">
-				{/* 2. Removed mode="wait". 
-                   We don't want to wait. We want the switch to be instant.
-                */}
-				<AnimatePresence initial={false}>
+				<AnimatePresence initial={false} mode="wait">
 					<motion.div
-						key={location.pathname}
+						key={location.key}
 						initial={{ opacity: 0, y: 10 }}
 						animate={{ opacity: 1, y: 0 }}
-						/* 3. REMOVED THE EXIT PROP.
-                           This is the key fix. By removing 'exit', the old page 
-                           unmounts instantly. The new page mounts instantly 
-                           and fades in. No gap, no bouncing footer.
-                        */
 						transition={{ duration: 0.3, ease: "easeOut" }}
 						className="flex-grow w-full flex flex-col"
 					>

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { jwtDecode } from "jwt-decode";
+import { Link } from "react-router-dom"; // Added Link
 import {
 	Search,
 	MessageCircle,
@@ -13,6 +14,7 @@ import {
 	IndianRupee,
 } from "lucide-react";
 
+// --- COMPONENT: Retro Perspective Grid ---
 const RetroGrid = () => {
 	return (
 		<div className="absolute top-0 inset-x-0 h-[600px] overflow-hidden pointer-events-none select-none z-0">
@@ -39,28 +41,39 @@ const RetroGrid = () => {
 	);
 };
 
-const quickLinks = [
-	{
-		title: "Track Booking",
-		icon: <Search className="w-5 h-5 text-blue-600" />,
-		color: "bg-blue-50",
-	},
-	{
-		title: "Reset Password",
-		icon: <User className="w-5 h-5 text-violet-600" />,
-		color: "bg-violet-50",
-	},
-	{
-		title: "Payment Issue",
-		icon: <CreditCard className="w-5 h-5 text-rose-600" />,
-		color: "bg-rose-50",
-	},
-	{
-		title: "KYC Verification",
-		icon: <Shield className="w-5 h-5 text-emerald-600" />,
-		color: "bg-emerald-50",
-	},
-];
+// Updated with real routes noticed in your App.js
+const quickLinksData = {
+	common: [
+		{
+			title: "Settings",
+			icon: <User className="w-5 h-5 text-violet-600" />,
+			color: "bg-violet-50",
+			to: "/settings",
+		},
+		{
+			title: "Support Ticket",
+			icon: <CreditCard className="w-5 h-5 text-rose-600" />,
+			color: "bg-rose-50",
+			to: "/#contact",
+		},
+	],
+	customer: [
+		{
+			title: "My Bookings",
+			icon: <Search className="w-5 h-5 text-blue-600" />,
+			color: "bg-blue-50",
+			to: "/dashboard/bookings",
+		},
+	],
+	provider: [
+		{
+			title: "KYC Verification",
+			icon: <Shield className="w-5 h-5 text-emerald-600" />,
+			color: "bg-emerald-50",
+			to: "/provider/dashboard", // KYC usually lives in provider dashboard
+		},
+	],
+};
 
 const allFaqs = {
 	customer: [
@@ -71,15 +84,11 @@ const allFaqs = {
 			questions: [
 				{
 					q: "What payment methods do you accept?",
-					a: "We accept all major Indian payment methods including UPI (Google Pay, PhonePe, Paytm), Credit/Debit Cards, and Net Banking.",
+					a: "We accept all major Indian payment methods including UPI, Credit/Debit Cards, and Net Banking.",
 				},
 				{
 					q: "How do refunds work?",
-					a: "Refunds for cancelled tasks are processed within 5-7 business days to the original payment source.",
-				},
-				{
-					q: "Do I get a GST invoice?",
-					a: "Yes, a GST-compliant invoice is sent to your registered email after service completion.",
+					a: "Refunds are processed within 5-7 business days to the original payment source.",
 				},
 			],
 		},
@@ -90,28 +99,20 @@ const allFaqs = {
 			questions: [
 				{
 					q: "Are professionals verified?",
-					a: "Yes, all Pros undergo Aadhaar and criminal background checks.",
-				},
-				{
-					q: "What if something gets damaged?",
-					a: "We cover damages up to ₹10,000 via the TaskGenie Promise.",
+					a: "Yes, every professional undergoes Aadhaar-based KYC.",
 				},
 			],
 		},
 	],
 	provider: [
 		{
-			category: "Earnings",
+			category: "Earnings & Payouts",
 			icon: <Briefcase className="w-6 h-6 text-amber-600" />,
 			bg: "bg-amber-100",
 			questions: [
 				{
 					q: "When do I get paid?",
 					a: "Payouts are processed every Wednesday via NEFT/IMPS.",
-				},
-				{
-					q: "What is the commission?",
-					a: "We charge a flat 10% platform fee on the total job value.",
 				},
 			],
 		},
@@ -121,8 +122,8 @@ const allFaqs = {
 			bg: "bg-blue-100",
 			questions: [
 				{
-					q: "What documents do I need to join?",
-					a: "You will need a valid Aadhaar Card, PAN Card, and a bank account proof (Cancelled Cheque or Passbook front page) to start accepting jobs.",
+					q: "What documents are required?",
+					a: "You need a valid Aadhaar Card, PAN Card, and bank details.",
 				},
 			],
 		},
@@ -142,48 +143,48 @@ const HelpCenter = () => {
 		if (token) {
 			try {
 				const decoded = jwtDecode(token);
-
-				if (decoded.role === "customer" || decoded.role === "provider") {
+				if (decoded.role) {
 					setUserRole(decoded.role);
 					setActiveTab(decoded.role);
 				}
 			} catch (e) {
-				console.error("Invalid token", e);
-				setUserRole(null);
+				console.error("Auth error", e);
 			}
 		}
 	}, []);
 
+	const visibleQuickLinks = useMemo(() => {
+		if (userRole === "customer")
+			return [...quickLinksData.customer, ...quickLinksData.common];
+		if (userRole === "provider")
+			return [...quickLinksData.provider, ...quickLinksData.common];
+		return [
+			...quickLinksData.customer,
+			...quickLinksData.provider,
+			...quickLinksData.common,
+		];
+	}, [userRole]);
+
 	const filteredFaqs = useMemo(() => {
-		let categoriesToSearch = [];
-
-		if (userRole) {
-			categoriesToSearch = allFaqs[userRole] || [];
-		} else {
-			if (!searchQuery) {
-				categoriesToSearch = allFaqs[activeTab] || [];
-			} else {
-				categoriesToSearch = [...allFaqs.customer, ...allFaqs.provider];
-			}
-		}
-
-		if (!searchQuery) return categoriesToSearch;
-
-		const lowerQuery = searchQuery.toLowerCase();
-
-		return categoriesToSearch
+		let pool = userRole
+			? allFaqs[userRole]
+			: searchQuery
+				? [...allFaqs.customer, ...allFaqs.provider]
+				: allFaqs[activeTab];
+		if (!searchQuery) return pool;
+		const q = searchQuery.toLowerCase();
+		return pool
 			.map((cat) => ({
 				...cat,
 				questions: cat.questions.filter(
-					(q) =>
-						q.q.toLowerCase().includes(lowerQuery) ||
-						q.a.toLowerCase().includes(lowerQuery),
+					(item) =>
+						item.q.toLowerCase().includes(q) ||
+						item.a.toLowerCase().includes(q),
 				),
 			}))
 			.filter(
 				(cat) =>
-					cat.questions.length > 0 ||
-					cat.category.toLowerCase().includes(lowerQuery),
+					cat.questions.length > 0 || cat.category.toLowerCase().includes(q),
 			);
 	}, [activeTab, searchQuery, userRole]);
 
@@ -191,20 +192,15 @@ const HelpCenter = () => {
 	const rightColumnFaqs = filteredFaqs.filter((_, i) => i % 2 !== 0);
 
 	return (
-		<div className="relative min-h-screen bg-white text-slate-900 selection:bg-violet-100 pt-8">
+		<div className="relative min-h-screen bg-white text-slate-900 selection:bg-violet-600 pt-8">
 			<RetroGrid />
-
-			<div className="max-w-5xl mx-auto px-4 pt-22 pb-20 relative z-10">
+			<div className="max-w-5xl mx-auto px-4 pt-20 pb-20 relative z-10">
 				{/* --- HERO --- */}
 				<div className="text-center mb-10">
 					<motion.div
 						initial={{ opacity: 0, y: 10 }}
 						animate={{ opacity: 1, y: 0 }}
-						className={`inline-flex items-center gap-2 px-3 py-1 rounded-full backdrop-blur-sm border shadow-sm mb-6 ${
-							isSupportOnline
-								? "bg-white/80 border-violet-100"
-								: "bg-slate-50/80 border-slate-200"
-						}`}
+						className={`inline-flex items-center gap-2 px-3 py-1 rounded-full backdrop-blur-sm border shadow-sm mb-6 ${isSupportOnline ? "bg-white/80 border-violet-100" : "bg-slate-50/80 border-slate-200"}`}
 					>
 						<span className="relative flex h-2 w-2">
 							{isSupportOnline && (
@@ -231,7 +227,6 @@ const HelpCenter = () => {
 						</span>
 					</h1>
 
-					{/* Search Bar */}
 					<div className="relative max-w-2xl mx-auto">
 						<div className="relative flex items-center bg-white shadow-xl shadow-slate-200/50 rounded-2xl p-2 border border-slate-100">
 							<div className="pl-4 text-slate-400">
@@ -253,32 +248,30 @@ const HelpCenter = () => {
 				</div>
 
 				{!searchQuery && (
-					<motion.div
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						exit={{ opacity: 0 }}
-					>
-						{/* Quick Actions (Always visible) */}
-						<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
-							{quickLinks.map((link, idx) => (
-								<motion.button
-									key={idx}
-									whileHover={{ y: -4 }}
-									className="mackinac cursor-pointer flex flex-col items-center justify-center gap-3 p-6 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group"
-								>
-									<div
-										className={`p-4 rounded-2xl ${link.color} group-hover:scale-110 transition-transform duration-300`}
+					<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+						{/* FIX: Dynamic grid column count based on links available */}
+						<div
+							className={`grid gap-4 mb-16 ${visibleQuickLinks.length === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 md:grid-cols-4"}`}
+						>
+							{visibleQuickLinks.map((link, idx) => (
+								<Link to={link.to} key={idx}>
+									<motion.div
+										whileHover={{ y: -4 }}
+										className="mackinac cursor-pointer flex flex-col items-center justify-center gap-3 p-6 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group h-full text-center"
 									>
-										{link.icon}
-									</div>
-									<span className="font-semibold text-slate-700">
-										{link.title}
-									</span>
-								</motion.button>
+										<div
+											className={`p-4 rounded-2xl ${link.color} group-hover:scale-110 transition-transform duration-300`}
+										>
+											{link.icon}
+										</div>
+										<span className="font-semibold text-slate-700">
+											{link.title}
+										</span>
+									</motion.div>
+								</Link>
 							))}
 						</div>
 
-						{/* --- TABS (ONLY SHOW IF GUEST) --- */}
 						{!userRole && (
 							<div className="flex justify-center mb-12">
 								<div className="bg-white/80 backdrop-blur-md p-1.5 rounded-2xl inline-flex border border-slate-200/50 shadow-sm">
@@ -294,7 +287,7 @@ const HelpCenter = () => {
 													className="absolute inset-0 bg-white shadow-md rounded-xl border border-slate-100"
 												/>
 											)}
-											<span className="inter cursor-pointer relative z-20 capitalize flex items-center gap-2">
+											<span className="inter relative z-20 capitalize flex items-center gap-2">
 												{tab === "customer" ? (
 													<User size={14} />
 												) : (
@@ -307,40 +300,10 @@ const HelpCenter = () => {
 								</div>
 							</div>
 						)}
-
-						{/* If logged in, show a subtle header instead of tabs */}
-						{userRole && (
-							<div className="text-center mb-12">
-								<span className="inter px-4 py-2 bg-violet-50 text-violet-700 rounded-full text-sm font-medium border border-violet-100">
-									Showing FAQs for{" "}
-									{userRole === "customer" ? "Customers" : "Providers"}
-								</span>
-							</div>
-						)}
 					</motion.div>
 				)}
 
-				{searchQuery && (
-					<div className="mb-8 text-center">
-						{filteredFaqs.length > 0 ? (
-							<p className="text-slate-500 font-medium">
-								Matches for "
-								<span className="text-slate-900">{searchQuery}</span>"
-							</p>
-						) : (
-							<div className="py-12">
-								<p className="text-slate-500 text-lg">No answers found.</p>
-								<button
-									onClick={() => setSearchQuery("")}
-									className="inter text-violet-600 font-bold hover:underline mt-2"
-								>
-									Clear Search
-								</button>
-							</div>
-						)}
-					</div>
-				)}
-
+				{/* FAQ Results */}
 				<div className="flex flex-col md:flex-row gap-8 mb-24 items-start">
 					<div className="flex-1 flex flex-col gap-8 w-full">
 						{leftColumnFaqs.map((cat, idx) => (
@@ -354,28 +317,30 @@ const HelpCenter = () => {
 					</div>
 				</div>
 
-				{/* --- FOOTER --- */}
-				<div className="mackinac bg-slate-900 rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden text-center md:text-left">
+				{/* --- HUMAN SUPPORT --- */}
+				<div className="mackinac bg-slate-900 rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden text-center md:text-left shadow-2xl">
 					<div className="absolute top-0 right-0 w-64 h-64 bg-violet-600 rounded-full blur-[80px] opacity-20" />
 					<div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
 						<div>
 							<h3 className="text-3xl font-bold text-white mb-4">
 								Still stuck?
 							</h3>
+							<p className="bricolage-grotesque text-slate-400 text-lg mb-8 max-w-md">
+								Our support team typically replies in under 2 minutes.
+							</p>
 							<div className="flex flex-col sm:flex-row gap-4">
 								<a
 									href="https://wa.me/916306642481"
 									target="_blank"
-									rel="noopener noreferrer"
-									className="flex items-center justify-center gap-2 bg-white text-slate-900 px-8 py-4 rounded-xl font-bold hover:bg-violet-100 transition-colors"
+									className="flex items-center justify-center gap-2 bg-white text-slate-900 px-8 py-4 rounded-xl font-bold hover:bg-violet-100 transition-all"
 								>
-									<MessageCircle className="w-5 h-5" /> Chat on WhatsApp
+									<MessageCircle className="w-5 h-5" /> WhatsApp
 								</a>
 								<a
 									href="mailto:sanskriti0409@gmail.com"
-									className="flex items-center justify-center gap-2 bg-slate-800 text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-700 transition-colors"
+									className="flex items-center justify-center gap-2 bg-slate-800 text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-700 transition-all"
 								>
-									<Mail className="w-5 h-5" /> Email Us
+									<Mail className="w-5 h-5" /> Email
 								</a>
 							</div>
 						</div>
@@ -393,8 +358,8 @@ const FaqCategoryCard = ({ category }) => (
 			<h3 className="text-xl font-bold text-slate-900">{category.category}</h3>
 		</div>
 		<div className="divide-y divide-slate-50">
-			{category.questions.map((q, qIdx) => (
-				<AccordionItem key={qIdx} question={q.q} answer={q.a} />
+			{category.questions.map((q, idx) => (
+				<AccordionItem key={idx} question={q.q} answer={q.a} />
 			))}
 		</div>
 	</div>
@@ -408,15 +373,15 @@ const AccordionItem = ({ question, answer }) => {
 		>
 			<button
 				onClick={() => setIsOpen(!isOpen)}
-				className="w-full flex items-center justify-between text-left p-6 hover:bg-slate-50/50 transition-colors group"
+				className="w-full flex items-center justify-between text-left p-6 hover:bg-slate-50/50 group"
 			>
 				<span
-					className={`mackinac font-semibold text-lg transition-colors duration-300 ${isOpen ? "text-violet-700" : "text-slate-700"}`}
+					className={`mackinac font-semibold text-lg transition-colors ${isOpen ? "text-violet-700" : "text-slate-700 group-hover:text-slate-900"}`}
 				>
 					{question}
 				</span>
 				<ChevronDown
-					className={`w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180 text-violet-600" : "text-slate-400"}`}
+					className={`w-5 h-5 transition-transform ${isOpen ? "rotate-180 text-violet-600" : "text-slate-400"}`}
 				/>
 			</button>
 			<AnimatePresence>
@@ -427,7 +392,7 @@ const AccordionItem = ({ question, answer }) => {
 						exit={{ height: 0, opacity: 0 }}
 						className="overflow-hidden"
 					>
-						<div className="bricolage-grotesque px-6 pb-6 text-slate-500 leading-relaxed">
+						<div className="bricolage-grotesque px-6 pb-6 text-slate-500 leading-relaxed italic">
 							{answer}
 						</div>
 					</motion.div>
