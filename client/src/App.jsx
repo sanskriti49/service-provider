@@ -1,12 +1,10 @@
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
-// Layouts and Auth (Keep these static as they are needed immediately)
 import AppLayout from "./layouts/AppLayout";
 import PlainLayout from "./layouts/PlainLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
 
-// Lazy Loaded Pages
 const Home = lazy(() => import("./pages/Home"));
 const SignIn = lazy(() => import("./pages/SignIn"));
 const SignUp = lazy(() => import("./pages/SignUp"));
@@ -34,7 +32,6 @@ const DashboardOverview = lazy(
 );
 const AllBookings = lazy(() => import("./dashboards/customer/AllBookings"));
 
-// A simple fallback component while the page loads
 const PageLoader = () => (
 	<div className="flex h-screen w-full items-center justify-center bg-slate-50">
 		<div className="h-10 w-10 animate-spin rounded-full border-4 border-violet-600 border-t-transparent"></div>
