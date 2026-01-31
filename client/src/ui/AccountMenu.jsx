@@ -87,7 +87,6 @@ export default function AccountMenu({ user }) {
 						</div>
 					</div>
 
-					{/* === CUSTOMER MENU ITEMS === */}
 					{!isProvider && (
 						<div className="p-1">
 							<MenuLink to="/dashboard" icon={LayoutDashboard}>
@@ -96,7 +95,7 @@ export default function AccountMenu({ user }) {
 							<MenuLink to="/profile" icon={UserCircle}>
 								Profile
 							</MenuLink>
-							<MenuLink to="/bookings" icon={History}>
+							<MenuLink to="/dashboard/bookings" icon={History}>
 								My Bookings
 							</MenuLink>
 							<MenuLink to="/saved" icon={Heart}>

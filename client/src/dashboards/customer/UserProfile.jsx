@@ -25,6 +25,7 @@ import api from "../../api/axiosInstance";
 
 const SERIF_FONT = { fontFamily: "P22Mackinac, Cambria, sans-serif" };
 const TEXT_MAIN = "text-[#281950]";
+const TEXT_MUTED = "text-[#281950]/60";
 
 const BentoCard = ({ children, className, delay = 0 }) => (
 	<motion.div
@@ -41,10 +42,10 @@ const BentoCard = ({ children, className, delay = 0 }) => (
 
 const StatPill = ({ icon: Icon, label, value, color, delay }) => {
 	const colorMap = {
-		blue: "bg-blue-50 text-blue-600 border-blue-100",
-		emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-		amber: "bg-amber-50 text-amber-600 border-amber-100",
-		rose: "bg-rose-50 text-rose-600 border-rose-100",
+		blue: "bg-blue-100/50 text-blue-700 border-blue-200/50",
+		emerald: "bg-emerald-100/50 text-emerald-700 border-emerald-200/50",
+		amber: "bg-amber-100/50 text-amber-700 border-amber-200/50",
+		rose: "bg-fuchsia-100/50 text-fuchsia-700 border-fuchsia-200/50",
 	};
 	const activeColor = colorMap[color] || colorMap.blue;
 
@@ -53,16 +54,22 @@ const StatPill = ({ icon: Icon, label, value, color, delay }) => {
 			initial={{ opacity: 0, x: -10 }}
 			animate={{ opacity: 1, x: 0 }}
 			transition={{ delay }}
-			className="flex items-center gap-3 p-3 pr-5 bg-white/50 border border-white rounded-2xl cursor-default transition-all duration-300 hover:scale-105 hover:bg-white hover:shadow-lg"
+			className="bg-violet-200/30 flex items-center gap-3 p-3 pr-5  backdrop-blur-md border border-violet-500/20 rounded-2xl cursor-default transition-all duration-300 hover:scale-[1.03] hover:bg-violet-400/20 hover:shadow-lg hover:shadow-violet-100/50"
 		>
-			<div className={`p-3 rounded-2xl ${activeColor}`}>
-				<Icon size={20} strokeWidth={2.5} />
+			<div
+				className={`p-3 rounded-xl border ${activeColor} transition-colors duration-300`}
+			>
+				<Icon size={18} strokeWidth={2.5} />
 			</div>
-			<div>
-				<p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+			<div className="flex flex-col">
+				<p
+					className={`text-[10px] ${TEXT_MUTED} font-black uppercase tracking-widest`}
+				>
 					{label}
 				</p>
-				<p className={`text-sm font-bold ${TEXT_MAIN}`}>{value}</p>
+				<p className={`text-base font-bold ${TEXT_MAIN} tracking-tight`}>
+					{value}
+				</p>
 			</div>
 		</motion.div>
 	);
@@ -82,8 +89,12 @@ const CustomMenuItem = ({
 		animate={{ opacity: 1, x: 0 }}
 		transition={{ delay }}
 		onClick={onClick}
-		className={`cursor-pointer w-full group flex items-center justify-between p-3 rounded-2xl transition-all duration-200 border border-transparent
-        ${isDanger ? "hover:bg-red-50 hover:border-red-100" : "hover:bg-white hover:shadow-md hover:shadow-violet-100/20 hover:border-white/50"}`}
+		className={`cursor-pointer w-full group/item flex items-center justify-between p-3 rounded-2xl transition-all duration-300 border border-transparent
+        ${
+					isDanger
+						? "hover:bg-red-50 hover:border-red-100"
+						: "hover:bg-violet-400/20 hover:border-violet-500/30"
+				}`}
 	>
 		<div className="flex items-center gap-4">
 			<div
@@ -104,14 +115,26 @@ const CustomMenuItem = ({
 				</p>
 			</div>
 		</div>
+
 		<ChevronRight
 			size={18}
-			className={`transition-opacity duration-300 ${isDanger ? "text-red-400" : "text-violet-300"} opacity-0 group-hover:opacity-100`}
+			className={`
+                transition-all duration-300 transform
+                opacity-0 group-hover/item:opacity-100 
+                
+                ${isDanger ? "text-red-400" : "text-violet-300"} 
+
+                ${
+									isDanger
+										? "group-hover/item:text-red-600"
+										: "group-hover/item:text-violet-600"
+								}
+                
+                group-hover/item:translate-x-1
+            `}
 		/>
 	</motion.button>
 );
-
-// --- Main Component ---
 
 export default function UserProfile() {
 	const navigate = useNavigate();
@@ -159,7 +182,6 @@ export default function UserProfile() {
 
 	return (
 		<div className="min-h-screen relative overflow-hidden bricolage-grotesque mt-20 pb-20">
-			{/* Optimized Background */}
 			<div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
 				<div className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-300/30 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/4" />
 				<div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-fuchsia-300/20 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/4" />
@@ -248,18 +270,17 @@ export default function UserProfile() {
 									</div>
 								</div>
 								<div className="flex flex-wrap justify-center md:justify-start gap-3">
-									<div className="px-4 py-2 rounded-full bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest border border-amber-200/50 flex items-center gap-2">
+									<div className="px-4 py-2 rounded-full bg-amber-50 text-amber-700 text-[11px] font-black uppercase tracking-widest border border-amber-200/50 flex items-center gap-2">
 										<Star size={12} className="fill-amber-400 text-amber-400" />{" "}
 										Gold Member
 									</div>
-									<div className="px-4 py-2 rounded-full bg-violet-50 text-violet-700 text-[10px] font-black uppercase tracking-widest border border-violet-200/50">
+									<div className="px-4 py-2 rounded-full bg-violet-50 text-violet-700 text-[11px] font-black uppercase tracking-widest border border-violet-200/50">
 										Verified Pro
 									</div>
 								</div>
 							</div>
 						</BentoCard>
 
-						{/* Stats */}
 						<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 							<StatPill
 								icon={Clock}
@@ -293,20 +314,32 @@ export default function UserProfile() {
 					</div>
 
 					<div className="md:col-span-4 h-full">
-						<BentoCard className="h-full bg-[#281950] border-0 text-[#281950] p-10 flex flex-col justify-center gap-6">
-							<div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/40 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2" />
-							<Zap
-								size={40}
-								className="text-yellow-400 fill-yellow-400 relative z-10"
-							/>
-							<div className="relative z-10">
-								<h3 className="text-3xl font-bold mb-3" style={SERIF_FONT}>
+						<BentoCard
+							delay={0.2}
+							className="h-full bg-[#281950] text-[#281950] border-0 flex flex-col justify-between overflow-hidden relative"
+						>
+							<div className="absolute top-0 right-0 w-64 h-64 bg-violet-600 rounded-full blur-[80px] opacity-40 translate-x-1/3 -translate-y-1/3" />
+
+							<div className="absolute bottom-0 left-0 w-48 h-48 bg-fuchsia-300 rounded-full blur-[60px] opacity-30 -translate-x-1/3 translate-y-1/3" />
+
+							<div className="p-8 relative z-10 flex flex-col h-full justify-center">
+								<div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10 mb-6">
+									<Zap className="text-yellow-300 fill-yellow-300" size={24} />
+								</div>
+
+								<h3
+									className="text-[#281950] text-2xl font-bold mb-2"
+									style={SERIF_FONT}
+								>
 									Upgrade to Genie+
 								</h3>
-								<p className="text-[#281950] text-sm leading-relaxed mb-8">
-									Priority support and 0% service fees for your projects.
+
+								<p className="text-[#281950] text-sm leading-relaxed mb-6">
+									Unlock priority support, 0% service fees, and exclusive
+									premium themes.
 								</p>
-								<button className="cursor-pointer w-full py-4 bg-violet-100/90 text-[#281950] rounded-2xl font-black hover:scale-[1.03] active:scale-95 transition-all shadow-2xl shadow-white/10">
+
+								<button className="cursor-pointer w-full py-4 bg-violet-600/20 border-violet-600/40 text-[#281950] rounded-2xl font-black hover:scale-[1.03] active:scale-95 transition-all shadow-2xl shadow-white/10">
 									Try Free Trial
 								</button>
 							</div>
@@ -315,7 +348,7 @@ export default function UserProfile() {
 
 					<div className="md:col-span-12 grid md:grid-cols-3 gap-6 mt-2">
 						<BentoCard delay={0.3} className="p-5">
-							<h3 className="text-xs font-black uppercase tracking-widest mb-4 pl-2 text-gray-400">
+							<h3 className="text-xs font-black uppercase tracking-widest mb-4 pl-2 text-slate-600">
 								Account
 							</h3>
 							<div className="space-y-1">
@@ -344,7 +377,7 @@ export default function UserProfile() {
 						</BentoCard>
 
 						<BentoCard delay={0.4} className="p-5">
-							<h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 pl-2">
+							<h3 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-4 pl-2">
 								Community
 							</h3>
 							<div className="space-y-1">

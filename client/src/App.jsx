@@ -55,7 +55,9 @@ const router = createBrowserRouter([
 				path: "/dashboard",
 				element: (
 					<ProtectedRoute allowed={["customer"]}>
-						<CustomerDashboard />
+						<Suspense fallback={<PageLoader />}>
+							<CustomerDashboard />
+						</Suspense>
 					</ProtectedRoute>
 				),
 				children: [
