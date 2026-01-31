@@ -6,12 +6,12 @@ const popularSearches = ["Plumbing", "House Cleaning", "Painting", "Haircut"];
 
 export const HeroSection = () => {
 	return (
-		<main className="relative w-full pb-36 md:-mt-38 md:pb-68 lg:-mt-40 lg:pb-105 xl:-mt-40 xl:pb-75  overflow-hidden">
-			<div className="absolute inset-0 w-full h-full mt-35 md:mt-50 lg:mt-70 xl:mt-40">
+		<main className="relative w-full pb-36 mt-10 md:-mt-38 md:pb-68 lg:-mt-40 lg:pb-105 xl:-mt-40 xl:pb-75  overflow-hidden">
+			{" "}
+			<div className="absolute inset-0 w-full h-full mt-32 md:mt-50 lg:mt-70 xl:mt-40">
 				<BackgroundPattern />
 			</div>
-
-			<div className="relative z-10 mt-80 max-w-4xl mx-auto px-4 sm:px-6">
+			<div className="relative z-10 mt-35 md:mt-90 lg:mt-90 xl:mt-80 2xl:mt-80 max-w-4xl mx-auto px-4 sm:px-6">
 				<div className="flex flex-col items-center text-center bricolage-grotesque">
 					<p className="font-medium text-violet-800/80  text-sm md:text-base tracking-wide">
 						"Your Wish, Our Command" —{" "}
@@ -19,7 +19,7 @@ export const HeroSection = () => {
 					</p>
 
 					<h1
-						className="text-4xl sm:text-4xl md:text-5xl lg:text-5xl text-[#281950] font-medium leading-[1.1] tracking-tight mb-6"
+						className="text-4xl sm:text-4xl md:text-4xl lg:text-5xl text-[#281950] font-medium leading-[1.1] tracking-tight mb-2"
 						style={{ fontFamily: "P22Mackinac, Cambria, sans-serif" }}
 					>
 						From burst pipes to makeovers,
@@ -28,7 +28,7 @@ export const HeroSection = () => {
 						</div>
 					</h1>
 
-					<p className="text-[#281950]/80 text-base sm:text-lg md:text-xl mt-4 mb-10 max-w-lg md:max-w-2xl mx-auto leading-relaxed">
+					<p className="text-[#281950]/80 text-base sm:text-lg md:text-lg  lg:text-xl xl:lg:text-xl mt-4 mb-10 max-w-lg md:max-w-2xl mx-auto leading-relaxed">
 						Need a handyman or a hair stylist? Our verified pros are just a tap
 						away. Fast, friendly, and always reliable.
 					</p>

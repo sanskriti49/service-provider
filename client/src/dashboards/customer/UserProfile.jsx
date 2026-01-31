@@ -18,6 +18,7 @@ import {
 	Moon,
 	Zap,
 	MessageSquare,
+	ZapIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -275,28 +276,28 @@ export default function UserProfile() {
 							<StatPill
 								icon={Clock}
 								label="Bookings"
-								value="12"
+								value="0"
 								color="bg-blue-500 text-blue-600"
 								delay={0.1}
 							/>
 							<StatPill
 								icon={Wallet}
 								label="Spent"
-								value="₹4.2k"
+								value="₹0"
 								color="bg-emerald-500 text-emerald-600"
 								delay={0.2}
 							/>
 							<StatPill
 								icon={Star}
 								label="Rating"
-								value="4.8"
+								value="0"
 								color="bg-amber-500 text-amber-600"
 								delay={0.3}
 							/>
 							<StatPill
-								icon={Heart}
-								label="Loved"
-								value="5"
+								icon={ZapIcon}
+								label="Recents"
+								value="0"
 								color="bg-rose-500 text-rose-600"
 								delay={0.4}
 							/>

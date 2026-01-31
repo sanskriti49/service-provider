@@ -1,41 +1,57 @@
-import {
-	createBrowserRouter,
-	RouterProvider,
-	useLocation,
-} from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+
+// Layouts and Auth (Keep these static as they are needed immediately)
 import AppLayout from "./layouts/AppLayout";
 import PlainLayout from "./layouts/PlainLayout";
-
-import Home from "./pages/Home";
-import SignIn from "./pages/SignIn";
-import SignUp from "./pages/SignUp";
-import BookingPage from "./pages/BookingPage";
-import ServiceDetails from "./pages/ServiceDetails";
 import ProtectedRoute from "./auth/ProtectedRoute";
-import CustomerDashboard from "./dashboards/customer/CustomerDashboard";
-import ProviderDashboard from "./dashboards/provider/ProviderDashboard";
-import ChooseRole from "./pages/ChooseRole";
-import AllServices from "./pages/AllServices";
-import BookingSuccess from "./pages/BookingSuccess";
-import Unauthorized from "./pages/Unauthorized";
-import SettingsPage from "./pages/SettingsPage";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import UserProfile from "./dashboards/customer/UserProfile";
-import DashboardOverview from "./dashboards/customer/DashboardOverview";
-import AllBookings from "./dashboards/customer/AllBookings";
-import HelpCenter from "./pages/HelpCenter";
+
+// Lazy Loaded Pages
+const Home = lazy(() => import("./pages/Home"));
+const SignIn = lazy(() => import("./pages/SignIn"));
+const SignUp = lazy(() => import("./pages/SignUp"));
+const BookingPage = lazy(() => import("./pages/BookingPage"));
+const ServiceDetails = lazy(() => import("./pages/ServiceDetails"));
+const ChooseRole = lazy(() => import("./pages/ChooseRole"));
+const AllServices = lazy(() => import("./pages/AllServices"));
+const BookingSuccess = lazy(() => import("./pages/BookingSuccess"));
+const Unauthorized = lazy(() => import("./pages/Unauthorized"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+
+// Dashboards
+const CustomerDashboard = lazy(
+	() => import("./dashboards/customer/CustomerDashboard"),
+);
+const ProviderDashboard = lazy(
+	() => import("./dashboards/provider/ProviderDashboard"),
+);
+const UserProfile = lazy(() => import("./dashboards/customer/UserProfile"));
+const DashboardOverview = lazy(
+	() => import("./dashboards/customer/DashboardOverview"),
+);
+const AllBookings = lazy(() => import("./dashboards/customer/AllBookings"));
+
+// A simple fallback component while the page loads
+const PageLoader = () => (
+	<div className="flex h-screen w-full items-center justify-center bg-slate-50">
+		<div className="h-10 w-10 animate-spin rounded-full border-4 border-violet-600 border-t-transparent"></div>
+	</div>
+);
 
 const router = createBrowserRouter([
 	{
 		path: "/",
-		element: <AppLayout />,
+		element: (
+			<Suspense fallback={<PageLoader />}>
+				<AppLayout />
+			</Suspense>
+		),
 		children: [
 			{ path: "/", element: <Home /> },
-			{
-				path: "/choose-role",
-				element: <ChooseRole />,
-			},
+			{ path: "/choose-role", element: <ChooseRole /> },
 			{ path: "/services", element: <AllServices /> },
 			{ path: "/help", element: <HelpCenter /> },
 			{
@@ -46,14 +62,8 @@ const router = createBrowserRouter([
 					</ProtectedRoute>
 				),
 				children: [
-					{
-						index: true,
-						element: <DashboardOverview />,
-					},
-					{
-						path: "bookings",
-						element: <AllBookings />,
-					},
+					{ index: true, element: <DashboardOverview /> },
+					{ path: "bookings", element: <AllBookings /> },
 				],
 			},
 			{
@@ -74,9 +84,12 @@ const router = createBrowserRouter([
 			},
 		],
 	},
-
 	{
-		element: <PlainLayout />,
+		element: (
+			<Suspense fallback={<PageLoader />}>
+				<PlainLayout />
+			</Suspense>
+		),
 		children: [
 			{ path: "login", element: <SignIn /> },
 			{ path: "sign-up", element: <SignUp /> },
@@ -85,18 +98,17 @@ const router = createBrowserRouter([
 			{ path: "/unauthorized", element: <Unauthorized /> },
 			{ path: "services/:slug", element: <ServiceDetails /> },
 			{ path: "/book/:customId", element: <BookingPage /> },
-			{
-				path: "/booking-success",
-				element: <BookingSuccess />,
-			},
+			{ path: "/booking-success", element: <BookingSuccess /> },
 		],
 	},
 	{
 		path: "/provider/dashboard",
 		element: (
-			<ProtectedRoute allowed={["provider"]}>
-				<ProviderDashboard />
-			</ProtectedRoute>
+			<Suspense fallback={<PageLoader />}>
+				<ProtectedRoute allowed={["provider"]}>
+					<ProviderDashboard />
+				</ProtectedRoute>
+			</Suspense>
 		),
 	},
 ]);

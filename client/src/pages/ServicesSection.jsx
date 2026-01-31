@@ -241,7 +241,7 @@ const ServicesSection = () => {
 				<div className="text-center mt-8 relative z-10">
 					<Link to="/services">
 						<button className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-slate-900 px-8 py-3 text-white transition-all hover:bg-slate-800 hover:scale-105 active:scale-95 shadow-xl shadow-slate-200">
-							<span className="font-medium">View All Categories</span>
+							<span className="font-medium inter">View All Categories</span>
 							<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
 						</button>
 					</Link>
