@@ -26,7 +26,7 @@ export default function BookingSuccess() {
 	const { booking } = state;
 
 	const [address, setAddress] = useState(
-		state.address || booking.address || ""
+		state.address || booking.address || "",
 	);
 	const [isEditing, setIsEditing] = useState(false);
 	const [tempAddress, setTempAddress] = useState(address);
@@ -77,7 +77,7 @@ export default function BookingSuccess() {
 						Authorization: `Bearer ${token}`,
 					},
 					body: JSON.stringify({ address: tempAddress }),
-				}
+				},
 			);
 
 			const data = await res.json();

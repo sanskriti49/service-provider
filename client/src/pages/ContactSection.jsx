@@ -323,7 +323,6 @@ export default function ContactSection() {
 							<div className="h-px bg-gray-300 flex-1 opacity-50" />
 						</div>
 
-						{/* --- HELP CENTER BLOCK (Moved here) --- */}
 						<div className="w-full bg-white/60 backdrop-blur-md border border-white/50 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 relative z-20">
 							<div className="flex items-start gap-4">
 								<div className="p-3 bg-violet-100 rounded-xl shrink-0">

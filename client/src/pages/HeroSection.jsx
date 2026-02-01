@@ -2,7 +2,7 @@ import BackgroundPattern from "../ui/BackgroundPattern";
 import { SearchBar } from "../ui/SearchBar";
 import { Link } from "react-router-dom";
 
-const popularSearches = ["Plumbing", "House Cleaning", "Painting", "Haircut"];
+const popularSearches = ["Plumbing", "House Cleaning", "Laundry", "Haircut"];
 
 export const HeroSection = () => {
 	return (

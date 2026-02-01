@@ -1,4 +1,3 @@
-// src/Home.jsx
 import { HeroSection } from "./HeroSection";
 import ServicesSection from "./ServicesSection";
 import HowItWorksSection from "./HowItWorksSection";

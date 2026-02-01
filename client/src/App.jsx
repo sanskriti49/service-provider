@@ -4,6 +4,8 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import PlainLayout from "./layouts/PlainLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
+import { Toaster } from "sonner";
+import PageLoader from "./ui/PageLoader";
 
 const Home = lazy(() => import("./pages/Home"));
 const SignIn = lazy(() => import("./pages/SignIn"));
@@ -31,12 +33,6 @@ const DashboardOverview = lazy(
 	() => import("./dashboards/customer/DashboardOverview"),
 );
 const AllBookings = lazy(() => import("./dashboards/customer/AllBookings"));
-
-const PageLoader = () => (
-	<div className="flex h-screen w-full items-center justify-center bg-slate-50">
-		<div className="h-10 w-10 animate-spin rounded-full border-4 border-violet-600 border-t-transparent"></div>
-	</div>
-);
 
 const router = createBrowserRouter([
 	{
@@ -113,5 +109,10 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
-	return <RouterProvider router={router} />;
+	return (
+		<>
+			<Toaster richColors position="top-center" />
+			<RouterProvider router={router} />
+		</>
+	);
 }

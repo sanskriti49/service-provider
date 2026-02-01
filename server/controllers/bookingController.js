@@ -1,5 +1,12 @@
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
 const db = require("../config/db");
 const sendEmail = require("../utils/sendEmail");
+
+const razorpay = new Razorpay({
+	key_id: process.env.RAZORPAY_KEY_ID,
+	key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 BigInt.prototype.toJSON = function () {
 	return this.toString();
@@ -8,28 +15,32 @@ BigInt.prototype.toJSON = function () {
 const TIME_LIMIT_MINUTES = 10;
 
 async function createBooking(req, res, next) {
-	console.log("--- New Booking Request ---");
-	let { provider_id, service_id, date, start_time, end_time, address } =
-		req.body;
+	let {
+		provider_id,
+		service_id,
+		date,
+		start_time,
+		end_time,
+		address,
+		payment_method,
+	} = req.body;
 
 	if (!provider_id || !service_id || !date || !start_time) {
 		return res.status(400).json({ message: "Missing fields" });
 	}
 
+	const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit
+
+	// default end_time logic (1 hour duration if not provided)
 	if (!end_time || end_time === start_time) {
 		const [hours, minutes] = start_time.split(":").map(Number);
 		const dateObj = new Date();
-		dateObj.setHours(hours, minutes);
-		dateObj.setHours(dateObj.getHours() + 1);
-
-		const newH = String(dateObj.getHours()).padStart(2, "0");
-		const newM = String(dateObj.getMinutes()).padStart(2, "0");
-		end_time = `${newH}:${newM}`;
+		dateObj.setHours(hours + 1, minutes);
+		end_time = `${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`;
 	}
 
 	const user_id = req.user ? req.user.id : null;
 	const cleanDate = date.toString().substring(0, 10);
-
 	const client = await db.connect();
 
 	try {
@@ -39,34 +50,25 @@ async function createBooking(req, res, next) {
 			"SELECT price FROM providers WHERE user_id = $1",
 			[provider_id],
 		);
+		if (priceRes.rows.length === 0) throw new Error("Provider not found");
+		const finalPrice = priceRes.rows[0].price || 0;
 
-		if (priceRes.rows.length === 0) {
-			throw new Error(`Provider not found with User ID: ${provider_id}`);
+		let payment_status = "pending";
+		let razorpay_order_id = null;
+
+		if (payment_method === "online") {
+			const order = await razorpay.orders.create({
+				amount: finalPrice * 100,
+				currency: "INR",
+				receipt: `receipt_${Date.now()}`,
+			});
+			razorpay_order_id = order.id;
 		}
 
-		const providerPrice = priceRes.rows[0].price;
-
-		if (!providerPrice && providerPrice !== 0) {
-			console.warn("Warning: This provider has no price set. Defaulting to 0.");
-		}
-
-		const finalPrice = providerPrice || 0;
-
-		const conflictQ = `
-            SELECT 1 FROM bookings
-            WHERE provider_id=$1
-            AND date=$2::date
-            AND status='booked'
-            AND NOT (end_time <= $3 OR start_time >= $4)
-            LIMIT 1
-        `;
-
-		const conflict = await client.query(conflictQ, [
-			provider_id,
-			cleanDate,
-			start_time,
-			end_time,
-		]);
+		const conflict = await client.query(
+			`SELECT 1 FROM bookings WHERE provider_id=$1 AND date=$2::date AND status='booked' AND NOT (end_time <= $3 OR start_time >= $4) LIMIT 1`,
+			[provider_id, cleanDate, start_time, end_time],
+		);
 
 		if (conflict.rowCount > 0) {
 			await client.query("ROLLBACK");
@@ -76,12 +78,9 @@ async function createBooking(req, res, next) {
 		const insertQ = `
             INSERT INTO bookings (
                 booking_id, provider_id, user_id, service_id, date, start_time, end_time, 
-                status, address, price
+                status, address, price, payment_method, payment_status, razorpay_order_id, otp
             )
-            VALUES (
-                gen_random_uuid(), $1, $2, $3, $4::date, $5, $6, 
-                'booked', $7, $8
-            )
+            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'booked', $7, $8, $9, $10, $11, $12)
             RETURNING *;
         `;
 
@@ -94,72 +93,18 @@ async function createBooking(req, res, next) {
 			end_time,
 			address,
 			finalPrice,
+			payment_method,
+			payment_status,
+			razorpay_order_id,
+			otp,
 		]);
 
-		const booking = r.rows[0];
-
-		const namesQ = `
-            SELECT
-            (SELECT name FROM users WHERE id=$1) as provider_name,
-            (SELECT name FROM services WHERE id=$2) as service_name
-        `;
-		const namesRes = await client.query(namesQ, [provider_id, service_id]);
-
-		const providerName = namesRes.rows[0]?.provider_name || "the Provider";
-		const serviceName = namesRes.rows[0]?.service_name || "Service";
-
 		await client.query("COMMIT");
-
-		console.log("✅ Booking successful. ID:", booking.booking_id);
-
-		const bookingDate = new Date(date).toLocaleDateString("en-IN", {
-			timeZone: "Asia/Kolkata",
-			weekday: "long",
-			year: "numeric",
-			month: "long",
-			day: "numeric",
-		});
-		const [hours, minutes] = start_time.split(":");
-		const timeObj = new Date();
-		timeObj.setHours(hours, minutes);
-
-		const formattedTime = timeObj.toLocaleTimeString("en-IN", {
-			hour: "numeric",
-			minute: "2-digit",
-			hour12: true,
-		});
-		const emailMessage = `Hello ${req.user.name || "Customer"}, 
-Your booking has been confirmed!
-
---------------------------------------------------
-Service:  ${serviceName}
-Provider: ${providerName}
-Date:     ${bookingDate}
-Time:     ${formattedTime}
-Location: ${address}
---------------------------------------------------
-
-You can view or manage your booking in your dashboard.
-
-Thank you for choosing TaskGenie!`;
-
-		try {
-			if (req.user && req.user.email) {
-				await sendEmail({
-					email: req.user.email,
-					subject: `Booking Confirmed: ${serviceName} with ${providerName}`,
-					message: emailMessage,
-				});
-				console.log(`Confirmation email sent to ${req.user.email}`);
-			}
-		} catch (emailErr) {
-			console.error("Failed to send confirmation email:", emailErr);
-		}
-
-		res.status(201).json({ booking });
+		res
+			.status(201)
+			.json({ booking: r.rows[0], razorpay_order: razorpay_order_id });
 	} catch (err) {
-		await client.query("ROLLBACK").catch(() => {});
-		console.error("CRITICAL BACKEND ERROR:", err);
+		await client.query("ROLLBACK");
 		res.status(500).json({ message: "Server error", error: err.message });
 	} finally {
 		client.release();
@@ -168,41 +113,30 @@ Thank you for choosing TaskGenie!`;
 
 async function updateBookingStatus(req, res) {
 	const { bookingId } = req.params;
-	const { status } = req.body;
+	const { status, otp_provided } = req.body;
 	const userId = req.user.id;
 	const userRole = req.user.role;
 
-	const validStatuses = [
-		"booked",
-		"in_progress",
-		"completed",
-		"cancelled",
-		"no_show",
-	];
-	if (!validStatuses.includes(status)) {
-		return res.status(400).json({ message: "Invalid status value" });
-	}
 	const client = await db.connect();
 	try {
 		await client.query("BEGIN");
 
 		const checkQ = `
-			SELECT b.*,
-				   u.email AS user_email, u.name AS user_name,
-				   p.email AS provider_email, p.name AS provider_name,
-				   s.name AS service_name
-			FROM bookings b
-			JOIN users u on b.user_id=u.id
-			JOIN users p ON b.provider_id=p.id
-			JOIN services s ON b.service_id=s.id
-			WHERE booking_id=$1
-		`;
+            SELECT b.*, u.email AS user_email, u.name AS user_name,
+                   p.email AS provider_email, p.name AS provider_name,
+                   s.name AS service_name
+            FROM bookings b
+            JOIN users u ON b.user_id=u.id
+            JOIN users p ON b.provider_id=p.id
+            JOIN services s ON b.service_id=s.id
+            WHERE booking_id=$1
+        `;
 		const bookingRes = await client.query(checkQ, [bookingId]);
-
 		if (bookingRes.rows.length === 0) {
 			await client.query("ROLLBACK");
 			return res.status(404).json({ message: "Booking not found." });
 		}
+
 		const currentBooking = bookingRes.rows[0];
 
 		if (
@@ -211,138 +145,254 @@ async function updateBookingStatus(req, res) {
 			userRole !== "admin"
 		) {
 			await client.query("ROLLBACK");
-			return res
-				.status(403)
-				.json({ message: "Unauthorized access to this booking." });
+			return res.status(403).json({ message: "Unauthorized access." });
 		}
+
+		const bookingDateTime = new Date(currentBooking.date);
+		const [h, m] = currentBooking.start_time.split(":");
+		bookingDateTime.setHours(h, m);
+		const now = new Date();
+		const hoursUntilService = (bookingDateTime - now) / (1000 * 60 * 60);
+		const allowedNoShowTime = new Date(bookingDateTime.getTime() + 20 * 60000); // 20 mins grace
+
+		let refundPercentage = 0;
 
 		if (userRole === "customer") {
 			if (status === "no_show") {
-				const bookingDateTime = new Date(currentBooking.date);
-				const [hours, minutes] = currentBooking.start_time.split(":");
-				bookingDateTime.setHours(hours, minutes);
-
-				const now = new Date();
-
-				const allowedReportTime = new Date(
-					bookingDateTime.getTime() + 20 * 60000,
-				);
-				if (now < allowedReportTime) {
+				if (now < allowedNoShowTime) {
 					await client.query("ROLLBACK");
 					return res.status(400).json({
-						message:
-							"You can only report a No-Show 20 minutes after the scheduled start time.",
+						message: "Wait 20 mins after start time to report No-Show.",
 					});
 				}
-			} else if (status !== "cancelled") {
+				refundPercentage = 100;
+			} else if (status === "cancelled") {
+				refundPercentage = hoursUntilService >= 2 ? 100 : 80;
+			} else {
 				await client.query("ROLLBACK");
 				return res
 					.status(400)
 					.json({ message: "Customers can only Cancel or report No-Show." });
 			}
-
-			if (
-				["no_show", "completed", "cancelled"].includes(currentBooking.status)
-			) {
-				await client.query("ROLLBACK");
-				return res
-					.status(400)
-					.json({ message: "Cannot change status of a finalized booking." });
-			}
 		} else if (userRole === "provider") {
-			// providers move from Booked -> In Progress -> Completed
-			const allowed = ["in_progress", "completed", "cancelled"];
+			const allowed = ["in_progress", "completed", "cancelled", "no_show"];
 			if (!allowed.includes(status)) {
 				await client.query("ROLLBACK");
-				return res
-					.status(400)
-					.json({ message: "Invalid status transition for provider." });
+				return res.status(400).json({ message: "Invalid status transition." });
 			}
-			if (status === "no_show") {
-				await client.query("ROLLBACK");
-				return res
-					.status(403)
-					.json({ message: "Providers cannot report No-Show." });
-			} else if (status === "cancelled") {
-				const jobDate = new Date(currentBooking.date);
-				const [hours, minutes] = currentBooking.start_time.split(":");
-				jobDate.setHours(hours, minutes);
 
-				const now = new Date();
-				const hoursUntilJob = (jobDate - now) / 1000 / 60 / 60;
-
-				if (hoursUntilJob < 2) {
+			if (status === "in_progress") {
+				if (
+					!otp_provided ||
+					otp_provided.toString() !== currentBooking.otp.toString()
+				) {
+					await client.query("ROLLBACK");
+					return res
+						.status(401)
+						.json({ message: "Invalid OTP. Handshake failed." });
+				}
+			} else if (status === "no_show") {
+				if (now < allowedNoShowTime) {
 					await client.query("ROLLBACK");
 					return res.status(400).json({
-						message: "Too late to cancel! Please contact support.",
+						message: "Wait 20 mins before reporting customer No-Show.",
 					});
 				}
+				refundPercentage = 0; // Provider keeps the money
+			} else if (status === "cancelled") {
+				if (hoursUntilService < 2) {
+					await client.query("ROLLBACK");
+					return res
+						.status(400)
+						.json({ message: "Too late to cancel! Contact support." });
+				}
+				refundPercentage = 100;
 			}
 		}
 
-		const updateQ = `
-			UPDATE bookings
-			SET status=$1, updated_at=NOW()
-			WHERE booking_id=$2
-			RETURNING *
-		`;
-		const r = await client.query(updateQ, [status, bookingId]);
+		if (
+			refundPercentage > 0 &&
+			currentBooking.payment_status === "paid" &&
+			currentBooking.razorpay_payment_id
+		) {
+			const refundAmount = Math.round(
+				currentBooking.price * (refundPercentage / 100) * 100,
+			);
+			try {
+				await razorpay.payments.refund(currentBooking.razorpay_payment_id, {
+					amount: refundAmount,
+					notes: {
+						reason: `Policy: ${refundPercentage}% refund for ${status}`,
+					},
+				});
+			} catch (err) {
+				console.error("Refund failed:", err.message);
+			}
+		}
+
+		const finalPaymentStatus =
+			refundPercentage === 100
+				? "refunded"
+				: refundPercentage > 0
+					? "partially_refunded"
+					: currentBooking.payment_status;
+
+		const updateQ = `UPDATE bookings SET status=$1, payment_status=$2, action_by=$3, updated_at=NOW() WHERE booking_id=$4 RETURNING *`;
+		const r = await client.query(updateQ, [
+			status,
+			finalPaymentStatus,
+			userRole,
+			bookingId,
+		]);
+
 		await client.query("COMMIT");
 
-		try {
-			const {
-				user_email,
-				user_name,
-				provider_email,
-				provider_name,
-				service_name,
-			} = currentBooking;
+		sendEmailNotifications(status, userRole, currentBooking, refundPercentage);
 
-			if (status === "no_show") {
-				//notify provider they were marked as no show
-				await sendEmail({
-					email: provider_email,
-					subject: `Alert: Customer Reported No-Show - ${service_name}`,
-					message: `Hi ${provider_name},\n\nThe customer, ${user_name}, has reported that you did not arrive for the scheduled service: ${service_name}.\n\nThis will affect your reliability score. If this is a mistake, please contact support immediately.\n\n- Team TaskGenie`,
-				});
-			}
-			if (status === "cancelled") {
-				const isCancelledByProvider = userRole === "provider";
-
-				if (isCancelledByProvider) {
-					await sendEmail({
-						email: user_email,
-						subject: `URGENT: Booking Cancelled - ${service_name}`,
-						message: `Hi ${user_name},\n\nWe regret to inform you that your provider, ${provider_name}, has cancelled the booking for ${service_name}.\n\nPlease open the app to book another provider immediately.\n\n- Team TaskGenie`,
-					});
-				} else {
-					await sendEmail({
-						email: provider_email,
-						subject: `Booking Cancelled by Customer - ${service_name}`,
-						message: `Hi ${provider_name},\n\nThe customer, ${user_name}, has cancelled their booking for ${service_name}.\n\nYour schedule has been freed up.\n\n- Team TaskGenie`,
-					});
-				}
-			}
-
-			if (status === "completed") {
-				await sendEmail({
-					email: user_email,
-					subject: `Service Completed: ${service_name}`,
-					message: `Hi ${user_name},\n\nYour service with ${provider_name} has been marked as completed.\n\nPlease log in to the dashboard to rate your provider and download your invoice.\n\nThank you!\n- Team TaskGenie`,
-				});
-			}
-		} catch (emailErr) {
-			console.error("⚠️ Email Notification Failed:", emailErr.message);
-		}
-
-		console.log(`Booking ${bookingId} status updated to: ${status}`);
 		res.json({ message: "Status updated successfully", booking: r.rows[0] });
 	} catch (err) {
 		await client.query("ROLLBACK");
-		console.error("Status Update Error:", err);
-		res.status(500).json({ message: "Server error" });
+		res.status(500).json({ message: "Server error", error: err.message });
 	} finally {
 		client.release();
+	}
+}
+
+async function sendEmailNotifications(
+	status,
+	role,
+	booking,
+	refundPercentage = 0,
+) {
+	try {
+		const {
+			provider_email,
+			provider_name,
+			user_email,
+			user_name,
+			service_name,
+			otp,
+		} = booking;
+		const emailsToSend = [];
+		const signature = `\n\nBest Regards,\nTeam TaskGenie\nSupport: support@taskgenie.com\n"Your local service, simplified."`;
+
+		// const targetEmail =
+		// 	role === "customer" ? booking.provider_email : booking.user_email;
+		// const targetName =
+		// 	role === "customer" ? booking.provider_name : booking.user_name;
+
+		if (status === "booked") {
+			// Send to Customer
+			emailsToSend.push({
+				email: user_email,
+				subject: `Booking Confirmed! - ${service_name}`,
+				message:
+					`Hi ${user_name}, your booking for ${service_name} is confirmed. \nYour handshake OTP is: ${otp}. Please share this only when the provider arrives.` +
+					signature,
+			});
+			// Send to Provider
+			emailsToSend.push({
+				email: provider_email,
+				subject: `New Booking Received! - ${service_name}`,
+				message:
+					`Hi ${provider_name}, you have a new booking from ${user_name}. Check your dashboard for the schedule.` +
+					signature,
+			});
+		} else if (status === "no_show") {
+			if (role === "customer") {
+				// Customer reporting Provider
+				emailsToSend.push({
+					email: user_email,
+					subject: `No-Show Reported - ${service_name}`,
+					message:
+						`Hi ${user_name},\n\nYou have reported that the provider did not arrive for the scheduled service. A full refund (100%) has been initiated to your original payment method.` +
+						signature,
+				});
+				emailsToSend.push({
+					email: provider_email,
+					subject: `Alert: Customer Reported No-Show - ${service_name}`,
+					message:
+						`Hi ${provider_name},\n\n${user_name} reported that you did not show up for the scheduled service. This incident has been logged and will affect your reliability score. If this is an error, please contact support.` +
+						signature,
+				});
+			} else {
+				// Provider reporting Customer
+				emailsToSend.push({
+					email: user_email,
+					subject: `Alert: No-Show Reported by Provider`,
+					message:
+						`Hi ${user_name},\n\n${provider_name} reported that you were not available at the scheduled time and location. Per TaskGenie policy, no refund is issued for customer no-shows to compensate the provider for their time and travel.` +
+						signature,
+				});
+				emailsToSend.push({
+					email: provider_email,
+					subject: `No-Show Logged - ${service_name}`,
+					message:
+						`Hi ${provider_name},\n\nWe have logged the customer as a no-show for your service. Your payout will be processed as per the platform policy for confirmed bookings.` +
+						signature,
+				});
+			}
+		} else if (status === "cancelled") {
+			if (role === "customer") {
+				const refundMsg =
+					refundPercentage === 100
+						? "A full refund has been initiated."
+						: "A refund of 80% has been initiated (20% cancellation fee applied).";
+
+				emailsToSend.push({
+					email: user_email,
+					subject: `Booking Cancelled`,
+					message:
+						`Hi ${user_name}, you cancelled your booking. ${refundMsg}` +
+						signature,
+				});
+				emailsToSend.push({
+					email: provider_email,
+					subject: `Booking Cancelled by Customer`,
+					message:
+						`Hi ${provider_name}, ${user_name} has cancelled the service for ${service_name}.` +
+						signature,
+				});
+			} else {
+				// Provider Cancelled
+				emailsToSend.push({
+					email: user_email,
+					subject: `Booking Cancelled by Provider`,
+					message:
+						`Hi ${user_name}, unfortunately ${provider_name} had to cancel. A 100% refund has been initiated to your bank account which will reflect within 3-5 business days.` +
+						signature,
+				});
+				emailsToSend.push({
+					email: provider_email,
+					subject: `Cancellation Confirmed`,
+					message:
+						`Hi ${provider_name}, you have cancelled the booking. Please try to avoid last-minute cancellations.` +
+						signature,
+				});
+			}
+		}
+	} catch (err) {
+		console.error("Notification Error:", err.message);
+	}
+}
+
+async function verifyPayment(req, res) {
+	const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+		req.body;
+	const hmac = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET);
+	hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
+	if (hmac.digest("hex") === razorpay_signature) {
+		try {
+			const result = await db.query(
+				`UPDATE bookings SET payment_status='paid', status='booked', razorpay_payment_id=$1 WHERE razorpay_order_id=$2 RETURNING *`,
+				[razorpay_payment_id, razorpay_order_id],
+			);
+			res.status(200).json({ success: true, booking: result.rows[0] });
+		} catch (err) {
+			res.status(500).json({ message: "Internal Server Error" });
+		}
+	} else {
+		res.status(400).json({ success: false, message: "Invalid signature" });
 	}
 }
 
@@ -519,4 +569,5 @@ module.exports = {
 	updateBookingAddress,
 	getUserHistory,
 	updateBookingStatus,
+	verifyPayment,
 };

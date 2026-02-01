@@ -11,16 +11,17 @@ import {
 	Star,
 	ShieldCheck,
 	Sparkles,
+	CreditCard,
+	Wallet,
 } from "lucide-react";
 import Alerts from "../ui/Alerts";
 import { FadeLoader } from "react-spinners";
+import PaymentOptions from "./PaymentOptions";
 
 export default function BookingPage() {
 	const { customId } = useParams();
 	const navigate = useNavigate();
 	const { state } = useLocation();
-
-	console.log(state);
 
 	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -29,21 +30,22 @@ export default function BookingPage() {
 		state?.preloadedAvailability || state?.provider?.availability || [],
 	);
 
-	const [address, setAddress] = useState(
-		state?.address || "Home • 12/B, Green Heights, Civil Lines, Kanpur",
-	);
+	const [address, setAddress] = useState(state?.address || "");
+	const [tempAddress, setTempAddress] = useState(state?.address || "");
 
 	const [selectedDate, setSelectedDate] = useState(
 		state?.selectedDateStr || null,
 	);
 	const [selectedTime, setSelectedTime] = useState(state?.selectedTime || null);
+	const serviceName = state?.serviceName || "Service";
 
 	const [isEditingAddress, setIsEditingAddress] = useState(false);
-	const [tempAddress, setTempAddress] = useState(address);
 
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [loading, setLoading] = useState(!state?.provider);
 	const [alert, setAlert] = useState(null);
+
+	const [paymentMethod, setPaymentMethod] = useState("cod");
 
 	function formatTime(timeString) {
 		if (!timeString) return "";
@@ -164,6 +166,13 @@ export default function BookingPage() {
 	};
 
 	async function handleConfirm() {
+		if (!address.trim()) {
+			return setAlert({
+				message:
+					"Where should our expert meet you? Please enter a service address.",
+				type: "error",
+			});
+		}
 		if (!selectedDate || !selectedTime)
 			return setAlert({ message: "Please select a slot.", type: "error" });
 
@@ -188,9 +197,19 @@ export default function BookingPage() {
 					start_time: selectedTime,
 					end_time: selectedTime,
 					address: address,
+					payment_method: paymentMethod,
 				}),
 			});
 			const data = await res.json();
+
+			if (paymentMethod === "online" && data.razorpay_order) {
+				handleRazorpayPayment(data.booking, data.razorpay_order);
+			} else {
+				navigate("/booking-success", {
+					state: { success: true, booking: data.booking, address: address },
+					replace: true,
+				});
+			}
 
 			if (res.ok) {
 				navigate("/booking-success", {
@@ -213,6 +232,49 @@ export default function BookingPage() {
 		}
 	}
 
+	const handleRazorpayPayment = (booking, orderId) => {
+		const options = {
+			key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+			amount: booking.price * 100,
+			currency: "INR",
+			name: "TaskGenie",
+			description: `Booking for ${booking.service_name || "Service"}`,
+			order_id: orderId,
+			handler: async function (response) {
+				try {
+					const verifyRes = await fetch(
+						`${API_URL}/api/bookings/verify-payment`,
+						{
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								Authorization: `Bearer ${localStorage.getItem("token")}`,
+							},
+							body: JSON.stringify(response),
+						},
+					);
+					const verifyData = await verifyRes.json();
+					if (verifyRes.ok) {
+						navigate("/booking-success", {
+							state: { success: true, booking: verifyData.booking },
+						});
+					} else {
+						alert("Payment verification failed. Please contact support.");
+					}
+				} catch (err) {
+					console.error("Verification Error:", err);
+				}
+			},
+			prefill: {
+				name: "Customer Name",
+				email: "customer@example.com",
+			},
+			theme: { color: "#6d28d9" },
+		};
+		const rzp = new window.Razorpay(options);
+		rzp.open();
+	};
+
 	if (loading || !provider) {
 		return (
 			<div className="min-h-screen bg-[#191034] text-white flex items-center justify-center">
@@ -225,6 +287,29 @@ export default function BookingPage() {
 			</div>
 		);
 	}
+
+	const detectLocation = () => {
+		if (!navigator.geolocation) {
+			setAlert({
+				message: "Geolocation not supported by your browser",
+				type: "error",
+			});
+			return;
+		}
+
+		navigator.geolocation.getCurrentPosition(async (position) => {
+			const { latitude, longitude } = position.coords;
+			try {
+				const res = await fetch(
+					`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+				);
+				const data = await res.json();
+				setTempAddress(data.display_name);
+			} catch (err) {
+				setAlert({ message: "Could not resolve address", type: "error" });
+			}
+		});
+	};
 
 	const dateDisplay = selectedDate ? formatDateDisplay(selectedDate) : null;
 
@@ -254,7 +339,7 @@ export default function BookingPage() {
 						<ArrowLeft size={22} />
 					</button>
 					<h1 className="text-xl font-bold bricolage-grotesque tracking-tight">
-						Complete Booking
+						Complete Booking for {serviceName}
 					</h1>
 				</div>
 			</div>
@@ -473,11 +558,22 @@ export default function BookingPage() {
 							<div className="bg-[#22194A] border border-white/5 rounded-2xl p-1 overflow-hidden">
 								{isEditingAddress ? (
 									<div className="p-4 space-y-3">
+										<div className="flex justify-between items-center mb-1">
+											<label className="text-[13px] text-gray-400">
+												Service Address
+											</label>
+											<button
+												onClick={detectLocation}
+												className="cursor-pointer text-[12px] text-violet-300 flex items-center gap-1 hover:text-violet-200/70"
+											>
+												<Navigation size={12} /> Use Current Location
+											</button>
+										</div>
 										<textarea
 											value={tempAddress}
 											onChange={(e) => setTempAddress(e.target.value)}
-											className="w-full bg-[#191034] border border-white/10 rounded-xl p-4 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all resize-none h-28"
-											placeholder="Enter your full address here..."
+											className="w-full bg-[#191034] border border-white/10 rounded-xl p-4 text-sm text-white focus:ring-1 focus:ring-violet-500 transition-all resize-none h-28"
+											placeholder="Enter your full address..."
 											autoFocus
 										/>
 										<div className="flex justify-end gap-2">
@@ -498,7 +594,7 @@ export default function BookingPage() {
 											</button>
 										</div>
 									</div>
-								) : (
+								) : address ? (
 									<div className="flex items-start gap-4 p-5 relative">
 										<div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-violet-600 to-indigo-600 opacity-50" />
 										<div className="p-2.5 bg-[#191034] rounded-xl shrink-0 border border-white/5">
@@ -515,18 +611,59 @@ export default function BookingPage() {
 											</div>
 										</div>
 									</div>
+								) : (
+									<button
+										onClick={() => setIsEditingAddress(true)}
+										className="w-full flex items-center justify-center gap-3 p-8 text-gray-400 hover:text-violet-300 hover:bg-white/5 transition-all group"
+									>
+										<div className="p-3 rounded-full bg-violet-500/10 group-hover:bg-violet-500/20 transition-colors">
+											<MapPin className="w-6 h-6" />
+										</div>
+										<span className="font-semibold">
+											Click to add service address
+										</span>
+									</button>
 								)}
 							</div>
 						</div>
+						{/* Step 4: Payment Method */}
+						<div className="inter space-y-4">
+							<div className="flex items-center gap-2 px-1">
+								<div className="p-1.5 rounded-lg bg-violet-500/20">
+									<ShieldCheck className="w-5 h-5 text-violet-300" />
+								</div>
+								<h3 className="text-lg font-semibold text-white">
+									Payment Method
+								</h3>
+							</div>
 
+							<div className="flex w-full gap-4 justify-center items-center">
+								<PaymentOptions
+									method="online"
+									currentMethod={paymentMethod}
+									setMethod={setPaymentMethod}
+									title="Pay Online"
+									subtitle="UPI, Cards, Wallet"
+									icon={CreditCard}
+								/>
+								<PaymentOptions
+									method="cash"
+									currentMethod={paymentMethod}
+									setMethod={setPaymentMethod}
+									title="Pay after Service"
+									subtitle="Cash on Delivery"
+									icon={Wallet}
+								/>
+							</div>
+						</div>
 						{/* Desktop Confirm Button */}
-						<div className="hidden lg:block pt-6">
+						<div className="hidden lg:block pt-6 inter ">
 							<button
 								onClick={handleConfirm}
-								disabled={isSubmitting || !selectedTime}
-								className={`w-full py-4 rounded-xl text-lg font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-3 group
+								disabled={isSubmitting || !selectedTime || !address.trim()}
+								className={`cursor-pointer w-full py-4 rounded-xl text-lg font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-3 group
                     ${
-											selectedTime
+											selectedTime && address.trim()
 												? "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-violet-900/40 transform hover:-translate-y-1"
 												: "bg-[#22194A] text-gray-500 cursor-not-allowed border border-white/5"
 										}`}
@@ -553,26 +690,70 @@ export default function BookingPage() {
 
 			{/* Mobile Sticky Footer */}
 			<div
-				className={`lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-[#191034]/90 backdrop-blur-xl border-t border-white/10 z-50 transition-transform duration-500 ease-out ${selectedTime ? "translate-y-0" : "translate-y-full"}`}
+				className={`inter lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-[#191034]/95 backdrop-blur-2xl border-t border-white/10 z-50 transition-all duration-500 ease-out ${
+					selectedTime
+						? "translate-y-0 opacity-100"
+						: "translate-y-full opacity-0"
+				}`}
 			>
-				<div className="flex items-center gap-4">
+				<div className="flex items-center gap-4 max-w-md mx-auto">
 					<div className="flex-1">
-						<p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">
-							Total
+						<p className="text-[10px] text-violet-300/60 uppercase tracking-widest mb-0.5 font-bold">
+							Total Amount
 						</p>
 						<div className="flex items-baseline gap-1">
-							<span className="text-xl font-bold text-white">
+							<span className="text-2xl font-bold text-white tracking-tight">
 								₹{provider.price}
 							</span>
-							<span className="text-xs text-violet-300">/ session</span>
 						</div>
+						{/* Payment Method Indicator */}
+						<p className="text-[9px] text-gray-400 flex items-center gap-1 mt-0.5">
+							<span
+								className={`w-1.5 h-1.5 rounded-full ${paymentMethod === "online" ? "bg-green-400" : "bg-orange-400"}`}
+							></span>
+							{paymentMethod === "online"
+								? "Online Payment"
+								: "Cash on Delivery"}
+						</p>
 					</div>
+
 					<button
 						onClick={handleConfirm}
-						disabled={isSubmitting}
-						className="flex-[2] py-3.5 rounded-xl bg-violet-600 text-white font-bold text-lg shadow-lg shadow-violet-900/40 active:scale-95 transition-all flex items-center justify-center gap-2"
+						disabled={isSubmitting || !address.trim()}
+						className={`cursor-pointer flex-[1.5] py-4 rounded-2xl font-bold text-lg shadow-2xl active:scale-95 transition-all duration-300 flex items-center justify-center gap-2 ${
+							paymentMethod === "online"
+								? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-violet-900/40"
+								: "bg-white text-[#191034] shadow-white/10"
+						} ${!address.trim() ? "opacity-50 grayscale cursor-not-allowed" : ""}`}
 					>
-						{isSubmitting ? "Book..." : "Confirm"}
+						{isSubmitting ? (
+							<div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin hover:scale-90" />
+						) : (
+							<>
+								{/* <span>
+									{paymentMethod === "online" ? "Pay & Book" : "Confirm"}
+								</span> */}
+								<div className="grid grid-cols-2 gap-4 w-full">
+									<PaymentOptions
+										method="online"
+										currentMethod={paymentMethod}
+										setMethod={setPaymentMethod}
+										title="Pay Online"
+										subtitle="UPI, Cards, Wallet"
+										icon={CreditCard}
+									/>
+									<PaymentOptions
+										method="cash"
+										currentMethod={paymentMethod}
+										setMethod={setPaymentMethod}
+										title="Pay after Service"
+										subtitle="Cash on Delivery"
+										icon={Wallet}
+									/>
+								</div>
+								<ArrowLeft size={20} className="rotate-180" />
+							</>
+						)}
 					</button>
 				</div>
 			</div>

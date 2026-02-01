@@ -118,7 +118,7 @@ export default function AllServices() {
 							onClick={() => setSelectedCategory(cat)}
 							className={`inter cursor-pointer px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 border ${
 								selectedCategory === cat
-									? "bg-violet-600 text-white border-violet-600 shadow-md shadow-violet-200 scale-105"
+									? "bg-violet-800 text-white border-violet-600 shadow-md shadow-violet-200 scale-105"
 									: "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-700 hover:bg-violet-50"
 							}`}
 						>
@@ -241,10 +241,9 @@ function ServiceCard({ service }) {
 					</div>
 				</div>
 
-				{/* Content - Dark text for contrast on light lavender */}
 				<div className="p-6 flex flex-col flex-grow">
 					<div className="flex justify-between items-start mb-3">
-						<h3 className="mackinac text-[22px] font-bold text-slate-800 group-hover:text-violet-700 transition-colors line-clamp-1">
+						<h3 className="mackinac text-[22px] font-bold text-slate-800 group-hover:text-violet-900 transition-colors line-clamp-1">
 							{service.name}
 						</h3>
 					</div>
@@ -254,7 +253,6 @@ function ServiceCard({ service }) {
 					</p>
 
 					<div className="inter flex items-center justify-between mt-auto pt-4 border-t border-violet-200/50">
-						{/* Price Badge */}
 						<div className="flex flex-col">
 							<span className="text-xs text-slate-500 font-medium uppercase tracking-wide">
 								Starts from
@@ -271,7 +269,7 @@ function ServiceCard({ service }) {
 							</span>
 						</div>
 
-						<div className="w-10 h-10 rounded-full bg-white border border-violet-200 flex items-center justify-center text-violet-500 group-hover:bg-violet-400 group-hover:text-white group-hover:border-violet-400 transition-all duration-300 shadow-sm">
+						<div className="w-10 h-10 rounded-full bg-white/80 border border-violet-200 flex items-center justify-center text-violet-500 group-hover:bg-violet-800 group-hover:text-white group-hover:border-violet-400 transition-all duration-300 shadow-sm">
 							<ArrowRight size={18} />
 						</div>
 					</div>

@@ -247,6 +247,7 @@ const ServiceDetails = () => {
 							<ProviderCard
 								key={p.user_id || index}
 								provider={p}
+								service={service}
 								isExpanded={expandedIndex === index}
 								isAnyExpanded={isAnyExpanded}
 								onToggleExpand={() => handleToggleExpand(index)}
@@ -261,6 +262,7 @@ const ServiceDetails = () => {
 
 const ProviderCard = ({
 	provider,
+	service,
 	isExpanded,
 	isAnyExpanded,
 	onToggleExpand,
@@ -590,6 +592,7 @@ const ProviderCard = ({
 											navigate(`/book/${provider.custom_id}`, {
 												state: {
 													provider,
+													serviceName: service.name,
 													preloadedAvailability: availability,
 													selectedDateStr,
 													selectedTime,

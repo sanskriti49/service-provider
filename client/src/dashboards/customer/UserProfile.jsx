@@ -18,7 +18,7 @@ import {
 	Star,
 	ZapIcon,
 } from "lucide-react";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../../api/axiosInstance";
@@ -27,7 +27,7 @@ const SERIF_FONT = { fontFamily: "P22Mackinac, Cambria, sans-serif" };
 const TEXT_MAIN = "text-[#281950]";
 const TEXT_MUTED = "text-[#281950]/60";
 
-const BentoCard = ({ children, className, delay = 0 }) => (
+const BentoCard = forwardRef(({ children, className, delay = 0 }) => (
 	<motion.div
 		initial={{ opacity: 0, y: 20, scale: 0.98 }}
 		animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -38,7 +38,8 @@ const BentoCard = ({ children, className, delay = 0 }) => (
 		<div className="absolute inset-0 bg-gradient-to-br from-violet-100/50 via-transparent to-violet-100/20 pointer-events-none" />
 		{children}
 	</motion.div>
-);
+));
+BentoCard.displayName = "BentoCard";
 
 const StatPill = ({ icon: Icon, label, value, color, delay }) => {
 	const colorMap = {
@@ -54,7 +55,7 @@ const StatPill = ({ icon: Icon, label, value, color, delay }) => {
 			initial={{ opacity: 0, x: -10 }}
 			animate={{ opacity: 1, x: 0 }}
 			transition={{ delay }}
-			className="bg-violet-200/30 flex items-center gap-3 p-3 pr-5  backdrop-blur-md border border-violet-500/20 rounded-2xl cursor-default transition-all duration-300 hover:scale-[1.03] hover:bg-violet-400/20 hover:shadow-lg hover:shadow-violet-100/50"
+			className="bg-violet-200/30 flex items-center gap-3 p-3 pr-5  backdrop-blur-md border border-violet-400/20 rounded-2xl cursor-default transition-all duration-300 hover:scale-[1.03] hover:bg-violet-400/20 hover:shadow-lg hover:shadow-violet-100/50"
 		>
 			<div
 				className={`p-3 rounded-xl border ${activeColor} transition-colors duration-300`}
@@ -75,50 +76,51 @@ const StatPill = ({ icon: Icon, label, value, color, delay }) => {
 	);
 };
 
-const CustomMenuItem = ({
-	icon: Icon,
-	title,
-	desc,
-	onClick,
-	iconColorClass,
-	isDanger = false,
-	delay,
-}) => (
-	<motion.button
-		initial={{ opacity: 0, x: -10 }}
-		animate={{ opacity: 1, x: 0 }}
-		transition={{ delay }}
-		onClick={onClick}
-		className={`cursor-pointer w-full group/item flex items-center justify-between p-3 rounded-2xl transition-all duration-300 border border-transparent
+const CustomMenuItem = forwardRef(
+	({
+		icon: Icon,
+		title,
+		desc,
+		onClick,
+		iconColorClass,
+		isDanger = false,
+		delay,
+	}) => (
+		<motion.button
+			initial={{ opacity: 0, x: -10 }}
+			animate={{ opacity: 1, x: 0 }}
+			transition={{ delay }}
+			onClick={onClick}
+			className={`cursor-pointer w-full group/item flex items-center justify-between p-3 rounded-2xl transition-all duration-300 border border-transparent
         ${
 					isDanger
 						? "hover:bg-red-50 hover:border-red-100"
 						: "hover:bg-violet-400/20 hover:border-violet-500/30"
 				}`}
-	>
-		<div className="flex items-center gap-4">
-			<div
-				className={`p-3 rounded-2xl transition-transform duration-300 ${isDanger ? "bg-red-50 text-red-500" : iconColorClass}`}
-			>
-				<Icon size={20} strokeWidth={2.5} />
-			</div>
-			<div className="text-left">
-				<h4
-					className={`font-bold text-[15px] ${isDanger ? "text-red-600" : TEXT_MAIN}`}
+		>
+			<div className="flex items-center gap-4">
+				<div
+					className={`p-3 rounded-2xl transition-transform duration-300 ${isDanger ? "bg-red-50 text-red-500" : iconColorClass}`}
 				>
-					{title}
-				</h4>
-				<p
-					className={`text-xs font-medium ${isDanger ? "text-red-400" : "text-gray-500"}`}
-				>
-					{desc}
-				</p>
+					<Icon size={20} strokeWidth={2.5} />
+				</div>
+				<div className="text-left">
+					<h4
+						className={`font-bold text-[15px] ${isDanger ? "text-red-600" : TEXT_MAIN}`}
+					>
+						{title}
+					</h4>
+					<p
+						className={`text-xs font-medium ${isDanger ? "text-red-400" : "text-gray-500"}`}
+					>
+						{desc}
+					</p>
+				</div>
 			</div>
-		</div>
 
-		<ChevronRight
-			size={18}
-			className={`
+			<ChevronRight
+				size={18}
+				className={`
                 transition-all duration-300 transform
                 opacity-0 group-hover/item:opacity-100 
                 
@@ -132,9 +134,11 @@ const CustomMenuItem = ({
                 
                 group-hover/item:translate-x-1
             `}
-		/>
-	</motion.button>
+			/>
+		</motion.button>
+	),
 );
+CustomMenuItem.displayName = "CustomMenuItem";
 
 export default function UserProfile() {
 	const navigate = useNavigate();
@@ -167,12 +171,16 @@ export default function UserProfile() {
 		};
 		fetchData();
 	}, []);
+	const hour = new Date().getHours();
 
 	const greeting = useMemo(() => {
-		const hour = new Date().getHours();
-		if (hour < 12) return "Good Morning";
-		if (hour < 18) return "Good Afternoon";
-		return "Good Evening";
+		if (hour >= 5 && hour < 12) return "Good Morning";
+
+		if (hour >= 12 && hour < 17) return "Good Afternoon";
+
+		if (hour >= 17 && hour < 23) return "Good Evening";
+
+		return "Good Night";
 	}, []);
 
 	const handleLogout = useCallback(() => {
@@ -195,10 +203,12 @@ export default function UserProfile() {
 						animate={{ opacity: 1, x: 0 }}
 					>
 						<div className="flex items-center gap-2 text-violet-600 font-bold text-xs tracking-widest uppercase mb-2">
-							{greeting.includes("Morning") ? (
+							{hour >= 5 && hour < 17 ? (
 								<Sun size={14} className="text-orange-400" />
-							) : (
+							) : hour >= 17 && hour < 22 ? (
 								<Moon size={14} className="text-indigo-400" />
+							) : (
+								<Zap size={14} className="text-yellow-400" /> // Using Zap for "Late Night" vibe
 							)}
 							<span>{greeting}</span>
 						</div>
@@ -213,7 +223,7 @@ export default function UserProfile() {
 
 					<button
 						onClick={() => navigate("/settings")}
-						className="group h-12 px-6 rounded-2xl bg-violet-100/20 border border-white hover:bg-white/20 hover:shadow-xl hover:shadow-violet-200/50 transition-all flex items-center gap-2 font-bold text-[#281950]"
+						className="cursor-pointer group h-12 px-6 rounded-2xl bg-violet-200/20 border border-violet-800/10 hover:bg-white/20 hover:shadow-xl hover:shadow-violet-200/50 transition-all flex items-center gap-2 font-bold text-[#281950]"
 					>
 						<Settings
 							size={18}

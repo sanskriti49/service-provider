@@ -24,6 +24,7 @@
 		"nanoid": "^3.3.4",
 		"nodemailer": "^7.0.11",
 		"pg": "^8.16.0",
+		"razorpay": "^2.9.6",
 		"uuid": "^11.1.0"
 	},
 	"devDependencies": {

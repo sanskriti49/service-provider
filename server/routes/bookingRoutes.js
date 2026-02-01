@@ -5,6 +5,7 @@ const {
 	updateBookingAddress,
 	getUserHistory,
 	updateBookingStatus,
+	verifyPayment,
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const db = require("../config/db");
@@ -58,14 +59,14 @@ router.get(
 			console.error(err);
 			res.status(500).json({ message: "Error fetching upcoming bookings" });
 		}
-	}
+	},
 );
 
 router.get(
 	"/user/history",
 	authMiddleware,
 	allowRoles("customer"),
-	getUserHistory
+	getUserHistory,
 );
 
 router.put("/:bookingId/status", authMiddleware, updateBookingStatus);
@@ -88,18 +89,16 @@ router.get(
 		} catch (err) {
 			res.status(500).json({ message: "Error fetching provider bookings" });
 		}
-	}
+	},
 );
 
 router.patch(
 	"/:bookingId/address",
 	authMiddleware,
 	allowRoles("customer"),
-	updateBookingAddress
+	updateBookingAddress,
 );
 
-// 4. WILDCARD ROUTE (MUST BE LAST)
-// This catches anything that looks like /api/bookings/some-id
 router.get("/:booking_id", authMiddleware, async (req, res) => {
 	try {
 		const q = `SELECT * FROM bookings WHERE booking_id=$1`;
@@ -123,5 +122,7 @@ router.get("/:booking_id", authMiddleware, async (req, res) => {
 		res.status(500).json({ message: "Server error" });
 	}
 });
+
+router.post("/verify-payment", authMiddleware, verifyPayment);
 
 module.exports = router;

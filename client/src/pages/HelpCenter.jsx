@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { jwtDecode } from "jwt-decode";
-import { Link } from "react-router-dom"; // Added Link
+import { Link } from "react-router-dom";
 import {
 	Search,
 	MessageCircle,
@@ -14,7 +14,6 @@ import {
 	IndianRupee,
 } from "lucide-react";
 
-// --- COMPONENT: Retro Perspective Grid ---
 const RetroGrid = () => {
 	return (
 		<div className="absolute top-0 inset-x-0 h-[600px] overflow-hidden pointer-events-none select-none z-0">
@@ -41,7 +40,6 @@ const RetroGrid = () => {
 	);
 };
 
-// Updated with real routes noticed in your App.js
 const quickLinksData = {
 	common: [
 		{
@@ -305,43 +303,111 @@ const HelpCenter = () => {
 
 				{/* FAQ Results */}
 				<div className="flex flex-col md:flex-row gap-8 mb-24 items-start">
-					<div className="flex-1 flex flex-col gap-8 w-full">
-						{leftColumnFaqs.map((cat, idx) => (
-							<FaqCategoryCard key={idx} category={cat} />
-						))}
-					</div>
-					<div className="flex-1 flex flex-col gap-8 w-full">
-						{rightColumnFaqs.map((cat, idx) => (
-							<FaqCategoryCard key={idx} category={cat} />
-						))}
-					</div>
+					{filteredFaqs.length === 0 ? (
+						<div className="col-span-2 text-center py-20">
+							<p className="text-slate-400 italic">
+								No results found for "{searchQuery}"
+							</p>
+						</div>
+					) : (
+						<>
+							<div className="flex-1 flex flex-col gap-8 w-full">
+								{leftColumnFaqs.map((cat, idx) => (
+									<FaqCategoryCard key={idx} category={cat} />
+								))}
+							</div>
+							<div className="flex-1 flex flex-col gap-8 w-full">
+								{rightColumnFaqs.map((cat, idx) => (
+									<FaqCategoryCard key={idx} category={cat} />
+								))}
+							</div>
+						</>
+					)}
 				</div>
 
 				{/* --- HUMAN SUPPORT --- */}
-				<div className="mackinac bg-slate-900 rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden text-center md:text-left shadow-2xl">
-					<div className="absolute top-0 right-0 w-64 h-64 bg-violet-600 rounded-full blur-[80px] opacity-20" />
-					<div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-						<div>
-							<h3 className="text-3xl font-bold text-white mb-4">
+				{/* --- HUMAN SUPPORT --- */}
+				<div className="mackinac bg-slate-900 rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden shadow-2xl">
+					{/* Background Glows */}
+					<div className="absolute top-0 right-0 w-64 h-64 bg-violet-600 rounded-full blur-[100px] opacity-20" />
+					<div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-600 rounded-full blur-[80px] opacity-10" />
+
+					<div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
+						<div className="flex-1 text-center md:text-left">
+							<h3 className="text-4xl font-bold text-white mb-4">
 								Still stuck?
 							</h3>
 							<p className="bricolage-grotesque text-slate-400 text-lg mb-8 max-w-md">
-								Our support team typically replies in under 2 minutes.
+								Our support team is available from 9 AM to 11 PM. We typically
+								reply in under 2 minutes.
 							</p>
-							<div className="flex flex-col sm:flex-row gap-4">
+
+							<div className="flex flex-wrap justify-center md:justify-start gap-4">
 								<a
 									href="https://wa.me/916306642481"
 									target="_blank"
-									className="flex items-center justify-center gap-2 bg-white text-slate-900 px-8 py-4 rounded-xl font-bold hover:bg-violet-100 transition-all"
+									className="flex items-center gap-2 bg-white text-slate-900 px-6 py-3.5 rounded-2xl font-bold hover:bg-violet-100 transition-all active:scale-95"
 								>
-									<MessageCircle className="w-5 h-5" /> WhatsApp
+									<MessageCircle className="w-5 h-5 text-green-600" /> WhatsApp
 								</a>
-								<a
-									href="mailto:sanskriti0409@gmail.com"
-									className="flex items-center justify-center gap-2 bg-slate-800 text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-700 transition-all"
+
+								<button
+									onClick={() => alert("Feature coming soon!")}
+									className="flex items-center gap-2 bg-violet-600 text-white px-6 py-3.5 rounded-2xl font-bold hover:bg-violet-500 transition-all border border-violet-400/30 active:scale-95 shadow-lg shadow-violet-900/20"
 								>
-									<Mail className="w-5 h-5" /> Email
-								</a>
+									<div className="relative">
+										<MessageCircle className="w-5 h-5" />
+										<span className="absolute -top-1 -right-1 flex h-2 w-2">
+											<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+											<span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+										</span>
+									</div>
+									Start Live Chat
+								</button>
+							</div>
+						</div>
+
+						<div className="bg-slate-800/40 p-1 rounded-[2rem] border border-white/10 backdrop-blur-md">
+							<div className="bg-slate-800/60 p-6 rounded-[1.8rem] border border-white/5 min-w-[260px] text-center md:text-left">
+								<div className="flex -space-x-3 mb-6 justify-center md:justify-start">
+									{[11, 5, 8].map((imgId) => (
+										<img
+											key={imgId}
+											src={`https://i.pravatar.cc/100?img=${imgId}`}
+											className="w-12 h-12 rounded-2xl border-2 border-slate-900 object-cover rotate-[-6deg] first:rotate-[6deg]"
+											alt="Support Agent"
+										/>
+									))}
+									<div className="w-12 h-12 rounded-2xl border-2 border-slate-900 bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-inner">
+										+12
+									</div>
+								</div>
+
+								<div className="space-y-1">
+									<p className="inter text-white font-semibold text-lg flex items-center justify-center md:justify-start gap-2">
+										Meet the team
+									</p>
+									<p className="inter text-slate-400 text-sm">
+										Typically replies in{" "}
+										<span className="text-emerald-400 font-bold">2 mins</span>
+									</p>
+								</div>
+
+								<div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-center md:justify-start gap-3">
+									<div className="relative flex h-3 w-3">
+										<span
+											className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSupportOnline ? "bg-emerald-400" : "bg-slate-500"}`}
+										></span>
+										<span
+											className={`relative inline-flex rounded-full h-3 w-3 ${isSupportOnline ? "bg-emerald-500" : "bg-slate-400"}`}
+										></span>
+									</div>
+									<span className="bricolage-grotesque text-sm font-medium text-slate-300">
+										{isSupportOnline
+											? "Support is Active"
+											: "Support is Offline"}
+									</span>
+								</div>
 							</div>
 						</div>
 					</div>

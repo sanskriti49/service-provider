@@ -84,7 +84,6 @@ async function createProvider(req, res, next) {
 	try {
 		await client.query("BEGIN");
 
-		// 1. Resolve Service ID
 		const serviceRow = await client.query(
 			"SELECT id FROM services WHERE slug = $1",
 			[service],
@@ -94,7 +93,6 @@ async function createProvider(req, res, next) {
 		}
 		const serviceId = serviceRow.rows[0].id;
 
-		// 2. Create User Account
 		const hashed = await hashIfPresent(password);
 		const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20);
 		const customId = "SRV" + nano();
@@ -107,8 +105,6 @@ async function createProvider(req, res, next) {
 		);
 		const userId = userInsert.rows[0].id;
 
-		// 3. Create Provider Profile (With price_unit)
-		// We store availability intent as JSON for quick reference, but logic uses tables
 		await client.query(
 			`INSERT INTO providers (user_id, service_id, price, price_unit, rating, availability)
              VALUES ($1,$2,$3,$4,$5,$6)`,
@@ -122,7 +118,6 @@ async function createProvider(req, res, next) {
 			],
 		);
 
-		// 4. Handle Scheduling (Professional Architecture)
 		// If no schedule provided, default to Mon-Sat 10-7
 		const masterSchedule = availability || [
 			{ day: 1, start: "10:00:00", end: "19:00:00" },
@@ -133,7 +128,6 @@ async function createProvider(req, res, next) {
 			{ day: 6, start: "10:00:00", end: "19:00:00" },
 		];
 
-		// A. Insert Intent (Rules)
 		for (const rule of masterSchedule) {
 			await client.query(
 				`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
@@ -142,7 +136,6 @@ async function createProvider(req, res, next) {
 			);
 		}
 
-		// B. Generate Inventory (Real Dates)
 		const realSlots = generateRealSlots(masterSchedule);
 		for (const s of realSlots) {
 			await client.query(
@@ -171,7 +164,6 @@ async function getProviders(req, res, next) {
 	try {
 		const { service } = req.query;
 
-		// ✅ FIX: Selecting price_unit
 		let query = `
             SELECT 
                 users.name, users.photo, users.phone, users.bio, users.location, users.custom_id,
@@ -202,7 +194,6 @@ async function getProviderById(req, res, next) {
 	try {
 		const { custom_id } = req.params;
 
-		// 1. Get Basic Info
 		const providerRes = await db.query(
 			`SELECT 
                 users.id, users.name, users.email, users.phone, users.role, users.custom_id, 
@@ -223,8 +214,7 @@ async function getProviderById(req, res, next) {
 
 		const providerId = providerRes.rows[0].id;
 
-		// 2. Get Real Availability (Inventory)
-		// Professional: Read directly from slots table instead of calculating on fly
+		// get Real Availability Read directly from slots table instead of calculating on fly
 		const today = new Date();
 		const nextMonth = new Date();
 		nextMonth.setDate(today.getDate() + 30);
@@ -280,7 +270,6 @@ async function updateProvider(req, res, next) {
 		await client.query("BEGIN");
 		const hashed = await hashIfPresent(password);
 
-		// Update User
 		await client.query(
 			`UPDATE users SET
                 name = COALESCE($1, name),
@@ -304,7 +293,6 @@ async function updateProvider(req, res, next) {
 			serviceId = s.rows[0].id;
 		}
 
-		// Update Provider (including price_unit)
 		await client.query(
 			`UPDATE providers SET
                 service_id = COALESCE($1, service_id),
@@ -315,9 +303,8 @@ async function updateProvider(req, res, next) {
 			[serviceId, price, rating, price_unit, id],
 		);
 
-		// ✅ Update Schedule if provided
 		if (availability) {
-			// 1. Update Master Intent
+			// update Master Intent
 			await client.query(
 				"DELETE FROM provider_master_availability WHERE provider_id=$1",
 				[id],
@@ -345,7 +332,6 @@ async function updateProvider(req, res, next) {
 				);
 			}
 
-			// 3. Sync JSON dump
 			await client.query(
 				`UPDATE providers SET availability = $1 WHERE user_id = $2`,
 				[JSON.stringify(availability), id],

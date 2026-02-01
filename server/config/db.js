@@ -10,11 +10,11 @@ const isNeon =
 	(connectionString && connectionString.includes("neon.tech")) ||
 	(dbHost && dbHost.includes("neon.tech"));
 
-const poolConfig = connectionString
+const poolConfig = process.env.DATABASE_URL
 	? {
-			connectionString: connectionString,
+			connectionString: process.env.DATABASE_URL,
 			ssl: isNeon ? { rejectUnauthorized: false } : false, // for neon
-	  }
+		}
 	: {
 			// LOCAL CONFIG ( when DATABASE_URL is missing)
 			user: process.env.DB_USER,
@@ -22,8 +22,8 @@ const poolConfig = connectionString
 			password: process.env.DB_PASSWORD,
 			port: parseInt(process.env.DB_PORT || "5432", 10),
 			database: process.env.DB_NAME,
-			ssl: isNeon ? { rejectUnauthorized: false } : false,
-	  };
+			ssl: false,
+		};
 
 const pool = new Pool(poolConfig);
 
@@ -31,7 +31,7 @@ pool.on("connect", () => {
 	console.log(
 		isNeon
 			? "✅ Connected to NEON DB (SSL Enabled)"
-			: "✅ Connected to LOCAL DB"
+			: "✅ Connected to LOCAL DB",
 	);
 });
 

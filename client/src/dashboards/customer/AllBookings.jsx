@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import Swal from "sweetalert2";
+import { toast } from "sonner";
 import {
 	Calendar,
 	Clock,
@@ -13,6 +15,7 @@ import {
 } from "lucide-react";
 import BookingDetailsSheet from "./BookingDetailsSheet";
 import { useNavigate } from "react-router-dom";
+import ConfirmModal from "../../ui/ConfirmModal";
 
 const StatusBadge = ({ status, date, startTime }) => {
 	let displayStatus = status.toLowerCase();
@@ -95,6 +98,12 @@ const StatusBadge = ({ status, date, startTime }) => {
 export default function AllBookings() {
 	const navigate = useNavigate();
 
+	const [confirmConfig, setConfirmConfig] = useState({
+		isOpen: false,
+		bookingId: null,
+		newStatus: null,
+	});
+
 	const [activeTab, setActiveTab] = useState("upcoming");
 	const [history, setHistory] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -158,7 +167,7 @@ export default function AllBookings() {
 				});
 				const res = await fetch(
 					`${API_URL}/api/bookings/user/history?${params.toString()}`,
-					{ headers: { Authorization: `Bearer ${token}` }, signal: signal }
+					{ headers: { Authorization: `Bearer ${token}` }, signal: signal },
 				);
 				if (res.ok) {
 					const responseData = await res.json();
@@ -204,17 +213,29 @@ export default function AllBookings() {
 	};
 
 	const handleStatusUpdate = async (bookingId, newStatus) => {
-		let confirmMsg = "Are you sure you want to update this booking?";
-
 		if (newStatus === "cancelled") {
-			confirmMsg = "Are you sure you want to cancel this booking?";
-		} else if (newStatus === "no_show") {
-			confirmMsg =
-				"⚠️ Confirm reporting Provider No-Show? \n\nThis marks that the provider did not arrive. This action cannot be undone.";
+			//confirmMsg = "Are you sure you want to cancel this booking?";
+			setConfirmConfig({
+				isOpen: true,
+				bookingId,
+				newStatus,
+				title:
+					newStatus === "cancelled" ? "Cancel Booking?" : "Report No-Show?",
+				message:
+					newStatus === "cancelled"
+						? "Are you sure? This service will be removed from your upcoming schedule."
+						: "This marks that the provider did not arrive. This action cannot be undone.",
+			});
+			return;
 		}
+		executeApiUpdate(bookingId, newStatus);
+	};
+	// } else if (newStatus === "no_show") {
+	// 	confirmMsg =
+	// 		"⚠️ Confirm reporting Provider No-Show? \n\nThis marks that the provider did not arrive. This action cannot be undone.";
+	// }
 
-		if (!window.confirm(confirmMsg)) return;
-
+	const executeApiUpdate = async (bookingId, newStatus) => {
 		setActionLoading(bookingId);
 		try {
 			const token = localStorage.getItem("token");
@@ -229,13 +250,12 @@ export default function AllBookings() {
 			const data = await res.json();
 
 			if (res.ok) {
-				// Update local list
 				setHistory((prev) =>
 					prev.map((item) =>
 						item.booking_id === bookingId
 							? { ...item, status: newStatus }
-							: item
-					)
+							: item,
+					),
 				);
 				if (selectedBooking && selectedBooking.booking_id === bookingId) {
 					setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
@@ -243,9 +263,14 @@ export default function AllBookings() {
 			} else {
 				alert(data.message || "Failed to update status");
 			}
+			setConfirmConfig({ ...confirmConfig, isOpen: false }); // Close modal on success
+			toast.success(`Booking ${newStatus.replace("_", " ")} successfully`, {
+				className:
+					"bricolage-grotesque font-semibold border-2 border-emerald-100 bg-white text-emerald-700 rounded-2xl shadow-xl",
+			});
 		} catch (err) {
+			toast.error(data.message || "Failed to update status");
 			console.error("Error updating status:", err);
-			alert("Network error occurred.");
 		} finally {
 			setActionLoading(null);
 		}
@@ -467,11 +492,11 @@ export default function AllBookings() {
 										const year = rawDate.getFullYear();
 										const month = String(rawDate.getMonth() + 1).padStart(
 											2,
-											"0"
+											"0",
 										);
 										const day = String(rawDate.getDate()).padStart(2, "0");
 										const dateObj = new Date(
-											`${year}-${month}-${day}T00:00:00`
+											`${year}-${month}-${day}T00:00:00`,
 										);
 
 										if (item.start_time) {
@@ -574,7 +599,7 @@ export default function AllBookings() {
 																	e.stopPropagation();
 																	handleStatusUpdate(
 																		item.booking_id,
-																		"cancelled"
+																		"cancelled",
 																	);
 																}}
 																disabled={actionLoading === item.booking_id}
@@ -627,7 +652,6 @@ export default function AllBookings() {
 				</div>
 			</motion.div>
 
-			{/* Sheet for Details */}
 			<AnimatePresence>
 				{selectedBooking && (
 					<BookingDetailsSheet
@@ -637,6 +661,17 @@ export default function AllBookings() {
 					/>
 				)}
 			</AnimatePresence>
+
+			<ConfirmModal
+				isOpen={confirmConfig.isOpen}
+				onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+				onConfirm={() =>
+					executeApiUpdate(confirmConfig.bookingId, confirmConfig.newStatus)
+				}
+				title={confirmConfig.title}
+				message={confirmConfig.message}
+				loading={actionLoading === confirmConfig.bookingId}
+			/>
 		</div>
 	);
 }

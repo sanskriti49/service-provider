@@ -33,7 +33,6 @@ const QUICK_SERVICES = [
 ];
 
 export default function DashboardOverview() {
-	// Get user from the parent Layout
 	const { user } = useOutletContext();
 
 	const [isLoading, setIsLoading] = useState(true);
