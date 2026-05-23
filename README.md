@@ -67,10 +67,11 @@ Prerequisites
     Razorpay Merchant Account (Sandbox/Test API Keys)
 
 1. Clone the Repository
-Bash
 
+```
 git clone [https://github.com/sanskriti49/service-provider.git](https://github.com/sanskriti49/service-provider.git)
 cd service-provider
+```
 
 2. Configure Environment Variables
 
@@ -106,12 +107,12 @@ npm run dev # Boots up local Vite server (typically at localhost:5173)
 ```
 ## Security & Optimization Best Practices Implemented
 
-    Cryptographic Verification: Validates Razorpay webhooks and hashes signatures locally using standard Node.js crypto toolsets to guarantee payment authenticity.
-
-    CORS Configuration: Explicit cross-origin allowance restrictions set up in the backend to ensure secure client-to-server transaction contexts.
-
-    Normalized Database Relational Schemas: Strict data rules on cascading targets handle operations cleanly, preventing orphan rows across user profiles, service states, and invoice tracking maps.
-
+```    Cryptographic Verification: Validates Razorpay webhooks and hashes signatures locally using standard Node.js crypto toolsets to guarantee payment authenticity.
+```
+```    CORS Configuration: Explicit cross-origin allowance restrictions set up in the backend to ensure secure client-to-server transaction contexts.
+```
+```    Normalized Database Relational Schemas: Strict data rules on cascading targets handle operations cleanly, preventing orphan rows across user profiles, service states, and invoice tracking maps.
+```
 ## Contributing
 
 Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are greatly appreciated.
