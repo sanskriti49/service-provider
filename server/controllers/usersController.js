@@ -84,7 +84,7 @@ async function createUser(req, res, next) {
 				lng,
 			],
 		);
-
+		console.log(result.rows);
 		res.status(201).json({
 			message: "User created successfully!",
 			user: result.rows[0],
@@ -173,6 +173,7 @@ async function updateUser(req, res, next) {
 				});
 
 				if (geoRes.data) {
+					const addr = geoRes.data.address;
 					location = `${addr.city || addr.town || addr.village}, ${addr.state}`;
 				}
 			} catch (geoErr) {

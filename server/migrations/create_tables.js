@@ -63,26 +63,29 @@ const queries = [
   )`,
 
 	// 5. Bookings
-	`CREATE TABLE IF NOT EXISTS public.bookings (
-    id serial4 NOT NULL,
+	`CREATE TABLE public.bookings (
+    booking_id uuid DEFAULT gen_random_uuid() NOT NULL,
     provider_id uuid NOT NULL,
     user_id uuid NOT NULL,
+    service_id uuid NULL,
     "date" date NOT NULL,
     start_time time NOT NULL,
     end_time time NOT NULL,
     status varchar(20) DEFAULT 'booked'::character varying NOT NULL,
+    address text NULL,
+    price float4 NULL,
+    payment_method varchar(20) DEFAULT 'cod'::character varying NULL,
+    payment_status varchar(20) DEFAULT 'pending'::character varying NULL,
+    razorpay_order_id varchar(255) NULL,
+    razorpay_payment_id varchar(255) NULL,
+    otp varchar(6) NULL,
+    action_by public.actor_role NULL,
+    cancellation_reason text NULL,
     created_at timestamptz DEFAULT now() NULL,
     updated_at timestamptz DEFAULT now() NULL,
-    booking_id uuid DEFAULT gen_random_uuid() NULL,
-    service_id uuid NULL,
-    address text NULL,
-    CONSTRAINT bookings_booking_id_key UNIQUE (booking_id),
-    CONSTRAINT bookings_pkey PRIMARY KEY (id),
-    CONSTRAINT bookings_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.users(id) ON DELETE CASCADE,
-    CONSTRAINT bookings_service_id_fkey FOREIGN KEY (service_id) REFERENCES public.services(id),
-    CONSTRAINT bookings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
-  )`,
-
+    
+    CONSTRAINT bookings_pkey PRIMARY KEY (booking_id)
+);`
 	// 5.1 Booking Indexes (Run separately)
 	`CREATE INDEX IF NOT EXISTS ix_bookings_booking_id ON public.bookings USING btree (booking_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_provider_date ON public.bookings USING btree (provider_id, date)`,

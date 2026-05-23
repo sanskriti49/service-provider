@@ -1,22 +1,36 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link, Outlet, NavLink } from "react-router-dom";
+import { Link, Outlet, NavLink, useNavigate } from "react-router-dom";
 import {
 	Zap,
 	LayoutDashboard,
 	History,
 	Settings as SettingsIcon,
 } from "lucide-react";
-import { useAuth } from "../../hooks/useAuth"; // ✅ single source of truth
+import { jwtDecode } from "jwt-decode";
 
 export default function CustomerDashboard() {
-	// ✅ No more manual jwtDecode + useEffect + navigate here.
-	// ProtectedRoute already guards this route; useAuth just reads the cached result.
-	const { user } = useAuth();
+	const navigate = useNavigate();
+	const [user, setUser] = useState({ name: "Guest" });
+
+	useEffect(() => {
+		const token = localStorage.getItem("token");
+		if (token) {
+			try {
+				const decoded = jwtDecode(token);
+				setUser(decoded);
+			} catch (e) {
+				navigate("/login");
+			}
+		} else {
+			navigate("/login");
+		}
+	}, [navigate]);
 
 	return (
 		<div className="pt-32 bricolage-grotesque min-h-screen relative bg-gray-50/50 pb-12 px-4 sm:px-8">
 			<div className="max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
-				{/* ── LEFT SIDEBAR ─────────────────────────────────────────────── */}
+				{/* --- LEFT SIDEBAR --- */}
 				<motion.aside
 					initial={{ x: -20, opacity: 0 }}
 					animate={{ x: 0, opacity: 1 }}
@@ -27,7 +41,7 @@ export default function CustomerDashboard() {
 						{/* User Profile Snippet */}
 						<div className="flex items-center gap-4 pb-6 border-b border-gray-100">
 							<div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-violet-500/30 overflow-hidden ring-2 ring-white">
-								{user?.photo ? (
+								{user.photo ? (
 									<img
 										src={user.photo}
 										alt="Profile"
@@ -39,15 +53,14 @@ export default function CustomerDashboard() {
 							</div>
 							<div className="overflow-hidden">
 								<h3 className="font-bold text-gray-800 truncate">
-									{user?.name || "Guest"}
+									{user.name}
 								</h3>
 								<p className="text-xs text-gray-500 font-medium truncate">
-									{user?.custom_id || "Standard Plan"}
+									{user.custom_id || "Standard Plan"}
 								</p>
 							</div>
 						</div>
 
-						{/* Nav links */}
 						<nav className="flex flex-col gap-2">
 							<SidebarLink
 								to="/dashboard"
@@ -77,7 +90,7 @@ export default function CustomerDashboard() {
 								Contact our 24/7 support team.
 							</p>
 							<Link
-								to="/help"
+								to="/#contact"
 								className="inline-block text-xs bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/30 hover:bg-white/30 transition-colors"
 							>
 								Contact Support
@@ -86,9 +99,15 @@ export default function CustomerDashboard() {
 					</div>
 				</motion.aside>
 
-				{/* ── MAIN CONTENT ─────────────────────────────────────────────── */}
+				{/* --- MAIN CONTENT AREA --- */}
 				<main className="min-w-0">
-					{/* Pass user down via context so children don't re-decode JWT */}
+					{/* This Outlet is where the Router injects:
+                1. DashboardOverview (at /dashboard)
+                2. AllBookings (at /dashboard/bookings)
+                3. SettingsPage (at /dashboard/settings)
+                
+                We pass the 'user' object down so children don't have to decode it again.
+             */}
 					<Outlet context={{ user }} />
 				</main>
 			</div>
@@ -96,7 +115,6 @@ export default function CustomerDashboard() {
 	);
 }
 
-// ── Sidebar link ──────────────────────────────────────────────────────────────
 function SidebarLink({ to, icon, label, end = false }) {
 	return (
 		<NavLink

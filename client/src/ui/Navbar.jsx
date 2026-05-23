@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { HashLink } from "react-router-hash-link";
 import { jwtDecode } from "jwt-decode";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,6 +38,14 @@ const Navbar = () => {
 	const [hoveredTab, setHoveredTab] = useState(null);
 	const [isDropdownOpen, setDropdownOpen] = useState(false);
 	const location = useLocation();
+	const navigate = useNavigate();
+
+	const handleLogout = () => {
+		localStorage.removeItem("token");
+		setUser(null);
+		setMobileMenuOpen(false);
+		navigate("/login");
+	};
 
 	useEffect(() => {
 		const token = localStorage.getItem("token");
@@ -269,20 +277,43 @@ const Navbar = () => {
 							>
 								Contact
 							</MobileLink>
-							{!user && (
+
+							{!user ? (
 								<div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-100">
 									<Link
 										to="/login"
-										className="py-3 rounded-xl text-center font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100"
+										className="cursor-pointer py-3 rounded-xl text-center font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100"
 									>
 										Log in
 									</Link>
 									<Link
 										to="/sign-up"
-										className="py-3 rounded-xl text-center font-semibold text-white bg-violet-600 shadow-md shadow-violet-200"
+										className="cursor-pointer py-3 rounded-xl text-center font-semibold text-white bg-violet-600 shadow-md shadow-violet-200"
 									>
 										Get Started
 									</Link>
+								</div>
+							) : (
+								<div className="mt-4 pt-4 border-t border-gray-100 flex flex-col gap-2">
+									{/* Option to view dashboard before logging out */}
+									<Link
+										to={
+											user.role === "provider"
+												? "/provider/dashboard"
+												: "/dashboard"
+										}
+										onClick={() => setMobileMenuOpen(false)}
+										className="cursor-pointer bricolage-grotesque block text-center w-full p-3 rounded-xl text-lg font-medium text-gray-700 bg-gray-50 hover:bg-violet-50 hover:text-violet-700 transition-all"
+									>
+										Go to Dashboard ({user.name || "Account"})
+									</Link>
+
+									<button
+										onClick={handleLogout}
+										className="cursor-pointer bricolage-grotesque w-full p-3 rounded-xl text-lg font-semibold text-red-600 bg-red-50 hover:bg-red-100 active:scale-95 transition-all text-center"
+									>
+										Log Out
+									</button>
 								</div>
 							)}
 						</div>

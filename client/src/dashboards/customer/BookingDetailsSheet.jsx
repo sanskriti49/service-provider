@@ -18,7 +18,6 @@ export default function BookingDetailsSheet({
 	onClose,
 	onUpdateStatus,
 }) {
-	// Prevent background scroll
 	useEffect(() => {
 		document.body.style.overflow = "hidden";
 		return () => {
@@ -30,10 +29,6 @@ export default function BookingDetailsSheet({
 
 	const { bookingDateTime, isPastStart, displayStatus, statusStyles } =
 		useMemo(() => {
-			// const bdt = new Date(
-			// 	`${booking.date}T${booking.start_time || "00:00"}:00`,
-			// );
-			console.log(booking);
 			const datePart = booking.date.split("T")[0];
 
 			const timePart = booking.start_time || "00:00:00";
@@ -291,12 +286,9 @@ export default function BookingDetailsSheet({
 							)}
 						</div>
 
-						{/* Subtle Watermark for Refunded Status */}
-						{/* Refined Watermark Logic */}
 						{(booking.status === "cancelled" ||
 							booking.status === "no_show") && (
 							<div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
-								{/* Large Centered Security Icon */}
 								<div
 									className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
                        text-red-900 opacity-[0.04] rotate-[-15deg]"
@@ -304,7 +296,6 @@ export default function BookingDetailsSheet({
 									<ShieldCheck size={280} strokeWidth={1} />
 								</div>
 
-								{/* Decorative "VOID" or "REFUNDED" text watermark */}
 								<div className="absolute bottom-2 right-4 text-red-900 opacity-[0.05] font-black text-4xl italic tracking-tighter uppercase">
 									Voided
 								</div>

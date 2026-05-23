@@ -1,22 +1,15 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 
-const connectionString = process.env.DATABASE_URL;
-const dbHost = process.env.DB_HOST;
+// Explicitly check for production environment flags
+const isProduction = process.env.NODE_ENV === "production";
 
-// check if we are using neon or local
-// check if the connection string OR the host variable contains "neon.tech"
-const isNeon =
-	(connectionString && connectionString.includes("neon.tech")) ||
-	(dbHost && dbHost.includes("neon.tech"));
-
-const poolConfig = process.env.DATABASE_URL
+const poolConfig = isProduction
 	? {
 			connectionString: process.env.DATABASE_URL,
-			ssl: isNeon ? { rejectUnauthorized: false } : false, // for neon
+			ssl: { rejectUnauthorized: false }, // Mandatory for Neon cloud setups
 		}
 	: {
-			// LOCAL CONFIG ( when DATABASE_URL is missing)
 			user: process.env.DB_USER,
 			host: process.env.DB_HOST,
 			password: process.env.DB_PASSWORD,
@@ -29,14 +22,14 @@ const pool = new Pool(poolConfig);
 
 pool.on("connect", () => {
 	console.log(
-		isNeon
-			? "✅ Connected to NEON DB (SSL Enabled)"
-			: "✅ Connected to LOCAL DB",
+		isProduction
+			? "🚀 LIVE: Connected to NEON DB CLOUD"
+			: "🏠 LOCAL: Connected to localized machine PostgreSQL",
 	);
 });
 
 pool.on("error", (err) => {
-	console.error("❌ DB Error:", err);
+	console.error("❌ DB Engine Error Encountered:", err);
 });
 
 module.exports = {
