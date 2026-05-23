@@ -1,10 +1,3 @@
-Instructions to Use:
-
-    Copy the Markdown code below.
-    Replace the placeholder database/server details if you wish to adjust the configurations.
-    Commit it directly to your repository as README.md.
-
-
 # TaskGenie 
 
 [![Deployed Link](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge&logo=vercel)](https://taskgenieee.vercel.app/)
@@ -62,7 +55,7 @@ service-provider/
 ├── package.json            # Monorepo Workspace Configuration
 └── README.md
 
-⚙️ Local Setup and Installation
+Local Setup and Installation
 
 Follow these steps to configure your local development environment.
 Prerequisites
@@ -110,8 +103,8 @@ Bash
 cd ../client
 npm install
 npm run dev # Boots up local Vite server (typically at localhost:5173)
-
-🔒 Security & Optimization Best Practices Implemented
+```
+## Security & Optimization Best Practices Implemented
 
     Cryptographic Verification: Validates Razorpay webhooks and hashes signatures locally using standard Node.js crypto toolsets to guarantee payment authenticity.
 
@@ -119,11 +112,11 @@ npm run dev # Boots up local Vite server (typically at localhost:5173)
 
     Normalized Database Relational Schemas: Strict data rules on cascading targets handle operations cleanly, preventing orphan rows across user profiles, service states, and invoice tracking maps.
 
-🤝 Contributing
+## Contributing
 
 Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are greatly appreciated.
 
-    Fork the Project
+```    Fork the Project
 
     Create your Feature Branch (git checkout -b feature/AmazingFeature)
 
