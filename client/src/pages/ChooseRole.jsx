@@ -64,7 +64,7 @@ const ChooseRole = () => {
 				className="relative z-10 w-full max-w-xl text-center"
 			>
 				{/* Header Section */}
-				<div className="mb-12">
+				<div className="mb-2">
 					<motion.div
 						initial={{ scale: 0.8, opacity: 0 }}
 						animate={{ scale: 1, opacity: 1 }}

@@ -9,6 +9,7 @@ const {
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const db = require("../config/db");
+const b = require("../controllers/bookingController");
 
 function allowRoles(...roles) {
 	return (req, res, next) => {
@@ -91,6 +92,8 @@ router.get(
 		}
 	},
 );
+
+router.get("/provider/recent/:id", authMiddleware, b.getRecentProviderBookings);
 
 router.patch(
 	"/:bookingId/address",

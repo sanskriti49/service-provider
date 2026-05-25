@@ -2,6 +2,7 @@ const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const {
 	getCustomerDashboardStats,
+	getProviderDashboardStats,
 } = require("../controllers/dashboardController");
 const router = express.Router();
 
@@ -18,7 +19,13 @@ router.get(
 	"/customer",
 	authMiddleware,
 	allowRoles("customer"),
-	getCustomerDashboardStats
+	getCustomerDashboardStats,
 );
 
+router.get(
+	"/provider/:id",
+	authMiddleware,
+	allowRoles("provider"),
+	getProviderDashboardStats,
+);
 module.exports = router;

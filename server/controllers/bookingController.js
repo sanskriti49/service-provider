@@ -47,7 +47,8 @@ async function createBooking(req, res, next) {
 		await client.query("BEGIN");
 
 		const priceRes = await client.query(
-			"SELECT price FROM providers WHERE user_id = $1",
+			`SELECT price FROM provider_services 
+			WHERE provider_id = $1 AND service_id=$2::uuid`,
 			[provider_id],
 		);
 		if (priceRes.rows.length === 0) throw new Error("Provider not found");
@@ -255,6 +256,31 @@ async function updateBookingStatus(req, res) {
 		res.status(500).json({ message: "Server error", error: err.message });
 	} finally {
 		client.release();
+	}
+}
+
+async function getRecentProviderBookings(req, res, next) {
+	const providerId = req.params.id; // Reads from router path variable string
+
+	try {
+		const result = await db.query(
+			`SELECT 
+                b.booking_id, b.date, b.status, b.price, b.start_time,
+                u.name AS customer_name,
+                s.name AS service_name
+             FROM bookings b
+             JOIN users u ON b.user_id = u.id
+             JOIN services s ON b.service_id = s.id
+             WHERE b.provider_id = $1
+             ORDER BY b.date DESC, b.start_time DESC
+             LIMIT 5`,
+			[providerId],
+		);
+
+		res.json(result.rows);
+	} catch (err) {
+		console.error("Failed to load recent dashboard lines:", err);
+		res.status(500).json({ error: "Server error parsing activity updates" });
 	}
 }
 
@@ -570,4 +596,5 @@ module.exports = {
 	getUserHistory,
 	updateBookingStatus,
 	verifyPayment,
+	getRecentProviderBookings,
 };

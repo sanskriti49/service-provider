@@ -62,6 +62,39 @@
 html {
 	scroll-behavior: smooth;
 }
+/* ===== GLOBAL SCROLLBAR FIX ===== */
+
+* {
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* Chrome / Edge / Safari */
+*::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+	background: transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+	background-color: rgba(255, 255, 255, 0.18);
+	border-radius: 999px;
+	border: none;
+}
+
+/* Prevent white hover flash */
+*::-webkit-scrollbar-thumb:hover {
+	background-color: rgba(139, 92, 246, 0.45);
+}
+
+/* Prevent scrollbar widening on hover */
+*::-webkit-scrollbar {
+	-webkit-appearance: none;
+	appearance: none;
+}
 
 .mackinac {
 	font-family: "P22Mackinac", sans-serif;
@@ -168,9 +201,9 @@ html {
 	border-radius: 999px;
 }
 
-.custom-scrollbar-y::-webkit-scrollbar-thumb:hover {
+/* .custom-scrollbar-y::-webkit-scrollbar-thumb:hover {
 	background-color: rgba(139, 92, 246, 0.6);
-}
+} */
 
 .arrow {
 	border: solid black;
@@ -259,7 +292,10 @@ html {
 	justify-content: center;
 	letter-spacing: 0em;
 	white-space: nowrap;
-	transition: 0.2s all ease-in-out;
+	transition:
+		background-color 0.2s ease,
+		color 0.2s ease,
+		border-color 0.2s ease;
 }
 
 /* Optional: Add a hover state for better interactivity */

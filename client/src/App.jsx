@@ -9,6 +9,7 @@ import PageLoader from "./ui/PageLoader";
 import ProviderBookings from "./dashboards/provider/ProviderBookings";
 import ProviderEarnings from "./dashboards/provider/ProviderEarnings";
 import ProviderServices from "./dashboards/provider/ProviderServices";
+import ProviderSettings from "./dashboards/provider/ProviderSettings";
 
 // ─── Lazy Pages ────────────────────────────────────────────────────────────────
 const Home = lazy(() => import("./pages/Home"));
@@ -143,8 +144,8 @@ const router = createBrowserRouter([
 			{ index: true, element: null },
 			{ path: "bookings", element: <ProviderBookings /> },
 			{ path: "earnings", element: <ProviderEarnings /> },
-
 			{ path: "services", element: <ProviderServices /> },
+			{ path: "settings", element: <ProviderSettings /> },
 		],
 	},
 ]);

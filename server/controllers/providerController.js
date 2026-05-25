@@ -6,6 +6,28 @@ const { hashIfPresent } = require("../utils/hash");
 const { generateRealSlots } = require("../utils/timeUtils");
 const { normalizeEmail } = require("../utils/normalizeEmail");
 
+// ── UUID detection ─────────────────────────────────────────────────────────────
+const UUID_REGEX =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function resolveProviderId(clientOrPool, idOrCustomId) {
+	const value = String(idOrCustomId).trim();
+	let result;
+	if (UUID_REGEX.test(value)) {
+		result = await clientOrPool.query(
+			`SELECT id FROM users WHERE id = $1::uuid AND role = 'provider'`,
+			[value],
+		);
+	} else {
+		result = await clientOrPool.query(
+			`SELECT id FROM users WHERE custom_id = $1 AND role = 'provider'`,
+			[value],
+		);
+	}
+	return result.rows[0]?.id ?? null;
+}
+
+// ── Validation schemas ────────────────────────────────────────────────────────
 const providerSchema = Joi.object({
 	name: Joi.string().min(3).max(100).required(),
 	email: Joi.string().email().lowercase().required(),
@@ -14,9 +36,17 @@ const providerSchema = Joi.object({
 		.message("Phone must be a valid Indian number (+91 followed by 10 digits)")
 		.required(),
 	location: Joi.string().optional(),
-	photo: Joi.string().uri().optional(),
-	bio: Joi.string().max(500).optional(),
+	photo: Joi.string().allow("").optional(),
+	bio: Joi.string().max(500).allow("").optional(),
 	service: Joi.string().required(),
+	services: Joi.array()
+		.items(
+			Joi.object({
+				slug: Joi.string().required(),
+				price: Joi.number().min(0).required(),
+			}),
+		)
+		.optional(),
 	price: Joi.number().min(0).optional(),
 	price_unit: Joi.string().optional().default("fixed"),
 	rating: Joi.number().min(0).max(5).optional(),
@@ -42,9 +72,10 @@ const providerUpdateSchema = Joi.object({
 		.required(),
 	password: Joi.string().min(6).optional(),
 	location: Joi.string().optional(),
-	photo: Joi.string().uri().optional(),
+	photo: Joi.string().allow("").optional(),
 	bio: Joi.string().max(500).optional(),
 	service: Joi.string().optional(),
+	service_id: Joi.string().uuid().optional(),
 	price: Joi.number().min(0).optional(),
 	price_unit: Joi.string().optional(),
 	rating: Joi.number().min(0).max(5).optional(),
@@ -59,6 +90,38 @@ const providerUpdateSchema = Joi.object({
 		.optional(),
 });
 
+// ── Slot helpers ───────────────────────────────────────────────────────────────
+const DEFAULT_SCHEDULE = [1, 2, 3, 4, 5, 6].map((day) => ({
+	day,
+	start: "10:00:00",
+	end: "19:00:00",
+}));
+
+async function insertSlots(client, userId, schedule) {
+	await client.query(
+		"DELETE FROM provider_master_availability WHERE provider_id = $1",
+		[userId],
+	);
+	for (const rule of schedule) {
+		await client.query(
+			`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
+             VALUES ($1,$2,$3,$4)`,
+			[userId, rule.day, rule.start, rule.end],
+		);
+	}
+	await client.query("DELETE FROM availability_slots WHERE provider_id = $1", [
+		userId,
+	]);
+	for (const s of generateRealSlots(schedule)) {
+		await client.query(
+			`INSERT INTO availability_slots (provider_id, date, start_time, end_time)
+             VALUES ($1,$2,$3,$4)`,
+			[userId, s.date, s.start_time, s.end_time],
+		);
+	}
+}
+
+// ── createProvider ─────────────────────────────────────────────────────────────
 async function createProvider(req, res, next) {
 	const { error, value } = providerSchema.validate(req.body);
 	if (error) return res.status(400).json({ error: error.details[0].message });
@@ -69,6 +132,7 @@ async function createProvider(req, res, next) {
 		phone,
 		password,
 		service,
+		services: extraServices,
 		price,
 		price_unit,
 		rating,
@@ -78,20 +142,18 @@ async function createProvider(req, res, next) {
 		bio,
 	} = value;
 
-	const cleanEmail = normalizeEmail(email);
 	const client = await db.connect();
-
 	try {
 		await client.query("BEGIN");
 
-		const serviceRow = await client.query(
-			"SELECT id FROM services WHERE slug = $1",
-			[service],
-		);
-		if (serviceRow.rows.length === 0) {
-			return res.status(400).json({ error: "Invalid service slug" });
-		}
-		const serviceId = serviceRow.rows[0].id;
+		const sRow = await client.query("SELECT id FROM services WHERE slug=$1", [
+			service,
+		]);
+		if (!sRow.rows.length)
+			return res
+				.status(400)
+				.json({ error: `Unknown service slug: ${service}` });
+		const serviceId = sRow.rows[0].id; // uuid
 
 		const hashed = await hashIfPresent(password);
 		const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20);
@@ -99,11 +161,19 @@ async function createProvider(req, res, next) {
 
 		const userInsert = await client.query(
 			`INSERT INTO users (name, email, phone, role, custom_id, password, location, photo, bio)
-             VALUES ($1,$2,$3,'provider',$3,$4,$5,$6,$7,$8)
-             RETURNING id`,
-			[name, cleanEmail, phone, customId, hashed, location, photo, bio],
+             VALUES ($1,$2,$3,'provider',$4,$5,$6,$7,$8) RETURNING id`,
+			[
+				name,
+				normalizeEmail(email),
+				phone,
+				customId,
+				hashed,
+				location,
+				photo,
+				bio,
+			],
 		);
-		const userId = userInsert.rows[0].id;
+		const userId = userInsert.rows[0].id; // uuid
 
 		await client.query(
 			`INSERT INTO providers (user_id, service_id, price, price_unit, rating, availability)
@@ -111,42 +181,35 @@ async function createProvider(req, res, next) {
 			[
 				userId,
 				serviceId,
-				price,
-				price_unit || "fixed",
-				rating,
-				JSON.stringify(availability || []),
+				price ?? 0,
+				price_unit ?? "fixed",
+				rating ?? null,
+				JSON.stringify(availability ?? []),
 			],
 		);
 
-		// If no schedule provided, default to Mon-Sat 10-7
-		const masterSchedule = availability || [
-			{ day: 1, start: "10:00:00", end: "19:00:00" },
-			{ day: 2, start: "10:00:00", end: "19:00:00" },
-			{ day: 3, start: "10:00:00", end: "19:00:00" },
-			{ day: 4, start: "10:00:00", end: "19:00:00" },
-			{ day: 5, start: "10:00:00", end: "19:00:00" },
-			{ day: 6, start: "10:00:00", end: "19:00:00" },
-		];
+		await client.query(
+			`INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible)
+             VALUES ($1,$2,$3,$4,TRUE)
+             ON CONFLICT (provider_id, service_id) DO NOTHING`,
+			[userId, serviceId, price ?? 0, price_unit ?? "fixed"],
+		);
 
-		for (const rule of masterSchedule) {
+		for (const svc of extraServices ?? []) {
+			const r = await client.query("SELECT id FROM services WHERE slug=$1", [
+				svc.slug,
+			]);
+			if (!r.rows.length) continue;
 			await client.query(
-				`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
-                 VALUES ($1, $2, $3, $4)`,
-				[userId, rule.day, rule.start, rule.end],
+				`INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible)
+                 VALUES ($1,$2,$3,'fixed',TRUE)
+                 ON CONFLICT (provider_id, service_id) DO UPDATE SET price=EXCLUDED.price`,
+				[userId, r.rows[0].id, svc.price],
 			);
 		}
 
-		const realSlots = generateRealSlots(masterSchedule);
-		for (const s of realSlots) {
-			await client.query(
-				`INSERT INTO availability_slots (provider_id, date, start_time, end_time)
-                 VALUES ($1, $2, $3, $4)`,
-				[userId, s.date, s.start_time, s.end_time],
-			);
-		}
-
+		await insertSlots(client, userId, availability ?? DEFAULT_SCHEDULE);
 		await client.query("COMMIT");
-
 		res.status(201).json({
 			message: "Provider created successfully",
 			user_id: userId,
@@ -160,84 +223,79 @@ async function createProvider(req, res, next) {
 	}
 }
 
+// ── getProviders ───────────────────────────────────────────────────────────────
 async function getProviders(req, res, next) {
 	try {
 		const { service } = req.query;
-
 		let query = `
-            SELECT 
-                users.name, users.photo, users.phone, users.bio, users.location, users.custom_id,
-                services.name AS service, services.slug AS service_slug, services.id as service_id,
-                providers.price, 
-                providers.price_unit, 
-                providers.rating, 
-                providers.user_id
-            FROM providers
-            JOIN users ON providers.user_id = users.id
-            LEFT JOIN services ON providers.service_id = services.id
+            SELECT u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
+                   s.name AS service, s.slug AS service_slug, s.id AS service_id,
+                   p.price, p.price_unit, p.rating, p.user_id
+            FROM providers p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN services s ON p.service_id = s.id
         `;
-
 		const params = [];
 		if (service) {
-			query += " WHERE services.slug = $1";
+			query += " WHERE s.slug = $1";
 			params.push(service);
 		}
-
-		const result = await db.query(query, params);
-		res.json(result.rows);
+		res.json((await db.query(query, params)).rows);
 	} catch (err) {
 		next(err);
 	}
 }
 
+// ── getProviderById ────────────────────────────────────────────────────────────
 async function getProviderById(req, res, next) {
 	try {
 		const { custom_id } = req.params;
-
 		const providerRes = await db.query(
-			`SELECT 
-                users.id, users.name, users.email, users.phone, users.role, users.custom_id, 
-                users.location, users.photo, users.bio,
-                providers.price, 
-                providers.price_unit,
-                providers.rating,
-                services.name AS service, services.slug AS service_slug, services.id as service_id
-             FROM providers
-             JOIN users ON users.id = providers.user_id
-             LEFT JOIN services ON providers.service_id = services.id
-             WHERE users.custom_id = $1`,
+			`SELECT u.id, u.name, u.email, u.phone, u.role, u.custom_id,
+                    u.location, u.photo, u.bio,
+                    p.price, p.price_unit, p.rating,
+                    s.name AS service, s.slug AS service_slug, s.id AS service_id
+             FROM providers p
+             JOIN users u ON u.id = p.user_id
+             LEFT JOIN services s ON p.service_id = s.id
+             WHERE u.custom_id = $1`,
 			[custom_id],
 		);
-
-		if (providerRes.rows.length === 0)
+		if (!providerRes.rows.length)
 			return res.status(404).json({ error: "Provider not found" });
 
-		const providerId = providerRes.rows[0].id;
+		const provider = providerRes.rows[0];
 
-		// get Real Availability Read directly from slots table instead of calculating on fly
+		const servicesRes = await db.query(
+			`SELECT s.id, s.name, s.slug, s.description, s.image_url,
+                    ps.price, ps.price_unit, ps.is_visible
+             FROM provider_services ps
+             JOIN services s ON s.id = ps.service_id
+             WHERE ps.provider_id = $1`,
+			[provider.id],
+		);
+
 		const today = new Date();
 		const nextMonth = new Date();
 		nextMonth.setDate(today.getDate() + 30);
-
 		const slotsRes = await db.query(
-			`SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, start_time, is_booked 
-             FROM availability_slots 
-             WHERE provider_id = $1 AND date >= $2 AND date <= $3
+			`SELECT TO_CHAR(date,'YYYY-MM-DD') AS date, start_time, is_booked
+             FROM availability_slots
+             WHERE provider_id=$1 AND date >= $2 AND date <= $3
              ORDER BY date, start_time`,
-			[providerId, today, nextMonth],
+			[provider.id, today, nextMonth],
 		);
-
-		const dynamicAvailability = slotsRes.rows.map((slot) => ({
-			date: slot.date,
-			start_time: slot.start_time.slice(0, 5), // "09:00:00" -> "09:00"
-			isBooked: slot.is_booked,
-		}));
 
 		res.json({
 			message: "Provider fetched",
 			provider: {
-				...providerRes.rows[0],
-				availability: dynamicAvailability,
+				...provider,
+				services: servicesRes.rows,
+				availability: slotsRes.rows.map((s) => ({
+					date: s.date,
+					start_time: s.start_time.slice(0, 5),
+					isBooked: s.is_booked,
+				})),
 			},
 		});
 	} catch (err) {
@@ -245,6 +303,7 @@ async function getProviderById(req, res, next) {
 	}
 }
 
+// ── updateProvider ─────────────────────────────────────────────────────────────
 async function updateProvider(req, res, next) {
 	const { error, value } = providerUpdateSchema.validate(req.body);
 	if (error) return res.status(400).json({ error: error.details[0].message });
@@ -259,82 +318,59 @@ async function updateProvider(req, res, next) {
 		photo,
 		bio,
 		service,
+		service_id: bodyServiceId,
 		price,
 		price_unit,
 		rating,
 		availability,
 	} = value;
 
+	const providerId = await resolveProviderId(db, id);
+	if (!providerId) return res.status(404).json({ error: "Provider not found" });
+
 	const client = await db.connect();
 	try {
 		await client.query("BEGIN");
-		const hashed = await hashIfPresent(password);
 
+		const hashed = await hashIfPresent(password);
 		await client.query(
 			`UPDATE users SET
-                name = COALESCE($1, name),
-                email = COALESCE($2, email),
-                password = COALESCE($3, password),
-                location = COALESCE($4, location),
-                photo = COALESCE($5, photo),
-                bio = COALESCE($6, bio),
-                phone = COALESCE($7, phone)
-             WHERE id = $8`,
-			[name, email, hashed, location, photo, bio, phone, id],
+                name=COALESCE($1,name), email=COALESCE($2,email), password=COALESCE($3,password),
+                location=COALESCE($4,location), photo=COALESCE($5,photo), bio=COALESCE($6,bio), phone=COALESCE($7,phone)
+             WHERE id=$8`,
+			[name, email, hashed, location, photo, bio, phone, providerId],
 		);
 
-		let serviceId = null;
-		if (service) {
-			const s = await client.query("SELECT id FROM services WHERE slug = $1", [
+		let serviceId = bodyServiceId ?? null;
+		if (!serviceId && service) {
+			const s = await client.query("SELECT id FROM services WHERE slug=$1", [
 				service,
 			]);
-			if (s.rows.length === 0)
-				return res.status(400).json({ error: "Invalid service slug" });
+			if (!s.rows.length)
+				return res
+					.status(400)
+					.json({ error: `Unknown service slug: ${service}` });
 			serviceId = s.rows[0].id;
 		}
 
-		await client.query(
-			`UPDATE providers SET
-                service_id = COALESCE($1, service_id),
-                price = COALESCE($2, price),
-                rating = COALESCE($3, rating),
-                price_unit = COALESCE($4, price_unit)
-             WHERE user_id = $5`,
-			[serviceId, price, rating, price_unit, id],
-		);
+		// 2. Redirect pricing and service updates to the correct target relation table
+		if (serviceId) {
+			await client.query(
+				`INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible)
+                 VALUES ($1, $2, $3, $4, TRUE)
+                 ON CONFLICT (provider_id, service_id)
+                 DO UPDATE SET 
+                    price = COALESCE(EXCLUDED.price, provider_services.price), 
+                    price_unit = COALESCE(EXCLUDED.price_unit, provider_services.price_unit)`,
+				[providerId, serviceId, price ?? 0, price_unit ?? "fixed"],
+			);
+		}
 
 		if (availability) {
-			// update Master Intent
+			await insertSlots(client, providerId, availability);
 			await client.query(
-				"DELETE FROM provider_master_availability WHERE provider_id=$1",
-				[id],
-			);
-			for (const s of availability) {
-				await client.query(
-					`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
-                     VALUES ($1, $2, $3, $4)`,
-					[id, s.day, s.start, s.end],
-				);
-			}
-
-			// 2. Regenerate Real Inventory
-			await client.query(
-				"DELETE FROM availability_slots WHERE provider_id=$1",
-				[id],
-			);
-
-			const newSlots = generateRealSlots(availability);
-			for (const s of newSlots) {
-				await client.query(
-					`INSERT INTO availability_slots (provider_id, date, start_time, end_time)
-                     VALUES ($1, $2, $3, $4)`,
-					[id, s.date, s.start_time, s.end_time],
-				);
-			}
-
-			await client.query(
-				`UPDATE providers SET availability = $1 WHERE user_id = $2`,
-				[JSON.stringify(availability), id],
+				`UPDATE providers SET availability=$1 WHERE user_id=$2`,
+				[JSON.stringify(availability), providerId],
 			);
 		}
 
@@ -348,41 +384,172 @@ async function updateProvider(req, res, next) {
 	}
 }
 
-async function getProviderAvailability(req, res, next) {
+// ── getProviderServices ────────────────────────────────────────────────────────
+async function getProviderServices(req, res, next) {
 	try {
-		const { id } = req.params;
-		const today = new Date();
-		const nextWeek = new Date();
-		nextWeek.setDate(today.getDate() + 14);
+		const providerId = await resolveProviderId(db, req.params.id);
+		if (!providerId)
+			return res.status(404).json({ error: "Provider not found" });
 
-		// Directly read from the pre-generated inventory table
-		const slotsRes = await db.query(
-			`SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, start_time, is_booked
-             FROM availability_slots
-             WHERE provider_id=$1 AND date >= $2 AND date <= $3
-             ORDER BY date, start_time`,
-			[id, today, nextWeek],
+		const result = await db.query(
+			`SELECT s.id, s.name, s.slug, s.description, s.image_url,
+                    ps.price, ps.price_unit, ps.is_visible
+             FROM provider_services ps
+             JOIN services s ON s.id = ps.service_id
+             WHERE ps.provider_id = $1
+             ORDER BY ps.created_at ASC`,
+			[providerId],
 		);
-
-		const dynamicAvailability = slotsRes.rows.map((row) => ({
-			date: row.date,
-			start_time: row.start_time.slice(0, 5),
-			isBooked: row.is_booked,
-		}));
-
-		res.json(dynamicAvailability);
+		res.json(result.rows);
 	} catch (err) {
 		next(err);
 	}
 }
 
+// ── addProviderService ─────────────────────────────────────────────────────────
+async function addProviderService(req, res, next) {
+	const { slug, price, description } = req.body;
+
+	if (!slug || price == null)
+		return res.status(400).json({ error: "slug and price are required" });
+
+	const parsedPrice = parseFloat(price);
+	if (isNaN(parsedPrice) || parsedPrice < 0)
+		return res
+			.status(400)
+			.json({ error: "price must be a non-negative number" });
+
+	const client = await db.connect();
+	try {
+		await client.query("BEGIN");
+
+		const providerId = await resolveProviderId(client, req.params.id);
+		if (!providerId)
+			return res.status(404).json({ error: "Provider not found" });
+
+		// Find the global base service template ID from the master services table
+		const sRow = await client.query("SELECT id FROM services WHERE slug=$1", [
+			slug,
+		]);
+		if (!sRow.rows.length)
+			return res.status(400).json({ error: `Unknown service slug: ${slug}` });
+		const serviceId = sRow.rows[0].id;
+
+		const result = await client.query(
+			`INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible, slug, description)
+             VALUES ($1, $2, $3, 'fixed', TRUE, $4, $5)
+             ON CONFLICT (provider_id, service_id)
+             DO UPDATE SET 
+                price = EXCLUDED.price, 
+                is_visible = TRUE,
+                slug = COALESCE(EXCLUDED.slug, provider_services.slug),
+                description = COALESCE(EXCLUDED.description, provider_services.description)
+             RETURNING *`,
+			[providerId, serviceId, parsedPrice, slug, description ?? null],
+		);
+
+		await client.query("COMMIT");
+		res
+			.status(201)
+			.json({ message: "Service added successfully", data: result.rows[0] });
+	} catch (err) {
+		await client.query("ROLLBACK");
+		next(err);
+	} finally {
+		client.release();
+	}
+}
+
+// ── removeProviderService ──────────────────────────────────────────────────────
+async function removeProviderService(req, res, next) {
+	try {
+		const providerId = await resolveProviderId(db, req.params.id);
+		if (!providerId)
+			return res.status(404).json({ error: "Provider not found" });
+
+		const result = await db.query(
+			`DELETE FROM provider_services WHERE provider_id=$1 AND service_id=$2::uuid`,
+			[providerId, req.params.serviceId],
+		);
+		if (!result.rowCount)
+			return res
+				.status(404)
+				.json({ error: "Service not found on this provider" });
+		res.json({ message: "Service removed" });
+	} catch (err) {
+		next(err);
+	}
+}
+
+// ── toggleServiceVisibility ────────────────────────────────────────────────────
+async function toggleServiceVisibility(req, res, next) {
+	try {
+		const { is_visible } = req.body;
+		if (typeof is_visible !== "boolean")
+			return res.status(400).json({ error: "is_visible must be a boolean" });
+
+		const providerId = await resolveProviderId(db, req.params.id);
+		if (!providerId)
+			return res.status(404).json({ error: "Provider not found" });
+
+		const result = await db.query(
+			`UPDATE provider_services SET is_visible=$1
+             WHERE provider_id=$2 AND service_id=$3::uuid RETURNING *`,
+			[is_visible, providerId, req.params.serviceId],
+		);
+		if (!result.rowCount)
+			return res
+				.status(404)
+				.json({ error: "Service not found on this provider" });
+
+		res.json({
+			message: is_visible ? "Service is now live" : "Service paused",
+			data: result.rows[0],
+		});
+	} catch (err) {
+		next(err);
+	}
+}
+
+// ── getProviderAvailability ────────────────────────────────────────────────────
+async function getProviderAvailability(req, res, next) {
+	try {
+		const today = new Date();
+		const end = new Date();
+		end.setDate(today.getDate() + 14);
+
+		// req.params.id here is custom_id (from the public route), so no UUID cast needed
+		const r = await db.query(
+			`SELECT TO_CHAR(date,'YYYY-MM-DD') AS date, start_time, is_booked
+             FROM availability_slots
+             WHERE provider_id = (SELECT id FROM users WHERE custom_id=$1)
+               AND date >= $2 AND date <= $3
+             ORDER BY date, start_time`,
+			[req.params.id, today, end],
+		);
+		res.json(
+			r.rows.map((row) => ({
+				date: row.date,
+				start_time: row.start_time.slice(0, 5),
+				isBooked: row.is_booked,
+			})),
+		);
+	} catch (err) {
+		next(err);
+	}
+}
+
+// ── deleteProvider ─────────────────────────────────────────────────────────────
 async function deleteProvider(req, res, next) {
 	try {
-		const id = req.params.id;
-		const result = await db.query("DELETE FROM providers WHERE user_id = $1", [
-			id,
+		const providerId = await resolveProviderId(db, req.params.id);
+		if (!providerId)
+			return res.status(404).json({ error: "Provider not found" });
+
+		const r = await db.query("DELETE FROM providers WHERE user_id=$1", [
+			providerId,
 		]);
-		if (result.rowCount === 0)
+		if (!r.rowCount)
 			return res.status(404).json({ error: "No provider found" });
 		res.json({ message: "Provider deleted successfully" });
 	} catch (err) {
@@ -395,6 +562,10 @@ module.exports = {
 	getProviders,
 	getProviderById,
 	updateProvider,
+	getProviderServices,
+	addProviderService,
+	removeProviderService,
+	toggleServiceVisibility,
 	deleteProvider,
 	getProviderAvailability,
 	providerSchema,

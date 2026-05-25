@@ -21,7 +21,7 @@ const userSchema = Joi.object({
 	address: Joi.string().optional(),
 	lat: Joi.number().optional(),
 	lng: Joi.number().optional(),
-	photo: Joi.string().uri().optional(),
+	photo: Joi.string().allow("").optional(),
 	bio: Joi.string().max(500).optional(),
 });
 
@@ -39,7 +39,7 @@ const userUpdateSchema = Joi.object({
 	location: Joi.string().allow("").optional(),
 	address: Joi.string().allow("").optional(),
 	bio: Joi.string().max(500).allow("").optional(),
-	photo: Joi.string().uri().allow("").optional(),
+	photo: Joi.string().allow("").optional(),
 
 	lat: Joi.number().optional(),
 	lng: Joi.number().optional(),
@@ -84,6 +84,15 @@ async function createUser(req, res, next) {
 				lng,
 			],
 		);
+		// If registering as a provider, create the stub providers row
+		if (role === "provider") {
+			await db.query(
+				`INSERT INTO providers (user_id, price, price_unit, availability)
+				VALUES ($1, 0, 'fixed', '[]')
+				ON CONFLICT (user_id) DO NOTHING`,
+				[result.rows[0].id],
+			);
+		}
 		console.log(result.rows);
 		res.status(201).json({
 			message: "User created successfully!",
@@ -197,7 +206,7 @@ async function updateUser(req, res, next) {
                 phone = COALESCE($10, phone),
                 address = COALESCE($11, address)
             WHERE id = $12
-            RETURNING id, name, email, role, location, lat, lng, address, created_at
+            RETURNING id, name, email, role, location, lat, lng, address, photo,bio,created_at
         `;
 
 		const result = await db.query(query, [

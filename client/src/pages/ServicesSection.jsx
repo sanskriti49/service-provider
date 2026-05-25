@@ -98,7 +98,6 @@ const ServiceCard = ({ service, isActive }) => {
 					{service.name}
 				</h3>
 
-				{/* ✅ PRICE DISPLAY */}
 				{service.price && (
 					<p className="text-violet-300 font-semibold mb-2">
 						₹{service.price}

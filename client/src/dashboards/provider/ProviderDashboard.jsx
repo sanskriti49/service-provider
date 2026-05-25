@@ -206,7 +206,7 @@ function SidebarCard({ user, notifications, onLogout, onLinkClick }) {
 					onClick={onLinkClick}
 				/>
 				<SidebarLink
-					to="/provider/settings"
+					to="/provider/dashboard/settings"
 					icon={<Settings size={20} />}
 					label="Settings"
 					onClick={onLinkClick}
@@ -271,8 +271,8 @@ export default function ProviderDashboard() {
 		const load = async () => {
 			try {
 				const [statsRes, bookingsRes] = await Promise.allSettled([
-					api.get("/api/dashboard/provider"),
-					api.get("/api/bookings/provider/recent"),
+					api.get(`/api/dashboard/provider/${user.id}`),
+					api.get(`/api/bookings/provider/recent/${user.id}`),
 				]);
 				if (statsRes.status === "fulfilled") {
 					setStats(statsRes.value.data?.stats || {});

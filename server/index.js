@@ -4,20 +4,20 @@ const cors = require("cors");
 const app = express();
 const db = require("./config/db");
 
-app.use(
-	cors({
-		origin: [
-			"http://localhost:5173",
-			process.env.CLIENT_URL,
-			"https://taskgenieee.vercel.app",
-			"https://service-provider-git-main-sanskriti49s-projects.vercel.app",
-		],
+const corsOptions = {
+	origin: [
+		"http://localhost:5173",
+		process.env.CLIENT_URL,
+		"https://taskgenieee.vercel.app",
+		"https://service-provider-git-main-sanskriti49s-projects.vercel.app",
+	],
+	credentials: true,
+	methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+	allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-		credentials: true,
-		methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-		allowedHeaders: ["Content-Type", "Authorization"],
-	}),
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 app.use(express.json());
 
