@@ -49,7 +49,7 @@ async function createBooking(req, res, next) {
 		const priceRes = await client.query(
 			`SELECT price FROM provider_services 
 			WHERE provider_id = $1 AND service_id=$2::uuid`,
-			[provider_id],
+			[provider_id, service_id],
 		);
 		if (priceRes.rows.length === 0) throw new Error("Provider not found");
 		const finalPrice = priceRes.rows[0].price || 0;
@@ -113,7 +113,7 @@ async function createBooking(req, res, next) {
 }
 
 async function updateBookingStatus(req, res) {
-	const { bookingId } = req.params;
+	const { booking_id } = req.params;
 	const { status, otp_provided } = req.body;
 	const userId = req.user.id;
 	const userRole = req.user.role;
@@ -132,7 +132,7 @@ async function updateBookingStatus(req, res) {
             JOIN services s ON b.service_id=s.id
             WHERE booking_id=$1
         `;
-		const bookingRes = await client.query(checkQ, [bookingId]);
+		const bookingRes = await client.query(checkQ, [booking_id]);
 		if (bookingRes.rows.length === 0) {
 			await client.query("ROLLBACK");
 			return res.status(404).json({ message: "Booking not found." });
@@ -260,7 +260,7 @@ async function updateBookingStatus(req, res) {
 }
 
 async function getRecentProviderBookings(req, res, next) {
-	const providerId = req.params.id; // Reads from router path variable string
+	const providerId = req.user.id;
 
 	try {
 		const result = await db.query(
@@ -284,6 +284,24 @@ async function getRecentProviderBookings(req, res, next) {
 	}
 }
 
+async function getUpcomingBookings(req, res) {
+	try {
+		const q = `
+            SELECT b.*, s.name AS service_name, pu.name AS provider_name
+            FROM bookings b
+            LEFT JOIN services s ON s.id = b.service_id
+            LEFT JOIN users pu ON pu.id = b.provider_id
+            WHERE b.user_id = $1 AND b.date >= NOW() AND b.status != 'cancelled'
+            ORDER BY b.date ASC
+        `;
+		const result = await db.query(q, [req.user.id]);
+		res.json(result.rows);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: "Error fetching upcoming bookings" });
+	}
+}
+
 async function sendEmailNotifications(
 	status,
 	role,
@@ -301,11 +319,6 @@ async function sendEmailNotifications(
 		} = booking;
 		const emailsToSend = [];
 		const signature = `\n\nBest Regards,\nTeam TaskGenie\nSupport: support@taskgenie.com\n"Your local service, simplified."`;
-
-		// const targetEmail =
-		// 	role === "customer" ? booking.provider_email : booking.user_email;
-		// const targetName =
-		// 	role === "customer" ? booking.provider_name : booking.user_name;
 
 		if (status === "booked") {
 			// Send to Customer
@@ -397,6 +410,9 @@ async function sendEmailNotifications(
 				});
 			}
 		}
+		for (const { email, subject, message } of emailsToSend) {
+			await sendEmail(email, subject, message);
+		}
 	} catch (err) {
 		console.error("Notification Error:", err.message);
 	}
@@ -423,7 +439,7 @@ async function verifyPayment(req, res) {
 }
 
 async function updateBookingAddress(req, res) {
-	const { bookingId } = req.params;
+	const { booking_id } = req.params;
 	const { address } = req.body;
 
 	if (!address) {
@@ -433,7 +449,7 @@ async function updateBookingAddress(req, res) {
 	try {
 		const checkRes = await db.query(
 			"SELECT created_at FROM bookings WHERE booking_id=$1",
-			[bookingId],
+			[booking_id],
 		);
 		if (checkRes.rows.length === 0) {
 			return res.status(404).json({ message: "Booking not found" });
@@ -452,7 +468,7 @@ async function updateBookingAddress(req, res) {
 
 		const updateRes = await db.query(
 			"UPDATE bookings SET address = $1 WHERE booking_id = $2 RETURNING address",
-			[address, bookingId],
+			[address, booking_id],
 		);
 		res.json({
 			message: "Address updated succesfully",
@@ -467,14 +483,14 @@ async function updateBookingAddress(req, res) {
 async function getUserHistory(req, res) {
 	const page = parseInt(req.query.page) || 1;
 	const limit = parseInt(req.query.limit) || 10;
-	// "Offset" (How many rows to skip)
+
 	const offset = (page - 1) * limit; // Page 1: skip 0. Page 2: skip 10. Page 3: skip 20.
 	const userId = req.user.id;
 
 	const type = req.query.type || "upcoming";
 	const search = (req.query.search || "").trim();
 
-	const dateFilter = req.query.data_filter || "All Time";
+	const dateFilter = req.query.date_filter || "All Time";
 	const minPrice = req.query.min_price;
 	const serviceFilter = (req.query.service_filter || "").trim();
 
@@ -597,4 +613,5 @@ module.exports = {
 	updateBookingStatus,
 	verifyPayment,
 	getRecentProviderBookings,
+	getUpcomingBookings,
 };

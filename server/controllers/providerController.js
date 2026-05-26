@@ -34,7 +34,7 @@ const providerSchema = Joi.object({
 	phone: Joi.string()
 		.pattern(/^\+91 ?[6-9]\d{9}$/)
 		.message("Phone must be a valid Indian number (+91 followed by 10 digits)")
-		.required(),
+		.optional(),
 	location: Joi.string().optional(),
 	photo: Joi.string().allow("").optional(),
 	bio: Joi.string().max(500).allow("").optional(),
@@ -69,7 +69,7 @@ const providerUpdateSchema = Joi.object({
 		.message(
 			"Phone must be a valid Indian number (+91 followed by 10 digits starting with 6-9)",
 		)
-		.required(),
+		.optional(),
 	password: Joi.string().min(6).optional(),
 	location: Joi.string().optional(),
 	photo: Joi.string().allow("").optional(),
@@ -469,7 +469,7 @@ async function removeProviderService(req, res, next) {
 
 		const result = await db.query(
 			`DELETE FROM provider_services WHERE provider_id=$1 AND service_id=$2::uuid`,
-			[providerId, req.params.serviceId],
+			[providerId, req.params.service_id],
 		);
 		if (!result.rowCount)
 			return res
@@ -495,7 +495,7 @@ async function toggleServiceVisibility(req, res, next) {
 		const result = await db.query(
 			`UPDATE provider_services SET is_visible=$1
              WHERE provider_id=$2 AND service_id=$3::uuid RETURNING *`,
-			[is_visible, providerId, req.params.serviceId],
+			[is_visible, providerId, req.params.service_id],
 		);
 		if (!result.rowCount)
 			return res
@@ -568,6 +568,4 @@ module.exports = {
 	toggleServiceVisibility,
 	deleteProvider,
 	getProviderAvailability,
-	providerSchema,
-	providerUpdateSchema,
 };

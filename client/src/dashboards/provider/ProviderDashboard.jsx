@@ -233,7 +233,7 @@ function SidebarCard({ user, notifications, onLogout, onLinkClick }) {
 			{/* Logout */}
 			<button
 				onClick={onLogout}
-				className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group border border-transparent hover:border-red-500/15"
+				className="cursor-pointer w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group border border-transparent hover:border-red-500/15"
 			>
 				<LogOut
 					size={18}
@@ -249,7 +249,7 @@ function SidebarCard({ user, notifications, onLogout, onLinkClick }) {
 export default function ProviderDashboard() {
 	const navigate = useNavigate();
 	const location = useLocation();
-	const { user } = useAuth();
+	const { user, setUser: setAuthUser } = useAuth();
 	const childOutlet = useOutlet();
 
 	const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -267,19 +267,43 @@ export default function ProviderDashboard() {
 	const isOverviewPage =
 		location.pathname === "/provider/dashboard" ||
 		location.pathname === "/provider/dashboard/";
+
 	useEffect(() => {
+		if (sidebarOpen) {
+			document.body.style.overflow = "hidden";
+		} else {
+			document.body.style.overflow = "auto";
+		}
+
+		return () => {
+			document.body.style.overflow = "auto";
+		};
+	}, [sidebarOpen]);
+	useEffect(() => {
+		if (!user?.id) return;
 		const load = async () => {
 			try {
-				const [statsRes, bookingsRes] = await Promise.allSettled([
-					api.get(`/api/dashboard/provider/${user.id}`),
-					api.get(`/api/bookings/provider/recent/${user.id}`),
+				const [statsRes, bookingsRes, meRes] = await Promise.allSettled([
+					api.get(`/api/dashboard/provider`),
+					api.get(`/api/bookings/provider/history/recent`),
+					api.get(`/api/auth/me`),
 				]);
+				console.log(statsRes);
 				if (statsRes.status === "fulfilled") {
 					setStats(statsRes.value.data?.stats || {});
 					setNotifications(statsRes.value.data?.pending_notifications || 0);
 				}
 				if (bookingsRes.status === "fulfilled") {
 					setRecentBookings(bookingsRes.value.data || []);
+				}
+				if (meRes.status === "fulfilled" && meRes.value.data?.user) {
+					const freshUser = meRes.value.data.user;
+
+					if (freshUser.photo !== user.photo || freshUser.name !== user.name) {
+						if (setAuthUser) {
+							setAuthUser((prev) => ({ ...prev, ...freshUser }));
+						}
+					}
 				}
 			} catch (err) {
 				console.error("Provider dashboard load error:", err);
@@ -288,7 +312,7 @@ export default function ProviderDashboard() {
 			}
 		};
 		load();
-	}, []);
+	}, [user?.id, user?.photo, setAuthUser]);
 
 	const handleLogout = useCallback(() => {
 		localStorage.clear();
@@ -323,7 +347,7 @@ export default function ProviderDashboard() {
 						animate={{ x: 0 }}
 						exit={{ x: "-100%" }}
 						transition={{ type: "spring", stiffness: 300, damping: 30 }}
-						className="fixed top-0 left-0 h-full w-[300px] bg-slate-950 z-30 flex flex-col p-4 lg:hidden"
+						className="fixed top-0 left-0 h-full w-[300px] bg-slate-950 z-30 flex flex-col p-4 lg:hidden overflow-y-auto"
 					>
 						<button
 							onClick={closeSidebar}

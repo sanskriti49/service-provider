@@ -38,7 +38,7 @@ const getCustomerDashboardStats = async (req, res) => {
 
 		res.json({
 			stats: {
-				total_spent: stats.total_spent,
+				total_spent: parseFloat(stats.total_spent),
 				total_completed: stats.total_completed,
 				active_tasks: activeCount,
 			},
@@ -50,10 +50,8 @@ const getCustomerDashboardStats = async (req, res) => {
 	}
 };
 
-// ── Provider Dashboard Stats (Added Fix) ───────────────────────────────────────
 const getProviderDashboardStats = async (req, res) => {
-	// Read the ID parameter passed from the frontend request parameter string
-	const providerId = req.params.id;
+	const providerId = req.user.id;
 
 	try {
 		const [metricsRes, ratingRes] = await Promise.all([

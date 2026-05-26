@@ -6,10 +6,11 @@ const {
 	getUserHistory,
 	updateBookingStatus,
 	verifyPayment,
+	getRecentProviderBookings,
+	getUpcomingBookings,
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const db = require("../config/db");
-const b = require("../controllers/bookingController");
 
 function allowRoles(...roles) {
 	return (req, res, next) => {
@@ -19,61 +20,27 @@ function allowRoles(...roles) {
 		next();
 	};
 }
-// 1. CREATE BOOKING
 router.post("/", authMiddleware, allowRoles("customer"), createBooking);
+router.post("/verify-payment", authMiddleware, verifyPayment);
 
-// 2. ADMIN: GET ALL
-router.get("/", authMiddleware, allowRoles("admin"), async (req, res) => {
-	try {
-		const q = `
-            SELECT b.*, u.name AS customer_name, pu.name AS provider_name
-            FROM bookings b
-            LEFT JOIN users u ON u.id = b.user_id
-            LEFT JOIN users pu ON pu.id = b.provider_id
-            ORDER BY b.date ASC
-        `;
-		const result = await db.query(q);
-		res.json(result.rows);
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ message: "Error fetching bookings" });
-	}
-});
-
-router.get(
-	"/user/upcoming",
-	authMiddleware,
-	allowRoles("customer"),
-	async (req, res) => {
-		try {
-			const q = `
-            SELECT b.*, s.name AS service_name, pu.name AS provider_name
-            FROM bookings b
-            LEFT JOIN services s on s.id = b.service_id
-            LEFT JOIN users pu ON pu.id = b.provider_id
-            WHERE b.user_id = $1 AND b.date >= NOW() AND b.status != 'cancelled'
-            ORDER BY b.date ASC
-        `;
-			const result = await db.query(q, [req.user.id]);
-			res.json(result.rows);
-		} catch (err) {
-			console.error(err);
-			res.status(500).json({ message: "Error fetching upcoming bookings" });
-		}
-	},
-);
-
+// GET USER HISTORY
 router.get(
 	"/user/history",
 	authMiddleware,
 	allowRoles("customer"),
 	getUserHistory,
 );
-
-router.put("/:bookingId/status", authMiddleware, updateBookingStatus);
-
+// GET UPCOMING
 router.get(
-	"/provider",
+	"/user/upcoming",
+	authMiddleware,
+	allowRoles("customer"),
+	getUpcomingBookings,
+);
+
+// GET PROVIDER BOOKINGS
+router.get(
+	"/provider/history/all",
 	authMiddleware,
 	allowRoles("provider"),
 	async (req, res) => {
@@ -93,15 +60,45 @@ router.get(
 	},
 );
 
-router.get("/provider/recent/:id", authMiddleware, b.getRecentProviderBookings);
+router.get(
+	"/provider/history/recent",
+	authMiddleware,
+	getRecentProviderBookings,
+);
+
+// ADMIN: GET ALL BOOKINGS
+router.get(
+	"/admin/all",
+	authMiddleware,
+	allowRoles("admin"),
+	async (req, res) => {
+		try {
+			const q = `
+            SELECT b.*, u.name AS customer_name, pu.name AS provider_name
+            FROM bookings b
+            LEFT JOIN users u ON u.id = b.user_id
+            LEFT JOIN users pu ON pu.id = b.provider_id
+            ORDER BY b.date ASC
+        `;
+			const result = await db.query(q);
+			res.json(result.rows);
+		} catch (err) {
+			console.error(err);
+			res.status(500).json({ message: "Error fetching bookings" });
+		}
+	},
+);
 
 router.patch(
-	"/:bookingId/address",
+	"/:booking_id/address",
 	authMiddleware,
 	allowRoles("customer"),
 	updateBookingAddress,
 );
+// ADDED EXPLICIT GUARDS: Ensures only permitted actors trigger logic checks
+router.put("/:booking_id/status", authMiddleware, updateBookingStatus);
 
+// GET SINGLE BOOKING
 router.get("/:booking_id", authMiddleware, async (req, res) => {
 	try {
 		const q = `SELECT * FROM bookings WHERE booking_id=$1`;
@@ -125,7 +122,5 @@ router.get("/:booking_id", authMiddleware, async (req, res) => {
 		res.status(500).json({ message: "Server error" });
 	}
 });
-
-router.post("/verify-payment", authMiddleware, verifyPayment);
 
 module.exports = router;

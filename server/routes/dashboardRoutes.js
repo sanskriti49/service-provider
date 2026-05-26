@@ -23,7 +23,7 @@ router.get(
 );
 
 router.get(
-	"/provider/:id",
+	"/provider",
 	authMiddleware,
 	allowRoles("provider"),
 	getProviderDashboardStats,

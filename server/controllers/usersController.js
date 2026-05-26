@@ -5,6 +5,14 @@ const { hashIfPresent } = require("../utils/hash");
 const Joi = require("joi");
 const { customAlphabet } = require("nanoid");
 const { normalizeEmail } = require("../utils/normalizeEmail");
+const cloudinary = require("cloudinary").v2;
+const streamifier = require("streamifier");
+
+cloudinary.config({
+	cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+	api_key: process.env.CLOUDINARY_API_KEY,
+	api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const userSchema = Joi.object({
 	name: Joi.string().min(3).max(100).required(),
@@ -151,6 +159,22 @@ async function updateUser(req, res, next) {
 		lat,
 		lng,
 	} = value;
+	if (req.file) {
+		const result = await new Promise((resolve, reject) => {
+			const stream = cloudinary.uploader.upload_stream(
+				{
+					folder: "profile_photos",
+				},
+				(err, result) => {
+					if (err) reject(err);
+					else resolve(result);
+				},
+			);
+			streamifier.createReadStream(req.file.buffer).pipe(stream);
+		});
+
+		photo = result.secure_url;
+	}
 
 	try {
 		// FORWARD GEOCODING (location text -> lat/lng)
@@ -191,6 +215,8 @@ async function updateUser(req, res, next) {
 		}
 
 		const hashed = password ? await hashIfPresent(password) : undefined;
+		const safeLocation =
+			location && location.trim() !== "" ? location : undefined;
 
 		const query = `
             UPDATE users SET
@@ -206,7 +232,7 @@ async function updateUser(req, res, next) {
                 phone = COALESCE($10, phone),
                 address = COALESCE($11, address)
             WHERE id = $12
-            RETURNING id, name, email, role, location, lat, lng, address, photo,bio,created_at
+            RETURNING id, name, email, phone,role, location, lat, lng, address, photo,bio,created_at
         `;
 
 		const result = await db.query(query, [
@@ -214,8 +240,8 @@ async function updateUser(req, res, next) {
 			email,
 			hashed,
 			role,
-			location,
-			photo,
+			safeLocation ?? null,
+			photo || null,
 			bio,
 			lat,
 			lng,

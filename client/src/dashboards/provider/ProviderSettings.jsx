@@ -1,7 +1,3 @@
-/**
- * dashboards/provider/ProviderSettings.jsx
- * Route: /provider/settings
- */
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,7 +28,7 @@ function normalizePhone(raw = "") {
 	if (t.startsWith("+91")) return t;
 	return `+91${t.replace(/\s+/g, "")}`;
 }
-const PHONE_RE = /^\+91[6-9]\d{9}$/;
+const PHONE_RE = /^\+91 ?[6-9]\d{9}$/;
 
 const ACCENT = {
 	violet: { wrap: "bg-violet-500/10 border-violet-500/20 text-violet-400" },
@@ -180,25 +176,29 @@ function SubmitBtn({ loading, saved, children }) {
 }
 
 export default function ProviderSettings() {
-	const { user, setUser } = useAuth();
+	// ── useAuth only used for the shared context update (sidebar avatar etc.) ──
+	const { setUser: setAuthUser } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
 	const phoneBoxRef = useRef(null);
 
-	const [profile, setProfile] = useState({
-		name: "",
-		email: "",
-		phone: "",
-		state: "",
-		city: "",
-		photo: "",
-		bio: "",
-	});
+	const [user, setUser] = useState(
+		JSON.parse(localStorage.getItem("user") || "{}"),
+	);
+
+	const [name, setName] = useState(user.name || "");
+	const [email, setEmail] = useState(user.email || "");
+	const [phone, setPhone] = useState(
+		user.phone ? normalizePhone(String(user.phone)) : "",
+	);
+	const [bio, setBio] = useState(user.bio || "");
+	const [state, setState] = useState("");
+	const [city, setCity] = useState("");
+	const [photo, setPhoto] = useState(user.photo || "");
+	const [selectedFile, setSelectedFile] = useState(null);
 
 	const [profileLoading, setProfileLoading] = useState(false);
 	const [profileSaved, setProfileSaved] = useState(false);
-	const set = (key) => (e) =>
-		setProfile((p) => ({ ...p, [key]: e.target.value }));
 
 	const [pwd, setPwd] = useState({ current: "", next: "", confirm: "" });
 	const [showPwd, setShowPwd] = useState({
@@ -208,82 +208,113 @@ export default function ProviderSettings() {
 	});
 	const [pwdLoading, setPwdLoading] = useState(false);
 	const [pwdSaved, setPwdSaved] = useState(false);
-	const setPwdField = (k) => (e) =>
-		setPwd((p) => ({ ...p, [k]: e.target.value }));
-	const toggleShow = (k) => () => setShowPwd((p) => ({ ...p, [k]: !p[k] }));
 
 	const [phrase, setPhrase] = useState("");
 	const [deleteOpen, setDeleteOpen] = useState(false);
 	const [deleteLoading, setDeleteLoading] = useState(false);
 
-	// Sync context to state without layout drift loops
-	useEffect(() => {
-		if (!user) return;
-		const [rawCity = "", rawState = ""] = (user.location || "").split(",");
+	const setPwdField = (k) => (e) =>
+		setPwd((p) => ({ ...p, [k]: e.target.value }));
+	const toggleShow = (k) => () => setShowPwd((p) => ({ ...p, [k]: !p[k] }));
 
-		setProfile({
-			name: user.name ?? "",
-			email: user.email ?? "",
-			phone: user.phone ?? "",
-			state: rawState.trim(),
-			city: rawCity.trim(),
-			photo: user.photo ?? "",
-			bio: user.bio ?? "",
-		});
+	// ── 1. Fetch fresh data from server on mount (fixes refresh bug) ──────────
+	useEffect(() => {
+		const fetchUserData = async () => {
+			try {
+				const response = await api.get("/api/auth/me");
+				const fresh = response.data.user;
+				setUser(fresh);
+				localStorage.setItem("user", JSON.stringify(fresh));
+				// Also sync the auth context so sidebar avatar etc. update
+				if (setAuthUser) setAuthUser((prev) => ({ ...prev, ...fresh }));
+			} catch (err) {
+				console.warn("Could not refresh user:", err.message);
+			}
+		};
+		fetchUserData();
+	}, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+	// ── 2. Sync individual fields whenever local user object changes ──────────
+	useEffect(() => {
+		if (!user || !Object.keys(user).length) return;
+		setName(user.name || "");
+		setEmail(user.email || "");
+		setPhone(user.phone ? normalizePhone(String(user.phone)) : "");
+		setBio(user.bio || "");
+		setPhoto(user.photo || "");
+		// Parse city,state from "City,State" location string
+		const [rawCity = "", rawState = ""] = (user.location || "").split(",");
+		setState(rawState.trim());
+		setCity(rawCity.trim());
 	}, [user]);
 
+	// ── Scroll-to-phone from hash link ───────────────────────────────────────
 	useEffect(() => {
 		if (location.hash === "#phone" && phoneBoxRef.current) {
-			const timer = setTimeout(() => {
+			const t = setTimeout(() => {
 				phoneBoxRef.current.scrollIntoView({
 					behavior: "smooth",
 					block: "center",
 				});
 				phoneBoxRef.current.querySelector("input")?.focus();
 			}, 350);
-			return () => clearTimeout(timer);
+			return () => clearTimeout(t);
 		}
 	}, [location.hash]);
 
 	const phoneOk =
-		profile.phone &&
-		PHONE_RE.test(normalizePhone(profile.phone).replace(/\s+/g, ""));
+		!!phone && PHONE_RE.test(normalizePhone(phone).replace(/\s+/g, ""));
 
+	const showPhoneWarning = () => {
+		if (phoneOk) return false;
+		if (!user?.phone) return true;
+		return !PHONE_RE.test(
+			normalizePhone(String(user.phone)).replace(/\s+/g, ""),
+		);
+	};
+
+	// ── Helper: sync user everywhere after any save ───────────────────────────
+	const syncUser = (fresh) => {
+		setUser(fresh);
+		localStorage.setItem("user", JSON.stringify(fresh));
+		if (setAuthUser) setAuthUser((prev) => ({ ...prev, ...fresh }));
+	};
+
+	// ── Save profile ──────────────────────────────────────────────────────────
 	const saveProfile = async (e) => {
 		e.preventDefault();
-		const phone = normalizePhone(profile.phone);
-		if (!PHONE_RE.test(phone.replace(/\s/g, ""))) {
-			toast.error(
-				"Enter a valid Indian mobile number (+91 + 10 digits starting 6–9)",
-			);
+		const normalizedPhone = normalizePhone(phone);
+		if (!PHONE_RE.test(normalizedPhone.replace(/\s/g, ""))) {
+			toast.error("Enter a valid Indian mobile number");
 			phoneBoxRef.current?.querySelector("input")?.focus();
 			return;
 		}
+
 		setProfileLoading(true);
 		try {
-			const response = await api.put(`/api/providers/v1/${user.id}`, {
-				name: profile.name,
-				email: profile.email,
-				phone,
-				photo: profile.photo,
-				bio: profile.bio,
-				location:
-					profile.city && profile.state
-						? `${profile.city},${profile.state}`
-						: user.location,
+			const formData = new FormData();
+			formData.append("name", name);
+			formData.append("email", email);
+			formData.append("phone", normalizedPhone);
+			formData.append("bio", bio);
+
+			// Only send location if we have something meaningful; never send ""
+			const locationVal =
+				city && state ? `${city},${state}` : user?.location || null;
+			if (locationVal) formData.append("location", locationVal);
+
+			if (selectedFile) formData.append("photo", selectedFile);
+
+			await api.put(`/api/users/${user.id}`, formData, {
+				headers: { "Content-Type": "multipart/form-data" },
 			});
 
-			const updatedUser = response.data.user;
+			// Re-fetch authoritative state — same as CustomerSettings does after updateProfile
+			const refreshed = await api.get("/api/auth/me");
+			const fresh = refreshed.data.user;
+			syncUser(fresh);
 
-			if (setUser) {
-				setUser((prev) => {
-					const merged = { ...prev, ...updatedUser };
-					// Persist to local storage to survive browser refreshes seamlessly
-					localStorage.setItem("user", JSON.stringify(merged));
-					return merged;
-				});
-			}
-
+			setSelectedFile(null);
 			setProfileSaved(true);
 			toast.success("Profile saved!");
 			setTimeout(() => setProfileSaved(false), 3000);
@@ -294,6 +325,7 @@ export default function ProviderSettings() {
 		}
 	};
 
+	// ── Save password ─────────────────────────────────────────────────────────
 	const savePassword = async (e) => {
 		e.preventDefault();
 		if (pwd.next !== pwd.confirm) {
@@ -304,14 +336,15 @@ export default function ProviderSettings() {
 			toast.error("Password must be at least 6 characters");
 			return;
 		}
-		const phone = normalizePhone(profile.phone);
-		if (!PHONE_RE.test(phone.replace(/\s/g, ""))) {
+		if (!phoneOk) {
 			toast.error(
 				<span>
 					Phone required to change password.{" "}
 					<button
 						className="underline font-bold"
-						onClick={() => navigate("/provider/dashboard/settings#phone")}
+						onClick={() =>
+							phoneBoxRef.current?.scrollIntoView({ behavior: "smooth" })
+						}
 					>
 						Add it →
 					</button>
@@ -322,9 +355,9 @@ export default function ProviderSettings() {
 		}
 		setPwdLoading(true);
 		try {
-			await api.put(`/api/providers/v1/${user.id}`, {
-				phone,
-				password: pwd.next,
+			await api.put("/api/auth/update-password", {
+				currentPassword: pwd.current,
+				newPassword: pwd.next,
 			});
 			setPwd({ current: "", next: "", confirm: "" });
 			setPwdSaved(true);
@@ -337,6 +370,7 @@ export default function ProviderSettings() {
 		}
 	};
 
+	// ── Delete account ────────────────────────────────────────────────────────
 	const deleteAccount = async () => {
 		if (phrase !== "DELETE MY ACCOUNT") return;
 		setDeleteLoading(true);
@@ -375,7 +409,7 @@ export default function ProviderSettings() {
 						Profile, credentials, and account management.
 					</p>
 				</div>
-				{!phoneOk && user?.phone && (
+				{showPhoneWarning() && (
 					<motion.button
 						initial={{ opacity: 0, scale: 0.95 }}
 						animate={{ opacity: 1, scale: 1 }}
@@ -395,7 +429,7 @@ export default function ProviderSettings() {
 				)}
 			</div>
 
-			{/* ── 1. Profile ─────────────────────────────────────────────────────── */}
+			{/* ── 1. Profile ── */}
 			<Card
 				id="profile"
 				icon={User}
@@ -404,13 +438,13 @@ export default function ProviderSettings() {
 				accent="violet"
 			>
 				<form onSubmit={saveProfile} className="space-y-4">
-					{/* Native File Upload Area */}
+					{/* Avatar */}
 					<div className="flex items-center gap-5 p-4 rounded-xl border border-white/5 bg-slate-950/20">
 						<div className="relative w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center group shadow-inner">
-							{profile.photo ? (
+							{photo ? (
 								<img
-									src={profile.photo}
-									alt="Profile Preview"
+									src={photo}
+									alt="Profile"
 									className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
 								/>
 							) : (
@@ -419,8 +453,7 @@ export default function ProviderSettings() {
 						</div>
 						<div className="flex-1 space-y-1.5">
 							<Label>
-								<ImageIcon size={11} />
-								Profile Picture
+								<ImageIcon size={11} /> Profile Picture
 							</Label>
 							<div className="flex items-center gap-3">
 								<input
@@ -435,24 +468,24 @@ export default function ProviderSettings() {
 											toast.error("Image must be smaller than 2MB");
 											return;
 										}
-										const reader = new FileReader();
-										reader.onloadend = () => {
-											setProfile((p) => ({ ...p, photo: reader.result }));
-										};
-										reader.readAsDataURL(file);
+										setSelectedFile(file);
+										setPhoto(URL.createObjectURL(file));
 									}}
 								/>
 								<label
 									htmlFor="avatar-picker"
 									className="cursor-pointer px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 transition-colors shadow-sm flex items-center gap-1.5"
 								>
-									<ImageIcon size={13} className="text-slate-400" />
-									Browse Local Files
+									<ImageIcon size={13} className="text-slate-400" /> Browse
+									Local Files
 								</label>
-								{profile.photo && (
+								{photo && (
 									<button
 										type="button"
-										onClick={() => setProfile((p) => ({ ...p, photo: "" }))}
+										onClick={() => {
+											setPhoto("");
+											setSelectedFile(null);
+										}}
 										className="cursor-pointer px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 rounded-xl text-xs font-bold transition-all"
 									>
 										Remove
@@ -463,11 +496,11 @@ export default function ProviderSettings() {
 						</div>
 					</div>
 
+					{/* Name + Email */}
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div>
 							<Label>
-								<User size={11} />
-								Full name
+								<User size={11} /> Full name
 							</Label>
 							<TextInput
 								icon={User}
@@ -475,32 +508,31 @@ export default function ProviderSettings() {
 								required
 								minLength={3}
 								placeholder="Rajesh Kumar"
-								value={profile.name}
-								onChange={set("name")}
+								value={name}
+								onChange={(e) => setName(e.target.value)}
 							/>
 						</div>
 						<div>
 							<Label>
-								<Mail size={11} />
-								Email address
+								<Mail size={11} /> Email address
 							</Label>
 							<TextInput
 								icon={Mail}
 								type="email"
 								placeholder="you@example.com"
-								value={profile.email}
-								onChange={set("email")}
+								value={email}
+								onChange={(e) => setEmail(e.target.value)}
 							/>
 						</div>
 					</div>
 
+					{/* Phone */}
 					<div
 						ref={phoneBoxRef}
 						className={`rounded-xl p-4 border transition-all duration-300 ${phoneOk ? "border-slate-700 bg-transparent" : "border-amber-500/30 bg-amber-500/[0.04]"}`}
 					>
 						<Label>
-							<Phone size={11} />
-							Phone number
+							<Phone size={11} /> Phone number
 							{phoneOk ? (
 								<span className="normal-case font-semibold text-emerald-400 tracking-normal flex items-center gap-1">
 									<CheckCircle2 size={10} /> verified
@@ -515,8 +547,8 @@ export default function ProviderSettings() {
 							icon={Phone}
 							type="tel"
 							placeholder="+91 98765 43210"
-							value={profile.phone}
-							onChange={set("phone")}
+							value={phone}
+							onChange={(e) => setPhone(e.target.value)}
 							className={
 								!phoneOk ? "border-amber-500/40 focus:border-amber-500/60" : ""
 							}
@@ -524,11 +556,11 @@ export default function ProviderSettings() {
 						<Hint>Indian mobile number: +91 followed by 10 digits.</Hint>
 					</div>
 
+					{/* State + City */}
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div>
 							<Label>
-								<MapPin size={11} />
-								State
+								<MapPin size={11} /> State
 							</Label>
 							<div className="relative">
 								<MapPin
@@ -536,14 +568,11 @@ export default function ProviderSettings() {
 									className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none z-10"
 								/>
 								<select
-									value={profile.state}
-									onChange={(e) =>
-										setProfile((p) => ({
-											...p,
-											state: e.target.value,
-											city: "",
-										}))
-									}
+									value={state}
+									onChange={(e) => {
+										setState(e.target.value);
+										setCity("");
+									}}
 									className="w-full pl-9 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 appearance-none"
 								>
 									<option value="">Select state</option>
@@ -557,8 +586,7 @@ export default function ProviderSettings() {
 						</div>
 						<div>
 							<Label>
-								<MapPin size={11} />
-								City
+								<MapPin size={11} /> City
 							</Label>
 							<div className="relative">
 								<MapPin
@@ -566,16 +594,14 @@ export default function ProviderSettings() {
 									className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none z-10"
 								/>
 								<select
-									value={profile.city}
-									disabled={!profile.state}
-									onChange={(e) =>
-										setProfile((p) => ({ ...p, city: e.target.value }))
-									}
+									value={city}
+									disabled={!state}
+									onChange={(e) => setCity(e.target.value)}
 									className="w-full pl-9 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 appearance-none disabled:opacity-50"
 								>
 									<option value="">Select city</option>
-									{profile.state &&
-										LOCATION_DATA[profile.state]?.map((ct) => (
+									{state &&
+										LOCATION_DATA[state]?.map((ct) => (
 											<option key={ct} value={ct}>
 												{ct}
 											</option>
@@ -585,10 +611,10 @@ export default function ProviderSettings() {
 						</div>
 					</div>
 
+					{/* Bio */}
 					<div>
 						<Label>
-							<FileText size={11} />
-							Bio
+							<FileText size={11} /> Bio
 						</Label>
 						<div className="relative">
 							<FileText
@@ -599,14 +625,14 @@ export default function ProviderSettings() {
 								maxLength={500}
 								rows={3}
 								placeholder="Experienced electrician with 8+ years..."
-								value={profile.bio}
-								onChange={set("bio")}
+								value={bio}
+								onChange={(e) => setBio(e.target.value)}
 								className="w-full pl-9 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-600 resize-none focus:outline-none focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 transition-all"
 							/>
 						</div>
 						<div className="flex justify-end mt-1">
 							<span className="text-[10px] text-slate-600">
-								{profile.bio.length} / 500
+								{bio.length} / 500
 							</span>
 						</div>
 					</div>
@@ -619,7 +645,7 @@ export default function ProviderSettings() {
 				</form>
 			</Card>
 
-			{/* ── 2. Password ────────────────────────────────────────────────────── */}
+			{/* ── 2. Password ── */}
 			<Card
 				id="password"
 				icon={Lock}
@@ -647,8 +673,7 @@ export default function ProviderSettings() {
 					].map(({ key, label, placeholder }) => (
 						<div key={key}>
 							<Label>
-								<Lock size={11} />
-								{label}
+								<Lock size={11} /> {label}
 							</Label>
 							<TextInput
 								icon={Lock}
@@ -660,7 +685,7 @@ export default function ProviderSettings() {
 									<button
 										type="button"
 										onClick={toggleShow(key)}
-										className="text-slate-600 hover:text-slate-400 transition-colors"
+										className="cursor-pointer text-slate-600 hover:text-slate-400 transition-colors"
 									>
 										{showPwd[key] ? <EyeOff size={14} /> : <Eye size={14} />}
 									</button>
@@ -686,7 +711,7 @@ export default function ProviderSettings() {
 				</form>
 			</Card>
 
-			{/* ── 3. Danger zone ─────────────────────────────────────────────────── */}
+			{/* ── 3. Danger zone ── */}
 			<Card
 				id="danger"
 				icon={AlertTriangle}
@@ -702,10 +727,9 @@ export default function ProviderSettings() {
 					<button
 						type="button"
 						onClick={() => setDeleteOpen(true)}
-						className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/15 border border-red-500/20 hover:border-red-500/30 text-red-400 rounded-xl text-sm font-bold transition-all"
+						className="cursor-pointer flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/15 border border-red-500/20 hover:border-red-500/30 text-red-400 rounded-xl text-sm font-bold transition-all"
 					>
-						<Trash2 size={14} />
-						Delete provider account
+						<Trash2 size={14} /> Delete provider account
 					</button>
 				) : (
 					<AnimatePresence>
@@ -750,7 +774,7 @@ export default function ProviderSettings() {
 										<Loader2 size={13} className="animate-spin" />
 									) : (
 										<Trash2 size={13} />
-									)}
+									)}{" "}
 									Confirm delete
 								</button>
 							</div>
@@ -760,8 +784,8 @@ export default function ProviderSettings() {
 			</Card>
 
 			<div className="flex items-center gap-2 text-slate-700 text-xs pb-2">
-				<ShieldCheck size={12} className="text-emerald-700" />
-				Data stored securely. Your information is never shared.
+				<ShieldCheck size={12} className="text-emerald-700" /> Data stored
+				securely. Your information is never shared.
 			</div>
 		</div>
 	);

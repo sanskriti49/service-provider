@@ -7,16 +7,16 @@ const {
 
 async function getAvailability(req, res, next) {
 	try {
-		const providerId = req.params.providerId;
+		let providerId = req.params.provider_id;
 
 		const isUUID =
 			/^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/.test(
-				providerId
+				providerId,
 			);
 		if (!isUUID) {
 			const userRes = await db.query(
 				`SELECT id FROM users WHERE custom_id = $1`,
-				[providerId]
+				[providerId],
 			);
 			if (userRes.rows.length === 0) {
 				return res.status(404).json({ message: "Provider not found" });
@@ -33,7 +33,7 @@ async function getAvailability(req, res, next) {
 			`SELECT day_of_week,start_time::text, end_time::text
              FROM provider_master_availability
              WHERE provider_id=$1`,
-			[providerId]
+			[providerId],
 		);
 
 		const endDate = new Date(from);
@@ -47,7 +47,7 @@ async function getAvailability(req, res, next) {
 				providerId,
 				from.toISOString().slice(0, 10),
 				endDate.toISOString().slice(0, 10),
-			]
+			],
 		);
 
 		const bookingsRes = await db.query(
@@ -58,7 +58,7 @@ async function getAvailability(req, res, next) {
 				providerId,
 				from.toISOString().slice(0, 10),
 				endDate.toISOString().slice(0, 10),
-			]
+			],
 		);
 
 		const masterMap = {}; // day_of_week => [{start,end},...]
@@ -134,7 +134,7 @@ async function getAvailability(req, res, next) {
 					...intervals.map((iv) => ({
 						start: minutesToTime(iv.s),
 						end: minutesToTime(iv.e),
-					}))
+					})),
 				);
 			}
 

@@ -37,7 +37,6 @@ export default function ProviderServices() {
 			try {
 				const [marketRes, myRes] = await Promise.allSettled([
 					api.get("/api/services/v1"),
-					// New endpoint: GET /api/providers/v1/:id/services
 					api.get(`/api/providers/v1/${user.id}/services`),
 				]);
 
