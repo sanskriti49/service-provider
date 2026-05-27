@@ -230,10 +230,6 @@ export default function AllBookings() {
 		}
 		executeApiUpdate(bookingId, newStatus);
 	};
-	// } else if (newStatus === "no_show") {
-	// 	confirmMsg =
-	// 		"⚠️ Confirm reporting Provider No-Show? \n\nThis marks that the provider did not arrive. This action cannot be undone.";
-	// }
 
 	const executeApiUpdate = async (bookingId, newStatus) => {
 		setActionLoading(bookingId);

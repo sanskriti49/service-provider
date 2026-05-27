@@ -18,6 +18,7 @@ import {
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../hooks/useAuth";
 import { Link } from "react-router-dom";
+import { UNIT_LABELS, getAllowedUnits } from "../../utils/pricingHelper";
 
 export default function ProviderServices() {
 	const { user } = useAuth();
@@ -28,8 +29,8 @@ export default function ProviderServices() {
 	const [activeTab, setActiveTab] = useState("active");
 	const [selectedService, setSelectedService] = useState(null);
 	const [customPrice, setCustomPrice] = useState("");
+	const [priceUnit, setPriceUnit] = useState("fixed");
 
-	// ── Fetch ──────────────────────────────────────────────────────────────────
 	useEffect(() => {
 		if (!user?.id) return;
 		const load = async () => {
@@ -59,13 +60,16 @@ export default function ProviderServices() {
 		load();
 	}, [user?.id]);
 
-	// Services the provider has NOT yet signed up for
 	const discoverableServices = useMemo(() => {
 		const myIds = new Set(myServices.map((s) => s.id));
 		return allMarketplaceServices.filter((s) => !myIds.has(s.id));
 	}, [myServices, allMarketplaceServices]);
 
-	// ── Save / update price ────────────────────────────────────────────────────
+	const currentAllowedUnits = useMemo(() => {
+		if (!selectedService) return ["fixed"];
+		return getAllowedUnits(selectedService.slug, selectedService.price_unit);
+	}, [selectedService]);
+
 	const handleSavePrice = async (e) => {
 		e.preventDefault();
 		if (!selectedService) return;
@@ -81,14 +85,17 @@ export default function ProviderServices() {
 		setUpdatingId(loadingKey);
 
 		try {
-			await api.post(`/api/providers/v1/${user.id}/services`, {
-				slug: selectedService.slug,
-				price: finalPrice,
-			});
 			if (isExisting) {
+				await api.post(`/api/providers/v1/${user.id}/services`, {
+					slug: selectedService.slug,
+					price: finalPrice,
+					price_unit: priceUnit,
+				});
 				setMyServices((prev) =>
 					prev.map((s) =>
-						s.id === selectedService.id ? { ...s, price: finalPrice } : s,
+						s.id === selectedService.id
+							? { ...s, price: finalPrice, price_unit: priceUnit }
+							: s,
 					),
 				);
 				toast.success("Price updated successfully", {
@@ -96,14 +103,19 @@ export default function ProviderServices() {
 						"bricolage-grotesque font-semibold border border-emerald-500/20 bg-slate-900 text-emerald-400 rounded-2xl shadow-xl",
 				});
 			} else {
-				// Add brand-new service via the dedicated POST endpoint — no phone needed
 				await api.post(`/api/providers/v1/${user.id}/services`, {
 					slug: selectedService.slug,
 					price: finalPrice,
+					price_unit: priceUnit,
 				});
 				setMyServices((prev) => [
 					...prev,
-					{ ...selectedService, price: finalPrice, is_visible: true },
+					{
+						...selectedService,
+						price: finalPrice,
+						price_unit: priceUnit,
+						is_visible: true,
+					},
 				]);
 				toast.success(`Added ${selectedService.name} to your services!`, {
 					className:
@@ -124,12 +136,10 @@ export default function ProviderServices() {
 		}
 	};
 
-	// ── Toggle visibility ──────────────────────────────────────────────────────
 	const handleToggleVisibility = async (serviceItem) => {
 		const nextVis = !serviceItem.is_visible;
 		setUpdatingId(serviceItem.id);
 		try {
-			// New endpoint: PUT /api/providers/v1/:id/services/:serviceId/visibility
 			await api.put(
 				`/api/providers/v1/${user.id}/services/${serviceItem.id}/visibility`,
 				{ is_visible: nextVis },
@@ -150,9 +160,17 @@ export default function ProviderServices() {
 	const openEditDrawer = (service) => {
 		setSelectedService(service);
 		setCustomPrice(service.price ? String(service.price) : "500");
+
+		const allowed = getAllowedUnits(service.slug, service.price_unit);
+		const existingUnit = service.price_unit?.toLowerCase().trim();
+
+		if (existingUnit && allowed.includes(existingUnit)) {
+			setPriceUnit(existingUnit);
+		} else {
+			setPriceUnit(allowed[0] || "fixed");
+		}
 	};
 
-	// ── Loading state ──────────────────────────────────────────────────────────
 	if (loading) {
 		return (
 			<div className="flex flex-col items-center justify-center min-h-[350px] gap-4 text-slate-400">
@@ -162,10 +180,8 @@ export default function ProviderServices() {
 		);
 	}
 
-	// ── Render ─────────────────────────────────────────────────────────────────
 	return (
 		<div className="space-y-8 relative bricolage-grotesque">
-			{/* Header */}
 			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
 				<div>
 					<h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
@@ -202,7 +218,6 @@ export default function ProviderServices() {
 				</div>
 			</div>
 
-			{/* Tab content */}
 			<AnimatePresence mode="wait">
 				{activeTab === "active" ? (
 					<motion.div
@@ -276,8 +291,33 @@ export default function ProviderServices() {
 												<span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
 													Your Rate
 												</span>
-												<span className="text-sm font-extrabold font-mono text-emerald-400 mt-0.5 block">
-													₹{service.price}
+												<span className="text-sm font-extrabold font-mono text-emerald-400 mt-0.5 block capitalize">
+													{service.price_unit === "fixed" ||
+													service.price_unit === "package" ? (
+														<>
+															₹{service.price}{" "}
+															<span className="text-[11px] text-slate-400 font-normal lowercase ml-0.5">
+																(
+																{UNIT_LABELS[service.price_unit] ||
+																	service.price_unit}
+																)
+															</span>
+														</>
+													) : service.price_unit === "starts at" ? (
+														<>
+															<span className="text-[11px] text-slate-400 font-normal lowercase mr-0.5">
+																starts at
+															</span>{" "}
+															₹{service.price}
+														</>
+													) : (
+														<>
+															₹{service.price}{" "}
+															<span className="text-[11px] text-slate-400 font-normal lowercase ml-0.5">
+																/ {service.price_unit}
+															</span>
+														</>
+													)}
 												</span>
 											</div>
 										</div>
@@ -415,7 +455,6 @@ export default function ProviderServices() {
 									</button>
 								</div>
 
-								{/* Service preview */}
 								<div className="p-4 bg-violet-900/20 border border-violet-500/15 rounded-xl flex gap-3 items-center">
 									<div className="w-12 h-12 rounded-xl bg-slate-950 overflow-hidden shrink-0 border border-white/10">
 										<img
@@ -439,8 +478,28 @@ export default function ProviderServices() {
 									</div>
 								</div>
 
-								{/* Price form */}
 								<form onSubmit={handleSavePrice} className="space-y-5">
+									<div className="space-y-2">
+										<label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+											Rate Structure
+										</label>
+										<select
+											value={priceUnit}
+											onChange={(e) => setPriceUnit(e.target.value)}
+											className="w-full px-3 py-2.5 bg-slate-800 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500/50 transition-all cursor-pointer capitalize"
+										>
+											{currentAllowedUnits.map((unit) => (
+												<option
+													key={unit}
+													value={unit}
+													className="bg-slate-900"
+												>
+													{UNIT_LABELS[unit] || unit}
+												</option>
+											))}
+										</select>
+									</div>
+
 									<div className="space-y-2">
 										<label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
 											<IndianRupee size={10} /> Base Fee (INR)
@@ -461,29 +520,84 @@ export default function ProviderServices() {
 										</div>
 									</div>
 
-									{/* Earnings breakdown */}
-									<div className="p-4 rounded-xl bg-slate-950/50 border border-white/5 space-y-3 text-xs">
+									{/* Professional Breakdown Layout */}
+									<div className="p-4 rounded-xl bg-slate-950/50 border border-white/5 space-y-3 text-sm">
 										<div className="flex justify-between text-slate-400">
 											<span>Customer pays</span>
 											<span className="font-mono text-slate-200">
-												₹{customPrice || 0}
+												{priceUnit === "starts at" ? (
+													<>
+														<span className="text-[11px] text-slate-500 mr-1">
+															Starts at
+														</span>{" "}
+														₹{customPrice || 0}
+													</>
+												) : priceUnit === "fixed" || priceUnit === "package" ? (
+													<>
+														₹{customPrice || 0}{" "}
+														<span className="text-[11px] text-slate-500 ml-1">
+															({UNIT_LABELS[priceUnit]})
+														</span>
+													</>
+												) : (
+													<>
+														₹{customPrice || 0}{" "}
+														<span className="text-[11px] text-slate-500 ml-1">
+															/ {priceUnit}
+														</span>
+													</>
+												)}
 											</span>
 										</div>
-										<div className="flex justify-between text-slate-400">
-											<span className="flex items-center gap-1">
-												Platform fee
-												<Info
-													size={11}
-													className="text-slate-600"
-													title="0% commission during early access"
-												/>
+
+										<div className="flex justify-between items-center bg-violet-500/5 border border-violet-500/10 rounded-lg p-2.5 group/info transition-all relative">
+											<span className="flex items-center gap-1.5 text-slate-400 text-[12px]">
+												Platform Commission
+												<div className="relative cursor-pointer text-violet-400 hover:text-violet-300">
+													<Info size={13} />
+													<div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-950 text-slate-300 text-[13px] p-2 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover/info:opacity-100 transition-opacity duration-200 border border-white/10 leading-normal z-50 normal-case font-normal">
+														TaskGenie charges a 0% introductory commission fee
+														during our launch program.
+													</div>
+												</div>
 											</span>
-											<span className="font-mono text-emerald-400">0%</span>
+											<div className="flex items-center gap-1.5">
+												<span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-[10px]">
+													Free Launch Access
+												</span>
+												<span className="font-mono text-emerald-400 line-through opacity-40 text-[11px]">
+													₹0
+												</span>
+											</div>
 										</div>
+
 										<div className="pt-2.5 border-t border-white/5 flex justify-between items-center">
-											<span className="font-bold text-white">You earn</span>
+											<span className="font-bold text-white">
+												Net Payout Take-home
+											</span>
 											<span className="font-mono font-bold text-emerald-400 text-sm">
-												₹{customPrice || 0}
+												{priceUnit === "starts at" ? (
+													<>
+														<span className="text-[11px] text-emerald-600 font-normal mr-1">
+															Starts at
+														</span>{" "}
+														₹{customPrice || 0}
+													</>
+												) : priceUnit === "fixed" || priceUnit === "package" ? (
+													<>
+														₹{customPrice || 0}{" "}
+														<span className="text-[11px] text-emerald-600 font-normal ml-1">
+															({UNIT_LABELS[priceUnit]})
+														</span>
+													</>
+												) : (
+													<>
+														₹{customPrice || 0}{" "}
+														<span className="text-[11px] text-emerald-600 font-normal ml-1">
+															/ {priceUnit}
+														</span>
+													</>
+												)}
 											</span>
 										</div>
 									</div>
@@ -510,7 +624,7 @@ export default function ProviderServices() {
 							<button
 								type="button"
 								onClick={() => setSelectedService(null)}
-								className="w-full py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors border border-dashed border-white/5 rounded-xl"
+								className="cursor-pointer w-full py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors border border-dashed border-white/5 rounded-xl"
 							>
 								Cancel
 							</button>

@@ -72,7 +72,7 @@ const SignUp = () => {
 	];
 
 	const [haiku, setHaiku] = useState(
-		HAIKUS[Math.floor(Math.random() * HAIKUS.length)]
+		HAIKUS[Math.floor(Math.random() * HAIKUS.length)],
 	);
 
 	const handleChange = (e) => {
@@ -90,17 +90,25 @@ const SignUp = () => {
 				theme: "outline",
 				size: "large",
 				width: 400,
-			}
+			},
 		);
 	}, []);
 
 	const handleGoogleResponse = async (response) => {
+		let lat = null;
+		let lng = null;
 		try {
 			const position = await new Promise((resolve, reject) => {
-				navigator.geolocation.getCurrentPosition(resolve, reject);
-			});
-			const lat = position.coords.latitude;
-			const lng = position.coords.longitude;
+				navigator.geolocation.getCurrentPosition(resolve, reject, {
+					timeout: 5000,
+				});
+			}).catch((err) =>
+				console.log("Location denied by user, moving forward without it."),
+			);
+			if (position) {
+				lat = position.coords.latitude;
+				lng = position.coords.longitude;
+			}
 
 			const res = await api.post("/api/auth/google", {
 				googleToken: response.credential,
@@ -119,7 +127,7 @@ const SignUp = () => {
 			}
 		} catch (err) {
 			console.error(err);
-			alert("Google login failed");
+			toast.error("Google authentication failed. Please try again.");
 		}
 	};
 

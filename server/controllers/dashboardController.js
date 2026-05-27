@@ -1,6 +1,5 @@
 const db = require("../config/db");
 
-// ── Customer Dashboard Stats ───────────────────────────────────────────────────
 const getCustomerDashboardStats = async (req, res) => {
 	const userId = req.user.id;
 
@@ -74,7 +73,6 @@ const getProviderDashboardStats = async (req, res) => {
 		const metrics = metricsRes.rows[0];
 		const providerRow = ratingRes.rows[0];
 
-		// Format the payload structure to exactly match what ProviderDashboard.jsx expects
 		res.json({
 			stats: {
 				total_earnings: parseFloat(metrics.total_earnings),

@@ -54,7 +54,7 @@ export default function AccountMenu({ user }) {
 				</Menu.Button>
 			</div>
 
-			{/* 2. THE DROPDOWN PANEL */}
+			{/* THE DROPDOWN PANEL */}
 			<Transition
 				as={Fragment}
 				enter="transition ease-out duration-200"
@@ -65,7 +65,6 @@ export default function AccountMenu({ user }) {
 				leaveTo="transform opacity-0 scale-95"
 			>
 				<Menu.Items className="absolute right-0 z-50 mt-3 w-64 origin-top-right rounded-2xl bg-white/95 backdrop-blur-xl py-1 shadow-2xl ring-1 ring-black/5 focus:outline-none border border-white/50 outline-none">
-					{/* Header: User Info */}
 					<div className="cursor-default px-4 py-4 border-b border-gray-100">
 						<p className="text-sm font-semibold text-gray-900 truncate">
 							{user.name || "User"}
@@ -104,19 +103,18 @@ export default function AccountMenu({ user }) {
 						</div>
 					)}
 
-					{/* === PROVIDER MENU ITEMS === */}
 					{isProvider && (
 						<div className="p-1">
 							<MenuLink to="/provider/dashboard" icon={LayoutDashboard}>
 								Dashboard
 							</MenuLink>
-							<MenuLink to="/provider/bookings" icon={CalendarCheck}>
+							<MenuLink to="/provider/dashboard/bookings" icon={CalendarCheck}>
 								Manage Bookings
 							</MenuLink>
-							<MenuLink to="/provider/services" icon={Briefcase}>
+							<MenuLink to="/provider/dashboard/services" icon={Briefcase}>
 								My Services
 							</MenuLink>
-							<MenuLink to="/provider/earnings" icon={Wallet}>
+							<MenuLink to="/provider/dashboard/earnings" icon={Wallet}>
 								Earnings
 							</MenuLink>
 							<MenuLink to="/provider/reviews" icon={Star}>

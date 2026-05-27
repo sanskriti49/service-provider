@@ -214,7 +214,6 @@ const seedData = async () => {
 				],
 			);
 
-			// 4. ✅ provider_services junction row — this is what was missing
 			await client.query(
 				`INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible)
                  VALUES ($1,$2,$3,$4,TRUE)

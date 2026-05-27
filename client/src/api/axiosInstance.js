@@ -19,18 +19,16 @@ api.interceptors.request.use(
 
 // 2. Response Interceptor: Handle Token Expiration
 api.interceptors.response.use(
-	(response) => response, // Return successful responses as is
+	(response) => response,
 	(error) => {
 		if (error.response && error.response.status === 401) {
 			// 401 means "Unauthorized" (Token expired or invalid)
 			console.warn("Session expired. Logging out...");
 
-			// Clear local storage
 			localStorage.removeItem("token");
 			localStorage.removeItem("user");
 
 			// Redirect to login (window.location is robust for hard redirects)
-			// Or you can use a global navigate function if you set that up
 			if (window.location.pathname !== "/login") {
 				window.location.href = "/login";
 			}

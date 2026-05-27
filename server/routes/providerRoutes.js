@@ -3,17 +3,17 @@ const router = express.Router();
 const c = require("../controllers/providerController");
 const authenticate = require("../middleware/authMiddleware");
 
-// ── Public ────────────────────────────────────────────────────────────────────
+// Public
 router.post("/v1", c.createProvider);
 router.get("/v1", c.getProviders);
 router.get("/v1/:custom_id", c.getProviderById);
-router.get("/v1/:id/availability", c.getProviderAvailability); // Now safely maps to a valid function!
+router.get("/v1/:id/availability", c.getProviderAvailability);
 
-// ── Protected ─────────────────────────────────────────────────────────────────
+// Protected
 router.put("/v1/:id", authenticate, c.updateProvider);
 router.delete("/v1/:id", authenticate, c.deleteProvider);
 
-// ── Service management ────────────────────────────────────────────────────────
+// Service management
 router.get("/v1/:id/services", authenticate, c.getProviderServices);
 router.post("/v1/:id/services", authenticate, c.addProviderService);
 router.delete(

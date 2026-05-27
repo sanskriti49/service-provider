@@ -6,7 +6,6 @@ const { hashIfPresent } = require("../utils/hash");
 const { generateRealSlots } = require("../utils/timeUtils");
 const { normalizeEmail } = require("../utils/normalizeEmail");
 
-// ── UUID detection ─────────────────────────────────────────────────────────────
 const UUID_REGEX =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -27,7 +26,6 @@ async function resolveProviderId(clientOrPool, idOrCustomId) {
 	return result.rows[0]?.id ?? null;
 }
 
-// ── Validation schemas ────────────────────────────────────────────────────────
 const providerSchema = Joi.object({
 	name: Joi.string().min(3).max(100).required(),
 	email: Joi.string().email().lowercase().required(),
@@ -90,7 +88,6 @@ const providerUpdateSchema = Joi.object({
 		.optional(),
 });
 
-// ── Slot helpers ───────────────────────────────────────────────────────────────
 const DEFAULT_SCHEDULE = [1, 2, 3, 4, 5, 6].map((day) => ({
 	day,
 	start: "10:00:00",
@@ -121,7 +118,6 @@ async function insertSlots(client, userId, schedule) {
 	}
 }
 
-// ── createProvider ─────────────────────────────────────────────────────────────
 async function createProvider(req, res, next) {
 	const { error, value } = providerSchema.validate(req.body);
 	if (error) return res.status(400).json({ error: error.details[0].message });
@@ -153,7 +149,7 @@ async function createProvider(req, res, next) {
 			return res
 				.status(400)
 				.json({ error: `Unknown service slug: ${service}` });
-		const serviceId = sRow.rows[0].id; // uuid
+		const serviceId = sRow.rows[0].id;
 
 		const hashed = await hashIfPresent(password);
 		const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20);
@@ -173,19 +169,12 @@ async function createProvider(req, res, next) {
 				bio,
 			],
 		);
-		const userId = userInsert.rows[0].id; // uuid
+		const userId = userInsert.rows[0].id;
 
 		await client.query(
-			`INSERT INTO providers (user_id, service_id, price, price_unit, rating, availability)
-             VALUES ($1,$2,$3,$4,$5,$6)`,
-			[
-				userId,
-				serviceId,
-				price ?? 0,
-				price_unit ?? "fixed",
-				rating ?? null,
-				JSON.stringify(availability ?? []),
-			],
+			`INSERT INTO providers (user_id, rating, availability)
+             VALUES ($1,$2,$3)`,
+			[userId, rating ?? null, JSON.stringify(availability ?? [])],
 		);
 
 		await client.query(
@@ -223,42 +212,50 @@ async function createProvider(req, res, next) {
 	}
 }
 
-// ── getProviders ───────────────────────────────────────────────────────────────
 async function getProviders(req, res, next) {
 	try {
 		const { service } = req.query;
 		let query = `
-            SELECT u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
+            SELECT DISTINCT ON (u.id)
+				   u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
                    s.name AS service, s.slug AS service_slug, s.id AS service_id,
-                   p.price, p.price_unit, p.rating, p.user_id
+                   ps.price, ps.price_unit, 
+				   p.rating, p.user_id
             FROM providers p
             JOIN users u ON p.user_id = u.id
-            LEFT JOIN services s ON p.service_id = s.id
+            JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
+            JOIN services s ON s.id = ps.service_id
         `;
 		const params = [];
 		if (service) {
 			query += " WHERE s.slug = $1";
 			params.push(service);
 		}
-		res.json((await db.query(query, params)).rows);
+		query += " ORDER BY u.id, ps.created_at ASC";
+
+		const result = await db.query(query, params);
+		res.json(result.rows);
 	} catch (err) {
+		console.error("Fetch marketplace providers error:", err.message);
 		next(err);
 	}
 }
 
-// ── getProviderById ────────────────────────────────────────────────────────────
 async function getProviderById(req, res, next) {
 	try {
 		const { custom_id } = req.params;
 		const providerRes = await db.query(
 			`SELECT u.id, u.name, u.email, u.phone, u.role, u.custom_id,
                     u.location, u.photo, u.bio,
-                    p.price, p.price_unit, p.rating,
+					p.rating,
+                    ps.price, ps.price_unit, 
                     s.name AS service, s.slug AS service_slug, s.id AS service_id
              FROM providers p
              JOIN users u ON u.id = p.user_id
-             LEFT JOIN services s ON p.service_id = s.id
-             WHERE u.custom_id = $1`,
+			 LEFT JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
+             LEFT JOIN services s ON s.id=ps.service_id
+             WHERE u.custom_id = $1
+			 LIMIT 1`,
 			[custom_id],
 		);
 		if (!providerRes.rows.length)
@@ -303,7 +300,6 @@ async function getProviderById(req, res, next) {
 	}
 }
 
-// ── updateProvider ─────────────────────────────────────────────────────────────
 async function updateProvider(req, res, next) {
 	const { error, value } = providerUpdateSchema.validate(req.body);
 	if (error) return res.status(400).json({ error: error.details[0].message });
@@ -353,19 +349,17 @@ async function updateProvider(req, res, next) {
 			serviceId = s.rows[0].id;
 		}
 
-		// 2. Redirect pricing and service updates to the correct target relation table
 		if (serviceId) {
 			await client.query(
 				`INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible)
-                 VALUES ($1, $2, $3, $4, TRUE)
-                 ON CONFLICT (provider_id, service_id)
-                 DO UPDATE SET 
-                    price = COALESCE(EXCLUDED.price, provider_services.price), 
-                    price_unit = COALESCE(EXCLUDED.price_unit, provider_services.price_unit)`,
+         VALUES ($1, $2, $3, $4, TRUE)
+         ON CONFLICT (provider_id, service_id)
+         DO UPDATE SET 
+            price = COALESCE(EXCLUDED.price, provider_services.price), 
+            price_unit = COALESCE(EXCLUDED.price_unit, provider_services.price_unit)`,
 				[providerId, serviceId, price ?? 0, price_unit ?? "fixed"],
 			);
 		}
-
 		if (availability) {
 			await insertSlots(client, providerId, availability);
 			await client.query(
@@ -384,7 +378,6 @@ async function updateProvider(req, res, next) {
 	}
 }
 
-// ── getProviderServices ────────────────────────────────────────────────────────
 async function getProviderServices(req, res, next) {
 	try {
 		const providerId = await resolveProviderId(db, req.params.id);
@@ -406,9 +399,8 @@ async function getProviderServices(req, res, next) {
 	}
 }
 
-// ── addProviderService ─────────────────────────────────────────────────────────
 async function addProviderService(req, res, next) {
-	const { slug, price, description } = req.body;
+	const { slug, price, description, price_unit } = req.body;
 
 	if (!slug || price == null)
 		return res.status(400).json({ error: "slug and price are required" });
@@ -427,7 +419,6 @@ async function addProviderService(req, res, next) {
 		if (!providerId)
 			return res.status(404).json({ error: "Provider not found" });
 
-		// Find the global base service template ID from the master services table
 		const sRow = await client.query("SELECT id FROM services WHERE slug=$1", [
 			slug,
 		]);
@@ -437,15 +428,23 @@ async function addProviderService(req, res, next) {
 
 		const result = await client.query(
 			`INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible, slug, description)
-             VALUES ($1, $2, $3, 'fixed', TRUE, $4, $5)
+             VALUES ($1, $2, $3, COALESCE($4, 'fixed'), TRUE, $5, $6)
              ON CONFLICT (provider_id, service_id)
              DO UPDATE SET 
                 price = EXCLUDED.price, 
+                price_unit = COALESCE(EXCLUDED.price_unit, provider_services.price_unit),
                 is_visible = TRUE,
                 slug = COALESCE(EXCLUDED.slug, provider_services.slug),
                 description = COALESCE(EXCLUDED.description, provider_services.description)
              RETURNING *`,
-			[providerId, serviceId, parsedPrice, slug, description ?? null],
+			[
+				providerId,
+				serviceId,
+				parsedPrice,
+				price_unit || null,
+				slug,
+				description ?? null,
+			],
 		);
 
 		await client.query("COMMIT");
@@ -460,7 +459,6 @@ async function addProviderService(req, res, next) {
 	}
 }
 
-// ── removeProviderService ──────────────────────────────────────────────────────
 async function removeProviderService(req, res, next) {
 	try {
 		const providerId = await resolveProviderId(db, req.params.id);
@@ -481,7 +479,6 @@ async function removeProviderService(req, res, next) {
 	}
 }
 
-// ── toggleServiceVisibility ────────────────────────────────────────────────────
 async function toggleServiceVisibility(req, res, next) {
 	try {
 		const { is_visible } = req.body;
@@ -511,14 +508,12 @@ async function toggleServiceVisibility(req, res, next) {
 	}
 }
 
-// ── getProviderAvailability ────────────────────────────────────────────────────
 async function getProviderAvailability(req, res, next) {
 	try {
 		const today = new Date();
 		const end = new Date();
 		end.setDate(today.getDate() + 14);
 
-		// req.params.id here is custom_id (from the public route), so no UUID cast needed
 		const r = await db.query(
 			`SELECT TO_CHAR(date,'YYYY-MM-DD') AS date, start_time, is_booked
              FROM availability_slots
@@ -539,7 +534,6 @@ async function getProviderAvailability(req, res, next) {
 	}
 }
 
-// ── deleteProvider ─────────────────────────────────────────────────────────────
 async function deleteProvider(req, res, next) {
 	try {
 		const providerId = await resolveProviderId(db, req.params.id);

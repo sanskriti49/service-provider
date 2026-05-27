@@ -11,7 +11,6 @@ import ProviderEarnings from "./dashboards/provider/ProviderEarnings";
 import ProviderServices from "./dashboards/provider/ProviderServices";
 import ProviderSettings from "./dashboards/provider/ProviderSettings";
 
-// ─── Lazy Pages ────────────────────────────────────────────────────────────────
 const Home = lazy(() => import("./pages/Home"));
 const SignIn = lazy(() => import("./pages/SignIn"));
 const SignUp = lazy(() => import("./pages/SignUp"));
@@ -38,17 +37,11 @@ const DashboardOverview = lazy(
 );
 const AllBookings = lazy(() => import("./dashboards/customer/AllBookings"));
 
-// ─── Router ────────────────────────────────────────────────────────────────────
 // Suspense is placed at the layout level so each layout gets ONE fallback.
 // Child routes are lazy but share the parent's Suspense boundary.
 const router = createBrowserRouter([
 	{
-		// ── Main layout (with Navbar + Footer) ──────────────────────────────
-		element: (
-			<Suspense fallback={<PageLoader />}>
-				<AppLayout />
-			</Suspense>
-		),
+		element: <AppLayout />,
 		children: [
 			{ path: "/", element: <Home /> },
 			{ path: "/choose-role", element: <ChooseRole /> },
@@ -56,7 +49,7 @@ const router = createBrowserRouter([
 			{ path: "/help", element: <HelpCenter /> },
 			{ path: "/unauthorized", element: <Unauthorized /> },
 
-			// Customer-only routes
+			// customer-only routes
 			{
 				path: "/dashboard",
 				element: (
@@ -104,7 +97,6 @@ const router = createBrowserRouter([
 		],
 	},
 	{
-		// ── Plain layout (no Navbar/Footer — auth pages, service detail) ────
 		element: (
 			<Suspense fallback={<PageLoader />}>
 				<PlainLayout />
@@ -133,7 +125,6 @@ const router = createBrowserRouter([
 		],
 	},
 	{
-		// ── Provider dashboard (standalone — no shared layout) ───────────────
 		path: "/provider/dashboard",
 		element: (
 			<ProtectedRoute allowed={["provider"]}>
@@ -150,7 +141,6 @@ const router = createBrowserRouter([
 	},
 ]);
 
-// ─── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
 	return (
 		<>

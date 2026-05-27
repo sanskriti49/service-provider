@@ -95,8 +95,8 @@ async function createUser(req, res, next) {
 		// If registering as a provider, create the stub providers row
 		if (role === "provider") {
 			await db.query(
-				`INSERT INTO providers (user_id, price, price_unit, availability)
-				VALUES ($1, 0, 'fixed', '[]')
+				`INSERT INTO providers (user_id, rating, availability)
+				VALUES ($1,NULL, '[]')
 				ON CONFLICT (user_id) DO NOTHING`,
 				[result.rows[0].id],
 			);

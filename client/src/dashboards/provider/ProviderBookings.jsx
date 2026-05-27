@@ -1,13 +1,3 @@
-/**
- * dashboards/provider/ProviderBookings.jsx
- *
- * Provider's booking management page.
- * Dark theme mirror of customer's AllBookings — same table/tab/filter/pagination
- * pattern but with provider-specific actions (accept, complete, mark no-show)
- * and a dark slide-in details sheet.
- *
- * Route: /provider/bookings  (child of ProviderDashboard Outlet OR standalone)
- */
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -33,7 +23,6 @@ import {
 import api from "../../api/axiosInstance";
 import ConfirmModal from "../../ui/ConfirmModal";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
 		style: "currency",
@@ -59,7 +48,6 @@ function resolveDisplayStatus(status, date, startTime) {
 	return s;
 }
 
-// ── Status badge — dark variant ───────────────────────────────────────────────
 const STATUS_STYLES = {
 	completed: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
 	cancelled: "bg-red-500/15 text-red-300 border-red-500/25",
@@ -91,7 +79,6 @@ const StatusBadge = ({ status, date, startTime }) => {
 	);
 };
 
-// ── Booking details sheet (dark) ──────────────────────────────────────────────
 function BookingDetailsSheet({
 	booking,
 	onClose,
@@ -410,7 +397,6 @@ function BookingDetailsSheet({
 	);
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
 export default function ProviderBookings() {
 	const [activeTab, setActiveTab] = useState("upcoming");
 	const [bookings, setBookings] = useState([]);

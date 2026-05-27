@@ -70,7 +70,7 @@ const SignIn = () => {
 		},
 	];
 	const [haiku, setHaiku] = useState(
-		HAIKUS[Math.floor(Math.random() * HAIKUS.length)]
+		HAIKUS[Math.floor(Math.random() * HAIKUS.length)],
 	);
 
 	const handleChange = (e) => {
@@ -89,22 +89,22 @@ const SignIn = () => {
 				theme: "outline",
 				size: "large",
 				width: 400,
-			}
+			},
 		);
 	}, []);
 
 	const handleGoogleResponse = async (response) => {
 		try {
-			const position = await new Promise((resolve, reject) => {
-				navigator.geolocation.getCurrentPosition(resolve, reject);
-			});
-			const lat = position.coords.latitude;
-			const lng = position.coords.longitude;
+			// const position = await new Promise((resolve, reject) => {
+			// 	navigator.geolocation.getCurrentPosition(resolve, reject);
+			// });
+			// const lat = position.coords.latitude;
+			// const lng = position.coords.longitude;
 
 			const res = await api.post("/api/auth/google", {
 				googleToken: response.credential,
-				lat,
-				lng,
+				// lat,
+				// lng,
 			});
 
 			const { token } = res.data;

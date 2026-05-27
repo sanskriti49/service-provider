@@ -43,7 +43,8 @@ export const HeroSection = () => {
 							{popularSearches.map((term) => (
 								<Link
 									key={term}
-									to={`/services/${term.toLowerCase()}`}
+									//to={`/services/${term.toLowerCase()}`}
+									to={`/services/${term.toLowerCase().replace(/\s+/g, "-")}`}
 									className="px-3 py-1.5 text-xs sm:text-sm font-medium text-violet-700 bg-violet-50/50 border border-violet-100 rounded-full
                                     hover:bg-violet-100 hover:text-violet-900 hover:border-violet-200 hover:scale-105
                                     transition-all duration-200 ease-out cursor-pointer"

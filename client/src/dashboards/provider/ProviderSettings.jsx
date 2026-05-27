@@ -375,7 +375,7 @@ export default function ProviderSettings() {
 		if (phrase !== "DELETE MY ACCOUNT") return;
 		setDeleteLoading(true);
 		try {
-			await api.delete(`/api/providers/v1/${user.id}`);
+			await api.delete(`/api/users/${user.id}`);
 			localStorage.clear();
 			navigate("/");
 		} catch (err) {
@@ -768,7 +768,7 @@ export default function ProviderSettings() {
 									type="button"
 									disabled={phrase !== "DELETE MY ACCOUNT" || deleteLoading}
 									onClick={deleteAccount}
-									className="flex-1 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-500 disabled:bg-red-950 disabled:text-red-800 border border-red-500/30 rounded-xl transition-all flex items-center justify-center gap-2"
+									className="cursor-pointer flex-1 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-500 disabled:bg-red-950 disabled:text-red-800 border border-red-500/30 rounded-xl transition-all flex items-center justify-center gap-2"
 								>
 									{deleteLoading ? (
 										<Loader2 size={13} className="animate-spin" />

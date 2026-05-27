@@ -9,8 +9,6 @@ import {
 import { useAuth } from "../../hooks/useAuth"; // ✅ single source of truth
 
 export default function CustomerDashboard() {
-	// ✅ No more manual jwtDecode + useEffect + navigate here.
-	// ProtectedRoute already guards this route; useAuth just reads the cached result.
 	const { user } = useAuth();
 
 	return (
@@ -96,7 +94,6 @@ export default function CustomerDashboard() {
 	);
 }
 
-// ── Sidebar link ──────────────────────────────────────────────────────────────
 function SidebarLink({ to, icon, label, end = false }) {
 	return (
 		<NavLink
