@@ -24,44 +24,42 @@ async function getAvailability(req, res, next) {
 			providerId = userRes.rows[0].id;
 		}
 
-		const from = req.query.from ? new Date(req.query.from) : new Date();
-		from.setHours(0, 0, 0, 0);
+		const fromStr = req.query.from || new Date().toISOString().slice(0, 10);
+		const [year, month, day] = fromStr.split("-").map(Number);
+		const from = new Date(year, month - 1, day, 0, 0, 0, 0);
 
 		const days = Math.min(parseInt(req.query.days || "7", 10), 30);
 
 		const masterRes = await db.query(
-			`SELECT day_of_week,start_time::text, end_time::text
+			`SELECT day_of_week, 
+                    TO_CHAR(start_time, 'HH24:MI') AS start_time, 
+                    TO_CHAR(end_time, 'HH24:MI') AS end_time
              FROM provider_master_availability
              WHERE provider_id=$1`,
 			[providerId],
 		);
 
 		const endDate = new Date(from);
-		endDate.setDate(endDate.getDate() + days - 1);
+		endDate.setDate(from.getDate() + days - 1);
+		const endDateStr = endDate.toISOString().slice(0, 10);
 
 		const exceptionsRes = await db.query(
-			`SELECT date,is_available, override_slots
+			`SELECT TO_CHAR(date, 'YYYY-MM-DD') as date_str, is_available, override_slots
             FROM provider_date_exceptions
-            WHERE provider_id = $1 AND date BETWEEN $2 AND $3`,
-			[
-				providerId,
-				from.toISOString().slice(0, 10),
-				endDate.toISOString().slice(0, 10),
-			],
+            WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date`,
+			[providerId, fromStr, endDateStr],
 		);
 
 		const bookingsRes = await db.query(
-			`SELECT date, start_time::text AS start_time, end_time::text AS end_time
+			`SELECT TO_CHAR(date, 'YYYY-MM-DD') as date_str, 
+                    TO_CHAR(start_time, 'HH24:MI') AS start_time, 
+                    TO_CHAR(end_time, 'HH24:MI') AS end_time
              FROM bookings
-             WHERE provider_id = $1 AND date BETWEEN $2 AND $3 AND status = 'booked'`,
-			[
-				providerId,
-				from.toISOString().slice(0, 10),
-				endDate.toISOString().slice(0, 10),
-			],
+             WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date AND status = 'booked'`,
+			[providerId, fromStr, endDateStr],
 		);
 
-		const masterMap = {}; // day_of_week => [{start,end},...]
+		const masterMap = {};
 		for (const row of masterRes.rows) {
 			const d = parseInt(row.day_of_week, 10);
 			masterMap[d] = masterMap[d] || [];
@@ -70,48 +68,38 @@ async function getAvailability(req, res, next) {
 
 		const exceptionsMap = {};
 		for (const ex of exceptionsRes.rows) {
-			exceptionsMap[ex.date.toISOString().slice(0, 10)] = ex;
+			exceptionsMap[ex.date_str] = ex;
 		}
 
 		const bookingsMap = {};
 		for (const b of bookingsRes.rows) {
-			const key = b.date.toISOString().slice(0, 10);
-			bookingsMap[key] = bookingsMap[key] || [];
-			bookingsMap[key].push({ start: b.start_time, end: b.end_time });
+			bookingsMap[b.date_str] = bookingsMap[b.date_str] || [];
+			bookingsMap[b.date_str].push({ start: b.start_time, end: b.end_time });
 		}
 
-		// Expand each day and subtract bookings + apply exceptions
 		const results = [];
 		for (let i = 0; i < days; i++) {
 			const dt = new Date(from);
 			dt.setDate(from.getDate() + i);
 			const dateStr = dt.toISOString().slice(0, 10);
-			const dow = dt.getDay(); // 0..6
+			const dow = dt.getDay();
 
 			let slots = [];
-
 			const exception = exceptionsMap[dateStr];
-			if (exception) {
-				if (exception.is_available && exception.override_slots) {
-					// use override slots (stored as JSONB)
-					slots = exception.override_slots.map((s) => ({
-						start: s.start,
-						end: s.end,
-					}));
-				} else if (!exception.is_available) {
-					// fully blocked
-					slots = [];
-				}
+
+			if (exception.is_available && exception.override_slots) {
+				slots = exception.override_slots.map((s) => ({
+					start: s.start && s.start.length > 5 ? s.start.slice(0, 5) : s.start,
+					end: s.end && s.end.length > 5 ? s.end.slice(0, 5) : s.end,
+				}));
 			} else {
-				// use master template for this weekday
 				const templ = masterMap[dow] || [];
 				slots = templ.map((s) => ({ start: s.start, end: s.end }));
 			}
 
-			// subtract bookings (naive subtraction; for each booked slot remove overlapping chunk)
 			const booked = bookingsMap[dateStr] || [];
-			// convert to minutes and subtract
 			let freeChunks = [];
+
 			for (const slot of slots) {
 				let intervals = [
 					{ s: timeToMinutes(slot.start), e: timeToMinutes(slot.end) },
@@ -121,7 +109,6 @@ async function getAvailability(req, res, next) {
 					const bs = timeToMinutes(b.start);
 					const be = timeToMinutes(b.end);
 					intervals = intervals.flatMap((iv) => {
-						// no overlap
 						if (be <= iv.s || bs >= iv.e) return [iv];
 						const out = [];
 						if (bs > iv.s) out.push({ s: iv.s, e: bs });
@@ -137,9 +124,6 @@ async function getAvailability(req, res, next) {
 					})),
 				);
 			}
-
-			// Optionally split into fixed booking chunks, e.g., 60-min slots
-			// const finalSlots = freeChunks.flatMap(fc => splitIntoChunks(fc.start, fc.end, 60));
 
 			results.push({ date: dateStr, free_slots: freeChunks });
 		}

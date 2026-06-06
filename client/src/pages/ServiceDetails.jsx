@@ -194,8 +194,7 @@ const ServiceDetails = () => {
 					<div className="sticky top-0 h-full w-full flex flex-col ">
 						<div
 							onClick={handleGoBack}
-							className="cursor-pointer z-200 m-10 w-12 h-12 rounded-full border border-violet-400/50 flex items-center justify-center bg-black/20 backdrop-blur-sm text-violet-300 hover:bg-violet-500/20 hover:border-violet-400 transition-all duration-300"
-							redirect
+							className="cursor-pointer z-[20] m-10 p-2 w-16 h-16 rounded-full border border-violet-400/50 flex items-center justify-center bg-black/20 backdrop-blur-sm text-violet-300 hover:bg-violet-500/20 hover:border-violet-400 transition-all duration-300"
 						>
 							<ArrowLeft />
 						</div>
@@ -282,15 +281,18 @@ const ProviderCard = ({
 		setLoadingSlots(true);
 
 		try {
+			const today = new Date().toISOString().slice(0, 10);
 			const res = await fetch(
 				`${API_URL}/api/providers/v1/${provider.user_id}/availability`,
 			);
 			if (!res.ok) throw new Error("Failed to load slots");
 			const data = await res.json();
-			setAvailability(data);
+
+			setAvailability(Array.isArray(data) ? data : []);
 			setHasLoaded(true);
 		} catch (error) {
 			console.error(error);
+			setAvailability([]);
 		} finally {
 			setLoadingSlots(false);
 		}
@@ -308,7 +310,7 @@ const ProviderCard = ({
 		const grouped = availability.reduce((acc, slot) => {
 			const dateKey = slot.date;
 			if (!acc[dateKey]) acc[dateKey] = [];
-			acc[dateKey].push(slot.start_time);
+			acc[dateKey].push(slot);
 			return acc;
 		}, {});
 
@@ -329,12 +331,14 @@ const ProviderCard = ({
 			const validTimes = grouped[dateStr]
 				.filter((t) => {
 					if (!isToday) return true;
-					const [h, m] = t.split(":");
+
+					const [h, m] = t.start_time.split(":");
 					const slotTime = new Date();
 					slotTime.setHours(h, m, 0, 0);
+
 					return slotTime > new Date();
 				})
-				.sort();
+				.sort((a, b) => a.start_time.localeCompare(b.start_time));
 
 			if (validTimes.length > 0) {
 				validData[dateStr] = validTimes;
@@ -417,11 +421,9 @@ const ProviderCard = ({
 		}
   `}
 		>
-			{/* Top Gradient Accent */}
 			<div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
 			<div className="p-7">
-				{/* Header Section */}
 				<div className="flex gap-5 items-start">
 					<div className="relative">
 						<div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white/10 shadow-lg group-hover:border-violet-500/50 transition-colors duration-300">
@@ -434,7 +436,8 @@ const ProviderCard = ({
 								className="w-full h-full object-cover"
 							/>
 						</div>
-						{/* Rating Badge */}
+
+						{/* Rating  */}
 						<div className="absolute -bottom-3 -right-2 bg-[#1a103f] border border-violet-500/30 px-2 py-1 rounded-lg flex items-center gap-1 shadow-lg">
 							<StarIcon className="h-3.5 w-3.5 text-yellow-400" />
 							<span className="text-xs font-bold text-white">
@@ -452,7 +455,7 @@ const ProviderCard = ({
 							<span>Verified Expert</span>
 						</div>
 
-						{/* Price Tag - Modern Pill */}
+						{/* Price*/}
 						<div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-200 text-sm">
 							<span className="font-bold">₹{provider.price}</span>
 							<span className="text-xs opacity-60 font-normal">/ visit</span>
@@ -513,7 +516,7 @@ const ProviderCard = ({
 
 						{validDates.length > 0 && (
 							<div className="space-y-4">
-								{/* Date Selector - FIXED SCROLLBAR */}
+								{/* Date Selector */}
 								<div>
 									<h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
 										Select Date
@@ -563,12 +566,13 @@ const ProviderCard = ({
 										</div>
 
 										<div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar-y">
-											{processedData[selectedDateStr].map((time) => {
-												const isSelected = selectedTime === time;
+											{processedData[selectedDateStr].map((slot) => {
+												const isSelected =
+													selectedTime?.start_time === slot.start_time;
 												return (
 													<button
-														key={time}
-														onClick={() => setSelectedTime(time)}
+														key={slot}
+														onClick={() => setSelectedTime(slot)}
 														className={`text-xs py-2 rounded-lg transition-all duration-200 border
                                                         ${
 																													isSelected
@@ -576,7 +580,8 @@ const ProviderCard = ({
 																														: "bg-white/5 border-transparent text-gray-300 hover:bg-white/10 hover:border-white/20"
 																												}`}
 													>
-														{formatTime(time)}
+														{formatTime(slot.start_time)} -{" "}
+														{formatTime(slot.end_time)}
 													</button>
 												);
 											})}
@@ -595,7 +600,7 @@ const ProviderCard = ({
 													serviceName: service.name,
 													preloadedAvailability: availability,
 													selectedDateStr,
-													selectedTime,
+													selectedSlot: selectedTime,
 												},
 											})
 										}

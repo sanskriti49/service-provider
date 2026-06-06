@@ -78,22 +78,6 @@ const router = createBrowserRouter([
 					</ProtectedRoute>
 				),
 			},
-			{
-				path: "/book/:customId",
-				element: (
-					<ProtectedRoute allowed={["customer"]}>
-						<BookingPage />
-					</ProtectedRoute>
-				),
-			},
-			{
-				path: "/booking-success",
-				element: (
-					<ProtectedRoute allowed={["customer"]}>
-						<BookingSuccess />
-					</ProtectedRoute>
-				),
-			},
 		],
 	},
 	{
@@ -122,6 +106,22 @@ const router = createBrowserRouter([
 			{ path: "/forgot-password", element: <ForgotPassword /> },
 			{ path: "/reset-password/:resetToken", element: <ResetPassword /> },
 			{ path: "/services/:slug", element: <ServiceDetails /> },
+			{
+				path: "/book/:customId",
+				element: (
+					<ProtectedRoute allowed={["customer"]}>
+						<BookingPage />
+					</ProtectedRoute>
+				),
+			},
+			{
+				path: "/booking-success",
+				element: (
+					<ProtectedRoute allowed={["customer"]}>
+						<BookingSuccess />
+					</ProtectedRoute>
+				),
+			},
 		],
 	},
 	{
@@ -144,7 +144,22 @@ const router = createBrowserRouter([
 export default function App() {
 	return (
 		<>
-			<Toaster richColors position="top-center" />
+			<Toaster
+				richColors
+				position="top-center"
+				richColors
+				closeButton
+				expand={true}
+				visibleToasts={3}
+				toastOptions={{
+					unstyled: false,
+					classNames: {
+						toast: "text-base font-sans rounded-2xl",
+						title: "text-base font-bold",
+						description: "text-sm",
+					},
+				}}
+			/>
 			<RouterProvider router={router} />
 		</>
 	);

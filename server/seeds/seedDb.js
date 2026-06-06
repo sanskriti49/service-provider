@@ -233,10 +233,14 @@ const seedData = async () => {
 			// 6. Real calendar slots (next 30 days)
 			const realSlots = generateRealSlots(masterSchedule);
 			for (const s of realSlots) {
+				const cleanDateStr =
+					s.date instanceof Date
+						? s.date.toISOString().slice(0, 10)
+						: String(s.date).substring(0, 10);
 				await client.query(
 					`INSERT INTO availability_slots (provider_id, date, start_time, end_time)
-                     VALUES ($1,$2,$3,$4)`,
-					[userId, s.date, s.start_time, s.end_time],
+                     VALUES ($1,$2::date,$3,$4)`,
+					[userId, cleanDateStr, s.start_time, s.end_time],
 				);
 			}
 

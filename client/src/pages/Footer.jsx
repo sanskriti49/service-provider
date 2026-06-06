@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
 const Footer = () => {
 	return (
@@ -20,26 +21,24 @@ const Footer = () => {
 							connects you with trusted professionals for every need.
 						</p>
 
-						<div className="flex gap-4 mt-5 text-[#A39AC1] text-sm">
+						{/* <div className="flex gap-4 mt-5 text-white text-sm">
 							<a
-								href="#"
-								className="cursor-pointer hover:text-violet-500 transition"
-							>
-								Twitter
-							</a>
-							<a
-								href="#"
+								href="https://www.linkedin.com/in/sanskriti49/"
+								target="_blank"
+								rel="noopener noreferrer"
 								className="cursor-pointer hover:text-violet-500 transition"
 							>
 								LinkedIn
 							</a>
 							<a
-								href="#"
+								href="https://www.instagram.com/sanskriti._4/"
+								target="_blank"
+								rel="noopener noreferrer"
 								className="cursor-pointer hover:text-violet-500 transition"
 							>
 								Instagram
 							</a>
-						</div>
+						</div> */}
 					</div>
 
 					<div className="flex-grow grid grid-cols-2 md:grid-cols-4 gap-8">

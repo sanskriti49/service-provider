@@ -89,7 +89,9 @@ const SignUp = () => {
 			{
 				theme: "outline",
 				size: "large",
-				width: 400,
+				width: 340,
+				shape: "pill",
+				text: "continue_with",
 			},
 		);
 	}, []);
@@ -199,10 +201,13 @@ const SignUp = () => {
 
 							<div className="space-y-4">
 								<div className="relative w-full">
-									<div
-										id="googleButtonDiv"
-										className="absolute inset-0 z-10 opacity-0 overflow-hidden flex items-center justify-center cursor-pointer"
-									></div>
+									<div className="w-full mb-5 flex flex-col items-center justify-center min-h-[48px]">
+										{/* Google's official iframe script mounts natively right here */}
+										<div
+											id="googleButtonDiv"
+											className="w-full flex justify-center dynamic-google-container animate-in fade-in duration-300"
+										/>
+									</div>
 
 									<button
 										type="button"
@@ -368,7 +373,7 @@ const SignUp = () => {
 				</div>
 			</div>
 
-			<aside className="relative hidden lg:block lg:w-[28rem] xl:w-[32rem] h-full p-16">
+			<aside className="relative hidden lg:block lg:w-[28rem] xl:w-[32rem]">
 				<img
 					src={signInImg}
 					className="absolute inset-0 max-w-none w-full h-full object-cover"

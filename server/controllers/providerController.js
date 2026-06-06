@@ -3,8 +3,13 @@ const { customAlphabet } = require("nanoid");
 const Joi = require("joi");
 const db = require("../config/db");
 const { hashIfPresent } = require("../utils/hash");
-const { generateRealSlots } = require("../utils/timeUtils");
 const { normalizeEmail } = require("../utils/normalizeEmail");
+
+const {
+	generateRealSlots,
+	timeToMinutes,
+	minutesToTime,
+} = require("../utils/timeUtils");
 
 const UUID_REGEX =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -88,10 +93,19 @@ const providerUpdateSchema = Joi.object({
 		.optional(),
 });
 
+function localDateStr(dt) {
+	return [
+		dt.getFullYear(),
+		String(dt.getMonth() + 1).padStart(2, "0"),
+		String(dt.getDate()).padStart(2, "0"),
+	].join("-");
+}
+
+// Mon-Sat 10:00-19:00  (day 0 = Sunday, skipped)
 const DEFAULT_SCHEDULE = [1, 2, 3, 4, 5, 6].map((day) => ({
 	day,
-	start: "10:00:00",
-	end: "19:00:00",
+	start: "10:00",
+	end: "19:00",
 }));
 
 async function insertSlots(client, userId, schedule) {
@@ -110,10 +124,15 @@ async function insertSlots(client, userId, schedule) {
 		userId,
 	]);
 	for (const s of generateRealSlots(schedule)) {
+		const cleanDateStr =
+			s.date instanceof Date
+				? s.date.toISOString().slice(0, 10)
+				: String(s.date).substring(0, 10);
+
 		await client.query(
 			`INSERT INTO availability_slots (provider_id, date, start_time, end_time)
-             VALUES ($1,$2,$3,$4)`,
-			[userId, s.date, s.start_time, s.end_time],
+             VALUES ($1,$2::date,$3,$4)`,
+			[userId, cleanDateStr, s.start_time, s.end_time],
 		);
 	}
 }
@@ -172,9 +191,18 @@ async function createProvider(req, res, next) {
 		const userId = userInsert.rows[0].id;
 
 		await client.query(
-			`INSERT INTO providers (user_id, rating, availability)
-             VALUES ($1,$2,$3)`,
-			[userId, rating ?? null, JSON.stringify(availability ?? [])],
+			`INSERT INTO providers (user_id, service_id, slug, description, price, rating, availability, price_unit)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+			[
+				userId,
+				serviceId,
+				customId,
+				bio ?? null,
+				price ?? 0,
+				rating ?? null,
+				JSON.stringify(availability ?? []),
+				price_unit ?? "fixed",
+			],
 		);
 
 		await client.query(
@@ -217,10 +245,10 @@ async function getProviders(req, res, next) {
 		const { service } = req.query;
 		let query = `
             SELECT DISTINCT ON (u.id)
-				   u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
+                   u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
                    s.name AS service, s.slug AS service_slug, s.id AS service_id,
                    ps.price, ps.price_unit, 
-				   p.rating, p.user_id
+                   p.rating, p.user_id
             FROM providers p
             JOIN users u ON p.user_id = u.id
             JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
@@ -247,15 +275,15 @@ async function getProviderById(req, res, next) {
 		const providerRes = await db.query(
 			`SELECT u.id, u.name, u.email, u.phone, u.role, u.custom_id,
                     u.location, u.photo, u.bio,
-					p.rating,
+                    p.rating,
                     ps.price, ps.price_unit, 
                     s.name AS service, s.slug AS service_slug, s.id AS service_id
              FROM providers p
              JOIN users u ON u.id = p.user_id
-			 LEFT JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
+             LEFT JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
              LEFT JOIN services s ON s.id=ps.service_id
              WHERE u.custom_id = $1
-			 LIMIT 1`,
+             LIMIT 1`,
 			[custom_id],
 		);
 		if (!providerRes.rows.length)
@@ -272,15 +300,18 @@ async function getProviderById(req, res, next) {
 			[provider.id],
 		);
 
-		const today = new Date();
-		const nextMonth = new Date();
-		nextMonth.setDate(today.getDate() + 30);
 		const slotsRes = await db.query(
-			`SELECT TO_CHAR(date,'YYYY-MM-DD') AS date, start_time, is_booked
+			`SELECT 
+				TO_CHAR(date,'YYYY-MM-DD') AS date_str,
+				TO_CHAR(start_time, 'HH24:MI') AS start_time,
+				TO_CHAR(end_time, 'HH24:MI') AS end_time,
+				is_booked
              FROM availability_slots
-             WHERE provider_id=$1 AND date >= $2 AND date <= $3
+             WHERE provider_id=$1 
+			 		AND date >= CURRENT_DATE 
+					AND date <= CURRENT_DATE + INTERVAL '30 days'
              ORDER BY date, start_time`,
-			[provider.id, today, nextMonth],
+			[provider.id],
 		);
 
 		res.json({
@@ -288,9 +319,16 @@ async function getProviderById(req, res, next) {
 			provider: {
 				...provider,
 				services: servicesRes.rows,
+				// availability: slotsRes.rows.map((s) => ({
+				// 	date: s.date_str,
+				// 	start_time: s.start_time.slice(0, 5),
+				// 	end_time: s.end_time.slice(0, 5),
+				// 	isBooked: s.is_booked,
+				// })),
 				availability: slotsRes.rows.map((s) => ({
-					date: s.date,
-					start_time: s.start_time.slice(0, 5),
+					date: s.date_str,
+					start_time: s.start_time,
+					end_time: s.end_time,
 					isBooked: s.is_booked,
 				})),
 			},
@@ -510,25 +548,99 @@ async function toggleServiceVisibility(req, res, next) {
 
 async function getProviderAvailability(req, res, next) {
 	try {
-		const today = new Date();
-		const end = new Date();
-		end.setDate(today.getDate() + 14);
+		const providerId = await resolveProviderId(db, req.params.id);
+
+		if (!providerId) {
+			return res.status(404).json({ error: "Provider not found" });
+		}
 
 		const r = await db.query(
-			`SELECT TO_CHAR(date,'YYYY-MM-DD') AS date, start_time, is_booked
-             FROM availability_slots
-             WHERE provider_id = (SELECT id FROM users WHERE custom_id=$1)
-               AND date >= $2 AND date <= $3
-             ORDER BY date, start_time`,
-			[req.params.id, today, end],
+			`SELECT 
+				TO_CHAR(date,'YYYY-MM-DD') AS date,
+				TO_CHAR(start_time, 'HH24:MI') AS start_time,
+				TO_CHAR(end_time, 'HH24:MI') AS end_time,
+				is_booked
+			 FROM availability_slots
+			 WHERE provider_id = $1
+			   AND date >= CURRENT_DATE
+			   AND date <= CURRENT_DATE + INTERVAL '14 days'
+			   AND is_booked = false
+			 ORDER BY date, start_time`,
+			[providerId],
 		);
-		res.json(
-			r.rows.map((row) => ({
-				date: row.date,
-				start_time: row.start_time.slice(0, 5),
-				isBooked: row.is_booked,
-			})),
+
+		if (r.rows.length > 0) {
+			return res.json(
+				r.rows.map((row) => ({
+					date: row.date,
+					start_time: row.start_time,
+					end_time: row.end_time,
+					isBooked: row.is_booked,
+				})),
+			);
+		}
+
+		const masterRes = await db.query(
+			`SELECT 
+				day_of_week,
+				TO_CHAR(start_time, 'HH24:MI') AS start_time,
+				TO_CHAR(end_time, 'HH24:MI') AS end_time
+			 FROM provider_master_availability
+			 WHERE provider_id = $1`,
+			[providerId],
 		);
+
+		const schedule = masterRes.rows.length
+			? masterRes.rows.map((r) => ({
+					day: Number(r.day_of_week),
+					start: r.start_time,
+					end: r.end_time,
+				}))
+			: DEFAULT_SCHEDULE;
+
+		const masterMap = {};
+
+		for (const rule of schedule) {
+			masterMap[rule.day] = masterMap[rule.day] || [];
+			masterMap[rule.day].push({
+				start: rule.start,
+				end: rule.end,
+			});
+		}
+
+		const slots = [];
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+
+		const SLOT_DURATION = 120;
+		const BUFFER = 60;
+
+		for (let i = 0; i < 14; i++) {
+			const dt = new Date(today);
+			dt.setDate(today.getDate() + i);
+
+			const dow = dt.getDay();
+			const dateStr = localDateStr(dt);
+			const templ = masterMap[dow] || [];
+
+			for (const slot of templ) {
+				let s = timeToMinutes(slot.start);
+				const e = timeToMinutes(slot.end);
+
+				while (s + SLOT_DURATION <= e) {
+					slots.push({
+						date: dateStr,
+						start_time: minutesToTime(s),
+						end_time: minutesToTime(s + SLOT_DURATION),
+						isBooked: false,
+					});
+
+					s += SLOT_DURATION + BUFFER;
+				}
+			}
+		}
+
+		return res.json(slots);
 	} catch (err) {
 		next(err);
 	}
