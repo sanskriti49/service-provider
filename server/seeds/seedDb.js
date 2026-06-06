@@ -11,7 +11,7 @@ const {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const PROVIDER_COUNT = 20;
-const RESET_PROVIDERS_ONLY = false;
+const RESET_PROVIDERS_ONLY = true;
 
 const indianCities = [
 	{ city: "Mumbai", state: "Maharashtra", lat: 19.076, lng: 72.8777 },
@@ -116,6 +116,14 @@ const seedData = async () => {
 	const client = await db.connect();
 	try {
 		console.log("✅ Connected to DB...");
+		const debug = await client.query(`
+	SELECT 
+		current_database() AS db,
+		current_schema() AS schema,
+		inet_server_addr() AS host
+`);
+		console.log("DB DEBUG:", debug.rows[0]);
+		console.log("DATABASE_URL:", process.env.DATABASE_URL?.slice(0, 45));
 
 		if (RESET_PROVIDERS_ONLY) {
 			console.log("🔄 Resetting provider tables...");
@@ -128,7 +136,6 @@ const seedData = async () => {
                     users
                 RESTART IDENTITY CASCADE
             `);
-			// ↑ provider_services is now included in the truncate
 		}
 
 		await client.query("BEGIN");
@@ -200,18 +207,12 @@ const seedData = async () => {
 
 			// 3. providers row (primary service — keeps booking JOINs working)
 			await client.query(
-				`INSERT INTO providers (user_id, service_id, slug, description, price, rating, availability, price_unit)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-				[
-					userId,
-					dbService.id,
-					dbService.slug,
-					dbService.description,
-					finalPrice,
-					rating,
-					JSON.stringify(masterSchedule),
-					pricingInfo.unit,
-				],
+				`INSERT INTO providers (user_id, rating, availability)
+     VALUES ($1,$2,$3)
+     ON CONFLICT (user_id) DO UPDATE SET
+        rating = EXCLUDED.rating,
+        availability = EXCLUDED.availability`,
+				[userId, rating, JSON.stringify(masterSchedule)],
 			);
 
 			await client.query(
@@ -250,6 +251,15 @@ const seedData = async () => {
 		}
 
 		await client.query("COMMIT");
+		const counts = await client.query(`
+	SELECT
+		(SELECT COUNT(*) FROM users) AS users,
+		(SELECT COUNT(*) FROM providers) AS providers,
+		(SELECT COUNT(*) FROM provider_services) AS provider_services,
+		(SELECT COUNT(*) FROM provider_master_availability) AS master_slots,
+		(SELECT COUNT(*) FROM availability_slots) AS availability_slots
+`);
+		console.log("COUNTS AFTER SEED:", counts.rows[0]);
 		console.log(
 			`\n🎉 Done! ${PROVIDER_COUNT} providers seeded with provider_services entries.`,
 		);
