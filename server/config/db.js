@@ -1,13 +1,12 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 
-// Explicitly check for production environment flags
 const isProduction = process.env.NODE_ENV === "production";
 
 const poolConfig = isProduction
 	? {
 			connectionString: process.env.DATABASE_URL,
-			ssl: { rejectUnauthorized: false }, // Mandatory for Neon cloud setups
+			ssl: { rejectUnauthorized: false },
 		}
 	: {
 			user: process.env.DB_USER,

@@ -9,9 +9,8 @@ const {
 	generateRealSlots,
 } = require("../utils/timeUtils");
 
-// ── Config ────────────────────────────────────────────────────────────────────
 const PROVIDER_COUNT = 20;
-const RESET_PROVIDERS_ONLY = true;
+const RESET_PROVIDERS_ONLY = false;
 
 const indianCities = [
 	{ city: "Mumbai", state: "Maharashtra", lat: 19.076, lng: 72.8777 },

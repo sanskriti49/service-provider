@@ -147,7 +147,6 @@ export default function App() {
 			<Toaster
 				richColors
 				position="top-center"
-				richColors
 				closeButton
 				expand={true}
 				visibleToasts={3}

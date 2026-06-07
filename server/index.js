@@ -39,6 +39,12 @@ app.use("/api/availability", availabilityRoutes);
 app.get("/", (req, res) => {
 	res.send("Backend running..");
 });
+app.get("/health", (req, res) => {
+	res.status(200).json({
+		status: "ok",
+		timestamp: new Date().toISOString(),
+	});
+});
 
 app.use(errorHandler);
 
