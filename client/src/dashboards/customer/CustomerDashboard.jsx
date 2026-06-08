@@ -54,12 +54,17 @@ export default function CustomerDashboard() {
 								label="Overview"
 							/>
 							<SidebarLink
+								to="/account/profile"
+								icon={<History size={18} />}
+								label="Profile"
+							/>
+							<SidebarLink
 								to="/dashboard/bookings"
 								icon={<History size={18} />}
 								label="My Bookings"
 							/>
 							<SidebarLink
-								to="/settings"
+								to="/account/settings"
 								icon={<SettingsIcon size={18} />}
 								label="Settings"
 							/>

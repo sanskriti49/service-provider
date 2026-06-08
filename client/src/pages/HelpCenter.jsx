@@ -46,7 +46,10 @@ const quickLinksData = {
 			title: "Settings",
 			icon: <User className="w-5 h-5 text-violet-600" />,
 			color: "bg-violet-50",
-			to: "/settings",
+			to:
+				userRole === "provider"
+					? "/provider/dashboard/settings"
+					: "/account/settings",
 		},
 		{
 			title: "Support Ticket",

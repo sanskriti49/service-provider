@@ -1,8 +1,3 @@
-/**
- * auth/useAuth.js
- * Single source of truth for reading the current user from localStorage.
- * Both ProtectedRoute and GuestRoute use this — no more duplicated jwtDecode calls.
- */
 import { useMemo } from "react";
 import { jwtDecode } from "jwt-decode";
 

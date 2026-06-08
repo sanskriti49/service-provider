@@ -6,6 +6,7 @@ import {
 	User,
 	Phone,
 	Mail,
+	Copy,
 	MapPin,
 	Image as ImageIcon,
 	FileText,
@@ -21,7 +22,7 @@ import {
 	ShieldCheck,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
-import { useAuth } from "../../hooks/useAuth";
+import { useAuth } from "../../contexts/AuthContext";
 
 function normalizePhone(raw = "") {
 	const t = raw.trim();
@@ -176,25 +177,20 @@ function SubmitBtn({ loading, saved, children }) {
 }
 
 export default function ProviderSettings() {
-	// ── useAuth only used for the shared context update (sidebar avatar etc.) ──
-	const { setUser: setAuthUser } = useAuth();
+	const { user: authUser, syncUser } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
 	const phoneBoxRef = useRef(null);
 
-	const [user, setUser] = useState(
-		JSON.parse(localStorage.getItem("user") || "{}"),
-	);
-
-	const [name, setName] = useState(user.name || "");
-	const [email, setEmail] = useState(user.email || "");
+	const [name, setName] = useState(authUser?.name || "");
+	const [email, setEmail] = useState(authUser?.email || "");
 	const [phone, setPhone] = useState(
-		user.phone ? normalizePhone(String(user.phone)) : "",
+		authUser?.phone ? normalizePhone(String(authUser.phone)) : "",
 	);
-	const [bio, setBio] = useState(user.bio || "");
+	const [bio, setBio] = useState(authUser?.bio || "");
 	const [state, setState] = useState("");
 	const [city, setCity] = useState("");
-	const [photo, setPhoto] = useState(user.photo || "");
+	const [photo, setPhoto] = useState(authUser?.photo || "");
 	const [selectedFile, setSelectedFile] = useState(null);
 
 	const [profileLoading, setProfileLoading] = useState(false);
@@ -217,38 +213,32 @@ export default function ProviderSettings() {
 		setPwd((p) => ({ ...p, [k]: e.target.value }));
 	const toggleShow = (k) => () => setShowPwd((p) => ({ ...p, [k]: !p[k] }));
 
-	// ── 1. Fetch fresh data from server on mount (fixes refresh bug) ──────────
 	useEffect(() => {
 		const fetchUserData = async () => {
 			try {
 				const response = await api.get("/api/auth/me");
 				const fresh = response.data.user;
-				setUser(fresh);
+				if (syncUser) syncUser(fresh);
 				localStorage.setItem("user", JSON.stringify(fresh));
-				// Also sync the auth context so sidebar avatar etc. update
-				if (setAuthUser) setAuthUser((prev) => ({ ...prev, ...fresh }));
 			} catch (err) {
 				console.warn("Could not refresh user:", err.message);
 			}
 		};
 		fetchUserData();
-	}, []); // eslint-disable-line react-hooks/exhaustive-deps
+	}, []);
 
-	// ── 2. Sync individual fields whenever local user object changes ──────────
 	useEffect(() => {
-		if (!user || !Object.keys(user).length) return;
-		setName(user.name || "");
-		setEmail(user.email || "");
-		setPhone(user.phone ? normalizePhone(String(user.phone)) : "");
-		setBio(user.bio || "");
-		setPhoto(user.photo || "");
-		// Parse city,state from "City,State" location string
-		const [rawCity = "", rawState = ""] = (user.location || "").split(",");
+		if (!authUser || !Object.keys(authUser).length) return;
+		setName(authUser.name || "");
+		setEmail(authUser.email || "");
+		setPhone(authUser.phone ? normalizePhone(String(authUser.phone)) : "");
+		setBio(authUser.bio || "");
+		setPhoto(authUser.photo || "");
+		const [rawCity = "", rawState = ""] = (authUser.location || "").split(",");
 		setState(rawState.trim());
 		setCity(rawCity.trim());
-	}, [user]);
+	}, [authUser]);
 
-	// ── Scroll-to-phone from hash link ───────────────────────────────────────
 	useEffect(() => {
 		if (location.hash === "#phone" && phoneBoxRef.current) {
 			const t = setTimeout(() => {
@@ -267,20 +257,12 @@ export default function ProviderSettings() {
 
 	const showPhoneWarning = () => {
 		if (phoneOk) return false;
-		if (!user?.phone) return true;
+		if (!authUser?.phone) return true;
 		return !PHONE_RE.test(
-			normalizePhone(String(user.phone)).replace(/\s+/g, ""),
+			normalizePhone(String(authUser.phone)).replace(/\s+/g, ""),
 		);
 	};
 
-	// ── Helper: sync user everywhere after any save ───────────────────────────
-	const syncUser = (fresh) => {
-		setUser(fresh);
-		localStorage.setItem("user", JSON.stringify(fresh));
-		if (setAuthUser) setAuthUser((prev) => ({ ...prev, ...fresh }));
-	};
-
-	// ── Save profile ──────────────────────────────────────────────────────────
 	const saveProfile = async (e) => {
 		e.preventDefault();
 		const normalizedPhone = normalizePhone(phone);
@@ -298,21 +280,17 @@ export default function ProviderSettings() {
 			formData.append("phone", normalizedPhone);
 			formData.append("bio", bio);
 
-			// Only send location if we have something meaningful; never send ""
 			const locationVal =
-				city && state ? `${city},${state}` : user?.location || null;
+				city && state ? `${city},${state}` : authUser?.location || null;
 			if (locationVal) formData.append("location", locationVal);
-
 			if (selectedFile) formData.append("photo", selectedFile);
 
-			await api.put(`/api/users/${user.id}`, formData, {
+			const response = await api.put(`/api/users/${authUser.id}`, formData, {
 				headers: { "Content-Type": "multipart/form-data" },
 			});
 
-			// Re-fetch authoritative state — same as CustomerSettings does after updateProfile
-			const refreshed = await api.get("/api/auth/me");
-			const fresh = refreshed.data.user;
-			syncUser(fresh);
+			const freshUser = response.data?.user;
+			if (freshUser) syncUser(freshUser);
 
 			setSelectedFile(null);
 			setProfileSaved(true);
@@ -325,7 +303,6 @@ export default function ProviderSettings() {
 		}
 	};
 
-	// ── Save password ─────────────────────────────────────────────────────────
 	const savePassword = async (e) => {
 		e.preventDefault();
 		if (pwd.next !== pwd.confirm) {
@@ -370,12 +347,11 @@ export default function ProviderSettings() {
 		}
 	};
 
-	// ── Delete account ────────────────────────────────────────────────────────
 	const deleteAccount = async () => {
 		if (phrase !== "DELETE MY ACCOUNT") return;
 		setDeleteLoading(true);
 		try {
-			await api.delete(`/api/users/${user.id}`);
+			await api.delete(`/api/users/${authUser.id}`);
 			localStorage.clear();
 			navigate("/");
 		} catch (err) {
@@ -437,62 +413,103 @@ export default function ProviderSettings() {
 				subtitle="Shown to customers who find you."
 				accent="violet"
 			>
-				<form onSubmit={saveProfile} className="space-y-4">
-					{/* Avatar */}
-					<div className="flex items-center gap-5 p-4 rounded-xl border border-white/5 bg-slate-950/20">
-						<div className="relative w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center group shadow-inner">
+				<form onSubmit={saveProfile} className="space-y-6">
+					{/* Innovative Avatar Dropzone Box */}
+					<div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 p-5 rounded-2xl border border-slate-800 bg-slate-950/40 relative overflow-hidden">
+						{/* Interactive Image Container - Group Hover localized here now */}
+						<div className="group relative w-20 h-20 rounded-2xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-violet-500/50 flex-shrink-0 flex items-center justify-center transition-all duration-300 shadow-xl overflow-hidden">
+							<input
+								type="file"
+								id="avatar-picker"
+								accept="image/*"
+								className="hidden"
+								onChange={(e) => {
+									const file = e.target.files[0];
+									if (!file) return;
+									if (file.size > 2 * 1024 * 1024) {
+										toast.error("Image must be smaller than 2MB");
+										return;
+									}
+									setSelectedFile(file);
+									setPhoto(URL.createObjectURL(file));
+								}}
+							/>
+
 							{photo ? (
-								<img
-									src={photo}
-									alt="Profile"
-									className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-								/>
+								<>
+									<img
+										src={photo}
+										alt="Profile"
+										className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+									/>
+									{/* Overlay ONLY pops up when mousing explicitly inside this square */}
+									<label
+										htmlFor="avatar-picker"
+										className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all duration-200 text-violet-400 backdrop-blur-[2px]"
+									>
+										<ImageIcon size={16} className="animate-pulse" />
+										<span className="text-[10px] font-bold uppercase tracking-wider text-white">
+											Change
+										</span>
+									</label>
+								</>
 							) : (
-								<User size={26} className="text-slate-600" />
-							)}
-						</div>
-						<div className="flex-1 space-y-1.5">
-							<Label>
-								<ImageIcon size={11} /> Profile Picture
-							</Label>
-							<div className="flex items-center gap-3">
-								<input
-									type="file"
-									id="avatar-picker"
-									accept="image/*"
-									className="hidden"
-									onChange={(e) => {
-										const file = e.target.files[0];
-										if (!file) return;
-										if (file.size > 2 * 1024 * 1024) {
-											toast.error("Image must be smaller than 2MB");
-											return;
-										}
-										setSelectedFile(file);
-										setPhoto(URL.createObjectURL(file));
-									}}
-								/>
 								<label
 									htmlFor="avatar-picker"
-									className="cursor-pointer px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 transition-colors shadow-sm flex items-center gap-1.5"
+									className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-slate-500 hover:text-violet-400 transition-colors bg-slate-950/10"
 								>
-									<ImageIcon size={13} className="text-slate-400" /> Browse
-									Local Files
+									<User
+										size={24}
+										className="text-slate-600 group-hover:text-violet-400/70 transition-colors"
+									/>
+									<span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+										Upload
+									</span>
 								</label>
-								{photo && (
+							)}
+						</div>
+
+						{/* Info Text & Alternative Controls */}
+						<div className="flex-1 space-y-2 min-w-0">
+							<div>
+								<Label>
+									<ImageIcon size={11} /> Profile Display
+								</Label>
+								<h3 className="text-white text-sm font-semibold tracking-tight mt-1">
+									{photo ? "Custom Avatar Active" : "No photo uploaded yet"}
+								</h3>
+								<Hint>
+									Drag & drop or tap the square to pick an image. Supports JPG,
+									PNG or WEBP up to 2MB.
+								</Hint>
+							</div>
+
+							{/* Secondary Actions Row */}
+							{photo && (
+								<motion.div
+									initial={{ opacity: 0, x: -4 }}
+									animate={{ opacity: 1, x: 0 }}
+									className="flex items-center gap-3 pt-1"
+								>
+									<label
+										htmlFor="avatar-picker"
+										className="text-xs font-bold text-violet-400 hover:text-violet-300 cursor-pointer transition-colors flex items-center gap-1"
+									>
+										Upload new
+									</label>
+									<span className="text-slate-800 text-xs">•</span>
 									<button
 										type="button"
 										onClick={() => {
 											setPhoto("");
 											setSelectedFile(null);
 										}}
-										className="cursor-pointer px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 rounded-xl text-xs font-bold transition-all"
+										className="cursor-pointer text-xs font-bold text-red-400 hover:text-red-300 transition-colors"
 									>
-										Remove
+										Remove picture
 									</button>
-								)}
-							</div>
-							<Hint>Supports JPG, PNG or WEBP (Max 2MB)</Hint>
+								</motion.div>
+							)}
 						</div>
 					</div>
 
@@ -507,7 +524,7 @@ export default function ProviderSettings() {
 								type="text"
 								required
 								minLength={3}
-								placeholder="Rajesh Kumar"
+								placeholder="Your name..."
 								value={name}
 								onChange={(e) => setName(e.target.value)}
 							/>
@@ -783,8 +800,8 @@ export default function ProviderSettings() {
 				)}
 			</Card>
 
-			<div className="flex items-center gap-2 text-slate-700 text-xs pb-2">
-				<ShieldCheck size={12} className="text-emerald-700" /> Data stored
+			<div className="flex items-center gap-2 text-slate-300 text-[13px] pb-2">
+				<ShieldCheck size={12} className="text-emerald-400" /> Data stored
 				securely. Your information is never shared.
 			</div>
 		</div>

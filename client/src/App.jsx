@@ -20,7 +20,9 @@ const ChooseRole = lazy(() => import("./pages/ChooseRole"));
 const AllServices = lazy(() => import("./pages/AllServices"));
 const BookingSuccess = lazy(() => import("./pages/BookingSuccess"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const CustomerSettings = lazy(
+	() => import("./dashboards/customer/CustomerSettings"),
+);
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
@@ -31,7 +33,9 @@ const CustomerDashboard = lazy(
 const ProviderDashboard = lazy(
 	() => import("./dashboards/provider/ProviderDashboard"),
 );
-const UserProfile = lazy(() => import("./dashboards/customer/UserProfile"));
+const CustomerProfile = lazy(
+	() => import("./dashboards/customer/CustomerProfile"),
+);
 const DashboardOverview = lazy(
 	() => import("./dashboards/customer/DashboardOverview"),
 );
@@ -63,18 +67,18 @@ const router = createBrowserRouter([
 				],
 			},
 			{
-				path: "/profile",
+				path: "/account/profile",
 				element: (
 					<ProtectedRoute allowed={["customer"]}>
-						<UserProfile />
+						<CustomerProfile />
 					</ProtectedRoute>
 				),
 			},
 			{
-				path: "/settings",
+				path: "/account/settings",
 				element: (
 					<ProtectedRoute allowed={["customer"]}>
-						<SettingsPage />
+						<CustomerSettings />
 					</ProtectedRoute>
 				),
 			},

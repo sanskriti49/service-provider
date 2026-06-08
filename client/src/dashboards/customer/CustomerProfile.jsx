@@ -16,6 +16,8 @@ import {
 	Zap,
 	MessageSquare,
 	Star,
+	Copy,
+	Heart,
 } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -132,11 +134,9 @@ const CustomMenuItem = forwardRef(
 );
 CustomMenuItem.displayName = "CustomMenuItem";
 
-// ── Main component ────────────────────────────────────────────────────────────
-export default function UserProfile() {
+export default function CustomerProfile() {
 	const navigate = useNavigate();
 
-	// ✅ API is the primary source — no more localStorage.getItem("user") as default
 	const [user, setUser] = useState(null);
 	const [stats, setStats] = useState({
 		bookings: 0,
@@ -222,7 +222,7 @@ export default function UserProfile() {
 					</motion.div>
 
 					<button
-						onClick={() => navigate("/settings")}
+						onClick={() => navigate("/account/settings")}
 						className="cursor-pointer group h-12 px-6 rounded-2xl bg-violet-200/20 border border-violet-800/10 hover:bg-white/20 hover:shadow-xl hover:shadow-violet-200/50 transition-all flex items-center gap-2 font-bold text-[#281950]"
 					>
 						<Settings
@@ -240,7 +240,7 @@ export default function UserProfile() {
 						<BentoCard className="p-8 md:p-10 flex flex-col md:flex-row items-center md:items-start gap-10">
 							<div className="relative shrink-0">
 								<div className="absolute -inset-6 bg-gradient-to-tr from-violet-400 to-fuchsia-400 opacity-20 blur-2xl rounded-full" />
-								<div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-[6px] border-white shadow-2xl overflow-hidden relative z-10 bg-white">
+								<div className="w-22 h-22 md:w-30 md:h-30 rounded-full border-[5px] border-violet-500 shadow-2xl overflow-hidden relative z-10 bg-white">
 									{user?.photo && !imageError ? (
 										<img
 											src={user.photo}
@@ -254,7 +254,7 @@ export default function UserProfile() {
 										</div>
 									)}
 								</div>
-								<button className="cursor-pointer absolute bottom-2 right-2 z-20 bg-[#281950] text-white p-2.5 rounded-full border-4 border-white shadow-xl hover:scale-110 transition-transform">
+								<button className="cursor-pointer absolute bottom-2 right-2 z-20 bg-[#281950] text-white p-2.5 rounded-full border-3 border-violet-200 shadow-xl hover:scale-110 transition-transform">
 									<Camera size={16} />
 								</button>
 							</div>
@@ -262,9 +262,22 @@ export default function UserProfile() {
 							<div className="flex-1 space-y-6 text-center md:text-left">
 								<div>
 									<div className="flex items-center justify-center md:justify-start gap-3 mb-2">
-										<h2 className={`text-3xl font-bold ${TEXT_MAIN}`}>
+										<div
+											className={`cursor-pointer text-black text-3xl font-bold ${TEXT_MAIN}`}
+										>
 											{user?.custom_id || "Genie_User"}
-										</h2>
+										</div>
+										<button
+											type="button"
+											onClick={() => {
+												if (!user.custom_id) return;
+												navigator.clipboard.writeText(user.custom_id);
+												toast.success("Provider ID copied!");
+											}}
+											className="cursor-pointer rounded-xl  text-violet-600 hover:text-violet-800 transition-colors"
+										>
+											<Copy size={1} />
+										</button>
 										<Shield
 											size={20}
 											className="text-blue-500 fill-blue-500/20"
@@ -311,11 +324,11 @@ export default function UserProfile() {
 								delay={0.2}
 							/>
 							<StatPill
-								icon={Star}
-								label="Rating"
-								value={stats.rating || "N/A"}
-								color="amber"
-								delay={0.3}
+								icon={Heart}
+								label="Saved"
+								value={stats.rating || "0"}
+								//value={stats.savedProviders}
+								color="rose"
 							/>
 							<StatPill
 								icon={Zap}

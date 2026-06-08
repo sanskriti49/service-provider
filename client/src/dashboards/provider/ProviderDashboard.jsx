@@ -1,13 +1,3 @@
-/**
- * dashboards/provider/ProviderDashboard.jsx
- *
- * Structural twin of CustomerDashboard:
- *   - Same pt-20 + sticky sidebar + Outlet grid pattern
- *   - Same glassmorphism sidebar card (dark variant)
- *   - Same support widget at the bottom of the sidebar
- *   - Stats + recent bookings + quick actions rendered inline (no child Outlet needed for overview)
- *   - Mobile: hamburger + AnimatePresence slide-in drawer
- */
 import { useState, useEffect, useCallback } from "react";
 import {
 	NavLink,
@@ -38,11 +28,11 @@ import {
 	Users,
 	Plus,
 	ArrowUpRight,
+	Copy,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
-import { useAuth } from "../../hooks/useAuth";
+import { useAuth } from "../../contexts/AuthContext";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
 		style: "currency",
@@ -139,12 +129,21 @@ function SidebarLink({ to, icon, label, end = false, onClick }) {
 	);
 }
 
-// ── Sidebar card contents ─────────────────────────────────────────────────────
-function SidebarCard({ user, notifications, onLogout, onLinkClick }) {
+function SidebarCard({ notifications, onLogout, onLinkClick }) {
+	const { user, logout } = useAuth();
+	console.log("user-------", user);
+
+	const [copied, setCopied] = useState(false);
+
+	const handleCopyId = useCallback(() => {
+		if (!user?.custom_id) return;
+		navigator.clipboard.writeText(user.custom_id);
+		setCopied(true);
+		toast.success("Provider ID copied!");
+		setTimeout(() => setCopied(false), 2000);
+	}, [user?.custom_id]);
 	return (
-		// Dark glassmorphism — exact mirror structure of CustomerDashboard's sidebar card
 		<div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-xl shadow-slate-950/50 rounded-3xl p-6 flex flex-col gap-6">
-			{/* Brand + user — mirrors CustomerDashboard profile snippet */}
 			<div className="flex items-center gap-4 pb-6 border-b border-white/8">
 				<div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-slate-900/50 overflow-hidden ring-2 ring-white/10">
 					{user?.photo ? (
@@ -167,18 +166,40 @@ function SidebarCard({ user, notifications, onLogout, onLinkClick }) {
 						{user?.custom_id || "Service Provider"}
 					</p>
 				</div>
-				{/* Notification dot on avatar area */}
-				{notifications > 0 && (
+				{/* notif dot on avatar  */}
+				{notifications === 0 && (
 					<div className="ml-auto flex-shrink-0">
-						<button className="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors">
+						<button className="cursor-pointer relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors">
 							<Bell size={16} />
 							<span className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full" />
 						</button>
 					</div>
 				)}
 			</div>
+			{user?.custom_id && (
+				<button
+					onClick={handleCopyId}
+					title="Click to copy Provider ID"
+					className="cursor-pointer flex items-center justify-between w-full mt-1 px-3 py-2 bg-slate-950/60 hover:bg-slate-950 border border-white/5 hover:border-violet-500/30 rounded-xl text-left transition-all duration-200 group active:scale-[0.98]"
+				>
+					<div className="overflow-hidden pr-2">
+						<span className="block text-[9px] text-slate-600 font-bold uppercase tracking-wider">
+							Provider ID
+						</span>
+						<span className="block font-mono text-xs text-violet-300 truncate tracking-wide mt-0.5">
+							{user.custom_id}
+						</span>
+					</div>
+					<div className="w-7 h-7 rounded-lg bg-slate-900 border border-white/5 text-slate-500 flex items-center justify-center transition-colors group-hover:text-violet-400 group-hover:border-violet-500/20 shrink-0">
+						{copied ? (
+							<Check size={12} className="text-emerald-400" />
+						) : (
+							<Copy size={12} />
+						)}
+					</div>
+				</button>
+			)}
 
-			{/* Nav */}
 			<nav className="flex flex-col gap-2">
 				<SidebarLink
 					to="/provider/dashboard"
@@ -213,7 +234,6 @@ function SidebarCard({ user, notifications, onLogout, onLinkClick }) {
 				/>
 			</nav>
 
-			{/* Support widget — dark mirror of CustomerDashboard "Need Help?" widget */}
 			<div className="bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl p-5 text-white shadow-lg shadow-slate-950/40 relative overflow-hidden group border border-white/8">
 				<div className="absolute top-0 right-0 p-3 opacity-10 transform group-hover:scale-110 transition-transform duration-500">
 					<TrendingUp size={60} />
@@ -245,11 +265,10 @@ function SidebarCard({ user, notifications, onLogout, onLinkClick }) {
 	);
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
 export default function ProviderDashboard() {
 	const navigate = useNavigate();
 	const location = useLocation();
-	const { user, setUser: setAuthUser } = useAuth();
+	const { user, logout } = useAuth();
 	const childOutlet = useOutlet();
 
 	const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -283,10 +302,10 @@ export default function ProviderDashboard() {
 		if (!user?.id) return;
 		const load = async () => {
 			try {
-				const [statsRes, bookingsRes, meRes] = await Promise.allSettled([
+				const [statsRes, bookingsRes] = await Promise.allSettled([
 					api.get(`/api/dashboard/provider`),
 					api.get(`/api/bookings/provider/history/recent`),
-					api.get(`/api/auth/me`),
+					//	api.get(`/api/auth/me`),
 				]);
 				console.log(statsRes);
 				if (statsRes.status === "fulfilled") {
@@ -296,28 +315,29 @@ export default function ProviderDashboard() {
 				if (bookingsRes.status === "fulfilled") {
 					setRecentBookings(bookingsRes.value.data || []);
 				}
-				if (meRes.status === "fulfilled" && meRes.value.data?.user) {
-					const freshUser = meRes.value.data.user;
+				// if (meRes.status === "fulfilled" && meRes.value.data?.user) {
+				// 	const freshUser = meRes.value.data.user;
 
-					if (freshUser.photo !== user.photo || freshUser.name !== user.name) {
-						if (setAuthUser) {
-							setAuthUser((prev) => ({ ...prev, ...freshUser }));
-						}
-					}
-				}
+				// 	if (freshUser.photo !== user.photo || freshUser.name !== user.name) {
+				// 		if (setAuthUser) {
+				// 			setAuthUser((prev) => ({ ...prev, ...freshUser }));
+				// 		}
+				// 	}
+				// }
 			} catch (err) {
-				console.error("Provider dashboard load error:", err);
+				toast.error("Provider dashboard load error:", err);
 			} finally {
 				setIsLoading(false);
 			}
 		};
 		load();
-	}, [user?.id, user?.photo, setAuthUser]);
+	}, [user?.id]);
 
 	const handleLogout = useCallback(() => {
-		localStorage.clear();
+		//localStorage.clear();
+		logout();
 		navigate("/login");
-	}, [navigate]);
+	}, [logout, navigate]);
 
 	const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
@@ -356,7 +376,7 @@ export default function ProviderDashboard() {
 							<X size={18} />
 						</button>
 						<SidebarCard
-							user={user}
+							//	user={user}
 							notifications={notifications}
 							onLogout={handleLogout}
 							onLinkClick={closeSidebar}
@@ -365,7 +385,7 @@ export default function ProviderDashboard() {
 				)}
 			</AnimatePresence>
 
-			{/* ── Mobile top bar ────────────────────────────────────────────── */}
+			{/* ── mobile top bar ────────────────────────────────────────────── */}
 			<div className="lg:hidden sticky top-0 z-10 bg-slate-950/90 backdrop-blur-md -mx-4 px-4 py-3 border-b border-white/8 mb-6 flex items-center justify-between">
 				<button
 					onClick={() => setSidebarOpen(true)}
@@ -387,7 +407,6 @@ export default function ProviderDashboard() {
 				</button>
 			</div>
 
-			{/* ── Grid — exact same structure as CustomerDashboard ──────────── */}
 			<div className="max-w-7xl mx-auto relative z-10 pt-8 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
 				{/* ── LEFT SIDEBAR (desktop) ────────────────────────────────── */}
 				<motion.aside
@@ -397,19 +416,18 @@ export default function ProviderDashboard() {
 					className="hidden lg:block lg:h-fit sticky top-8"
 				>
 					<SidebarCard
-						user={user}
+						//user={user}
 						notifications={notifications}
 						onLogout={handleLogout}
 						onLinkClick={() => {}}
 					/>
 				</motion.aside>
 
-				{/* ── MAIN CONTENT ──────────────────────────────────────────── */}
 				<main className="min-w-0">
 					{isLoading ? (
 						<ProviderSkeleton />
 					) : isOverviewPage ? (
-						// 4. Force overview render if matching the exact root dashboard URL path
+						//  Force overview render if matching the exact root dashboard URL path
 						<ProviderOverview
 							user={user}
 							stats={stats}
@@ -425,7 +443,6 @@ export default function ProviderDashboard() {
 	);
 }
 
-// ── Overview (renders in main, no child route needed) ─────────────────────────
 function ProviderOverview({ user, stats, recentBookings }) {
 	return (
 		<motion.div

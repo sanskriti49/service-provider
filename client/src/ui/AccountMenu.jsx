@@ -91,7 +91,7 @@ export default function AccountMenu({ user }) {
 							<MenuLink to="/dashboard" icon={LayoutDashboard}>
 								Dashboard
 							</MenuLink>
-							<MenuLink to="/profile" icon={UserCircle}>
+							<MenuLink to="/account/profile" icon={UserCircle}>
 								Profile
 							</MenuLink>
 							<MenuLink to="/dashboard/bookings" icon={History}>
@@ -129,7 +129,7 @@ export default function AccountMenu({ user }) {
 					<div className="h-px bg-gray-100 my-1 mx-2" />
 
 					<div className="p-1">
-						<MenuLink to="/settings" icon={Settings}>
+						<MenuLink to="/account/settings" icon={Settings}>
 							Settings
 						</MenuLink>
 						<MenuLink to="/help" icon={HelpCircle}>

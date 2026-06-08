@@ -13,8 +13,8 @@ import {
 	EyeOff,
 	Save,
 } from "lucide-react";
-import Alerts from "../ui/Alerts";
-import api from "../api/axios";
+import api from "../../api/axios";
+import { toast } from "sonner";
 
 const SaveButton = ({ loading, disabled, onClick, label, loadingLabel }) => (
 	<button
@@ -64,7 +64,7 @@ const PasswordInput = ({
 	</div>
 );
 
-const SettingsPage = () => {
+const CustomerSettings = () => {
 	const navigate = useNavigate();
 
 	const [user, setUser] = useState(
@@ -80,7 +80,10 @@ const SettingsPage = () => {
 	const [otpSent, setOtpSent] = useState(false);
 	const [emailLoading, setEmailLoading] = useState(false);
 
-	const [address, setAddress] = useState(user.location || user.address || "");
+	const [locationText, setLocationText] = useState(user.location || "");
+	const [locationLoading, setLocationLoading] = useState(false);
+
+	const [address, setAddress] = useState(user.address || "");
 	const [addressLoading, setAddressLoading] = useState(false);
 
 	const [phone, setPhone] = useState(user.phone ? String(user.phone) : "");
@@ -94,8 +97,6 @@ const SettingsPage = () => {
 	const [showCurrent, setShowCurrent] = useState(false);
 	const [showNew, setShowNew] = useState(false);
 
-	const [alert, setAlert] = useState(null);
-
 	const getInitials = (name) => {
 		if (!name) return "U";
 		const parts = name.split(" ");
@@ -103,18 +104,14 @@ const SettingsPage = () => {
 	};
 
 	const handlePasswordUpdate = async () => {
-		if (newPassword.length < 6)
-			return setAlert({
-				type: "error",
-				message: "Password must be at least 6 characters",
-			});
-		if (newPassword !== confirmPassword)
-			return setAlert({ type: "error", message: "Passwords do not match" });
+		if (newPassword.length < 6) {
+			return toast.error("Password must be at least 6 characters");
+		}
+		if (newPassword !== confirmPassword) {
+			return toast.error("Passwords do not match");
+		}
 		if (!user.isGoogleUser && !currentPassword) {
-			return setAlert({
-				type: "error",
-				message: "Please enter your current password",
-			});
+			return toast.error("Please enter your current password");
 		}
 
 		try {
@@ -125,18 +122,17 @@ const SettingsPage = () => {
 				{ currentPassword, newPassword },
 				{ headers: { Authorization: `Bearer ${token}` } },
 			);
-			setAlert({ type: "success", message: "Password updated successfully!" });
+			toast.success("Password updated successfully!");
 			setCurrentPassword("");
 			setNewPassword("");
 			setConfirmPassword("");
 			setShowCurrent(false);
 			setShowNew(false);
 		} catch (err) {
-			setAlert({
-				type: "error",
-				message: err.response?.data?.error || "Failed to update password!",
-			});
+			console.log(err);
+			toast.error(err.response?.data?.error || "Failed to update password!");
 		} finally {
+			passwordLoading(false);
 			setPasswordLoading(false);
 		}
 	};
@@ -145,44 +141,55 @@ const SettingsPage = () => {
 		try {
 			if (specificLoadingSet) specificLoadingSet(true);
 			const token = localStorage.getItem("token");
+
+			const cleanField = (incoming, current, fallback) => {
+				if (incoming !== undefined) return incoming;
+				return current && current.trim() !== ""
+					? current
+					: fallback || undefined;
+			};
+
 			const payload = {
 				...dataToUpdate,
-				name:
-					dataToUpdate.name !== undefined
-						? dataToUpdate.name
-						: name || user.name,
-				address:
-					dataToUpdate.address !== undefined
-						? dataToUpdate.address
-						: address || user.location,
-				phone:
-					dataToUpdate.phone !== undefined
-						? dataToUpdate.phone
-						: phone || user.phone,
+				name: cleanField(dataToUpdate.name, name, user.name),
+				location: cleanField(
+					dataToUpdate.location,
+					locationText,
+					user.location,
+				),
+				address: cleanField(dataToUpdate.address, address, user.address),
+				phone: cleanField(dataToUpdate.phone, phone, user.phone),
 			};
+
+			Object.keys(payload).forEach((key) => {
+				if (payload[key] === undefined) {
+					delete payload[key];
+				}
+			});
+
 			const response = await api.put(`/api/users/${user.id}`, payload, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 			const updatedUser = { ...user, ...response.data.user };
+
 			if (response.data.user.name) setName(response.data.user.name);
-			if (response.data.user.location) setAddress(response.data.user.location);
+			if (response.data.user.location)
+				setLocationText(response.data.user.location);
+			if (response.data.user.address) setAddress(response.data.user.address);
 			if (response.data.user.phone) setPhone(response.data.user.phone);
+
 			localStorage.setItem("user", JSON.stringify(updatedUser));
 			setUser(updatedUser);
-			setAlert({ type: "success", message: "Profile updated successfully!" });
+			toast.success("Profile updated successfully!");
 		} catch (err) {
-			setAlert({
-				type: "error",
-				message: err.response?.data?.error || "Failed to update profile.",
-			});
+			toast.error(err.response?.data?.error || "Failed to update profile.");
 		} finally {
 			if (specificLoadingSet) specificLoadingSet(false);
 		}
 	};
 
 	const handleSendOtp = async () => {
-		if (!email.includes("@"))
-			return setAlert({ type: "error", message: "Invalid email" });
+		if (!email.includes("@")) return toast.error("Invalid email");
 		try {
 			setEmailLoading(true);
 			const token = localStorage.getItem("token");
@@ -193,9 +200,9 @@ const SettingsPage = () => {
 			);
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			setOtpSent(true);
-			setAlert({ type: "success", message: `OTP sent to ${email}` });
+			toast.success(`OTP sent to ${email}`);
 		} catch (err) {
-			setAlert({ type: "error", message: "Failed to send OTP" });
+			toast.error("Failed to send OTP");
 		} finally {
 			setEmailLoading(false);
 		}
@@ -217,9 +224,9 @@ const SettingsPage = () => {
 			setIsEditingEmail(false);
 			setOtpSent(false);
 			setOtp("");
-			setAlert({ type: "success", message: "Email updated successfully!" });
+			toast.success("Email updated successfully!");
 		} catch (err) {
-			setAlert({ type: "error", message: "Invalid OTP or failed to update" });
+			toast.error("Invalid OTP or failed to update");
 		} finally {
 			setEmailLoading(false);
 		}
@@ -227,9 +234,9 @@ const SettingsPage = () => {
 
 	const handleCurrentLocation = () => {
 		if (!navigator.geolocation)
-			return setAlert({ type: "error", message: "Geolocation not supported." });
+			return toast.error("Geolocation not supported.");
 
-		setAddressLoading(true);
+		setLocationLoading(true);
 
 		const options = {
 			enableHighAccuracy: true,
@@ -247,13 +254,25 @@ const SettingsPage = () => {
 					);
 					const data = await response.json();
 
+					const cityOrTown =
+						data.address?.city ||
+						data.address?.town ||
+						data.address?.village ||
+						data.address?.suburb ||
+						"";
+					const stateString = data.address?.state || "";
+					const formattedLoc =
+						cityOrTown && stateString
+							? `${cityOrTown}, ${stateString}`
+							: data.display_name;
+
 					updateProfile(
 						{
 							lat: latitude,
 							lng: longitude,
-							location: data.display_name || `${latitude}, ${longitude}`,
+							location: formattedLoc || `${latitude}, ${longitude}`,
 						},
-						setAddressLoading,
+						setLocationLoading,
 					);
 				} catch (err) {
 					updateProfile(
@@ -262,17 +281,17 @@ const SettingsPage = () => {
 							lng: longitude,
 							location: `${latitude}, ${longitude}`,
 						},
-						setAddressLoading,
+						setLocationLoading,
 					);
 				}
 			},
 			(error) => {
-				setAddressLoading(false);
+				setLocationLoading(false);
 				let msg = "Unable to retrieve location.";
 				if (error.code === 1) msg = "Location permission denied.";
 				if (error.code === 2) msg = "Position unavailable (check GPS).";
 				if (error.code === 3) msg = "Location request timed out.";
-				setAlert({ type: "error", message: msg });
+				toast.error(msg);
 			},
 			options,
 		);
@@ -302,7 +321,8 @@ const SettingsPage = () => {
 		if (user && Object.keys(user).length > 0) {
 			setName(user.name || "");
 			setEmail(user.email || "");
-			setAddress(user.location || user.address || "");
+			setLocationText(user.location || "");
+			setAddress(user.address || "");
 			setPhone(user.phone ? String(user.phone) : "");
 		}
 	}, [user]);
@@ -315,13 +335,6 @@ const SettingsPage = () => {
 
 	return (
 		<div className="bricolage-grotesque min-h-screen text-[#191034] p-6 md:p-12 font-sans pt-24 md:pt-32">
-			{alert && (
-				<Alerts
-					message={alert.message}
-					type={alert.type}
-					onClose={() => setAlert(null)}
-				/>
-			)}
 			<div className="max-w-6xl mx-auto space-y-8">
 				{/* Header */}
 				<div className="flex flex-col md:flex-row md:items-end justify-between border-b border-[#e7e6f4] pb-6 gap-4">
@@ -365,7 +378,6 @@ const SettingsPage = () => {
 							</div>
 
 							<div className="w-full space-y-5">
-								{/* Name Input */}
 								<div className="text-left group">
 									<label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">
 										Display Name
@@ -472,7 +484,7 @@ const SettingsPage = () => {
 								<div className="bg-blue-50 p-2.5 rounded-xl text-blue-600">
 									<MapPin size={22} />
 								</div>
-								Contact & Location
+								Contact & Location Details
 							</h3>
 
 							<div className="grid md:grid-cols-2 gap-8">
@@ -502,39 +514,64 @@ const SettingsPage = () => {
 									/>
 								</div>
 
-								{/* Auto Detect Button */}
-								<div className="flex flex-col justify-end">
-									<div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 text-center space-y-3 h-full flex flex-col justify-center">
-										<p className="text-sm text-gray-500 font-medium">
-											Need to update your address quickly?
-										</p>
+								{/* General Location / Service Region */}
+								<div className="space-y-2">
+									<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">
+										General Service Region (City, State)
+									</label>
+									<div className="relative group mb-3">
+										<MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
+										<input
+											type="text"
+											placeholder="e.g., Kanpur, Uttar Pradesh"
+											value={locationText}
+											onChange={(e) => setLocationText(e.target.value)}
+											className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50/30 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all font-medium"
+										/>
+									</div>
+
+									<div className="flex gap-2">
 										<button
+											type="button"
 											onClick={handleCurrentLocation}
-											className="cursor-pointer w-full flex items-center justify-center gap-2 text-sm font-bold text-white bg-gray-900 hover:bg-gray-800 px-4 py-3 rounded-xl transition-all shadow-lg shadow-gray-200 hover:-translate-y-0.5"
+											disabled={locationLoading}
+											className="cursor-pointer bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1 disabled:opacity-50"
+											title="Auto-detect using browser GPS"
 										>
-											<MapPin size={16} />
-											Auto-Detect Location
+											<MapPin size={13} /> Auto-GPS
 										</button>
+										<div className="flex-1">
+											<SaveButton
+												loading={locationLoading}
+												disabled={locationText === (user.location || "")}
+												onClick={() =>
+													updateProfile(
+														{ location: locationText },
+														setLocationLoading,
+													)
+												}
+												label="Save Region"
+											/>
+										</div>
 									</div>
 								</div>
 							</div>
 
 							{/* Address Text Area */}
-							<div className="mt-8">
+							<div className="mt-8 pt-6 border-t border-gray-100">
 								<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 mb-2 block">
-									Permanent Address
+									Permanent Doorstep Address (For Deliveries / Bookings)
 								</label>
 								<textarea
 									value={address}
 									onChange={(e) => setAddress(e.target.value)}
-									placeholder="Enter your full address details..."
+									placeholder="Enter your specific house/flat number, building name, street address, and landmark details..."
 									rows="3"
-									className="w-full px-5 py-4 rounded-2xl border border-gray-200 bg-gray-50/30 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all resize-none leading-relaxed mb-4"
+									className="w-full px-5 py-4 rounded-2xl border border-gray-200 bg-gray-50/30 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all resize-none leading-relaxed mb-4 font-medium"
 								/>
-								{/* FIX: Button is always visible, but disabled/greyed until change */}
 								<SaveButton
 									loading={addressLoading}
-									disabled={address === (user.location || user.address || "")}
+									disabled={address === (user.address || "")}
 									onClick={() => updateProfile({ address }, setAddressLoading)}
 									label="Update Address"
 								/>
@@ -628,7 +665,7 @@ const SettingsPage = () => {
 											className="cursor-pointer w-full group border border-red-100 bg-red-50 text-red-600 px-6 py-4 rounded-2xl font-bold hover:bg-red-600 hover:text-white transition-all duration-300 flex items-center justify-center gap-2"
 										>
 											<span className="group-hover:hidden">
-												Log Out All Devices
+												Log out from all devices
 											</span>
 											<span className="hidden group-hover:inline">
 												Confirm Logout
@@ -645,4 +682,4 @@ const SettingsPage = () => {
 	);
 };
 
-export default SettingsPage;
+export default CustomerSettings;

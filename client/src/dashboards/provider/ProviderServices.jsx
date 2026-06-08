@@ -206,7 +206,7 @@ export default function ProviderServices() {
 					</button>
 					<button
 						onClick={() => setActiveTab("explore")}
-						className={`cursor-pointer px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 ${
+						className={`cursor-pointer px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 duration-200 ${
 							activeTab === "explore"
 								? "bg-violet-600 text-white shadow-lg shadow-violet-900/30"
 								: "text-slate-400 hover:text-slate-200"
@@ -237,7 +237,7 @@ export default function ProviderServices() {
 									You won't appear in customer searches. Click{" "}
 									<button
 										onClick={() => setActiveTab("explore")}
-										className="text-violet-400 underline"
+										className="cursor-pointer text-violet-400 hover:text-violet-300 duration-200 underline"
 									>
 										Add New
 									</button>{" "}

@@ -51,7 +51,6 @@ const userUpdateSchema = Joi.object({
 
 	lat: Joi.number().optional(),
 	lng: Joi.number().optional(),
-	role: Joi.string().valid("customer", "provider").optional(),
 });
 
 function generateCustomId(role) {
@@ -92,7 +91,7 @@ async function createUser(req, res, next) {
 				lng,
 			],
 		);
-		// If registering as a provider, create the stub providers row
+
 		if (role === "provider") {
 			await db.query(
 				`INSERT INTO providers (user_id, rating, availability)
@@ -146,50 +145,44 @@ async function updateUser(req, res, next) {
 	}
 
 	const id = req.params.id;
-	let {
-		name,
-		email,
-		phone,
-		password,
-		role,
-		location,
-		address,
-		photo,
-		bio,
-		lat,
-		lng,
-	} = value;
-	if (req.file) {
-		const result = await new Promise((resolve, reject) => {
-			const stream = cloudinary.uploader.upload_stream(
-				{
-					folder: "profile_photos",
-				},
-				(err, result) => {
-					if (err) reject(err);
-					else resolve(result);
-				},
-			);
-			streamifier.createReadStream(req.file.buffer).pipe(stream);
-		});
+	let updates = { ...value };
 
-		photo = result.secure_url;
+	if (req.file) {
+		try {
+			const result = await new Promise((resolve, reject) => {
+				const stream = cloudinary.uploader.upload_stream(
+					{ folder: "profile_photos" },
+					(err, res) => {
+						if (err) reject(err);
+						else resolve(res);
+					},
+				);
+				streamifier.createReadStream(req.file.buffer).pipe(stream);
+			});
+			updates.photo = result.secure_url;
+		} catch (uploadErr) {
+			return res.status(500).json({ error: "Profile image upload failed" });
+		}
 	}
 
 	try {
+		// ✅ FIXED: Using updates.location, updates.lat, updates.lng everywhere
 		// FORWARD GEOCODING (location text -> lat/lng)
-		// if user provides a text location but NO coordinates find the coordinates
-		if (location && (!lat || !lng)) {
+		if (
+			updates.location &&
+			updates.location.trim() !== "" &&
+			(!updates.lat || !updates.lng)
+		) {
 			try {
 				const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-					location,
+					updates.location,
 				)}`;
 				const geoRes = await axios.get(url, {
 					headers: { "User-Agent": "TaskGenie/1.0" },
 				});
 				if (geoRes.data && geoRes.data.length > 0) {
-					lat = parseFloat(geoRes.data[0].lat);
-					lng = parseFloat(geoRes.data[0].lon);
+					updates.lat = parseFloat(geoRes.data[0].lat);
+					updates.lng = parseFloat(geoRes.data[0].lon);
 				}
 			} catch (geoErr) {
 				console.error("Forward Geocoding failed:", geoErr.message);
@@ -197,58 +190,58 @@ async function updateUser(req, res, next) {
 		}
 
 		// REVERSE GEOCODING (lat/lng -> location)
-		// if user provides coordinates but NO text location, find the address name.
-		else if (lat && lng && !location) {
+		else if (updates.lat && updates.lng && !updates.location) {
 			try {
-				const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+				const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${updates.lat}&lon=${updates.lng}`;
 				const geoRes = await axios.get(url, {
 					headers: { "User-Agent": "TaskGenie/1.0" },
 				});
 
-				if (geoRes.data) {
+				if (geoRes.data && geoRes.data.address) {
 					const addr = geoRes.data.address;
-					location = `${addr.city || addr.town || addr.village}, ${addr.state}`;
+					const cityOrTown =
+						addr.city ||
+						addr.town ||
+						addr.village ||
+						addr.suburb ||
+						"Unknown Local Region";
+					updates.location = `${cityOrTown}, ${addr.state || ""}`.trim();
 				}
 			} catch (geoErr) {
 				console.error("Reverse Geocoding failed:", geoErr.message);
 			}
 		}
 
-		const hashed = password ? await hashIfPresent(password) : undefined;
-		const safeLocation =
-			location && location.trim() !== "" ? location : undefined;
+		if (updates.password) {
+			updates.password = await hashIfPresent(updates.password);
+		}
+
+		const fields = [];
+		const values = [];
+		let index = 1;
+
+		for (const [key, val] of Object.entries(updates)) {
+			fields.push(`"${key}" = $${index}`);
+			values.push(typeof val === "string" && val.trim() === "" ? null : val);
+			index++;
+		}
+
+		if (fields.length === 0 && !req.file) {
+			return res
+				.status(400)
+				.json({ message: "No explicit changes detected to process update" });
+		}
+
+		values.push(id);
 
 		const query = `
-            UPDATE users SET
-                name = COALESCE($1, name),
-                email = COALESCE($2, email),
-                password = COALESCE($3, password),
-                role = COALESCE($4, role),
-                location = COALESCE($5, location),
-                photo = COALESCE($6, photo),
-                bio = COALESCE($7, bio),
-                lat = COALESCE($8, lat),
-                lng = COALESCE($9, lng),
-                phone = COALESCE($10, phone),
-                address = COALESCE($11, address)
-            WHERE id = $12
-            RETURNING id, name, email, phone,role, location, lat, lng, address, photo,bio,created_at
+            UPDATE users
+            SET ${fields.join(", ")}
+            WHERE id = $${index}
+            RETURNING id, name, email, phone, role, location, address, lat, lng, photo, bio, created_at
         `;
 
-		const result = await db.query(query, [
-			name,
-			email,
-			hashed,
-			role,
-			safeLocation ?? null,
-			photo || null,
-			bio,
-			lat,
-			lng,
-			phone,
-			address,
-			id,
-		]);
+		const result = await db.query(query, values);
 
 		if (result.rowCount === 0) {
 			return res.status(404).json({ message: "User not found" });
