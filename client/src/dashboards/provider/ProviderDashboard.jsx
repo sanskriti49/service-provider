@@ -305,7 +305,6 @@ export default function ProviderDashboard() {
 				const [statsRes, bookingsRes] = await Promise.allSettled([
 					api.get(`/api/dashboard/provider`),
 					api.get(`/api/bookings/provider/history/recent`),
-					//	api.get(`/api/auth/me`),
 				]);
 				console.log(statsRes);
 				if (statsRes.status === "fulfilled") {
@@ -315,15 +314,6 @@ export default function ProviderDashboard() {
 				if (bookingsRes.status === "fulfilled") {
 					setRecentBookings(bookingsRes.value.data || []);
 				}
-				// if (meRes.status === "fulfilled" && meRes.value.data?.user) {
-				// 	const freshUser = meRes.value.data.user;
-
-				// 	if (freshUser.photo !== user.photo || freshUser.name !== user.name) {
-				// 		if (setAuthUser) {
-				// 			setAuthUser((prev) => ({ ...prev, ...freshUser }));
-				// 		}
-				// 	}
-				// }
 			} catch (err) {
 				toast.error("Provider dashboard load error:", err);
 			} finally {
@@ -334,7 +324,6 @@ export default function ProviderDashboard() {
 	}, [user?.id]);
 
 	const handleLogout = useCallback(() => {
-		//localStorage.clear();
 		logout();
 		navigate("/login");
 	}, [logout, navigate]);

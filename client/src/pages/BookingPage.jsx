@@ -648,7 +648,7 @@ export default function BookingPage() {
 							<button
 								onClick={handleConfirm}
 								disabled={isSubmitting || !selectedTime || !address.trim()}
-								className={`w-full py-3.5 rounded-xl text-base font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group
+								className={`w-full mx-auto py-3.5 rounded-full text-base font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group
                                 ${
 																	selectedTime && address.trim()
 																		? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white transform hover:-translate-y-0.5 cursor-pointer"

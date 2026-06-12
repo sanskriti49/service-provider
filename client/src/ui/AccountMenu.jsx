@@ -34,7 +34,7 @@ export default function AccountMenu({ user }) {
 		<Menu as="div" className="relative ml-3 bricolage-grotesque">
 			<div>
 				<Menu.Button
-					className={`group relative flex rounded-full text-sm transition-transform hover:scale-105 active:scale-95 !outline-none !ring-0 !ring-offset-0 focus:!outline-none focus:!ring-0 focus:!ring-offset-0 focus-visible:!outline-none focus-visible:!ring-0 focus-visible:!ring-offset-0 ${nuclearSafeClass}`}
+					className={`cursor-pointer group relative flex rounded-full text-sm transition-transform hover:scale-105 active:scale-95 !outline-none !ring-0 !ring-offset-0 focus:!outline-none focus:!ring-0 focus:!ring-offset-0 focus-visible:!outline-none focus-visible:!ring-0 focus-visible:!ring-offset-0 ${nuclearSafeClass}`}
 					style={{
 						WebkitTapHighlightColor: "transparent",
 						outline: "none",
@@ -149,7 +149,7 @@ export default function AccountMenu({ user }) {
 									}}
 									className={`${
 										active ? "bg-red-50 text-red-600" : "text-gray-700"
-									} group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors outline-none`}
+									} cursor-pointer group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors outline-none`}
 								>
 									<LogOut
 										className={`mr-3 h-4 w-4 ${

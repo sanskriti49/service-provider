@@ -201,32 +201,31 @@ const SignUp = () => {
 
 							<div className="space-y-4">
 								<div className="relative w-full">
-									<div className="w-full mb-5 flex flex-col items-center justify-center min-h-[48px]">
-										{/* Google's official iframe script mounts natively right here */}
-										<div
-											id="googleButtonDiv"
-											className="w-full flex justify-center dynamic-google-container animate-in fade-in duration-300"
-										/>
-									</div>
+									{/* The hidden overlay that captures the click and mounts the native iframe */}
+									<div
+										id="googleButtonDiv"
+										className="absolute inset-0 z-10 opacity-0 overflow-hidden flex items-center justify-center cursor-pointer"
+									></div>
 
+									{/* Your styled custom UI button container beneath the invisible iframe layer */}
 									<button
 										type="button"
 										className="
-                                            w-full flex items-center justify-center gap-2
-                                            text-gray-700 font-medium
-                                            py-2 rounded-lg transition cursor-pointer
-                                            bg-white border border-[#d4ceea]
-                                            shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
-                                            hover:shadow-[inset_0_3px_6px_#ddd6fe]         
-                                            active:shadow-[inset_0_0_6px_#ddd6fe]         
-                                    "
+            w-full flex items-center justify-center gap-2
+            text-gray-700 font-medium
+            py-2 rounded-lg transition cursor-pointer
+            bg-white border border-[#d4ceea]
+            shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
+            hover:shadow-[inset_0_3px_6px_#ddd6fe]         
+            active:shadow-[inset_0_0_6px_#ddd6fe]         
+        "
 									>
 										<img
 											src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
 											className="w-5 h-5"
 											alt="Google Logo"
 										/>
-										Sign up with Google
+										Continue with Google
 									</button>
 								</div>
 

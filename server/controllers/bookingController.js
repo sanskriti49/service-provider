@@ -31,7 +31,6 @@ async function createBooking(req, res, next) {
 
 	const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit
 
-	// default end_time logic (1 hour duration if not provided)
 	if (!end_time || end_time === start_time) {
 		const [hours, minutes] = start_time.split(":").map(Number);
 		const dateObj = new Date();
@@ -287,12 +286,12 @@ async function getRecentProviderBookings(req, res, next) {
 async function getUpcomingBookings(req, res) {
 	try {
 		const q = `
-            SELECT b.*, s.name AS service_name, pu.name AS provider_name
+            SELECT b.*, s.name AS service_name, pu.name AS provider_name, pu.phone as provider_phone
             FROM bookings b
             LEFT JOIN services s ON s.id = b.service_id
             LEFT JOIN users pu ON pu.id = b.provider_id
-            WHERE b.user_id = $1 AND b.date >= NOW() AND b.status != 'cancelled'
-            ORDER BY b.date ASC
+            WHERE b.user_id = $1 AND b.date >=CURRENT_DATE AND b.status != 'cancelled'
+            ORDER BY b.date ASC, b.start_time ASC
         `;
 		const result = await db.query(q, [req.user.id]);
 		res.json(result.rows);

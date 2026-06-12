@@ -281,7 +281,7 @@ export default function BookingSuccess() {
 				<div className="bg-white/5 backdrop-blur-2xl border border-t-0 border-white/10 rounded-b-3xl p-6">
 					<button
 						onClick={() => navigate("/", { replace: true })}
-						className="cursor-pointer w-full py-4 bg-white text-violet-950 rounded-xl font-bold text-lg hover:bg-gray-100 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-xl flex items-center justify-center gap-2"
+						className="cursor-pointer w-full py-4 bg-white text-violet-950 rounded-xl font-bold text-lg hover:bg-gray-100 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-xl flex items-center justify-center gap-2 opacity-90 hover:opacity-75"
 					>
 						<Home className="w-5 h-5" />
 						Back to Home

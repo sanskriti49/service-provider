@@ -191,24 +191,16 @@ async function createProvider(req, res, next) {
 		const userId = userInsert.rows[0].id;
 
 		await client.query(
-			`INSERT INTO providers (user_id, service_id, slug, description, price, rating, availability, price_unit)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-			[
-				userId,
-				serviceId,
-				customId,
-				bio ?? null,
-				price ?? 0,
-				rating ?? null,
-				JSON.stringify(availability ?? []),
-				price_unit ?? "fixed",
-			],
+			`INSERT INTO providers (user_id, rating, availability)
+             VALUES ($1,$2,$3)`,
+			[userId, rating ?? null, JSON.stringify(availability ?? [])],
 		);
 
 		await client.query(
 			`INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible)
              VALUES ($1,$2,$3,$4,TRUE)
-             ON CONFLICT (provider_id, service_id) DO NOTHING`,
+             ON CONFLICT (provider_id, service_id) 
+			 DO NOTHING`,
 			[userId, serviceId, price ?? 0, price_unit ?? "fixed"],
 		);
 
@@ -220,7 +212,9 @@ async function createProvider(req, res, next) {
 			await client.query(
 				`INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible)
                  VALUES ($1,$2,$3,'fixed',TRUE)
-                 ON CONFLICT (provider_id, service_id) DO UPDATE SET price=EXCLUDED.price`,
+                 ON CONFLICT (provider_id, service_id) 
+				 DO UPDATE 
+				 SET price=EXCLUDED.price`,
 				[userId, r.rows[0].id, svc.price],
 			);
 		}
@@ -251,12 +245,12 @@ async function getProviders(req, res, next) {
                    p.rating, p.user_id
             FROM providers p
             JOIN users u ON p.user_id = u.id
-            JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
+            JOIN provider_services ps ON ps.provider_id = p.user_id AND ps.is_visible = TRUE
             JOIN services s ON s.id = ps.service_id
         `;
 		const params = [];
 		if (service) {
-			query += " WHERE s.slug = $1";
+			query += " WHERE s.slug = $1 AND ps.is_visible = true";
 			params.push(service);
 		}
 		query += " ORDER BY u.id, ps.created_at ASC";
@@ -319,12 +313,6 @@ async function getProviderById(req, res, next) {
 			provider: {
 				...provider,
 				services: servicesRes.rows,
-				// availability: slotsRes.rows.map((s) => ({
-				// 	date: s.date_str,
-				// 	start_time: s.start_time.slice(0, 5),
-				// 	end_time: s.end_time.slice(0, 5),
-				// 	isBooked: s.is_booked,
-				// })),
 				availability: slotsRes.rows.map((s) => ({
 					date: s.date_str,
 					start_time: s.start_time,
@@ -456,6 +444,13 @@ async function addProviderService(req, res, next) {
 		const providerId = await resolveProviderId(client, req.params.id);
 		if (!providerId)
 			return res.status(404).json({ error: "Provider not found" });
+
+		await client.query(
+			`INSERT INTO providers (user_id, rating, availability)
+             VALUES ($1, NULL, '[]')
+             ON CONFLICT (user_id) DO NOTHING`,
+			[providerId],
+		);
 
 		const sRow = await client.query("SELECT id FROM services WHERE slug=$1", [
 			slug,

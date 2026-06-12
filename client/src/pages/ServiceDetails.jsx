@@ -74,6 +74,8 @@ const ServiceDetails = () => {
 				if (!providersRes.ok) throw new Error("Could not fetch providers");
 				const providersData = await providersRes.json();
 				setProviders(providersData);
+
+				console.log(providersData);
 			} catch (err) {
 				console.error("Error fetching providers:", err);
 				setError(err.message);
@@ -608,7 +610,7 @@ const ProviderCard = ({
       inline-flex items-center justify-center gap-2 w-full
       btn-xl btn-purple btn-border-dark
       px-7 py-3 rounded-lg
-      group/btn transition-all
+      group/btn transition-all cursor-pointer
       ${
 				selectedTime
 					? "opacity-100 hover:scale-[1.02]"
@@ -618,7 +620,7 @@ const ProviderCard = ({
 									>
 										<span>Continue to Booking</span>
 
-										<div className="flex items-center opacity-50 group-hover/btn:opacity-100 transition-opacity">
+										<div className="flex items-center justify-center opacity-50 group-hover/btn:opacity-100 transition-opacity">
 											<svg
 												viewBox="0 0 16 16"
 												className="w-0 group-hover/btn:w-2.5 h-3 translate-x-2.5 transition-all duration-200"

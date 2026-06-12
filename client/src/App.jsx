@@ -157,7 +157,7 @@ export default function App() {
 				toastOptions={{
 					unstyled: false,
 					classNames: {
-						toast: "text-base font-sans rounded-2xl",
+						toast: "inter text-base font-sans rounded-2xl",
 						title: "text-base font-bold",
 						description: "text-sm",
 					},

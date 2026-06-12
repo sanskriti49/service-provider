@@ -65,11 +65,9 @@ const Navbar = () => {
 	}, [location]);
 
 	return (
-		/* CHANGED: 'fixed' -> 'absolute' so it scrolls away */
 		<div className="absolute top-0 left-0 w-full z-50 pt-4 sm:pt-6 px-4 pointer-events-none">
-			{/* Main Container */}
 			<div className="max-w-7xl mx-auto relative flex items-center justify-between">
-				{/* 1. LOGO (LEFT) */}
+				{/* 1. LOGO */}
 				<div className="pointer-events-auto flex-none z-50">
 					<Link
 						to="/"
@@ -78,18 +76,18 @@ const Navbar = () => {
 					>
 						<div className="h-12 w-12 overflow-hidden drop-shadow-sm">
 							<img
-								src="/images/la.png"
+								src="/images/lamp-logo-1.png"
 								className="h-full w-full object-contain"
 								alt="TaskGenie Logo"
 							/>
 						</div>
-						<span className="text-3xl lobster font-bold bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent pb-1 drop-shadow-sm">
+						<span className="text-4xl lobster font-bold bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent pb-1 drop-shadow-2xl">
 							TaskGenie
 						</span>
 					</Link>
 				</div>
 
-				{/* 2. NAVBAR (CENTER) */}
+				{/* 2. NAVBAR */}
 				<div className="pointer-events-auto absolute left-1/2 -translate-x-1/2 hidden md:block z-40">
 					<motion.header
 						className={cn(
@@ -195,7 +193,6 @@ const Navbar = () => {
 						<AccountMenu user={user} />
 					)}
 
-					{/* Mobile Menu Toggle */}
 					<button
 						onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
 						className="md:hidden p-2 rounded-full bg-white/80 border border-white/60 text-gray-600 shadow-sm hover:bg-gray-100 hover:text-violet-600 active:scale-95 transition-all"

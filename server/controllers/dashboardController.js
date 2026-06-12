@@ -18,27 +18,27 @@ const getCustomerDashboardStats = async (req, res) => {
                 FROM bookings b
                 JOIN services s ON s.id=b.service_id
                 JOIN users u ON u.id=b.provider_id
-                WHERE b.user_id=$1 AND b.date>=NOW() AND b.status!='cancelled'
-                ORDER BY b.date ASC
+                WHERE b.user_id=$1 AND b.date >= CURRENT_DATE AND b.status != 'cancelled'
+                ORDER BY b.date ASC, b.start_time ASC
                 LIMIT 1`,
 				[userId],
 			),
 			db.query(
 				`SELECT COUNT(*) AS active_count
-                FROM bookings b
-                WHERE user_id=$1 AND date>=NOW() AND status != 'cancelled'`,
+                FROM bookings
+                WHERE user_id=$1 AND status IN ('booked', 'confirmed', 'in_progress')`,
 				[userId],
 			),
 		]);
 
 		const stats = statsRes.rows[0];
 		const nextBooking = upcomingRes.rows[0] || null;
-		const activeCount = parseInt(historyRes.rows[0].active_count);
+		const activeCount = parseInt(historyRes.rows[0].active_count) || 0;
 
 		res.json({
 			stats: {
 				total_spent: parseFloat(stats.total_spent),
-				total_completed: stats.total_completed,
+				total_completed: parseInt(stats.total_completed) || 0,
 				active_tasks: activeCount,
 			},
 			next_booking: nextBooking,

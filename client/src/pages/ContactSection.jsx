@@ -89,7 +89,6 @@ export default function ContactSection() {
 
 	return (
 		<>
-			{/* Custom Alerts component is completely removed here since Sonner handles global rendering */}
 			<div className="bricolage-grotesque relative min-h-screen w-full flex items-center justify-center bg-[#F3F4F6] overflow-hidden p-6 font-sans">
 				<div className="absolute top-0 left-0 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" />
 				<div className="absolute top-0 right-0 w-96 h-96 bg-orange-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000" />

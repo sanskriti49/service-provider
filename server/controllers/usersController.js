@@ -166,7 +166,6 @@ async function updateUser(req, res, next) {
 	}
 
 	try {
-		// ✅ FIXED: Using updates.location, updates.lat, updates.lng everywhere
 		// FORWARD GEOCODING (location text -> lat/lng)
 		if (
 			updates.location &&

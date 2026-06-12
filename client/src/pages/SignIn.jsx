@@ -210,7 +210,7 @@ const SignIn = () => {
 											className="w-5 h-5"
 											alt="Google Logo"
 										/>
-										Sign in with Google
+										Continue with Google
 									</button>
 								</div>
 								<div className="flex items-center gap-4 my-4">

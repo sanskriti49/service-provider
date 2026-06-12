@@ -90,6 +90,7 @@ export default function ProviderServices() {
 					slug: selectedService.slug,
 					price: finalPrice,
 					price_unit: priceUnit,
+					is_visible: true,
 				});
 				setMyServices((prev) =>
 					prev.map((s) =>

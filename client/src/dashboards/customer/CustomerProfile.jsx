@@ -28,7 +28,6 @@ const SERIF_FONT = { fontFamily: "P22Mackinac, Cambria, sans-serif" };
 const TEXT_MAIN = "text-[#281950]";
 const TEXT_MUTED = "text-[#281950]/60";
 
-// ── Reusable card ─────────────────────────────────────────────────────────────
 const BentoCard = forwardRef(({ children, className, delay = 0 }, ref) => (
 	<motion.div
 		ref={ref}
@@ -43,7 +42,6 @@ const BentoCard = forwardRef(({ children, className, delay = 0 }, ref) => (
 ));
 BentoCard.displayName = "BentoCard";
 
-// ── Stat pill ─────────────────────────────────────────────────────────────────
 const colorMap = {
 	blue: "bg-blue-100/50 text-blue-700 border-blue-200/50",
 	emerald: "bg-emerald-100/50 text-emerald-700 border-emerald-200/50",
@@ -152,15 +150,16 @@ export default function CustomerProfile() {
 			try {
 				const [userRes, statsRes] = await Promise.allSettled([
 					api.get("/api/auth/me"),
-					api.get("/api/user/stats"),
+					api.get("/api/dashboard/customer"),
 				]);
 
 				if (userRes.status === "fulfilled" && userRes.value.data?.user) {
 					setUser(userRes.value.data.user);
 				}
-				if (statsRes.status === "fulfilled" && statsRes.value.data) {
-					setStats(statsRes.value.data);
+				if (statsRes.status === "fulfilled") {
+					setStats(statsRes.value.data.stats || statsRes.value.data);
 				}
+				console.log(statsRes.value);
 			} catch (err) {
 				console.error("Profile fetch error:", err);
 			} finally {
@@ -312,14 +311,14 @@ export default function CustomerProfile() {
 							<StatPill
 								icon={Clock}
 								label="Bookings"
-								value={stats.bookings}
+								value={stats.active_tasks}
 								color="blue"
 								delay={0.1}
 							/>
 							<StatPill
 								icon={Wallet}
 								label="Spent"
-								value={`₹${stats.spent}`}
+								value={`₹${stats.total_spent}`}
 								color="emerald"
 								delay={0.2}
 							/>
@@ -333,7 +332,7 @@ export default function CustomerProfile() {
 							<StatPill
 								icon={Zap}
 								label="Recents"
-								value={stats.recents}
+								value={stats.total_completed}
 								color="rose"
 								delay={0.4}
 							/>
