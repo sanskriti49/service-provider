@@ -26,12 +26,14 @@ import {
 	X,
 	IndianRupee,
 	Users,
-	Plus,
 	ArrowUpRight,
 	Copy,
+	Calendar,
+	Check,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
+import { toast } from "react-hot-toast"; // Ensure toast is imported properly
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -96,7 +98,6 @@ const ACCENT_MAP = {
 	},
 };
 
-// ── Sidebar NavLink — dark variant of CustomerDashboard's SidebarLink ─────────
 function SidebarLink({ to, icon, label, end = false, onClick }) {
 	return (
 		<NavLink
@@ -106,7 +107,7 @@ function SidebarLink({ to, icon, label, end = false, onClick }) {
 			className={({ isActive }) =>
 				`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
 					isActive
-						? "bg-slate-700/70 text-white shadow-lg shadow-slate-900/40 border border-white/8"
+						? "bg-slate-700/70 text-white shadow-lg shadow-slate-900/40 border border-white/5"
 						: "text-slate-400 hover:bg-white/5 hover:text-slate-100"
 				}`
 			}
@@ -130,9 +131,7 @@ function SidebarLink({ to, icon, label, end = false, onClick }) {
 }
 
 function SidebarCard({ notifications, onLogout, onLinkClick }) {
-	const { user, logout } = useAuth();
-	console.log("user-------", user);
-
+	const { user } = useAuth();
 	const [copied, setCopied] = useState(false);
 
 	const handleCopyId = useCallback(() => {
@@ -142,9 +141,10 @@ function SidebarCard({ notifications, onLogout, onLinkClick }) {
 		toast.success("Provider ID copied!");
 		setTimeout(() => setCopied(false), 2000);
 	}, [user?.custom_id]);
+
 	return (
 		<div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-xl shadow-slate-950/50 rounded-3xl p-6 flex flex-col gap-6">
-			<div className="flex items-center gap-4 pb-6 border-b border-white/8">
+			<div className="flex items-center gap-4 pb-6 border-b border-white/5">
 				<div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-slate-900/50 overflow-hidden ring-2 ring-white/10">
 					{user?.photo ? (
 						<img
@@ -166,10 +166,9 @@ function SidebarCard({ notifications, onLogout, onLinkClick }) {
 						{user?.custom_id || "Service Provider"}
 					</p>
 				</div>
-				{/* notif dot on avatar  */}
 				{notifications === 0 && (
 					<div className="ml-auto flex-shrink-0">
-						<button className="cursor-pointer relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors">
+						<button className="cursor-pointer relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors">
 							<Bell size={16} />
 							<span className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full" />
 						</button>
@@ -234,7 +233,7 @@ function SidebarCard({ notifications, onLogout, onLinkClick }) {
 				/>
 			</nav>
 
-			<div className="bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl p-5 text-white shadow-lg shadow-slate-950/40 relative overflow-hidden group border border-white/8">
+			<div className="bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl p-5 text-white shadow-lg shadow-slate-950/40 relative overflow-hidden group border border-white/5">
 				<div className="absolute top-0 right-0 p-3 opacity-10 transform group-hover:scale-110 transition-transform duration-500">
 					<TrendingUp size={60} />
 				</div>
@@ -250,7 +249,6 @@ function SidebarCard({ notifications, onLogout, onLinkClick }) {
 				</Link>
 			</div>
 
-			{/* Logout */}
 			<button
 				onClick={onLogout}
 				className="cursor-pointer w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group border border-transparent hover:border-red-500/15"
@@ -293,11 +291,11 @@ export default function ProviderDashboard() {
 		} else {
 			document.body.style.overflow = "auto";
 		}
-
 		return () => {
 			document.body.style.overflow = "auto";
 		};
 	}, [sidebarOpen]);
+
 	useEffect(() => {
 		if (!user?.id) return;
 		const load = async () => {
@@ -306,7 +304,6 @@ export default function ProviderDashboard() {
 					api.get(`/api/dashboard/provider`),
 					api.get(`/api/bookings/provider/history/recent`),
 				]);
-				console.log(statsRes);
 				if (statsRes.status === "fulfilled") {
 					setStats(statsRes.value.data?.stats || {});
 					setNotifications(statsRes.value.data?.pending_notifications || 0);
@@ -315,7 +312,7 @@ export default function ProviderDashboard() {
 					setRecentBookings(bookingsRes.value.data || []);
 				}
 			} catch (err) {
-				toast.error("Provider dashboard load error:", err);
+				toast.error("Provider dashboard load error");
 			} finally {
 				setIsLoading(false);
 			}
@@ -331,9 +328,7 @@ export default function ProviderDashboard() {
 	const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
 	return (
-		// Dark slate bg, same font + structure as CustomerDashboard
 		<div className="bricolage-grotesque min-h-screen relative bg-slate-950 pb-12 px-4 sm:px-8">
-			{/* ── Mobile overlay ────────────────────────────────────────────── */}
 			<AnimatePresence>
 				{sidebarOpen && (
 					<motion.div
@@ -347,7 +342,6 @@ export default function ProviderDashboard() {
 				)}
 			</AnimatePresence>
 
-			{/* ── Mobile sidebar drawer ─────────────────────────────────────── */}
 			<AnimatePresence>
 				{sidebarOpen && (
 					<motion.div
@@ -365,7 +359,6 @@ export default function ProviderDashboard() {
 							<X size={18} />
 						</button>
 						<SidebarCard
-							//	user={user}
 							notifications={notifications}
 							onLogout={handleLogout}
 							onLinkClick={closeSidebar}
@@ -374,11 +367,10 @@ export default function ProviderDashboard() {
 				)}
 			</AnimatePresence>
 
-			{/* ── mobile top bar ────────────────────────────────────────────── */}
-			<div className="lg:hidden sticky top-0 z-10 bg-slate-950/90 backdrop-blur-md -mx-4 px-4 py-3 border-b border-white/8 mb-6 flex items-center justify-between">
+			<div className="lg:hidden sticky top-0 z-10 bg-slate-950/90 backdrop-blur-md -mx-4 px-4 py-3 border-b border-white/5 mb-6 flex items-center justify-between">
 				<button
 					onClick={() => setSidebarOpen(true)}
-					className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors"
+					className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
 				>
 					<Menu size={20} />
 				</button>
@@ -388,7 +380,7 @@ export default function ProviderDashboard() {
 					</div>
 					<span className="text-sm font-bold text-slate-200">Genie Pro</span>
 				</div>
-				<button className="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors">
+				<button className="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors">
 					<Bell size={18} />
 					{notifications > 0 && (
 						<span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-400 rounded-full" />
@@ -397,7 +389,6 @@ export default function ProviderDashboard() {
 			</div>
 
 			<div className="max-w-7xl mx-auto relative z-10 pt-8 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
-				{/* ── LEFT SIDEBAR (desktop) ────────────────────────────────── */}
 				<motion.aside
 					initial={{ x: -20, opacity: 0 }}
 					animate={{ x: 0, opacity: 1 }}
@@ -405,7 +396,6 @@ export default function ProviderDashboard() {
 					className="hidden lg:block lg:h-fit sticky top-8"
 				>
 					<SidebarCard
-						//user={user}
 						notifications={notifications}
 						onLogout={handleLogout}
 						onLinkClick={() => {}}
@@ -416,14 +406,12 @@ export default function ProviderDashboard() {
 					{isLoading ? (
 						<ProviderSkeleton />
 					) : isOverviewPage ? (
-						//  Force overview render if matching the exact root dashboard URL path
 						<ProviderOverview
 							user={user}
 							stats={stats}
 							recentBookings={recentBookings}
 						/>
 					) : (
-						// Swap out and render active child modules (bookings, earnings, services) safely
 						<Outlet context={{ user, stats, recentBookings }} />
 					)}
 				</main>
@@ -439,7 +427,6 @@ function ProviderOverview({ user, stats, recentBookings }) {
 			animate={{ opacity: 1, y: 0 }}
 			className="space-y-8"
 		>
-			{/* Header — mirrors DashboardOverview header */}
 			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 				<div>
 					<h1 className="text-3xl font-bold text-white tracking-tight">
@@ -465,7 +452,6 @@ function ProviderOverview({ user, stats, recentBookings }) {
 				</Link>
 			</div>
 
-			{/* Stats grid — mirrors DashboardOverview 4-col grid */}
 			<div className="grid grid-cols-2 md:grid-cols-3 gap-4">
 				{[
 					{
@@ -509,10 +495,8 @@ function ProviderOverview({ user, stats, recentBookings }) {
 				))}
 			</div>
 
-			{/* Content grid — mirrors DashboardOverview 2-col layout */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-				{/* Recent bookings — mirrors "Up Next" card */}
-				<div className="bg-slate-900/60 backdrop-blur-md border border-white/8 p-6 rounded-3xl shadow-sm flex flex-col min-h-[400px]">
+				<div className="bg-slate-900/60 backdrop-blur-md border border-white/5 p-6 rounded-3xl shadow-sm flex flex-col min-h-[400px]">
 					<div className="flex justify-between items-center mb-6">
 						<h3 className="font-bold text-lg text-white flex items-center gap-2">
 							<div className="p-2 bg-slate-800 rounded-lg text-slate-400">
@@ -527,11 +511,11 @@ function ProviderOverview({ user, stats, recentBookings }) {
 							View all <ChevronRight size={13} />
 						</Link>
 					</div>
-					<div className="flex-1 flex flex-col">
+					<div className="flex-1 flex flex-col justify-start">
 						{recentBookings.length === 0 ? (
 							<EmptyBookings />
 						) : (
-							<div className="divide-y divide-white/5 -mx-6">
+							<div className="cursor-pointer divide-y divide-white/5 rounded-2xl overflow-hidden border border-white/5">
 								{recentBookings.slice(0, 5).map((b, i) => (
 									<BookingRow key={b.booking_id || i} booking={b} />
 								))}
@@ -540,8 +524,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 					</div>
 				</div>
 
-				{/* Quick actions — mirrors "Quick Book" card */}
-				<div className="bg-slate-900/60 backdrop-blur-md border border-white/8 p-6 rounded-3xl shadow-sm">
+				<div className="bg-slate-900/60 backdrop-blur-md border border-white/5 p-6 rounded-3xl shadow-sm">
 					<h3 className="font-bold text-lg text-white mb-6 flex items-center gap-2">
 						<div className="p-2 bg-amber-500/10 rounded-lg text-amber-400">
 							<TrendingUp size={18} />
@@ -584,7 +567,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 							<Link
 								key={a.to}
 								to={a.to}
-								className="flex items-center gap-4 p-4 rounded-2xl border border-white/6 bg-slate-800/30 hover:bg-slate-800/70 hover:border-white/12 transition-all group"
+								className="flex items-center gap-4 p-4 rounded-2xl border border-white/5 bg-slate-800/30 hover:bg-slate-800/70 hover:border-white/12 transition-all group"
 							>
 								<div
 									className={`w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 ${a.accent}`}
@@ -608,7 +591,6 @@ function ProviderOverview({ user, stats, recentBookings }) {
 	);
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, icon: Icon, accent, delay }) => {
 	const a = ACCENT_MAP[accent] || ACCENT_MAP.violet;
 	return (
@@ -636,34 +618,74 @@ const StatCard = ({ label, value, icon: Icon, accent, delay }) => {
 };
 
 const BookingRow = ({ booking }) => {
+	const navigate = useNavigate();
 	const status = STATUS_MAP[booking.status] || STATUS_MAP.pending;
+
+	const dateObj = booking.date
+		? new Date(booking.date.split("T")[0] + "T00:00:00")
+		: null;
+	if (dateObj && booking.start_time) {
+		const [h, m] = booking.start_time.split(":");
+		dateObj.setHours(+h, +m);
+	}
+
+	const formattedDate = dateObj
+		? dateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
+		: "—";
+	const formattedTime = dateObj
+		? dateObj.toLocaleTimeString("en-IN", {
+				hour: "2-digit",
+				minute: "2-digit",
+				hour12: true,
+			})
+		: null;
+
 	return (
-		<div className="flex items-center justify-between px-6 py-4 hover:bg-white/[0.02] transition-colors">
+		<button
+			onClick={() => navigate("/provider/dashboard/bookings")}
+			className="w-full text-left flex items-center gap-3 px-4 py-3.5 hover:bg-slate-800/60 transition-colors group"
+		>
+			{/* Icon */}
+			<div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-500 shrink-0">
+				<Wrench size={13} />
+			</div>
+
+			{/* Service + ID */}
 			<div className="flex-1 min-w-0">
-				<p className="text-sm font-semibold text-white truncate">
-					{booking.service_name || "Service"}
+				<p className="text-sm font-semibold text-slate-200 truncate group-hover:text-white transition-colors">
+					{booking.service_name || "Custom Service"}
 				</p>
-				<p className="text-xs text-slate-500 mt-0.5 truncate">
-					{booking.customer_name || "Customer"}
-					{booking.date ? ` · ${booking.date}` : ""}
+				<p className="text-[11px] text-slate-500 font-mono mt-0.5">
+					#{booking.booking_id?.slice(0, 8).toUpperCase()}
+					{formattedTime && (
+						<span className="ml-2 not-italic font-sans text-slate-600">
+							{formattedDate} · {formattedTime}
+						</span>
+					)}
 				</p>
 			</div>
-			<div className="flex items-center gap-3 flex-shrink-0 ml-4">
+
+			{/* Status + price */}
+			<div className="flex items-center gap-2.5 shrink-0">
 				<span
-					className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border ${status.cls}`}
+					className={`text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-md border hidden sm:inline-flex ${status.cls}`}
 				>
 					{status.label}
 				</span>
-				<span className="text-sm font-bold text-slate-300 tabular-nums">
-					{booking.price ? formatCurrency(booking.price) : "—"}
+				<span className="text-sm font-bold text-white tabular-nums">
+					₹{booking.price ?? "0"}
 				</span>
+				<ChevronRight
+					size={14}
+					className="text-slate-600 group-hover:text-slate-400 transition-colors"
+				/>
 			</div>
-		</div>
+		</button>
 	);
 };
 
 const EmptyBookings = () => (
-	<div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-white/8 rounded-2xl">
+	<div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-white/5 rounded-2xl">
 		<div className="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-600">
 			<CalendarCheck size={24} />
 		</div>

@@ -1,12 +1,3 @@
-/**
- * dashboards/provider/ProviderEarnings.jsx
- *
- * Earnings overview for providers.
- * Shows: summary stat cards, a monthly breakdown bar chart (CSS-only),
- * and a paginated transaction history table.
- *
- * Route: /provider/earnings
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -24,7 +15,27 @@ import {
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+import {
+	Chart as ChartJS,
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	Title,
+	Tooltip,
+	Legend,
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
+import { useNavigate } from "react-router-dom";
+
+ChartJS.register(
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	Title,
+	Tooltip,
+	Legend,
+);
+
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
 		style: "currency",
@@ -55,7 +66,6 @@ const ACCENT_MAP = {
 	},
 };
 
-// ── Sub-components ────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, icon: Icon, accent, sub, delay }) => {
 	const a = ACCENT_MAP[accent] || ACCENT_MAP.violet;
 	return (
@@ -85,56 +95,16 @@ const StatCard = ({ label, value, icon: Icon, accent, sub, delay }) => {
 	);
 };
 
-// CSS-only bar chart for monthly earnings
-const MonthlyChart = ({ months }) => {
-	if (!months || months.length === 0) return null;
-	const max = Math.max(...months.map((m) => m.amount), 1);
-
-	return (
-		<div className="flex items-end gap-2 h-36 w-full">
-			{months.map((m, i) => {
-				const pct = (m.amount / max) * 100;
-				const isLatest = i === months.length - 1;
-				return (
-					<div
-						key={m.label}
-						className="flex-1 flex flex-col items-center gap-2 group"
-					>
-						<div
-							className="relative w-full flex flex-col items-center justify-end"
-							style={{ height: "100px" }}
-						>
-							{/* Tooltip */}
-							<div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap z-10 pointer-events-none">
-								{formatCurrency(m.amount)}
-							</div>
-							<motion.div
-								initial={{ height: 0 }}
-								animate={{ height: `${pct}%` }}
-								transition={{ delay: i * 0.04, duration: 0.5, ease: "easeOut" }}
-								className={`w-full rounded-t-lg transition-colors ${
-									isLatest
-										? "bg-violet-500 group-hover:bg-violet-400"
-										: "bg-slate-700 group-hover:bg-slate-600"
-								}`}
-							/>
-						</div>
-						<span className="text-[10px] text-slate-500 font-medium">
-							{m.label}
-						</span>
-					</div>
-				);
-			})}
-		</div>
-	);
-};
-
-// Transaction row
 const TxRow = ({ tx }) => {
 	const isCredit = tx.type !== "deduction";
 	const date = new Date(tx.date || tx.created_at);
+	const navigate = useNavigate();
+
 	return (
-		<div className="flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors group">
+		<div
+			onClick={() => navigate("/provider/dashboard/bookings")}
+			className="cursor-pointer flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors group"
+		>
 			<div className="flex items-center gap-4">
 				<div
 					className={`w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 ${
@@ -189,7 +159,6 @@ const EarningsSkeleton = () => (
 	</div>
 );
 
-// ── Main ──────────────────────────────────────────────────────────────────────
 export default function ProviderEarnings() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [summary, setSummary] = useState({
@@ -248,6 +217,59 @@ export default function ProviderEarnings() {
 	}, [txPage]);
 
 	const growthPositive = (summary.growth_pct ?? 0) >= 0;
+	const chartData = {
+		labels: monthlyData.map((m) => m.label),
+		datasets: [
+			{
+				label: "Revenue",
+				data: monthlyData.map((m) => m.amount),
+				backgroundColor: "rgba(139, 92, 246, 0.25)",
+				borderColor: "rgba(167, 139, 250, 1)",
+				borderWidth: 2,
+				borderRadius: 6,
+				hoverBackgroundColor: "rgba(139, 92, 246, 0.5)",
+			},
+		],
+	};
+
+	const chartOptions = {
+		responsive: true,
+		maintainAspectRatio: false,
+		plugins: {
+			legend: { display: false },
+			tooltip: {
+				backgroundColor: "#1e293b",
+				titleFont: { family: "Inter", size: 12 },
+				bodyFont: { family: "Inter", size: 13, weight: "bold" },
+				padding: 10,
+				borderColor: "rgba(255,255,255,0.08)",
+				borderWidth: 1,
+				callbacks: {
+					label: function (context) {
+						return ` ${formatCurrency(context.raw)}`;
+					},
+				},
+			},
+		},
+		scales: {
+			x: {
+				// grid: { color: "rgba(255, 255, 255, 0.04)" },
+				grid: { display: false },
+				ticks: {
+					color: "#94a3b8",
+					font: { family: "Inter", size: 12 },
+				},
+			},
+			y: {
+				grid: { color: "rgba(255, 255, 255, 0.04)" },
+				ticks: {
+					color: "#94a3b8",
+					font: { family: "Inter", size: 12 },
+					callback: (value) => "₹" + value,
+				},
+			},
+		},
+	};
 
 	if (isLoading) return <EarningsSkeleton />;
 
@@ -257,7 +279,6 @@ export default function ProviderEarnings() {
 			animate={{ opacity: 1, y: 0 }}
 			className="space-y-8"
 		>
-			{/* ── Header ─────────────────────────────────────────────────────── */}
 			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 				<div>
 					<h1 className="text-3xl font-bold text-white tracking-tight">
@@ -273,7 +294,6 @@ export default function ProviderEarnings() {
 				</button>
 			</div>
 
-			{/* ── Summary cards ───────────────────────────────────────────────── */}
 			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 				<StatCard
 					label="Total Earnings"
@@ -312,9 +332,7 @@ export default function ProviderEarnings() {
 				/>
 			</div>
 
-			{/* ── Chart + growth comparison ────────────────────────────────────── */}
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Monthly bar chart */}
 				<motion.div
 					initial={{ opacity: 0, y: 10 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -332,13 +350,15 @@ export default function ProviderEarnings() {
 							Last {monthlyData.length || 6} months
 						</span>
 					</div>
-					{monthlyData.length > 0 ? (
-						<MonthlyChart months={monthlyData} />
-					) : (
-						<div className="h-36 flex items-center justify-center text-slate-600 text-sm">
-							No monthly data yet
-						</div>
-					)}
+					<div className="h-44 w-full flex-1 min-h-[180px]">
+						{monthlyData.length > 0 ? (
+							<Bar data={chartData} options={chartOptions} />
+						) : (
+							<div className="h-full flex items-center justify-center text-slate-600 text-sm">
+								No monthly data yet
+							</div>
+						)}
+					</div>
 				</motion.div>
 
 				{/* Month comparison card */}
@@ -397,7 +417,6 @@ export default function ProviderEarnings() {
 				</motion.div>
 			</div>
 
-			{/* ── Transaction history ──────────────────────────────────────────── */}
 			<motion.div
 				initial={{ opacity: 0, y: 10 }}
 				animate={{ opacity: 1, y: 0 }}

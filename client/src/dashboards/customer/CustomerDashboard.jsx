@@ -14,7 +14,6 @@ export default function CustomerDashboard() {
 	return (
 		<div className="pt-28 sm:pt-32 bricolage-grotesque min-h-screen bg-slate-50/50 pb-12 px-4 sm:px-8 font-sans">
 			<div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8 items-start">
-				{/* ── LEFT SIDEBAR ─────────────────────────────────────────────── */}
 				<motion.aside
 					initial={{ y: 10, opacity: 0 }}
 					animate={{ y: 0, opacity: 1 }}
@@ -88,7 +87,6 @@ export default function CustomerDashboard() {
 					</div>
 				</motion.aside>
 
-				{/* ── MAIN CONTENT ─────────────────────────────────────────────── */}
 				<main className="min-w-0 w-full">
 					<Outlet context={{ user }} />
 				</main>

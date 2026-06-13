@@ -8,6 +8,7 @@ const {
 	verifyPayment,
 	getRecentProviderBookings,
 	getUpcomingBookings,
+	getProviderHistory,
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const db = require("../config/db");
@@ -60,6 +61,14 @@ router.get(
 	},
 );
 
+// GET PROVIDER BOOKINGS WITH FILTERS & PAGINATION
+router.get(
+	"/provider/list",
+	authMiddleware,
+	allowRoles("provider"),
+	getProviderHistory,
+);
+
 router.get(
 	"/provider/history/recent",
 	authMiddleware,
@@ -95,7 +104,7 @@ router.patch(
 	allowRoles("customer"),
 	updateBookingAddress,
 );
-// ADDED EXPLICIT GUARDS: Ensures only permitted actors trigger logic checks
+
 router.put("/:booking_id/status", authMiddleware, updateBookingStatus);
 
 // GET SINGLE BOOKING

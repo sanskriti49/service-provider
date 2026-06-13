@@ -22,7 +22,6 @@ import {
 	Copy,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
-import ConfirmModal from "../../ui/ConfirmModal";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -33,60 +32,7 @@ const formatCurrency = (n) =>
 
 const BUFFER_MS = 15 * 60 * 60 * 1000;
 
-function resolveDisplayStatus(status, date, startTime) {
-	let s = (status || "").toLowerCase();
-	const dateString =
-		typeof date === "string"
-			? date.split("T")[0]
-			: new Date(date).toISOString().split("T")[0];
-	const base = new Date(`${dateString}T00:00:00`);
-
-	if (startTime) {
-		const [h, m] = startTime.split(":");
-		base.setHours(+h, +m);
-	}
-	const now = new Date();
-	if (s === "booked" || s === "confirmed") {
-		if (now > base) {
-			s = now - base < BUFFER_MS ? "awaiting completion" : "expired";
-		}
-	}
-	return s;
-}
-
-const STATUS_STYLES = {
-	completed: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
-	cancelled: "bg-red-500/15 text-red-300 border-red-500/25",
-	no_show: "bg-red-500/20 text-red-300 border-red-500/30",
-	in_progress: "bg-blue-500/15 text-blue-300 border-blue-500/25",
-	"awaiting completion": "bg-amber-500/15 text-amber-300 border-amber-500/25",
-	awaiting_completion: "bg-amber-500/15 text-amber-300 border-amber-500/25",
-	booked: "bg-violet-500/15 text-violet-300 border-violet-500/25",
-	confirmed: "bg-violet-500/15 text-violet-300 border-violet-500/25",
-	expired: "bg-red-500/15 text-orange-300 border-orange-500/25",
-	pending: "bg-orange-400/25 text-slate-300 border-orange-400/25",
-};
-
-const StatusBadge = ({ status, date, startTime }) => {
-	const display = resolveDisplayStatus(status, date, startTime);
-	const cls = STATUS_STYLES[display] || STATUS_STYLES.pending;
-	const IconComp = ["completed"].includes(display)
-		? CheckCircle2
-		: ["cancelled", "no_show", "expired"].includes(display)
-			? AlertCircle
-			: Clock;
-	return (
-		<span
-			className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border flex items-center gap-1.5 w-fit ${cls}`}
-		>
-			<IconComp size={11} />
-			{display.replace(/_/g, " ")}
-		</span>
-	);
-};
-
-// ── BOOKING DETAILS SHEET COMPONENT ──────────────────────────────────────
-function BookingDetailsSheet({
+export default function BookingDetailsSheet({
 	booking,
 	onClose,
 	onUpdateStatus,

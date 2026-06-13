@@ -25,3 +25,36 @@ ON CONFLICT (provider_id, service_id) DO NOTHING;
 -- Index for fast lookups by provider
 CREATE INDEX IF NOT EXISTS idx_provider_services_provider_id ON provider_services(provider_id);
 CREATE INDEX IF NOT EXISTS idx_provider_services_service_id  ON provider_services(service_id);
+
+
+
+CREATE TABLE public.reviews (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    booking_id uuid NOT NULL, -- Optional: links to a specific transaction
+    customer_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    provider_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    rating int2 NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment text NULL,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT reviews_pkey PRIMARY KEY (id)
+);
+
+-- TRIGGER FUNCTION
+CREATE OR REPLACE FUNCTION update_provider_average_rating()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE public.providers
+    SET rating = (
+        SELECT COALESCE(AVG(rating), 0)::float4 
+        FROM public.reviews 
+        WHERE provider_id = COALESCE(NEW.provider_id, OLD.provider_id)
+    )
+    WHERE user_id = COALESCE(NEW.provider_id, OLD.provider_id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_review_changes
+AFTER INSERT OR UPDATE OR DELETE ON public.reviews
+FOR EACH ROW
+EXECUTE FUNCTION update_provider_average_rating();

@@ -82,7 +82,7 @@ const getProviderDashboardStats = async (req, res) => {
 				total_customers: parseInt(metrics.total_customers) || 0,
 				avg_rating: providerRow?.rating ? parseFloat(providerRow.rating) : null,
 			},
-			pending_notifications: parseInt(metrics.pending_jobs) || 0, // Highlights pending actions
+			pending_notifications: parseInt(metrics.pending_jobs) || 0,
 		});
 	} catch (err) {
 		console.error("Provider Dashboard Metrics Error:", err);

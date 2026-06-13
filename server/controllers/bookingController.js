@@ -29,7 +29,7 @@ async function createBooking(req, res, next) {
 		return res.status(400).json({ message: "Missing fields" });
 	}
 
-	const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit
+	const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
 	if (!end_time || end_time === start_time) {
 		const [hours, minutes] = start_time.split(":").map(Number);
@@ -74,15 +74,14 @@ async function createBooking(req, res, next) {
 			await client.query("ROLLBACK");
 			return res.status(409).json({ message: "Slot already booked!" });
 		}
-
 		const insertQ = `
-            INSERT INTO bookings (
-                booking_id, provider_id, user_id, service_id, date, start_time, end_time, 
-                status, address, price, payment_method, payment_status, razorpay_order_id, otp
-            )
-            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'booked', $7, $8, $9, $10, $11, $12)
-            RETURNING *;
-        `;
+			INSERT INTO bookings (
+				booking_id, provider_id, user_id, service_id, date, start_time, end_time, 
+				status, address, price, payment_method, payment_status, razorpay_order_id, otp
+			)
+			VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12)
+			RETURNING *;
+		`;
 
 		const r = await client.query(insertQ, [
 			provider_id,
@@ -129,7 +128,7 @@ async function updateBookingStatus(req, res) {
             JOIN users u ON b.user_id=u.id
             JOIN users p ON b.provider_id=p.id
             JOIN services s ON b.service_id=s.id
-            WHERE booking_id=$1
+            WHERE booking_id=$1 FOR UPDATE
         `;
 		const bookingRes = await client.query(checkQ, [booking_id]);
 		if (bookingRes.rows.length === 0) {
@@ -156,7 +155,9 @@ async function updateBookingStatus(req, res) {
 		const allowedNoShowTime = new Date(bookingDateTime.getTime() + 20 * 60000); // 20 mins grace
 
 		let refundPercentage = 0;
+		let updateReliabilityMetric = false;
 
+		// CUSTOMER FLOW
 		if (userRole === "customer") {
 			if (status === "no_show") {
 				if (now < allowedNoShowTime) {
@@ -167,20 +168,60 @@ async function updateBookingStatus(req, res) {
 				}
 				refundPercentage = 100;
 			} else if (status === "cancelled") {
-				refundPercentage = hoursUntilService >= 2 ? 100 : 80;
+				// If it was still pending provider acceptance, 100% refund instantly
+				if (currentBooking.status === "pending") {
+					refundPercentage = 100;
+				} else {
+					refundPercentage = hoursUntilService >= 2 ? 100 : 80;
+				}
 			} else {
 				await client.query("ROLLBACK");
 				return res
 					.status(400)
 					.json({ message: "Customers can only Cancel or report No-Show." });
 			}
-		} else if (userRole === "provider") {
-			const allowed = ["in_progress", "completed", "cancelled", "no_show"];
-			if (!allowed.includes(status)) {
-				await client.query("ROLLBACK");
-				return res.status(400).json({ message: "Invalid status transition." });
+		}
+
+		// PROVIDER FLOW
+		else if (userRole === "provider") {
+			// State flow validation checking
+			if (currentBooking.status === "pending") {
+				const allowedFromPending = ["confirmed", "cancelled"];
+				if (!allowedFromPending.includes(status)) {
+					await client.query("ROLLBACK");
+					return res.status(400).json({
+						message:
+							"Pending bookings can only be confirmed or cancelled (declined).",
+					});
+				}
+
+				if (status === "cancelled") {
+					refundPercentage = 100; // Decline yields a clean 100% automatic refund
+					updateReliabilityMetric = false; // Zero profile penalty for declining in queue
+				}
+			} else if (
+				currentBooking.status === "confirmed" ||
+				currentBooking.status === "booked"
+			) {
+				const allowedFromConfirmed = ["in_progress", "cancelled", "no_show"];
+				if (!allowedFromConfirmed.includes(status)) {
+					await client.query("ROLLBACK");
+					return res.status(400).json({ message: "Invalid transition state." });
+				}
+
+				if (status === "cancelled") {
+					if (hoursUntilService < 2) {
+						await client.query("ROLLBACK");
+						return res
+							.status(400)
+							.json({ message: "Too late to cancel! Contact system support." });
+					}
+					refundPercentage = 100;
+					updateReliabilityMetric = true; // Penalty applied: backed out after accepting job
+				}
 			}
 
+			// In-flight Execution Handshake Verification (OTP Gate)
 			if (status === "in_progress") {
 				if (
 					!otp_provided ||
@@ -189,7 +230,7 @@ async function updateBookingStatus(req, res) {
 					await client.query("ROLLBACK");
 					return res
 						.status(401)
-						.json({ message: "Invalid OTP. Handshake failed." });
+						.json({ message: "Invalid secure OTP verification handshake." });
 				}
 			} else if (status === "no_show") {
 				if (now < allowedNoShowTime) {
@@ -198,18 +239,11 @@ async function updateBookingStatus(req, res) {
 						message: "Wait 20 mins before reporting customer No-Show.",
 					});
 				}
-				refundPercentage = 0; // Provider keeps the money
-			} else if (status === "cancelled") {
-				if (hoursUntilService < 2) {
-					await client.query("ROLLBACK");
-					return res
-						.status(400)
-						.json({ message: "Too late to cancel! Contact support." });
-				}
-				refundPercentage = 100;
+				refundPercentage = 0; // Provider keeps customer transaction deposit
 			}
 		}
 
+		// Process Razorpay Secure Refund Processing Sub-routine
 		if (
 			refundPercentage > 0 &&
 			currentBooking.payment_status === "paid" &&
@@ -222,11 +256,11 @@ async function updateBookingStatus(req, res) {
 				await razorpay.payments.refund(currentBooking.razorpay_payment_id, {
 					amount: refundAmount,
 					notes: {
-						reason: `Policy: ${refundPercentage}% refund for ${status}`,
+						reason: `Policy automated ${refundPercentage}% refund transaction trigger for status: ${status}`,
 					},
 				});
 			} catch (err) {
-				console.error("Refund failed:", err.message);
+				console.error("Payment Gateway Refund execution aborted:", err.message);
 			}
 		}
 
@@ -237,24 +271,137 @@ async function updateBookingStatus(req, res) {
 					? "partially_refunded"
 					: currentBooking.payment_status;
 
+		// Apply Penalty Updates to Metrics Log if flag evaluates true
+		if (updateReliabilityMetric) {
+			await client.query(
+				`UPDATE providers SET rating = GREATEST(rating - 0.1, 1.0) WHERE user_id = $1`,
+				[currentBooking.provider_id],
+			);
+		}
+
 		const updateQ = `UPDATE bookings SET status=$1, payment_status=$2, action_by=$3, updated_at=NOW() WHERE booking_id=$4 RETURNING *`;
 		const r = await client.query(updateQ, [
 			status,
 			finalPaymentStatus,
 			userRole,
-			bookingId,
+			booking_id,
 		]);
 
 		await client.query("COMMIT");
-
 		sendEmailNotifications(status, userRole, currentBooking, refundPercentage);
 
-		res.json({ message: "Status updated successfully", booking: r.rows[0] });
+		res.json({
+			message: "Booking status matrix advanced successfully",
+			booking: r.rows[0],
+		});
 	} catch (err) {
 		await client.query("ROLLBACK");
-		res.status(500).json({ message: "Server error", error: err.message });
+		res.status(500).json({
+			message: "Server encountered runtime execution error",
+			error: err.message,
+		});
 	} finally {
 		client.release();
+	}
+}
+
+async function getProviderHistory(req, res) {
+	const page = parseInt(req.query.page) || 1;
+	const limit = parseInt(req.query.limit) || 8;
+	const offset = (page - 1) * limit;
+	const providerId = req.user.id;
+
+	const type = req.query.type || "upcoming"; // 'upcoming' or 'history'
+	const search = (req.query.search || "").trim();
+	const dateFilter = req.query.date_filter || "All Time";
+	const minPrice = req.query.min_price;
+	const customerFilter = (req.query.customer_filter || "").trim();
+
+	try {
+		const queryParams = [providerId];
+		let paramCounter = 1;
+
+		let whereClause = `WHERE b.provider_id = $${paramCounter}`;
+		paramCounter++;
+
+		if (type === "upcoming") {
+			whereClause +=
+				" AND b.status IN ('pending', 'booked', 'confirmed', 'in_progress')";
+		} else {
+			whereClause +=
+				" AND b.status IN ('completed', 'cancelled', 'no_show', 'expired')";
+		}
+
+		// Global search term processing
+		if (search) {
+			queryParams.push(`%${search}%`);
+			whereClause += ` AND (
+                s.name ILIKE $${paramCounter} OR
+                u.name ILIKE $${paramCounter} OR
+                b.booking_id::text ILIKE $${paramCounter}
+            )`;
+			paramCounter++;
+		}
+
+		// Specific sidebar menu structural filters
+		if (customerFilter) {
+			queryParams.push(`%${customerFilter}%`);
+			whereClause += ` AND u.name ILIKE $${paramCounter}`;
+			paramCounter++;
+		}
+
+		if (minPrice) {
+			queryParams.push(minPrice);
+			whereClause += ` AND b.price >= $${paramCounter}`;
+			paramCounter++;
+		}
+
+		if (dateFilter === "This Month") {
+			whereClause += ` AND date_trunc('month', b.date) = date_trunc('month', CURRENT_DATE)`;
+		} else if (dateFilter === "Last 3 Months") {
+			whereClause += ` AND b.date >= (CURRENT_DATE - INTERVAL '3 months')`;
+		}
+
+		const countQuery = `
+            SELECT COUNT(*) 
+            FROM bookings b
+            LEFT JOIN users u ON b.user_id = u.id
+            LEFT JOIN services s ON s.id = b.service_id
+            ${whereClause}`;
+
+		const dataQuery = `
+            SELECT b.*, u.name AS customer_name, u.email AS customer_email, s.name AS service_name
+            FROM bookings b
+            LEFT JOIN users u ON b.user_id = u.id
+            LEFT JOIN services s ON s.id = b.service_id
+            ${whereClause}
+            ORDER BY b.date ${type === "upcoming" ? "ASC" : "DESC"}, b.start_time DESC
+            LIMIT $${paramCounter} OFFSET $${paramCounter + 1};`;
+
+		// Run concurrently for performance
+		const [dataResult, countResult] = await Promise.all([
+			db.query(dataQuery, [...queryParams, limit, offset]),
+			db.query(countQuery, queryParams),
+		]);
+
+		const totalRows = parseInt(countResult.rows[0].count);
+		const totalPages = Math.ceil(totalRows / limit);
+
+		res.json({
+			meta: {
+				current_page: page,
+				items_per_page: limit,
+				total_items: totalRows,
+				total_pages: totalPages,
+				has_next_page: page < totalPages,
+			},
+			data: dataResult.rows,
+		});
+	} catch (err) {
+		console.error("Provider Pagination Error:", err);
+		res
+			.status(500)
+			.json({ message: "Error fetching provider database history" });
 	}
 }
 
@@ -613,4 +760,5 @@ module.exports = {
 	verifyPayment,
 	getRecentProviderBookings,
 	getUpcomingBookings,
+	getProviderHistory,
 };
