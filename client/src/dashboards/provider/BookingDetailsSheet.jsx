@@ -47,7 +47,6 @@ export default function BookingDetailsSheet({
 		};
 	}, []);
 
-	// Encapsulated handleCopyId locally so the template container has absolute access
 	const handleCopyId = useCallback((id) => {
 		if (!id) return;
 		navigator.clipboard.writeText(id);

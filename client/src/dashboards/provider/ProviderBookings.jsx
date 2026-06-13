@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 import ConfirmModal from "../../ui/ConfirmModal";
-import BookingDetailsSheet from "./BookingDetailsSheet";
+import BookingDetailsSheet from "../provider/BookingDetailsSheet";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
