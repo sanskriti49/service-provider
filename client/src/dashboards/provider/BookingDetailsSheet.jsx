@@ -124,7 +124,6 @@ export default function BookingDetailsSheet({
 						<h2 className="text-xl font-extrabold text-white tracking-tight">
 							Booking Details
 						</h2>
-						{/* Grouped header badge cleanly together into a single action container wrapper */}
 						<button
 							onClick={() => handleCopyId(booking.booking_id)}
 							className="group mt-2 flex items-center gap-2 text-xs font-mono text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 px-2.5 py-1 rounded-lg transition-all active:scale-95 cursor-pointer text-left"
@@ -132,7 +131,7 @@ export default function BookingDetailsSheet({
 							<span>#{booking.booking_id?.slice(0, 8).toUpperCase()}</span>
 							<Copy
 								size={12}
-								className={`transition-transform duration-200 ${copied ? "text-emerald-400 scale-110" : "text-violet-400/60 group-hover:text-violet-300"}`}
+								className={`cursor-pointer transition-transform duration-200 ${copied ? "text-emerald-400 scale-110" : "text-violet-400/60 group-hover:text-violet-300"}`}
 							/>
 						</button>
 					</div>

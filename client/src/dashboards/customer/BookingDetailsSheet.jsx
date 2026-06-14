@@ -5,24 +5,16 @@ import { toast } from "sonner";
 import {
 	Calendar,
 	Clock,
-	Search,
-	ListFilter,
-	AlertCircle,
-	CheckCircle2,
 	X,
-	ChevronRight,
 	MapPin,
 	CreditCard,
 	Shield,
 	ShieldCheck,
-	AlertTriangle,
-	Users,
-	History as HistoryIcon,
-	Loader2,
+	AlertCircle,
+	CheckCircle2,
 	Copy,
+	KeyRound,
 } from "lucide-react";
-import api from "../../api/axiosInstance";
-import ConfirmModal from "../../ui/ConfirmModal";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -31,65 +23,10 @@ const formatCurrency = (n) =>
 		minimumFractionDigits: 0,
 	}).format(n || 0);
 
-const BUFFER_MS = 15 * 60 * 60 * 1000;
-
-function resolveDisplayStatus(status, date, startTime) {
-	let s = (status || "").toLowerCase();
-	const dateString =
-		typeof date === "string"
-			? date.split("T")[0]
-			: new Date(date).toISOString().split("T")[0];
-	const base = new Date(`${dateString}T00:00:00`);
-
-	if (startTime) {
-		const [h, m] = startTime.split(":");
-		base.setHours(+h, +m);
-	}
-	const now = new Date();
-	if (s === "booked" || s === "confirmed") {
-		if (now > base) {
-			s = now - base < BUFFER_MS ? "awaiting completion" : "expired";
-		}
-	}
-	return s;
-}
-
-const STATUS_STYLES = {
-	completed: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
-	cancelled: "bg-red-500/15 text-red-300 border-red-500/25",
-	no_show: "bg-red-500/20 text-red-300 border-red-500/30",
-	in_progress: "bg-blue-500/15 text-blue-300 border-blue-500/25",
-	"awaiting completion": "bg-amber-500/15 text-amber-300 border-amber-500/25",
-	awaiting_completion: "bg-amber-500/15 text-amber-300 border-amber-500/25",
-	booked: "bg-violet-500/15 text-violet-300 border-violet-500/25",
-	confirmed: "bg-violet-500/15 text-violet-300 border-violet-500/25",
-	expired: "bg-red-500/15 text-orange-300 border-orange-500/25",
-	pending: "bg-orange-400/25 text-slate-300 border-orange-400/25",
-};
-
-const StatusBadge = ({ status, date, startTime }) => {
-	const display = resolveDisplayStatus(status, date, startTime);
-	const cls = STATUS_STYLES[display] || STATUS_STYLES.pending;
-	const IconComp = ["completed"].includes(display)
-		? CheckCircle2
-		: ["cancelled", "no_show", "expired"].includes(display)
-			? AlertCircle
-			: Clock;
-	return (
-		<span
-			className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border flex items-center gap-1.5 w-fit ${cls}`}
-		>
-			<IconComp size={11} />
-			{display.replace(/_/g, " ")}
-		</span>
-	);
-};
-
-// ── BOOKING DETAILS SHEET COMPONENT ──────────────────────────────────────
-function BookingDetailsSheet({
+export default function BookingDetailsSheet({
 	booking,
 	onClose,
-	onUpdateStatus,
+	onCancelBooking,
 	actionLoading,
 }) {
 	const [copied, setCopied] = useState(false);
@@ -101,15 +38,11 @@ function BookingDetailsSheet({
 		};
 	}, []);
 
-	// Encapsulated handleCopyId locally so the template container has absolute access
 	const handleCopyId = useCallback((id) => {
 		if (!id) return;
 		navigator.clipboard.writeText(id);
 		setCopied(true);
-		toast.success("Booking ID copied to clipboard!", {
-			className:
-				"bricolage-grotesque font-semibold bg-slate-900 text-white border border-white/10 rounded-2xl",
-		});
+		toast.success("Booking ID copied!");
 		setTimeout(() => setCopied(false), 2000);
 	}, []);
 
@@ -118,44 +51,11 @@ function BookingDetailsSheet({
 	const datePart = booking.date.split("T")[0];
 	const localStr = `${datePart.replace(/-/g, "/")} ${booking.start_time || "00:00:00"}`;
 	const bdt = new Date(localStr);
-	const now = new Date();
-	const GRACE = 20 * 60000;
-	const isPastStart = !isNaN(bdt.getTime()) && now > bdt.getTime() + GRACE;
 
 	const displayStatus = (booking.status || "").replace(/_/g, " ");
-
-	const STATUS_SHEET = {
-		completed: {
-			bar: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
-			dot: "bg-emerald-400",
-		},
-		in_progress: {
-			bar: "bg-blue-500/15 text-blue-300 border-blue-500/20",
-			dot: "bg-blue-400 animate-pulse",
-		},
-		no_show: {
-			bar: "bg-red-500/15 text-red-300 border-red-500/20",
-			dot: "bg-red-400",
-		},
-		cancelled: {
-			bar: "bg-red-500/15 text-red-300 border-red-500/20",
-			dot: "bg-red-400",
-		},
-		booked: {
-			bar: "bg-violet-500/15 text-violet-300 border-violet-500/20",
-			dot: "bg-violet-400",
-		},
-		confirmed: {
-			bar: "bg-violet-500/15 text-violet-300 border-violet-500/20",
-			dot: "bg-violet-400",
-		},
-	};
-	const style = STATUS_SHEET[booking.status] || {
-		bar: "bg-slate-800 text-slate-300 border-slate-700",
-		dot: "bg-slate-400",
-	};
-
-	const isRefunded = ["cancelled", "no_show"].includes(booking.status);
+	const isCancelable = ["pending", "booked", "confirmed"].includes(
+		booking.status,
+	);
 
 	return createPortal(
 		<>
@@ -177,51 +77,52 @@ function BookingDetailsSheet({
 				<div className="p-6 border-b border-white/8 flex justify-between items-start bg-slate-900">
 					<div>
 						<h2 className="text-xl font-extrabold text-white tracking-tight">
-							Booking Details
+							Booking Overview
 						</h2>
-						{/* Grouped header badge cleanly together into a single action container wrapper */}
 						<button
 							onClick={() => handleCopyId(booking.booking_id)}
-							className="group mt-2 flex items-center gap-2 text-xs font-mono text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 px-2.5 py-1 rounded-lg transition-all active:scale-95 cursor-pointer text-left"
+							className="group mt-2 flex items-center gap-2 text-xs font-mono text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2.5 py-1 rounded-lg transition-all"
 						>
 							<span>#{booking.booking_id?.slice(0, 8).toUpperCase()}</span>
 							<Copy
 								size={12}
-								className={`transition-transform duration-200 ${copied ? "text-emerald-400 scale-110" : "text-violet-400/60 group-hover:text-violet-300"}`}
+								className={copied ? "text-emerald-400" : "text-violet-400/60"}
 							/>
 						</button>
 					</div>
 					<button
 						onClick={onClose}
-						className="p-2.5 hover:bg-white/8 rounded-full transition-all active:scale-90 border border-white/10"
+						className="p-2.5 hover:bg-white/8 rounded-full border border-white/10"
 					>
 						<X size={18} className="text-slate-400" />
 					</button>
 				</div>
 
-				{/* Scrollable body */}
+				{/* Body */}
 				<div className="flex-1 overflow-y-auto p-6 space-y-6">
-					{/* Status bar */}
-					<div
-						className={`flex items-center justify-between p-4 rounded-2xl border ${style.bar}`}
-					>
-						<div className="flex items-center gap-3">
-							<div className={`h-2.5 w-2.5 rounded-full ${style.dot}`} />
-							<span className="text-sm font-bold uppercase tracking-wider">
-								{displayStatus}
-							</span>
+					{/* Secure OTP Handshake Hub — ONLY visible to Customer for active tasks */}
+					{["booked", "confirmed"].includes(booking.status) && booking.otp && (
+						<div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-5 rounded-2xl border border-violet-500/30 space-y-2">
+							<div className="flex items-center gap-2 text-violet-300 font-bold text-sm">
+								<KeyRound size={16} />
+								<span>Secure Start OTP</span>
+							</div>
+							<p className="text-3xl font-mono font-black tracking-widest text-white text-center py-2 bg-slate-950/40 rounded-xl border border-white/5">
+								{booking.otp}
+							</p>
+							<p className="text-xs text-slate-400 text-center leading-normal">
+								Share this 4-digit code with the provider <b>only after</b> they
+								arrive at your location to safely log the job start.
+							</p>
 						</div>
-						<Shield size={16} className="opacity-30" />
-					</div>
+					)}
 
-					{/* Info rows */}
 					<div className="space-y-5">
 						{[
 							{
 								icon: Calendar,
 								iconBg: "bg-violet-500/10 text-violet-400",
-								iconHover: "group-hover:bg-violet-600 group-hover:text-white",
-								label: "Scheduled",
+								label: "Appointment Date",
 								primary: isNaN(bdt)
 									? "—"
 									: bdt.toLocaleDateString(undefined, {
@@ -240,177 +141,75 @@ function BookingDetailsSheet({
 							{
 								icon: MapPin,
 								iconBg: "bg-blue-500/10 text-blue-400",
-								iconHover: "group-hover:bg-blue-600 group-hover:text-white",
-								label: "Location",
-								primary: booking.address || "Location not set",
+								label: "Service Address",
+								primary: booking.address || "No address provided",
 							},
 							{
-								icon: Users,
+								icon: Shield,
 								iconBg: "bg-fuchsia-500/10 text-fuchsia-400",
-								iconHover: "group-hover:bg-fuchsia-600 group-hover:text-white",
-								label: "Customer",
-								primary: booking.customer_name || "—",
-								secondary: booking.customer_email || "",
+								label: "Assigned Provider",
+								primary: booking.provider_name || "Assigning Provider...",
+								secondary: booking.provider_phone || "",
 							},
-						].map(
-							({
-								icon: Icon,
-								iconBg,
-								iconHover,
-								label,
-								primary,
-								secondary,
-							}) => (
-								<div key={label} className="flex gap-4 items-start group">
-									<div
-										className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors duration-300 ${iconBg} ${iconHover}`}
-									>
-										<Icon size={20} />
-									</div>
-									<div>
-										<p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-											{label}
-										</p>
-										<p className="text-white font-semibold text-sm">
-											{primary}
-										</p>
-										{secondary && (
-											<p className="text-slate-400 text-xs mt-0.5 flex items-center gap-1">
-												<Clock size={11} />
-												{secondary}
-											</p>
-										)}
-									</div>
+						].map(({ icon: Icon, iconBg, label, primary, secondary }) => (
+							<div key={label} className="flex gap-4 items-start">
+								<div
+									className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${iconBg}`}
+								>
+									<Icon size={20} />
 								</div>
-							),
-						)}
+								<div>
+									<p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
+										{label}
+									</p>
+									<p className="text-white font-semibold text-sm">{primary}</p>
+									{secondary && (
+										<p className="text-slate-400 text-xs mt-0.5">{secondary}</p>
+									)}
+								</div>
+							</div>
+						))}
 					</div>
 
 					<div className="border-t border-white/8" />
 
-					{/* Provider Actions */}
-					{isPastStart &&
-						(booking.status === "booked" ||
-							booking.status === "confirmed" ||
-							booking.status === "in_progress") && (
-							<motion.div
-								initial={{ scale: 0.95, opacity: 0 }}
-								animate={{ scale: 1, opacity: 1 }}
-								className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20 space-y-3"
-							>
-								<div className="flex items-center gap-2 text-amber-300">
-									<AlertTriangle size={16} />
-									<span className="font-bold text-sm">Update Job Status</span>
-								</div>
-								<button
-									onClick={() =>
-										onUpdateStatus(booking.booking_id, "completed")
-									}
-									disabled={actionLoading === booking.booking_id}
-									className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-900/30 active:translate-y-0.5 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-								>
-									{actionLoading === booking.booking_id ? (
-										<Loader2 size={16} className="animate-spin" />
-									) : (
-										<CheckCircle2 size={16} />
-									)}
-									Mark as Completed
-								</button>
-							</motion.div>
-						)}
-
-					{booking.status === "pending" && (
-						<div className="space-y-2 mt-4">
-							<button
-								onClick={() => onUpdateStatus(booking.booking_id, "confirmed")}
-								disabled={actionLoading === booking.booking_id}
-								className="w-full py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-							>
-								{actionLoading === booking.booking_id ? (
-									<Loader2 size={16} className="animate-spin" />
-								) : (
-									<CheckCircle2 size={16} />
-								)}
-								Accept & Lock Schedule
-							</button>
-							<button
-								onClick={() => onUpdateStatus(booking.booking_id, "cancelled")}
-								disabled={actionLoading === booking.booking_id}
-								className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-white/10 rounded-xl font-bold text-sm transition-all disabled:opacity-50 cursor-pointer"
-							>
-								Pass Job to Someone Else
-							</button>
-						</div>
-					)}
-
-					{/* Payment breakdown */}
-					<section className="bg-slate-800/60 rounded-3xl p-6 border border-white/8 relative overflow-hidden">
+					<section className="bg-slate-800/60 rounded-3xl p-6 border border-white/8">
 						<div className="flex items-center gap-2 mb-4">
-							<CreditCard
-								size={16}
-								className={isRefunded ? "text-red-400" : "text-slate-400"}
-							/>
-							<h4 className="font-bold text-white text-sm">
-								{isRefunded ? "Refund Details" : "Payment Breakdown"}
-							</h4>
+							<CreditCard size={16} className="text-slate-400" />
+							<h4 className="font-bold text-white text-sm">Payment Details</h4>
 						</div>
-						<div className="space-y-3">
-							<div className="flex justify-between text-sm">
-								<span className="text-slate-400">Service Fee</span>
-								<span
-									className={`font-medium ${isRefunded ? "text-slate-500 line-through" : "text-slate-200"}`}
-								>
+						<div className="space-y-3 text-sm">
+							<div className="flex justify-between">
+								<span className="text-slate-400">Amount Paid</span>
+								<span className="font-bold text-white">
 									{formatCurrency(booking.price)}
 								</span>
 							</div>
-							{isRefunded ? (
-								<>
-									<div className="flex justify-between text-sm">
-										<span className="text-red-400 font-medium">
-											Refund Amount
-										</span>
-										<span className="font-bold text-red-300">
-											-{formatCurrency(booking.price)}
-										</span>
-									</div>
-									<div className="pt-3 mt-3 border-t border-white/8 flex justify-between items-center">
-										<span className="font-bold text-white">Final Balance</span>
-										<div className="text-right">
-											<span className="text-xl font-black text-slate-400">
-												{formatCurrency(0)}
-											</span>
-											<p className="text-[10px] text-emerald-400 font-bold uppercase tracking-tight">
-												Full Refund Issued
-											</p>
-										</div>
-									</div>
-								</>
-							) : (
-								<>
-									<div className="flex justify-between text-sm">
-										<span className="text-slate-400">Platform Fee</span>
-										<span className="font-medium text-slate-200">
-											{formatCurrency(0)}
-										</span>
-									</div>
-									<div className="pt-3 mt-3 border-t border-white/8 flex justify-between items-center">
-										<span className="font-bold text-white">Your Earnings</span>
-										<span className="text-xl font-black text-emerald-400">
-											{formatCurrency(booking.price)}
-										</span>
-									</div>
-								</>
-							)}
+							<div className="flex justify-between text-xs text-slate-500">
+								<span>Method</span>
+								<span className="uppercase font-mono">
+									{booking.payment_method || "online"}
+								</span>
+							</div>
 						</div>
 					</section>
-				</div>
 
-				{/* Footer */}
-				<div className="p-6 bg-slate-950/50 border-t border-white/8">
-					<div className="flex items-center gap-3 text-slate-500 text-xs">
-						<ShieldCheck size={14} className="text-emerald-500" />
-						<span>Protected by Genie Secure Payments</span>
-					</div>
+					{/* Customer Cancellation Option */}
+					{isCancelable && (
+						<div className="pt-2">
+							<button
+								onClick={() => onCancelBooking(booking.booking_id, "cancelled")}
+								disabled={actionLoading === booking.booking_id}
+								className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl font-bold text-sm transition-all disabled:opacity-50 cursor-pointer text-center"
+							>
+								Cancel Booking
+							</button>
+							<p className="text-[10px] text-center text-slate-500 mt-2 leading-relaxed">
+								Note: Bookings cancelled less than 2 hours before the scheduled
+								slot are subject to a 20% cancellation fee.
+							</p>
+						</div>
+					)}
 				</div>
 			</motion.div>
 		</>,
