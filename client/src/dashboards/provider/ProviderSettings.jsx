@@ -20,6 +20,7 @@ import {
 	AlertTriangle,
 	ChevronRight,
 	ShieldCheck,
+	Clock,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
@@ -208,6 +209,42 @@ export default function ProviderSettings() {
 	const [phrase, setPhrase] = useState("");
 	const [deleteOpen, setDeleteOpen] = useState(false);
 	const [deleteLoading, setDeleteLoading] = useState(false);
+	const DAYS_OF_WEEK = [
+		"Sunday",
+		"Monday",
+		"Tuesday",
+		"Wednesday",
+		"Thursday",
+		"Friday",
+		"Saturday",
+	];
+
+	const [schedule, setSchedule] = useState([
+		{ day: 1, start: "10:00", end: "19:00", active: true },
+		{ day: 2, start: "10:00", end: "19:00", active: true },
+		{ day: 3, start: "10:00", end: "19:00", active: true },
+		{ day: 4, start: "10:00", end: "19:00", active: true },
+		{ day: 5, start: "10:00", end: "19:00", active: true },
+		{ day: 6, start: "10:00", end: "19:00", active: true },
+		{ day: 0, start: "10:00", end: "19:00", active: false },
+	]);
+	const [scheduleLoading, setScheduleLoading] = useState(false);
+
+	const handleScheduleToggle = (dayIndex) => {
+		setSchedule((prev) =>
+			prev.map((item) =>
+				item.day === dayIndex ? { ...item, active: !item.active } : item,
+			),
+		);
+	};
+
+	const handleScheduleTimeChange = (dayIndex, field, value) => {
+		setSchedule((prev) =>
+			prev.map((item) =>
+				item.day === dayIndex ? { ...item, [field]: value } : item,
+			),
+		);
+	};
 
 	const setPwdField = (k) => (e) =>
 		setPwd((p) => ({ ...p, [k]: e.target.value }));
@@ -235,9 +272,87 @@ export default function ProviderSettings() {
 		setBio(authUser.bio || "");
 		setPhoto(authUser.photo || "");
 		const [rawCity = "", rawState = ""] = (authUser.location || "").split(",");
-		setState(rawState.trim());
+
+		const formattedState = rawState.trim().replace(/\s+/g, "_");
+		setState(formattedState);
 		setCity(rawCity.trim());
+
+		console.log(authUser.location);
 	}, [authUser]);
+
+	const saveSchedule = async (e) => {
+		e.preventDefault();
+		setScheduleLoading(true);
+		try {
+			const activeAvailability = schedule
+				.filter((s) => s.active)
+				.map((s) => ({ day: s.day, start: s.start, end: s.end }));
+
+			const providerId = authUser?.custom_id || authUser?.id;
+			await api.put(`/api/providers/v1/${providerId}`, {
+				availability: activeAvailability,
+			});
+			toast.success("Working schedule updated!");
+		} catch (err) {
+			toast.error("Failed to update schedule");
+		} finally {
+			setScheduleLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		const fetchExistingSchedule = async () => {
+			const providerId = authUser?.custom_id || authUser?.id;
+			if (!providerId) return;
+			try {
+				const res = await api.get(`/api/providers/v1/${providerId}`);
+				const providerData = res.data?.provider || res.data;
+				let dbAvailability = providerData?.availability;
+
+				if (typeof dbAvailability === "string") {
+					try {
+						dbAvailability = JSON.parse(dbAvailability);
+					} catch (e) {
+						dbAvailability = [];
+					}
+				}
+
+				if (Array.isArray(dbAvailability) && dbAvailability.length > 0) {
+					const activeDaysMap = new Map();
+					dbAvailability.forEach((rule) => {
+						const rawDay =
+							rule?.day !== undefined ? rule.day : rule?.day_of_week;
+						if (rule && rawDay !== undefined && rawDay !== null) {
+							const formatTime = (t) =>
+								t && typeof t === "string" ? t.slice(0, 5) : "10:00";
+							activeDaysMap.set(Number(rawDay), {
+								start: formatTime(rule.start || rule.start_time),
+								end: formatTime(rule.end || rule.end_time),
+							});
+						}
+					});
+
+					setSchedule(
+						[0, 1, 2, 3, 4, 5, 6].map((day) => {
+							const rule = activeDaysMap.get(day);
+							return {
+								day,
+								start: rule ? rule.start : "10:00",
+								end: rule ? rule.end : "19:00",
+								active: Boolean(rule),
+							};
+						}),
+					);
+				}
+			} catch (err) {
+				console.warn(
+					"Failed to load existing provider availability:",
+					err.message,
+				);
+			}
+		};
+		fetchExistingSchedule();
+	}, [authUser?.id, authUser?.custom_id]);
 
 	useEffect(() => {
 		if (location.hash === "#phone" && phoneBoxRef.current) {
@@ -658,6 +773,74 @@ export default function ProviderSettings() {
 						<SubmitBtn loading={profileLoading} saved={profileSaved}>
 							Save changes
 						</SubmitBtn>
+					</div>
+				</form>
+			</Card>
+			<Card
+				id="availability"
+				icon={Clock}
+				title="Working hours & availability"
+				subtitle="Configure the days and times you are available for customer bookings."
+				accent="violet"
+			>
+				<form onSubmit={saveSchedule} className="space-y-4">
+					<div className="space-y-3">
+						{schedule.map((rule) => (
+							<div
+								key={rule.day}
+								className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-800/50 border border-slate-800 rounded-xl"
+							>
+								<div className="flex items-center gap-3">
+									<input
+										type="checkbox"
+										checked={rule.active}
+										onChange={() => handleScheduleToggle(rule.day)}
+										className="w-4 h-4 accent-violet-600 rounded cursor-pointer"
+									/>
+									<span className="text-sm font-semibold text-white w-24">
+										{DAYS_OF_WEEK[rule.day]}
+									</span>
+								</div>
+
+								{rule.active ? (
+									<div className="flex items-center gap-2">
+										<input
+											type="time"
+											value={rule.start}
+											onChange={(e) =>
+												handleScheduleTimeChange(
+													rule.day,
+													"start",
+													e.target.value,
+												)
+											}
+											className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500"
+										/>
+										<span className="text-slate-500 text-xs">to</span>
+										<input
+											type="time"
+											value={rule.end}
+											onChange={(e) =>
+												handleScheduleTimeChange(
+													rule.day,
+													"end",
+													e.target.value,
+												)
+											}
+											className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500"
+										/>
+									</div>
+								) : (
+									<span className="text-xs text-slate-500 font-medium italic">
+										Off Day
+									</span>
+								)}
+							</div>
+						))}
+					</div>
+
+					<div className="flex justify-end pt-2">
+						<SubmitBtn loading={scheduleLoading}>Save Schedule</SubmitBtn>
 					</div>
 				</form>
 			</Card>

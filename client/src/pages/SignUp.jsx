@@ -82,6 +82,7 @@ const SignUp = () => {
 		window.google.accounts.id.initialize({
 			client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
 			callback: handleGoogleResponse,
+			itp_support: true,
 		});
 
 		window.google.accounts.id.renderButton(

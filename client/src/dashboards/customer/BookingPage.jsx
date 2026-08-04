@@ -14,9 +14,10 @@ import {
 	CreditCard,
 	Wallet,
 } from "lucide-react";
-import Alerts from "../ui/Alerts";
+import Alerts from "../../ui/Alerts";
 import { FadeLoader } from "react-spinners";
-import PaymentOptions from "./PaymentOptions";
+import PaymentOptions from "../../pages/PaymentOptions";
+import { toast } from "sonner";
 
 export default function BookingPage() {
 	const { customId } = useParams();
@@ -32,6 +33,11 @@ export default function BookingPage() {
 
 	const [address, setAddress] = useState(state?.address || "");
 	const [tempAddress, setTempAddress] = useState(state?.address || "");
+
+	const [coords, setCoords] = useState({
+		lat: state?.provider?.latitude || null,
+		lng: state?.provider?.longitude || null,
+	});
 
 	const [selectedDate, setSelectedDate] = useState(
 		state?.selectedDateStr || null,
@@ -158,7 +164,7 @@ export default function BookingPage() {
 		if (!selectedDate || !groupedSlots[selectedDate]) return [];
 
 		return groupedSlots[selectedDate].filter((slot) => {
-			const isBooked = slot.isBooked;
+			const isBooked = slot.isBooked === true || slot.is_booked === true;
 			const isExpired = isSlotExpired(selectedDate, slot.start_time);
 			return !isBooked && !isExpired;
 		});
@@ -205,6 +211,8 @@ export default function BookingPage() {
 					end_time: selectedTime.end_time,
 					address,
 					payment_method: paymentMethod,
+					latitude: coords.lat,
+					longitude: coords.lng,
 				}),
 			});
 			const data = await res.json();
@@ -314,6 +322,8 @@ export default function BookingPage() {
 
 		navigator.geolocation.getCurrentPosition(async (position) => {
 			const { latitude, longitude } = position.coords;
+			setCoords({ lat: latitude, lng: longitude });
+
 			try {
 				const res = await fetch(
 					`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
@@ -321,7 +331,10 @@ export default function BookingPage() {
 				const data = await res.json();
 				setTempAddress(data.display_name);
 			} catch {
-				setAlert({ message: "Could not resolve address", type: "error" });
+				toast.error("Could not resolve address", {
+					className:
+						"bricolage-grotesque font-semibold border border-red-500/20 bg-slate-900 text-red-400 rounded-2xl",
+				});
 			}
 		});
 	};

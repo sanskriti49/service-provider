@@ -5,6 +5,13 @@ const {
 	splitIntoChunks,
 } = require("../utils/timeUtils");
 
+function localDateStr(dt) {
+	const year = dt.getFullYear();
+	const month = String(dt.getMonth() + 1).padStart(2, "0");
+	const day = String(dt.getDate()).padStart(2, "0");
+	return `${year}-${month}-${day}`;
+}
+
 async function getAvailability(req, res, next) {
 	try {
 		let providerId = req.params.provider_id;
@@ -24,7 +31,11 @@ async function getAvailability(req, res, next) {
 			providerId = userRes.rows[0].id;
 		}
 
-		const fromStr = req.query.from || new Date().toISOString().slice(0, 10);
+		const now = new Date();
+		const todayStr = localDateStr(now);
+		const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+		const fromStr = req.query.from || todayStr;
 		const [year, month, day] = fromStr.split("-").map(Number);
 		const from = new Date(year, month - 1, day, 0, 0, 0, 0);
 
@@ -41,7 +52,7 @@ async function getAvailability(req, res, next) {
 
 		const endDate = new Date(from);
 		endDate.setDate(from.getDate() + days - 1);
-		const endDateStr = endDate.toISOString().slice(0, 10);
+		const endDateStr = localDateStr(endDate);
 
 		const exceptionsRes = await db.query(
 			`SELECT TO_CHAR(date, 'YYYY-MM-DD') as date_str, is_available, override_slots
@@ -81,17 +92,24 @@ async function getAvailability(req, res, next) {
 		for (let i = 0; i < days; i++) {
 			const dt = new Date(from);
 			dt.setDate(from.getDate() + i);
-			const dateStr = dt.toISOString().slice(0, 10);
+			const dateStr = localDateStr(dt);
 			const dow = dt.getDay();
+
+			if (dateStr < todayStr) {
+				results.push({ date: dateStr, free_slots: [] });
+				continue;
+			}
 
 			let slots = [];
 			const exception = exceptionsMap[dateStr];
 
-			if (exception.is_available && exception.override_slots) {
+			if (exception && exception.is_available && exception.override_slots) {
 				slots = exception.override_slots.map((s) => ({
 					start: s.start && s.start.length > 5 ? s.start.slice(0, 5) : s.start,
 					end: s.end && s.end.length > 5 ? s.end.slice(0, 5) : s.end,
 				}));
+			} else if (exception && !exception.is_available) {
+				slots = [];
 			} else {
 				const templ = masterMap[dow] || [];
 				slots = templ.map((s) => ({ start: s.start, end: s.end }));
@@ -117,12 +135,15 @@ async function getAvailability(req, res, next) {
 					});
 				}
 
-				freeChunks.push(
-					...intervals.map((iv) => ({
+				for (const iv of intervals) {
+					if (dateStr === todayStr && iv.s <= nowMinutes) {
+						continue;
+					}
+					freeChunks.push({
 						start: minutesToTime(iv.s),
 						end: minutesToTime(iv.e),
-					})),
-				);
+					});
+				}
 			}
 
 			results.push({ date: dateStr, free_slots: freeChunks });
@@ -133,5 +154,4 @@ async function getAvailability(req, res, next) {
 		next(err);
 	}
 }
-
 module.exports = { getAvailability };

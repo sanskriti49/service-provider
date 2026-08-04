@@ -10,15 +10,18 @@ import ProviderBookings from "./dashboards/provider/ProviderBookings";
 import ProviderEarnings from "./dashboards/provider/ProviderEarnings";
 import ProviderServices from "./dashboards/provider/ProviderServices";
 import ProviderSettings from "./dashboards/provider/ProviderSettings";
+import ApplyProvider from "./pages/ApplyProvider";
 
 const Home = lazy(() => import("./pages/Home"));
 const SignIn = lazy(() => import("./pages/SignIn"));
 const SignUp = lazy(() => import("./pages/SignUp"));
-const BookingPage = lazy(() => import("./pages/BookingPage"));
+const BookingPage = lazy(() => import("./dashboards/customer/BookingPage"));
 const ServiceDetails = lazy(() => import("./pages/ServiceDetails"));
 const ChooseRole = lazy(() => import("./pages/ChooseRole"));
 const AllServices = lazy(() => import("./pages/AllServices"));
-const BookingSuccess = lazy(() => import("./pages/BookingSuccess"));
+const BookingSuccess = lazy(
+	() => import("./dashboards/customer/BookingSuccess"),
+);
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const CustomerSettings = lazy(
 	() => import("./dashboards/customer/CustomerSettings"),
@@ -41,8 +44,6 @@ const DashboardOverview = lazy(
 );
 const AllBookings = lazy(() => import("./dashboards/customer/AllBookings"));
 
-// Suspense is placed at the layout level so each layout gets ONE fallback.
-// Child routes are lazy but share the parent's Suspense boundary.
 const router = createBrowserRouter([
 	{
 		element: <AppLayout />,
@@ -110,6 +111,7 @@ const router = createBrowserRouter([
 			{ path: "/forgot-password", element: <ForgotPassword /> },
 			{ path: "/reset-password/:resetToken", element: <ResetPassword /> },
 			{ path: "/services/:slug", element: <ServiceDetails /> },
+			{ path: "/apply-now", element: <ApplyProvider /> },
 			{
 				path: "/book/:customId",
 				element: (

@@ -1126,3 +1126,90 @@ text-container {
 	opacity: 0.2;
 	transform: matrix(0.82, 0.57, 0.72, -0.7, 0, 0);
 }
+
+@import "tailwindcss";
+
+@layer base {
+	body {
+		background-color: #090514;
+		color: #f8fafc;
+		font-family: "Plus Jakarta Sans", sans-serif;
+	}
+}
+
+@keyframes floatSlow {
+	0%,
+	100% {
+		transform: translateY(0px) rotate(0deg);
+	}
+	50% {
+		transform: translateY(-10px) rotate(1.5deg);
+	}
+}
+
+@keyframes pulseGlow {
+	0%,
+	100% {
+		opacity: 0.75;
+		filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.6));
+	}
+	50% {
+		opacity: 1;
+		filter: drop-shadow(0 0 40px rgba(236, 72, 153, 0.9));
+	}
+}
+
+@keyframes sparkle {
+	0%,
+	100% {
+		transform: scale(0.85) rotate(0deg);
+		opacity: 0.5;
+	}
+	50% {
+		transform: scale(1.25) rotate(180deg);
+		opacity: 1;
+	}
+}
+
+@keyframes shimmer {
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+.animate-float {
+	animation: floatSlow 5s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+	animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.animate-sparkle {
+	animation: sparkle 3s ease-in-out infinite;
+}
+
+.bg-radial-gradient {
+	background: radial-gradient(
+		circle at 50% 30%,
+		rgba(168, 85, 247, 0.25) 0%,
+		rgba(236, 72, 153, 0.15) 45%,
+		rgba(9, 5, 20, 0) 80%
+	);
+}
+
+.glass-card {
+	background: rgba(23, 14, 43, 0.6);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	border: 1px solid rgba(192, 132, 252, 0.15);
+}
+
+.glass-card-hover {
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-card-hover:hover {
+	background: rgba(30, 18, 56, 0.8);
+	border-color: rgba(236, 72, 153, 0.35);
+	box-shadow: 0 10px 40px -10px rgba(168, 85, 247, 0.3);
+}
