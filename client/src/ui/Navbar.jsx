@@ -7,6 +7,7 @@ import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import AccountMenu from "./AccountMenu";
 import NavServices from "./NavServices";
+import NotificationBell from "./NotificationBell";
 
 function cn(...inputs) {
 	return twMerge(clsx(inputs));
@@ -190,7 +191,10 @@ const Navbar = () => {
 							</Link>
 						</div>
 					) : (
-						<AccountMenu user={user} />
+						<div className="flex items-center gap-2">
+							<NotificationBell />
+							<AccountMenu user={user} />
+						</div>
 					)}
 
 					<button

@@ -166,14 +166,18 @@ function SidebarCard({ notifications, onLogout, onLinkClick }) {
 						{user?.custom_id || "Service Provider"}
 					</p>
 				</div>
-				{notifications === 0 && (
-					<div className="ml-auto flex-shrink-0">
-						<button className="cursor-pointer relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors">
-							<Bell size={16} />
-							<span className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full" />
-						</button>
-					</div>
-				)}
+				<div className="ml-auto flex-shrink-0">
+					<Link
+						to="/notifications"
+						title="Notifications"
+						className="cursor-pointer relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors flex items-center justify-center"
+					>
+						<Bell size={16} />
+						{notifications > 0 && (
+							<span className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+						)}
+					</Link>
+				</div>
 			</div>
 			{user?.custom_id && (
 				<button
@@ -211,6 +215,12 @@ function SidebarCard({ notifications, onLogout, onLinkClick }) {
 					to="/provider/dashboard/bookings"
 					icon={<CalendarCheck size={20} />}
 					label="Bookings"
+					onClick={onLinkClick}
+				/>
+				<SidebarLink
+					to="/notifications"
+					icon={<Bell size={20} />}
+					label="Notifications"
 					onClick={onLinkClick}
 				/>
 				<SidebarLink

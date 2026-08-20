@@ -14,6 +14,7 @@ import {
 	BarChart3,
 	History,
 	Heart,
+	Bell,
 } from "lucide-react";
 
 export default function AccountMenu({ user }) {
@@ -129,6 +130,9 @@ export default function AccountMenu({ user }) {
 					<div className="h-px bg-gray-100 my-1 mx-2" />
 
 					<div className="p-1">
+						<MenuLink to="/notifications" icon={Bell}>
+							Notifications
+						</MenuLink>
 						<MenuLink to="/account/settings" icon={Settings}>
 							Settings
 						</MenuLink>

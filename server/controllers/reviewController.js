@@ -1,5 +1,6 @@
-﻿const db = require("../config/db");
+const db = require("../config/db");
 const cache = require("../utils/cache");
+const { sendNotification } = require("../utils/notificationService");
 
 const UUID_REGEX =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -124,6 +125,26 @@ async function createReview(req, res, next) {
 		);
 
 		await client.query("COMMIT");
+
+		// Fetch customer name for friendly alert
+		try {
+			const cRes = await db.query(`SELECT name FROM users WHERE id = $1`, [customerId]);
+			const customerName = cRes.rows[0]?.name || "A customer";
+
+			sendNotification({
+				userId: targetProviderId,
+				title: "New Review Received ⭐",
+				message: `${customerName} rated you ${numRating} stars: "${comment ? comment.substring(0, 80) : 'Great service!'}"`,
+				type: "review_received",
+				data: {
+					rating: numRating,
+					booking_id: validBookingId,
+					customer_name: customerName,
+				},
+			});
+		} catch (notifErr) {
+			console.warn("Review notification error:", notifErr);
+		}
 
 		// Invalidate cache
 		cache.delPattern(`reviews_${targetProviderId}`);

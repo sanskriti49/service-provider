@@ -29,6 +29,7 @@ const CustomerSettings = lazy(
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 
 const CustomerDashboard = lazy(
 	() => import("./dashboards/customer/CustomerDashboard"),
@@ -52,6 +53,7 @@ const router = createBrowserRouter([
 			{ path: "/choose-role", element: <ChooseRole /> },
 			{ path: "/services", element: <AllServices /> },
 			{ path: "/help", element: <HelpCenter /> },
+			{ path: "/notifications", element: <NotificationsPage /> },
 			{ path: "/unauthorized", element: <Unauthorized /> },
 
 			// customer-only routes

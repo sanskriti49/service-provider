@@ -1,4 +1,4 @@
-﻿const Razorpay = require("razorpay");
+const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const db = require("../config/db");
 const sendEmail = require("../utils/sendEmail");
@@ -8,6 +8,7 @@ const {
 	estimateTravelTimeMinutes,
 	getBatchedTravelDurations,
 } = require("../utils/geoUtils");
+const { sendNotification } = require("../utils/notificationService");
 
 const razorpay = new Razorpay({
 	key_id: process.env.RAZORPAY_KEY_ID || "rzp_test_placeholder",
@@ -245,8 +246,40 @@ async function createBooking(req, res, next) {
 		]);
 
 		await client.query("COMMIT");
+
+		const createdBooking = r.rows[0];
+
+		// Real-time alerts to provider and customer
+		sendNotification({
+			userId: resolvedProviderId,
+			title: "New Booking Request 📅",
+			message: `New booking request for ${serviceName} on ${cleanDate} at ${start_time}.`,
+			type: "booking_created",
+			data: {
+				booking_id: createdBooking.booking_id,
+				service_name: serviceName,
+				date: cleanDate,
+				start_time,
+			},
+		});
+
+		if (user_id) {
+			sendNotification({
+				userId: user_id,
+				title: "Booking Placed Successfully ✨",
+				message: `Your booking for ${serviceName} on ${cleanDate} at ${start_time} has been placed.`,
+				type: "booking_created",
+				data: {
+					booking_id: createdBooking.booking_id,
+					service_name: serviceName,
+					date: cleanDate,
+					start_time,
+				},
+			});
+		}
+
 		res.status(201).json({
-			booking: r.rows[0],
+			booking: createdBooking,
 			razorpay_order: razorpay_order_id,
 		});
 	} catch (err) {
@@ -433,6 +466,62 @@ async function updateBookingStatus(req, res) {
 
 		await client.query("COMMIT");
 		sendEmailNotifications(status, userRole, currentBooking, refundPercentage);
+
+		// Real-time status update notifications
+		try {
+			if (status === "confirmed" || status === "booked") {
+				sendNotification({
+					userId: currentBooking.user_id,
+					title: "Booking Confirmed! ✅",
+					message: `Your appointment for ${currentBooking.service_name || "service"} on ${String(currentBooking.date).substring(0, 10)} has been confirmed.`,
+					type: "booking_confirmed",
+					data: { booking_id, status },
+				});
+			} else if (status === "in_progress") {
+				sendNotification({
+					userId: currentBooking.user_id,
+					title: "Service Started 🚀",
+					message: `Your expert has verified the start code and begun the service.`,
+					type: "booking_in_progress",
+					data: { booking_id, status },
+				});
+			} else if (status === "completed") {
+				sendNotification({
+					userId: currentBooking.user_id,
+					title: "Service Completed 🎉",
+					message: `Your service is complete! Please rate and review your experience with ${currentBooking.provider_name}.`,
+					type: "booking_completed",
+					data: {
+						booking_id,
+						provider_id: currentBooking.provider_id,
+						provider_name: currentBooking.provider_name,
+					},
+				});
+				sendNotification({
+					userId: currentBooking.provider_id,
+					title: "Job Completed 💰",
+					message: `Job completed for ${currentBooking.user_name}. ₹${currentBooking.price} has been credited to your earnings.`,
+					type: "booking_completed",
+					data: { booking_id, amount: currentBooking.price },
+				});
+			} else if (status === "cancelled") {
+				const recipientId =
+					userRole === "customer"
+						? currentBooking.provider_id
+						: currentBooking.user_id;
+				const cancelledBy =
+					userRole === "customer" ? "the customer" : "the provider";
+				sendNotification({
+					userId: recipientId,
+					title: "Booking Cancelled ⚠️",
+					message: `The booking for ${currentBooking.service_name || "service"} on ${String(currentBooking.date).substring(0, 10)} was cancelled by ${cancelledBy}.`,
+					type: "booking_cancelled",
+					data: { booking_id, status },
+				});
+			}
+		} catch (notifErr) {
+			console.warn("Status notification warning:", notifErr);
+		}
 
 		res.json({
 			message: "Booking status updated successfully",

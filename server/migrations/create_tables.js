@@ -160,6 +160,21 @@ const queries = [
 	`CREATE INDEX IF NOT EXISTS ix_reviews_provider ON public.reviews(provider_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_reviews_customer ON public.reviews(customer_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_reviews_booking ON public.reviews(booking_id)`,
+
+	// 10. Notifications
+	`CREATE TABLE IF NOT EXISTS public.notifications (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    title text NOT NULL,
+    message text NOT NULL,
+    type varchar(50) DEFAULT 'system'::character varying NOT NULL,
+    data jsonb DEFAULT '{}'::jsonb NULL,
+    is_read bool DEFAULT false NOT NULL,
+    created_at timestamptz DEFAULT now() NULL,
+    CONSTRAINT notifications_pkey PRIMARY KEY (id),
+    CONSTRAINT fk_notification_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
+  )`,
+	`CREATE INDEX IF NOT EXISTS ix_notifications_user_unread ON public.notifications(user_id, is_read, created_at DESC)`,
 ];
 
 const runMigration = async () => {

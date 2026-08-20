@@ -1,9 +1,12 @@
 ﻿require("dotenv").config();
+const http = require("http");
 const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
 const app = express();
+const httpServer = http.createServer(app);
 const db = require("./config/db");
+const { initSocket } = require("./utils/socket");
 
 const corsOptions = {
 	origin: [
@@ -16,6 +19,9 @@ const corsOptions = {
 	methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 	allowedHeaders: ["Content-Type", "Authorization"],
 };
+
+// Initialize WebSocket with CORS
+initSocket(httpServer, corsOptions);
 
 // Performance compression for all outgoing JSON and text
 app.use(compression());
@@ -31,6 +37,7 @@ const authRoutes = require("./routes/authRoutes");
 const usersRoutes = require("./routes/usersRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 app.use("/api/providers", providerRoutes);
@@ -42,6 +49,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/availability", availabilityRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.get("/", (req, res) => {
 	res.send("Backend running..");
@@ -56,6 +64,6 @@ app.get("/health", (req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-	console.log(`🚀 Server listening safely on port ${PORT}`);
+httpServer.listen(PORT, () => {
+	console.log(`🚀 Server listening with WebSocket on port ${PORT}`);
 });
