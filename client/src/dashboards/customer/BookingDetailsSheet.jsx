@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -14,7 +14,9 @@ import {
 	CheckCircle2,
 	Copy,
 	KeyRound,
+	Star,
 } from "lucide-react";
+import ReviewModal from "../../ui/ReviewModal";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -30,6 +32,7 @@ export default function BookingDetailsSheet({
 	actionLoading,
 }) {
 	const [copied, setCopied] = useState(false);
+	const [showReviewModal, setShowReviewModal] = useState(false);
 
 	useEffect(() => {
 		document.body.style.overflow = "hidden";
@@ -48,12 +51,14 @@ export default function BookingDetailsSheet({
 
 	if (!booking) return null;
 
-	const datePart = booking.date.split("T")[0];
+	const datePart = (booking.date || "").split("T")[0];
 	const localStr = `${datePart.replace(/-/g, "/")} ${booking.start_time || "00:00:00"}`;
 	const bdt = new Date(localStr);
 
-	const displayStatus = (booking.status || "").replace(/_/g, " ");
 	const isCancelable = ["pending", "booked", "confirmed"].includes(
+		booking.status,
+	);
+	const canReview = ["completed", "booked", "confirmed", "in_progress"].includes(
 		booking.status,
 	);
 
@@ -100,7 +105,7 @@ export default function BookingDetailsSheet({
 
 				{/* Body */}
 				<div className="flex-1 overflow-y-auto p-6 space-y-6">
-					{/* Secure OTP Handshake Hub — ONLY visible to Customer for active tasks */}
+					{/* Secure OTP Handshake Hub */}
 					{["booked", "confirmed"].includes(booking.status) && booking.otp && (
 						<div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-5 rounded-2xl border border-violet-500/30 space-y-2">
 							<div className="flex items-center gap-2 text-violet-300 font-bold text-sm">
@@ -194,6 +199,19 @@ export default function BookingDetailsSheet({
 						</div>
 					</section>
 
+					{/* Rate & Review Button */}
+					{canReview && (
+						<div className="pt-2">
+							<button
+								onClick={() => setShowReviewModal(true)}
+								className="w-full py-3.5 bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 border border-amber-500/30 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-900/10"
+							>
+								<Star size={16} className="text-yellow-400 fill-yellow-400" />
+								<span>Rate & Review Provider</span>
+							</button>
+						</div>
+					)}
+
 					{/* Customer Cancellation Option */}
 					{isCancelable && (
 						<div className="pt-2">
@@ -212,6 +230,17 @@ export default function BookingDetailsSheet({
 					)}
 				</div>
 			</motion.div>
+
+			<ReviewModal
+				isOpen={showReviewModal}
+				onClose={() => setShowReviewModal(false)}
+				providerId={booking.provider_id}
+				providerName={booking.provider_name}
+				bookingId={booking.booking_id}
+				onReviewSubmitted={() => {
+					toast.success("Review recorded!");
+				}}
+			/>
 		</>,
 		document.body,
 	);

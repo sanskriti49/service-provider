@@ -13,9 +13,14 @@ import {
 	Navigation,
 	SlidersHorizontal,
 	Sparkles,
+	MessageSquare,
+	Star,
+	ThumbsUp,
 } from "lucide-react";
 import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { UNIT_LABELS } from "../utils/pricingHelper";
+import ReviewModal from "../ui/ReviewModal";
+import { apiCache } from "../utils/apiCache";
 
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
@@ -65,7 +70,7 @@ const ServiceDetails = () => {
 						lng: pos.coords.longitude,
 					});
 				},
-				(err) => {
+				() => {
 					console.log("Geolocation prompt dismissed or denied.");
 				},
 				{ timeout: 3000, enableHighAccuracy: false },
@@ -97,9 +102,15 @@ const ServiceDetails = () => {
 			try {
 				setLoading(true);
 				setError(null);
-				const serviceRes = await fetch(`${API_URL}/api/services/v1/${slug}`);
-				if (!serviceRes.ok) throw new Error("Service not found");
-				const serviceData = await serviceRes.json();
+
+				const cacheKeyService = `service_${slug}`;
+				let serviceData = apiCache.get(cacheKeyService);
+				if (!serviceData) {
+					const serviceRes = await fetch(`${API_URL}/api/services/v1/${slug}`);
+					if (!serviceRes.ok) throw new Error("Service not found");
+					serviceData = await serviceRes.json();
+					apiCache.set(cacheKeyService, serviceData, 300000);
+				}
 				setService(serviceData);
 
 				const params = new URLSearchParams({
@@ -109,11 +120,16 @@ const ServiceDetails = () => {
 					...(userCoords?.lng && { lng: String(userCoords.lng) }),
 				});
 
-				const providersRes = await fetch(
-					`${API_URL}/api/providers/v1?${params.toString()}`,
-				);
-				if (!providersRes.ok) throw new Error("Could not fetch providers");
-				const providersData = await providersRes.json();
+				const cacheKeyProviders = `providers_${slug}_${sortBy}_${userCoords?.lat || ""}`;
+				let providersData = apiCache.get(cacheKeyProviders);
+				if (!providersData) {
+					const providersRes = await fetch(
+						`${API_URL}/api/providers/v1?${params.toString()}`,
+					);
+					if (!providersRes.ok) throw new Error("Could not fetch providers");
+					providersData = await providersRes.json();
+					apiCache.set(cacheKeyProviders, providersData, 60000);
+				}
 				setProviders(Array.isArray(providersData) ? providersData : []);
 			} catch (err) {
 				console.error("Error fetching providers:", err);
@@ -186,7 +202,7 @@ const ServiceDetails = () => {
 		gsap.to(window, {
 			duration: 0.5,
 			scrollTo: contentRef.current,
-			ease: "bounce",
+			ease: "power2.inOut",
 		});
 	};
 
@@ -280,7 +296,7 @@ const ServiceDetails = () => {
 							Available Experts
 						</h2>
 						<p className="mt-1 text-gray-400 text-sm">
-							Matched by proximity, rating, and verified expertise.
+							Matched by proximity, customer reviews, and verified expertise.
 						</p>
 					</div>
 
@@ -347,16 +363,21 @@ const ProviderCard = ({
 }) => {
 	const navigate = useNavigate();
 
+	const [activeTab, setActiveTab] = useState("schedule"); // 'schedule' or 'reviews'
 	const [availability, setAvailability] = useState([]);
 	const [loadingSlots, setLoadingSlots] = useState(false);
-	const [hasLoaded, setHasLoaded] = useState(false);
+	const [hasLoadedSlots, setHasLoadedSlots] = useState(false);
+
+	const [reviewsData, setReviewsData] = useState(null);
+	const [loadingReviews, setLoadingReviews] = useState(false);
+	const [showReviewModal, setShowReviewModal] = useState(false);
 
 	const [selectedDateStr, setSelectedDateStr] = useState(null);
 	const [selectedTime, setSelectedTime] = useState(null);
 	const dateScrollRef = useRef(null);
 
 	const loadAvailability = async () => {
-		if (hasLoaded) return;
+		if (hasLoadedSlots) return;
 		setLoadingSlots(true);
 
 		try {
@@ -372,16 +393,22 @@ const ProviderCard = ({
 			});
 
 			const providerIdentifier = provider.user_id || provider.id || provider.custom_id;
-			const res = await fetch(
-				`${API_URL}/api/providers/v1/${providerIdentifier}/availability?${params.toString()}`,
-			);
-			if (!res.ok) throw new Error("Failed to load slots");
-			const data = await res.json();
+			const cacheKey = `avail_${providerIdentifier}_${todayStr}_${userCoords?.lat || ""}`;
+			let data = apiCache.get(cacheKey);
+
+			if (!data) {
+				const res = await fetch(
+					`${API_URL}/api/providers/v1/${providerIdentifier}/availability?${params.toString()}`,
+				);
+				if (!res.ok) throw new Error("Failed to load slots");
+				data = await res.json();
+				apiCache.set(cacheKey, data, 60000);
+			}
 
 			setAvailability(
 				Array.isArray(data.availability) ? data.availability : [],
 			);
-			setHasLoaded(true);
+			setHasLoadedSlots(true);
 		} catch (error) {
 			console.error("Availability error:", error);
 			setAvailability([]);
@@ -390,11 +417,41 @@ const ProviderCard = ({
 		}
 	};
 
-	const handleViewAvailability = () => {
+	const loadReviews = async () => {
+		if (reviewsData) return;
+		setLoadingReviews(true);
+		try {
+			const providerIdentifier = provider.user_id || provider.id || provider.custom_id;
+			const cacheKey = `reviews_${providerIdentifier}`;
+			let data = apiCache.get(cacheKey);
+
+			if (!data) {
+				const res = await fetch(`${API_URL}/api/reviews/provider/${providerIdentifier}`);
+				if (res.ok) {
+					data = await res.json();
+					apiCache.set(cacheKey, data, 120000);
+				}
+			}
+			setReviewsData(data);
+		} catch (err) {
+			console.error("Failed to load reviews:", err);
+		} finally {
+			setLoadingReviews(false);
+		}
+	};
+
+	const handleOpenSchedule = () => {
+		setActiveTab("schedule");
 		onToggleExpand();
 		if (!isExpanded) {
 			loadAvailability();
 		}
+	};
+
+	const handleOpenReviews = () => {
+		setActiveTab("reviews");
+		if (!isExpanded) onToggleExpand();
+		loadReviews();
 	};
 
 	const processedData = useMemo(() => {
@@ -492,7 +549,7 @@ const ProviderCard = ({
 						<div className="absolute -bottom-3 -right-2 bg-[#1a103f] border border-violet-500/30 px-2 py-1 rounded-lg flex items-center gap-1 shadow-lg">
 							<StarIcon className="h-3.5 w-3.5 text-yellow-400" />
 							<span className="text-xs font-bold text-white">
-								{provider.rating || "5.0"}
+								{provider.rating ? Number(provider.rating).toFixed(1) : "5.0"}
 							</span>
 						</div>
 					</div>
@@ -515,14 +572,24 @@ const ProviderCard = ({
 							)}
 						</div>
 
-						<div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-200 text-sm">
-							<span className="font-bold">₹{provider.price}</span>
-							<span className="text-xs opacity-60 font-normal">
-								/{" "}
-								{UNIT_LABELS[provider.price_unit] ||
-									provider.price_unit ||
-									"Fixed Rate"}
-							</span>
+						<div className="flex items-center justify-between">
+							<div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-200 text-sm">
+								<span className="font-bold">₹{provider.price}</span>
+								<span className="text-xs opacity-60 font-normal">
+									/{" "}
+									{UNIT_LABELS[provider.price_unit] ||
+										provider.price_unit ||
+										"Fixed Rate"}
+								</span>
+							</div>
+
+							<button
+								onClick={handleOpenReviews}
+								className="text-xs text-violet-300 hover:text-white flex items-center gap-1 hover:underline cursor-pointer"
+							>
+								<MessageSquare size={12} />
+								<span>Reviews</span>
+							</button>
 						</div>
 					</div>
 				</div>
@@ -534,152 +601,283 @@ const ProviderCard = ({
 			</div>
 
 			<div className="bg-black/20 border-t border-white/5 transition-all duration-500 ease-in-out">
-				<div className="p-4">
+				<div className="p-4 flex gap-2">
 					<button
-						onClick={handleViewAvailability}
+						onClick={handleOpenSchedule}
 						disabled={loadingSlots}
-						className={`cursor-pointer w-full py-3 rounded-lg font-semibold text-md transition-all duration-300 flex items-center justify-center gap-2 ${
-							isExpanded
-								? "bg-white/5 text-violet-200 border border-white/10"
-								: "bg-violet-400/10 text-violet-200 border border-violet-500/30 hover:bg-violet-500/20"
+						className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+							isExpanded && activeTab === "schedule"
+								? "bg-white/10 text-violet-200 border border-white/20"
+								: "bg-violet-500/20 text-violet-200 border border-violet-500/30 hover:bg-violet-500/30"
 						}`}
 					>
 						{loadingSlots ? (
 							<>
 								<div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-								Loading...
+								<span>Loading...</span>
 							</>
-						) : isExpanded ? (
+						) : isExpanded && activeTab === "schedule" ? (
 							"Close Schedule"
 						) : (
 							"Check Availability"
 						)}
 					</button>
+
+					<button
+						onClick={handleOpenReviews}
+						className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+							isExpanded && activeTab === "reviews"
+								? "bg-amber-500/30 text-amber-200 border border-amber-500/40"
+								: "bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10"
+						}`}
+					>
+						<Star size={14} className="text-yellow-400" />
+						<span>Reviews</span>
+					</button>
 				</div>
 
 				<div
 					className={`overflow-hidden transition-all duration-500 ease-in-out ${
-						isExpanded ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
+						isExpanded ? "max-h-[460px] opacity-100" : "max-h-0 opacity-0"
 					}`}
 				>
-					<div className="px-6 pb-6">
-						{!loadingSlots && validDates.length === 0 && (
-							<div className="text-center py-8 bg-white/5 rounded-2xl border border-dashed border-white/10">
-								<Calendar className="w-10 h-10 text-violet-300/20 mx-auto mb-3" />
-								<p className="text-gray-400 text-sm">
-									No upcoming slots available.
-								</p>
-							</div>
-						)}
-
-						{validDates.length > 0 && (
-							<div className="space-y-4">
-								<div>
-									<h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-										Select Date
-									</h4>
-									<div
-										ref={dateScrollRef}
-										className="flex gap-2 overflow-x-auto pb-4 snap-x -mx-2 px-2 custom-scrollbar-x momentum-scroll"
-									>
-										{validDates.map((dateStr) => {
-											const isSelected = selectedDateStr === dateStr;
-											const [yr, mo, dy] = dateStr.split("-").map(Number);
-											const dObj = new Date(yr, mo - 1, dy);
-											return (
-												<button
-													key={dateStr}
-													onClick={() => setSelectedDateStr(dateStr)}
-													className={`flex-shrink-0 snap-start px-4 py-2.5 rounded-xl border text-md font-medium transition-all duration-200 min-w-[80px] ${
-														isSelected
-															? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/40"
-															: "bg-[#1a103f] border-white/10 text-gray-400 hover:border-violet-500/50 hover:text-white"
-													}`}
-												>
-													<div className="text-xs opacity-70">
-														{dObj.toLocaleString("en-US", {
-															weekday: "short",
-														})}
-													</div>
-													<div className="font-bold">
-														{dObj.getDate()}
-													</div>
-												</button>
-											);
-										})}
-									</div>
+					{/* TAB: SCHEDULE */}
+					{activeTab === "schedule" && (
+						<div className="px-6 pb-6">
+							{!loadingSlots && validDates.length === 0 && (
+								<div className="text-center py-8 bg-white/5 rounded-2xl border border-dashed border-white/10">
+									<Calendar className="w-10 h-10 text-violet-300/20 mx-auto mb-3" />
+									<p className="text-gray-400 text-sm">
+										No upcoming slots available.
+									</p>
 								</div>
+							)}
 
-								{selectedDateStr && processedData[selectedDateStr] && (
-									<div className="animate-fade-in">
-										<div className="flex items-center justify-between mb-3">
-											<h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-												Select Time
-											</h4>
-											<span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-300 flex items-center gap-1">
-												<Clock size={10} />{" "}
-												{processedData[selectedDateStr].length} slots
-											</span>
-										</div>
-
-										<div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar-y">
-											{processedData[selectedDateStr].map((slot, idx) => {
-												const isSelected = selectedTime?.start === slot.start;
+							{validDates.length > 0 && (
+								<div className="space-y-4">
+									<div>
+										<h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+											Select Date
+										</h4>
+										<div
+											ref={dateScrollRef}
+											className="flex gap-2 overflow-x-auto pb-4 snap-x -mx-2 px-2 custom-scrollbar-x momentum-scroll"
+										>
+											{validDates.map((dateStr) => {
+												const isSelected = selectedDateStr === dateStr;
+												const [yr, mo, dy] = dateStr.split("-").map(Number);
+												const dObj = new Date(yr, mo - 1, dy);
 												return (
 													<button
-														key={`${slot.start}-${idx}`}
-														onClick={() => setSelectedTime(slot)}
-														className={`text-xs py-2 rounded-lg transition-all duration-200 border ${
+														key={dateStr}
+														onClick={() => setSelectedDateStr(dateStr)}
+														className={`flex-shrink-0 snap-start px-4 py-2.5 rounded-xl border text-md font-medium transition-all duration-200 min-w-[80px] cursor-pointer ${
 															isSelected
-																? "bg-white text-violet-900 font-bold border-white shadow-md scale-95"
-																: "bg-white/5 border-transparent text-gray-300 hover:bg-white/10 hover:border-white/20"
+																? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/40"
+																: "bg-[#1a103f] border-white/10 text-gray-400 hover:border-violet-500/50 hover:text-white"
 														}`}
 													>
-														{formatTime(slot.start)} - {formatTime(slot.end)}
+														<div className="text-xs opacity-70">
+															{dObj.toLocaleString("en-US", {
+																weekday: "short",
+															})}
+														</div>
+														<div className="font-bold">
+															{dObj.getDate()}
+														</div>
 													</button>
 												);
 											})}
 										</div>
 									</div>
-								)}
 
-								<div className="flex justify-center mt-4">
-									<button
-										disabled={!selectedTime}
-										onClick={() =>
-											navigate(`/book/${provider.custom_id}`, {
-												state: {
-													provider: {
-														...provider,
-														service_id: provider.service_id,
+									{selectedDateStr && processedData[selectedDateStr] && (
+										<div className="animate-fade-in">
+											<div className="flex items-center justify-between mb-3">
+												<h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+													Select Time
+												</h4>
+												<span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-300 flex items-center gap-1">
+													<Clock size={10} />{" "}
+													{processedData[selectedDateStr].length} slots
+												</span>
+											</div>
+
+											<div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar-y">
+												{processedData[selectedDateStr].map((slot, idx) => {
+													const isSelected = selectedTime?.start === slot.start;
+													return (
+														<button
+															key={`${slot.start}-${idx}`}
+															onClick={() => setSelectedTime(slot)}
+															className={`text-xs py-2 rounded-lg transition-all duration-200 border cursor-pointer ${
+																isSelected
+																	? "bg-white text-violet-900 font-bold border-white shadow-md scale-95"
+																	: "bg-white/5 border-transparent text-gray-300 hover:bg-white/10 hover:border-white/20"
+															}`}
+														>
+															{formatTime(slot.start)} - {formatTime(slot.end)}
+														</button>
+													);
+												})}
+											</div>
+										</div>
+									)}
+
+									<div className="flex justify-center mt-4">
+										<button
+											disabled={!selectedTime}
+											onClick={() =>
+												navigate(`/book/${provider.custom_id}`, {
+													state: {
+														provider: {
+															...provider,
+															service_id: provider.service_id,
+														},
+														serviceName: service.name,
+														preloadedAvailability: availability,
+														selectedDateStr,
+														selectedSlot: {
+															date: selectedDateStr,
+															start_time: selectedTime?.start_time || selectedTime?.start,
+															end_time: selectedTime?.end_time || selectedTime?.end,
+															start: selectedTime?.start_time || selectedTime?.start,
+															end: selectedTime?.end_time || selectedTime?.end,
+														},
 													},
-													serviceName: service.name,
-													preloadedAvailability: availability,
-													selectedDateStr,
-													selectedSlot: {
-														date: selectedDateStr,
-														start_time: selectedTime?.start_time || selectedTime?.start,
-														end_time: selectedTime?.end_time || selectedTime?.end,
-														start: selectedTime?.start_time || selectedTime?.start,
-														end: selectedTime?.end_time || selectedTime?.end,
-													},
-												},
-											})
-										}
-										className={`inline-flex items-center justify-center gap-2 w-full btn-xl btn-purple btn-border-dark px-7 py-3 rounded-lg group/btn transition-all cursor-pointer ${
-											selectedTime
-												? "opacity-100 hover:scale-[1.02]"
-												: "opacity-40 cursor-not-allowed pointer-events-none"
-										}`}
-									>
-										<span>Continue to Booking</span>
-									</button>
+												})
+											}
+											className={`inline-flex items-center justify-center gap-2 w-full btn-xl btn-purple btn-border-dark px-7 py-3 rounded-lg group/btn transition-all cursor-pointer ${
+												selectedTime
+													? "opacity-100 hover:scale-[1.02]"
+													: "opacity-40 cursor-not-allowed pointer-events-none"
+											}`}
+										>
+											<span>Continue to Booking</span>
+										</button>
+									</div>
 								</div>
-							</div>
-						)}
-					</div>
+							)}
+						</div>
+					)}
+
+					{/* TAB: REVIEWS */}
+					{activeTab === "reviews" && (
+						<div className="px-6 pb-6 space-y-4">
+							{loadingReviews ? (
+								<div className="text-center py-8">
+									<div className="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+									<p className="text-xs text-gray-400">Loading reviews...</p>
+								</div>
+							) : (
+								<>
+									{/* Rating Overview */}
+									<div className="flex items-center justify-between p-3.5 bg-white/5 rounded-2xl border border-white/10">
+										<div className="flex items-center gap-3">
+											<div className="text-3xl font-bold text-white">
+												{reviewsData?.average_rating ? Number(reviewsData.average_rating).toFixed(1) : (provider.rating || "5.0")}
+											</div>
+											<div>
+												<div className="flex items-center gap-0.5">
+													{[1, 2, 3, 4, 5].map((s) => (
+														<Star
+															key={s}
+															size={13}
+															className={
+																s <= Math.round(reviewsData?.average_rating || provider.rating || 5)
+																	? "text-yellow-400 fill-yellow-400"
+																	: "text-gray-600"
+															}
+														/>
+													))}
+												</div>
+												<span className="text-[11px] text-gray-400">
+													Based on {reviewsData?.total_reviews || 0} reviews
+												</span>
+											</div>
+										</div>
+
+										<button
+											onClick={() => setShowReviewModal(true)}
+											className="px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer"
+										>
+											Rate Expert
+										</button>
+									</div>
+
+									{/* Reviews List */}
+									<div className="max-h-48 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar-y">
+										{reviewsData?.reviews && reviewsData.reviews.length > 0 ? (
+											reviewsData.reviews.map((rev) => (
+												<div
+													key={rev.id}
+													className="p-3 bg-black/20 rounded-xl border border-white/5 text-xs space-y-1.5"
+												>
+													<div className="flex items-center justify-between">
+														<div className="flex items-center gap-2">
+															<span className="font-bold text-white">
+																{rev.customer?.name || "Customer"}
+															</span>
+															<div className="flex items-center gap-0.5">
+																{[...Array(rev.rating || 5)].map((_, i) => (
+																	<Star
+																		key={i}
+																		size={10}
+																		className="text-yellow-400 fill-yellow-400"
+																	/>
+																))}
+															</div>
+														</div>
+														<span className="text-[10px] text-gray-500">
+															{new Date(rev.created_at).toLocaleDateString("en-US", {
+																month: "short",
+																day: "numeric",
+															})}
+														</span>
+													</div>
+
+													{rev.comment && (
+														<p className="text-gray-300 text-xs leading-relaxed">
+															"{rev.comment}"
+														</p>
+													)}
+
+													{rev.tags && rev.tags.length > 0 && (
+														<div className="flex flex-wrap gap-1 pt-0.5">
+															{rev.tags.map((t, idx) => (
+																<span
+																	key={idx}
+																	className="text-[9px] bg-violet-500/15 text-violet-300 px-1.5 py-0.5 rounded-md border border-violet-500/20"
+																>
+																	{t}
+																</span>
+															))}
+														</div>
+													)}
+												</div>
+											))
+										) : (
+											<div className="text-center py-6 text-xs text-gray-400">
+												No reviews yet. Be the first to review {provider.name}!
+											</div>
+										)}
+									</div>
+								</>
+							)}
+						</div>
+					)}
 				</div>
 			</div>
+
+			<ReviewModal
+				isOpen={showReviewModal}
+				onClose={() => setShowReviewModal(false)}
+				providerId={provider.user_id || provider.id}
+				providerName={provider.name}
+				onReviewSubmitted={(newReview) => {
+					loadReviews();
+				}}
+			/>
 		</div>
 	);
 };

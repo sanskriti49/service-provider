@@ -1,4 +1,4 @@
-const db = require("../config/db");
+﻿const db = require("../config/db");
 
 const queries = [
 	`CREATE TABLE IF NOT EXISTS public.users (
@@ -24,6 +24,9 @@ const queries = [
     CONSTRAINT users_pkey1 PRIMARY KEY (id),
     CONSTRAINT users_role_check CHECK ((role = ANY (ARRAY['customer'::text, 'provider'::text])))
   )`,
+	`CREATE INDEX IF NOT EXISTS ix_users_custom_id ON public.users(custom_id)`,
+	`CREATE INDEX IF NOT EXISTS ix_users_role ON public.users(role)`,
+	`CREATE INDEX IF NOT EXISTS ix_users_lat_lng ON public.users(lat, lng)`,
 
 	`CREATE TABLE IF NOT EXISTS public.services (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -52,7 +55,26 @@ const queries = [
     CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
   )`,
 
-	// 4. Availability Slots
+	// 4. Provider Services
+	`CREATE TABLE IF NOT EXISTS public.provider_services (
+    id serial4 NOT NULL,
+    provider_id uuid NOT NULL,
+    service_id uuid NOT NULL,
+    price float4 NOT NULL DEFAULT 0,
+    price_unit varchar(20) NOT NULL DEFAULT 'fixed',
+    is_visible bool NOT NULL DEFAULT true,
+    slug text NULL,
+    description text NULL,
+    created_at timestamptz DEFAULT now() NULL,
+    CONSTRAINT provider_services_pkey PRIMARY KEY (id),
+    CONSTRAINT provider_services_provider_service_key UNIQUE (provider_id, service_id),
+    CONSTRAINT provider_services_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.users(id) ON DELETE CASCADE,
+    CONSTRAINT provider_services_service_id_fkey FOREIGN KEY (service_id) REFERENCES public.services(id) ON DELETE CASCADE
+  )`,
+	`CREATE INDEX IF NOT EXISTS ix_provider_services_provider ON public.provider_services(provider_id)`,
+	`CREATE INDEX IF NOT EXISTS ix_provider_services_service ON public.provider_services(service_id)`,
+
+	// 5. Availability Slots
 	`CREATE TABLE IF NOT EXISTS public.availability_slots (
     provider_id uuid NULL,
     "date" date NULL,
@@ -61,9 +83,10 @@ const queries = [
     created_at timestamptz DEFAULT now() NULL,
     CONSTRAINT availability_slots_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(user_id)
   )`,
+	`CREATE INDEX IF NOT EXISTS ix_availability_slots_provider_date ON public.availability_slots(provider_id, date)`,
 
-	// 5. Bookings
-	`CREATE TABLE public.bookings (
+	// 6. Bookings
+	`CREATE TABLE IF NOT EXISTS public.bookings (
     booking_id uuid DEFAULT gen_random_uuid() NOT NULL,
     provider_id uuid NOT NULL,
     user_id uuid NOT NULL,
@@ -79,18 +102,20 @@ const queries = [
     razorpay_order_id varchar(255) NULL,
     razorpay_payment_id varchar(255) NULL,
     otp varchar(6) NULL,
-    action_by public.actor_role NULL,
+    action_by varchar(20) NULL,
     cancellation_reason text NULL,
+    latitude float4 NULL,
+    longitude float4 NULL,
     created_at timestamptz DEFAULT now() NULL,
     updated_at timestamptz DEFAULT now() NULL,
-    
     CONSTRAINT bookings_pkey PRIMARY KEY (booking_id)
-);`
-	// 5.1 Booking Indexes (Run separately)
+  )`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_booking_id ON public.bookings USING btree (booking_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_provider_date ON public.bookings USING btree (provider_id, date)`,
+	`CREATE INDEX IF NOT EXISTS ix_bookings_user_id ON public.bookings(user_id)`,
+	`CREATE INDEX IF NOT EXISTS ix_bookings_status ON public.bookings(status)`,
 
-	// 6. Master Availability
+	// 7. Master Availability
 	`CREATE TABLE IF NOT EXISTS public.provider_master_availability (
     id serial4 NOT NULL,
     provider_id uuid NOT NULL,
@@ -103,7 +128,7 @@ const queries = [
   )`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS ux_provider_day_start_end ON public.provider_master_availability USING btree (provider_id, day_of_week, start_time, end_time)`,
 
-	// 7. Exceptions
+	// 8. Exceptions
 	`CREATE TABLE IF NOT EXISTS public.provider_date_exceptions (
     id serial4 NOT NULL,
     provider_id uuid NOT NULL,
@@ -117,12 +142,29 @@ const queries = [
     CONSTRAINT provider_date_exceptions_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.users(id) ON DELETE CASCADE
   )`,
 	`CREATE INDEX IF NOT EXISTS ix_exceptions_provider_date ON public.provider_date_exceptions USING btree (provider_id, date)`,
+
+	// 9. Reviews & Ratings
+	`CREATE TABLE IF NOT EXISTS public.reviews (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    booking_id uuid NULL,
+    customer_id uuid NOT NULL,
+    provider_id uuid NOT NULL,
+    rating int2 NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment text NULL,
+    tags jsonb DEFAULT '[]'::jsonb NULL,
+    created_at timestamptz DEFAULT now() NULL,
+    CONSTRAINT reviews_pkey PRIMARY KEY (id),
+    CONSTRAINT fk_review_customer FOREIGN KEY (customer_id) REFERENCES public.users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_review_provider FOREIGN KEY (provider_id) REFERENCES public.users(id) ON DELETE CASCADE
+  )`,
+	`CREATE INDEX IF NOT EXISTS ix_reviews_provider ON public.reviews(provider_id)`,
+	`CREATE INDEX IF NOT EXISTS ix_reviews_customer ON public.reviews(customer_id)`,
+	`CREATE INDEX IF NOT EXISTS ix_reviews_booking ON public.reviews(booking_id)`,
 ];
 
 const runMigration = async () => {
 	try {
 		console.log("⏳ Starting migration...");
-		// Loop through queries and run them one by one
 		for (const [index, query] of queries.entries()) {
 			console.log(`... Running Step ${index + 1}/${queries.length}`);
 			await db.query(query);
@@ -135,4 +177,8 @@ const runMigration = async () => {
 	}
 };
 
-runMigration();
+if (require.main === module) {
+	runMigration();
+}
+
+module.exports = { queries, runMigration };
