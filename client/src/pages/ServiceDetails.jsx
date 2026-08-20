@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from "react-router-dom";
+﻿import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StarIcon } from "@heroicons/react/24/solid";
 import gsap from "gsap";
@@ -9,6 +9,10 @@ import {
 	Clock,
 	Calendar,
 	CheckCircle2,
+	MapPin,
+	Navigation,
+	SlidersHorizontal,
+	Sparkles,
 } from "lucide-react";
 import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { UNIT_LABELS } from "../utils/pricingHelper";
@@ -40,12 +44,52 @@ const ServiceDetails = () => {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
 	const [expandedIndex, setExpandedIndex] = useState(-1);
+	const [userCoords, setUserCoords] = useState(null);
+	const [sortBy, setSortBy] = useState("recommended");
+	const [isLocating, setIsLocating] = useState(false);
+
 	const mainRef = useRef(null);
 	const headerRef = useRef(null);
 	const contentRef = useRef(null);
 	const scrollRef = useRef(null);
 
 	const isAnyExpanded = expandedIndex !== -1;
+
+	// Request browser geolocation once on mount
+	useEffect(() => {
+		if ("geolocation" in navigator) {
+			navigator.geolocation.getCurrentPosition(
+				(pos) => {
+					setUserCoords({
+						lat: pos.coords.latitude,
+						lng: pos.coords.longitude,
+					});
+				},
+				(err) => {
+					console.log("Geolocation prompt dismissed or denied.");
+				},
+				{ timeout: 3000, enableHighAccuracy: false },
+			);
+		}
+	}, []);
+
+	const requestLocation = () => {
+		if (!navigator.geolocation) return;
+		setIsLocating(true);
+		navigator.geolocation.getCurrentPosition(
+			(pos) => {
+				setUserCoords({
+					lat: pos.coords.latitude,
+					lng: pos.coords.longitude,
+				});
+				setIsLocating(false);
+			},
+			() => {
+				setIsLocating(false);
+			},
+			{ timeout: 5000 },
+		);
+	};
 
 	useEffect(() => {
 		if (!slug) return;
@@ -58,12 +102,19 @@ const ServiceDetails = () => {
 				const serviceData = await serviceRes.json();
 				setService(serviceData);
 
+				const params = new URLSearchParams({
+					service: slug,
+					sort_by: sortBy,
+					...(userCoords?.lat && { lat: String(userCoords.lat) }),
+					...(userCoords?.lng && { lng: String(userCoords.lng) }),
+				});
+
 				const providersRes = await fetch(
-					`${API_URL}/api/providers/v1?service=${encodeURIComponent(slug)}`,
+					`${API_URL}/api/providers/v1?${params.toString()}`,
 				);
 				if (!providersRes.ok) throw new Error("Could not fetch providers");
 				const providersData = await providersRes.json();
-				setProviders(providersData);
+				setProviders(Array.isArray(providersData) ? providersData : []);
 			} catch (err) {
 				console.error("Error fetching providers:", err);
 				setError(err.message);
@@ -72,7 +123,7 @@ const ServiceDetails = () => {
 			}
 		}
 		fetchServiceAndProviders();
-	}, [slug]);
+	}, [slug, userCoords?.lat, userCoords?.lng, sortBy]);
 
 	useEffect(() => {
 		if (!loading && service && mainRef.current) {
@@ -223,20 +274,58 @@ const ServiceDetails = () => {
 				ref={contentRef}
 				className="inter relative z-20 bg-[#191034] max-w-7xl mt-10 mx-auto py-16 sm:py-10 px-4 sm:px-6 lg:px-8 rounded-t-3xl border-t border-violet-800/50 shadow-2xl shadow-black/50"
 			>
-				<div className="text-center mb-12">
-					<h2 className="text-3xl sm:text-4xl font-bold text-gray-200 bricolage-grotesque">
-						Available Providers
-					</h2>
-					<p className="mt-3 text-gray-400">
-						Choose from our top-rated experts.
-					</p>
+				<div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8 pb-4 border-b border-white/5">
+					<div>
+						<h2 className="text-3xl sm:text-4xl font-bold text-gray-200 bricolage-grotesque">
+							Available Experts
+						</h2>
+						<p className="mt-1 text-gray-400 text-sm">
+							Matched by proximity, rating, and verified expertise.
+						</p>
+					</div>
+
+					{/* Geolocation matching controls */}
+					<div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
+						{!userCoords ? (
+							<button
+								onClick={requestLocation}
+								disabled={isLocating}
+								className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 text-violet-300 text-xs font-semibold transition-all cursor-pointer"
+							>
+								<Navigation size={12} className={isLocating ? "animate-spin" : ""} />
+								<span>{isLocating ? "Locating..." : "Use My Location"}</span>
+							</button>
+						) : (
+							<div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-green-500/10 border border-green-500/30 text-green-300 text-xs font-medium">
+								<MapPin size={12} />
+								<span>Location active</span>
+							</div>
+						)}
+
+						<div className="flex items-center gap-2 bg-[#22194A] border border-white/10 px-3 py-1.5 rounded-xl text-xs">
+							<SlidersHorizontal size={12} className="text-violet-400" />
+							<span className="text-gray-400">Sort by:</span>
+							<select
+								value={sortBy}
+								onChange={(e) => setSortBy(e.target.value)}
+								className="bg-transparent text-white font-semibold outline-none cursor-pointer"
+							>
+								<option value="recommended" className="bg-[#191034]">Recommended</option>
+								<option value="distance" className="bg-[#191034]">Nearest First</option>
+								<option value="rating" className="bg-[#191034]">Top Rated</option>
+								<option value="price_asc" className="bg-[#191034]">Price: Low to High</option>
+							</select>
+						</div>
+					</div>
 				</div>
+
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
 					{providers.map((p, index) => (
 						<ProviderCard
 							key={p.user_id || index}
 							provider={p}
 							service={service}
+							userCoords={userCoords}
 							isExpanded={expandedIndex === index}
 							isAnyExpanded={isAnyExpanded}
 							onToggleExpand={() => handleToggleExpand(index)}
@@ -251,6 +340,7 @@ const ServiceDetails = () => {
 const ProviderCard = ({
 	provider,
 	service,
+	userCoords,
 	isExpanded,
 	isAnyExpanded,
 	onToggleExpand,
@@ -270,41 +360,24 @@ const ProviderCard = ({
 		setLoadingSlots(true);
 
 		try {
-			let lat = null;
-			let lng = null;
+			const today = new Date();
+			const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-			if ("geolocation" in navigator) {
-				try {
-					const position = await new Promise((resolve, reject) => {
-						navigator.geolocation.getCurrentPosition(resolve, reject, {
-							timeout: 4000,
-							enableHighAccuracy: false,
-						});
-					});
-					lat = position.coords.latitude;
-					lng = position.coords.longitude;
-				} catch (geoErr) {
-					console.log(
-						"Geolocation bypassed or denied. Generating static slots.",
-					);
-				}
-			}
-
-			const today = new Date().toISOString().slice(0, 10);
 			const params = new URLSearchParams({
-				from: today,
+				from: todayStr,
 				days: "14",
-				...(lat && { lat: String(lat) }),
-				...(lng && { lng: String(lng) }),
+				service: service?.slug || "",
+				...(userCoords?.lat && { lat: String(userCoords.lat) }),
+				...(userCoords?.lng && { lng: String(userCoords.lng) }),
 			});
 
+			const providerIdentifier = provider.user_id || provider.id || provider.custom_id;
 			const res = await fetch(
-				`${API_URL}/api/providers/v1/${provider.user_id}/availability?${params}`,
+				`${API_URL}/api/providers/v1/${providerIdentifier}/availability?${params.toString()}`,
 			);
 			if (!res.ok) throw new Error("Failed to load slots");
 			const data = await res.json();
 
-			// Correctly parse response object: { provider_id, availability: [...] }
 			setAvailability(
 				Array.isArray(data.availability) ? data.availability : [],
 			);
@@ -331,20 +404,28 @@ const ProviderCard = ({
 			const dateStr = dayGroup.date;
 			const slots = dayGroup.free_slots || [];
 
-			const isToday =
-				new Date(dateStr).toDateString() === new Date().toDateString();
+			const now = new Date();
+			const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+			const isToday = dateStr === todayStr;
 
 			const validTimes = slots
 				.filter((t) => {
+					const sStart = t.start_time || t.start;
+					if (!sStart) return false;
 					if (!isToday) return true;
-					if (!t.start) return false;
 
-					const [h, m] = t.start.split(":").map(Number);
+					const [h, m] = sStart.split(":").map(Number);
 					const slotTime = new Date();
 					slotTime.setHours(h, m, 0, 0);
 
 					return slotTime > new Date();
 				})
+				.map((t) => ({
+					start: t.start_time || t.start,
+					end: t.end_time || t.end,
+					start_time: t.start_time || t.start,
+					end_time: t.end_time || t.end,
+				}))
 				.sort((a, b) => a.start.localeCompare(b.start));
 
 			if (validTimes.length > 0) {
@@ -386,12 +467,12 @@ const ProviderCard = ({
     relative flex flex-col bg-[#22194A] rounded-3xl overflow-hidden
     transition-all duration-300 border border-white/5
     ${
-			isExpanded
-				? "ring-2 ring-violet-500/60 shadow-2xl shadow-violet-900/30 scale-[1.02]"
-				: isAnyExpanded
-					? "opacity-60 pointer-events-none"
-					: "hover:-translate-y-2 hover:shadow-2xl hover:shadow-violet-900/30 hover:border-violet-500/30"
-		}
+		isExpanded
+			? "ring-2 ring-violet-500/60 shadow-2xl shadow-violet-900/30 scale-[1.02]"
+			: isAnyExpanded
+				? "opacity-60 pointer-events-none"
+				: "hover:-translate-y-2 hover:shadow-2xl hover:shadow-violet-900/30 hover:border-violet-500/30"
+	}
   `}
 		>
 			<div className="p-7">
@@ -411,7 +492,7 @@ const ProviderCard = ({
 						<div className="absolute -bottom-3 -right-2 bg-[#1a103f] border border-violet-500/30 px-2 py-1 rounded-lg flex items-center gap-1 shadow-lg">
 							<StarIcon className="h-3.5 w-3.5 text-yellow-400" />
 							<span className="text-xs font-bold text-white">
-								{provider.rating || "New"}
+								{provider.rating || "5.0"}
 							</span>
 						</div>
 					</div>
@@ -420,9 +501,18 @@ const ProviderCard = ({
 						<h3 className="plus-jakarta-sans font-bold text-[22px] text-white truncate">
 							{provider.name}
 						</h3>
-						<div className="flex items-center gap-1 text-xs text-violet-300/60 mt-1 mb-3">
-							<CheckCircle2 size={12} className="text-green-400" />
-							<span>Verified Expert</span>
+						<div className="flex items-center gap-2 text-xs text-violet-300/80 mt-1 mb-2.5">
+							<div className="flex items-center gap-1">
+								<CheckCircle2 size={12} className="text-green-400" />
+								<span>Verified</span>
+							</div>
+
+							{provider.distance_km != null && (
+								<div className="flex items-center gap-1 text-violet-300 bg-violet-500/10 px-2 py-0.5 rounded-md text-[11px] font-medium border border-violet-500/20">
+									<MapPin size={10} className="text-violet-400" />
+									<span>{provider.distance_km} km</span>
+								</div>
+							)}
 						</div>
 
 						<div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-200 text-sm">
@@ -494,6 +584,8 @@ const ProviderCard = ({
 									>
 										{validDates.map((dateStr) => {
 											const isSelected = selectedDateStr === dateStr;
+											const [yr, mo, dy] = dateStr.split("-").map(Number);
+											const dObj = new Date(yr, mo - 1, dy);
 											return (
 												<button
 													key={dateStr}
@@ -505,12 +597,12 @@ const ProviderCard = ({
 													}`}
 												>
 													<div className="text-xs opacity-70">
-														{new Date(dateStr).toLocaleString("en-US", {
+														{dObj.toLocaleString("en-US", {
 															weekday: "short",
 														})}
 													</div>
 													<div className="font-bold">
-														{new Date(dateStr).getDate()}
+														{dObj.getDate()}
 													</div>
 												</button>
 											);
@@ -557,11 +649,20 @@ const ProviderCard = ({
 										onClick={() =>
 											navigate(`/book/${provider.custom_id}`, {
 												state: {
-													provider,
+													provider: {
+														...provider,
+														service_id: provider.service_id,
+													},
 													serviceName: service.name,
 													preloadedAvailability: availability,
 													selectedDateStr,
-													selectedSlot: selectedTime,
+													selectedSlot: {
+														date: selectedDateStr,
+														start_time: selectedTime?.start_time || selectedTime?.start,
+														end_time: selectedTime?.end_time || selectedTime?.end,
+														start: selectedTime?.start_time || selectedTime?.start,
+														end: selectedTime?.end_time || selectedTime?.end,
+													},
 												},
 											})
 										}

@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 // Fallback services list if API endpoint isn't connected in dev preview
 const DEFAULT_SERVICES = [
 	{
@@ -109,7 +111,7 @@ export default function ApplyProvider() {
 	useEffect(() => {
 		async function fetchServices() {
 			try {
-				const res = await fetch("/api/services");
+				const res = await fetch(`${API_URL}/api/services/v1`);
 				if (res.ok) {
 					const data = await res.json();
 					if (Array.isArray(data) && data.length > 0) {
@@ -202,7 +204,7 @@ export default function ApplyProvider() {
 				availability: formData.availability,
 			};
 
-			const res = await fetch("/api/providers", {
+			const res = await fetch(`${API_URL}/api/providers/v1`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(payload),

@@ -1,4 +1,4 @@
-import { useLocation, useParams, useNavigate } from "react-router-dom";
+﻿import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useMemo } from "react";
 import {
 	ArrowLeft,
@@ -35,18 +35,17 @@ export default function BookingPage() {
 	const [tempAddress, setTempAddress] = useState(state?.address || "");
 
 	const [coords, setCoords] = useState({
-		lat: state?.provider?.latitude || null,
-		lng: state?.provider?.longitude || null,
+		lat: state?.provider?.latitude || state?.provider?.lat || null,
+		lng: state?.provider?.longitude || state?.provider?.lng || null,
 	});
 
 	const [selectedDate, setSelectedDate] = useState(
 		state?.selectedDateStr || null,
 	);
 	const [selectedTime, setSelectedTime] = useState(state?.selectedSlot || null);
-	const serviceName = state?.serviceName || "Service";
+	const serviceName = state?.serviceName || provider?.service || "Service";
 
 	const [isEditingAddress, setIsEditingAddress] = useState(false);
-
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [loading, setLoading] = useState(!state?.provider);
 	const [alert, setAlert] = useState(null);
@@ -55,13 +54,14 @@ export default function BookingPage() {
 
 	function formatTime(timeString) {
 		if (!timeString) return "";
-		if (typeof timeString !== "string") {
-			timeString = timeString.start_time || "";
+		let str = timeString;
+		if (typeof timeString === "object") {
+			str = timeString.start_time || timeString.start || "";
 		}
-		const [hours, minutes] = timeString.split(":");
+		if (!str || typeof str !== "string") return "";
+		const [hours, minutes] = str.split(":");
 		const date = new Date();
-		date.setHours(hours);
-		date.setMinutes(minutes);
+		date.setHours(parseInt(hours, 10) || 0, parseInt(minutes, 10) || 0, 0, 0);
 		return date.toLocaleTimeString("en-US", {
 			hour: "numeric",
 			minute: "2-digit",
@@ -70,7 +70,9 @@ export default function BookingPage() {
 	}
 
 	function formatDateDisplay(dateString) {
-		const date = new Date(dateString);
+		if (!dateString) return { day: "", weekday: "", month: "", full: "" };
+		const [year, month, day] = String(dateString).substring(0, 10).split("-").map(Number);
+		const date = new Date(year, month - 1, day);
 		return {
 			day: date.getDate(),
 			weekday: date.toLocaleDateString("en-US", { weekday: "short" }),
@@ -98,10 +100,10 @@ export default function BookingPage() {
 					setProvider(currentProvider);
 				}
 
-				if (currentProvider && currentProvider.id) {
-					if (availability.length === 0) setLoading(true);
+				if (currentProvider && (currentProvider.id || currentProvider.user_id)) {
+					const provIdentifier = currentProvider.user_id || currentProvider.id;
 					const slotsRes = await fetch(
-						`${API_URL}/api/providers/v1/${currentProvider.id}/availability`,
+						`${API_URL}/api/providers/v1/${provIdentifier}/availability`,
 					);
 					if (slotsRes.ok) {
 						const slotsData = await slotsRes.json();
@@ -118,43 +120,98 @@ export default function BookingPage() {
 				setLoading(false);
 			}
 		};
-		fetchData();
+		if (!provider || availability.length === 0) {
+			fetchData();
+		}
 	}, [customId]);
 
 	const groupedSlots = useMemo(() => {
-		return availability.reduce((acc, slot) => {
-			if (!acc[slot.date]) acc[slot.date] = [];
+		let raw = availability;
+		if (raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray(raw.availability)) {
+			raw = raw.availability;
+		}
+		if (!Array.isArray(raw)) return {};
 
-			const exists = acc[slot.date].some(
-				(s) => s.start_time === slot.start_time && s.end_time === slot.end_time,
-			);
+		const acc = {};
+		raw.forEach((item) => {
+			if (!item) return;
 
-			if (!exists) acc[slot.date].push(slot);
+			// Format A: Day group { date: 'YYYY-MM-DD', free_slots: [ { start, end } ] }
+			if (item.date && Array.isArray(item.free_slots)) {
+				if (!acc[item.date]) acc[item.date] = [];
+				item.free_slots.forEach((s) => {
+					const sStart = s.start_time || s.start;
+					const sEnd = s.end_time || s.end;
+					if (!sStart || !sEnd) return;
+					const exists = acc[item.date].some(
+						(existing) => existing.start_time === sStart && existing.end_time === sEnd,
+					);
+					if (!exists) {
+						acc[item.date].push({
+							date: item.date,
+							start_time: sStart,
+							end_time: sEnd,
+							start: sStart,
+							end: sEnd,
+							isBooked: s.isBooked === true || s.is_booked === true,
+							is_booked: s.isBooked === true || s.is_booked === true,
+						});
+					}
+				});
+			}
+			// Format B: Flat slot { date: 'YYYY-MM-DD', start_time, end_time }
+			else if (item.date && (item.start_time || item.start)) {
+				if (!acc[item.date]) acc[item.date] = [];
+				const sStart = item.start_time || item.start;
+				const sEnd = item.end_time || item.end;
+				const exists = acc[item.date].some(
+					(existing) => existing.start_time === sStart && existing.end_time === sEnd,
+				);
+				if (!exists) {
+					acc[item.date].push({
+						date: item.date,
+						start_time: sStart,
+						end_time: sEnd,
+						start: sStart,
+						end: sEnd,
+						isBooked: item.isBooked === true || item.is_booked === true,
+						is_booked: item.isBooked === true || item.is_booked === true,
+					});
+				}
+			}
+		});
 
-			acc[slot.date].sort((a, b) => a.start_time.localeCompare(b.start_time));
+		Object.keys(acc).forEach((d) => {
+			acc[d].sort((a, b) => (a.start_time || a.start).localeCompare(b.start_time || b.start));
+		});
 
-			return acc;
-		}, {});
+		return acc;
 	}, [availability]);
 
 	useEffect(() => {
 		if (!selectedDate && Object.keys(groupedSlots).length > 0) {
 			const sortedDates = Object.keys(groupedSlots).sort();
-			const validDate = sortedDates.find(
-				(d) => d >= new Date().toISOString().split("T")[0],
-			);
+			const now = new Date();
+			const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+			const validDate = sortedDates.find((d) => d >= todayStr);
 			if (validDate) setSelectedDate(validDate);
 		}
 	}, [groupedSlots, selectedDate]);
 
 	function isSlotExpired(slotDate, slotTime) {
+		if (!slotDate || !slotTime) return false;
 		const now = new Date();
-		const todayStr = now.toISOString().split("T")[0];
+		const year = now.getFullYear();
+		const month = String(now.getMonth() + 1).padStart(2, "0");
+		const day = String(now.getDate()).padStart(2, "0");
+		const todayStr = `${year}-${month}-${day}`;
 
 		if (slotDate < todayStr) return true;
 		if (slotDate > todayStr) return false;
 
-		const [hours, minutes] = slotTime.split(":").map(Number);
+		const timeVal = typeof slotTime === "string" ? slotTime : (slotTime.start_time || slotTime.start);
+		if (!timeVal) return false;
+		const [hours, minutes] = timeVal.split(":").map(Number);
 		const slotDateTime = new Date();
 		slotDateTime.setHours(hours, minutes, 0, 0);
 		return now >= slotDateTime;
@@ -165,7 +222,7 @@ export default function BookingPage() {
 
 		return groupedSlots[selectedDate].filter((slot) => {
 			const isBooked = slot.isBooked === true || slot.is_booked === true;
-			const isExpired = isSlotExpired(selectedDate, slot.start_time);
+			const isExpired = isSlotExpired(selectedDate, slot.start_time || slot.start);
 			return !isBooked && !isExpired;
 		});
 	}, [selectedDate, groupedSlots]);
@@ -197,6 +254,10 @@ export default function BookingPage() {
 
 		setIsSubmitting(true);
 		try {
+			const startTimeVal = selectedTime.start_time || selectedTime.start;
+			const endTimeVal = selectedTime.end_time || selectedTime.end;
+			const providerIdVal = provider.user_id || provider.id || provider.custom_id;
+
 			const res = await fetch(`${API_URL}/api/bookings`, {
 				method: "POST",
 				headers: {
@@ -204,11 +265,11 @@ export default function BookingPage() {
 					Authorization: `Bearer ${token}`,
 				},
 				body: JSON.stringify({
-					provider_id: provider.user_id,
+					provider_id: providerIdVal,
 					service_id: provider.service_id,
 					date: selectedDate,
-					start_time: selectedTime.start_time,
-					end_time: selectedTime.end_time,
+					start_time: startTimeVal,
+					end_time: endTimeVal,
 					address,
 					payment_method: paymentMethod,
 					latitude: coords.lat,
@@ -216,6 +277,10 @@ export default function BookingPage() {
 				}),
 			});
 			const data = await res.json();
+
+			if (!res.ok) {
+				throw new Error(data.message || "Failed to create booking.");
+			}
 
 			if (paymentMethod === "online" && data.razorpay_order) {
 				handleRazorpayPayment(data.booking, data.razorpay_order);
@@ -227,11 +292,15 @@ export default function BookingPage() {
 			}
 		} catch (err) {
 			console.error("Booking error: ", err);
-			setAlert({ message: "Something went wrong. Try again.", type: "error" });
+			setAlert({
+				message: err.message || "Something went wrong. Try again.",
+				type: "error",
+			});
 		} finally {
 			setIsSubmitting(false);
 		}
 	}
+
 	const loadRazorpayScript = () => {
 		return new Promise((resolve) => {
 			if (window.Razorpay) {
@@ -258,10 +327,10 @@ export default function BookingPage() {
 
 		const options = {
 			key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-			amount: booking.price * 100,
+			amount: (booking.price || provider.price) * 100,
 			currency: "INR",
 			name: "TaskGenie",
-			description: `Booking for ${booking.service_name || "Service"}`,
+			description: `Booking for ${booking.service_name || serviceName || "Service"}`,
 			order_id: orderId,
 			handler: async function (response) {
 				try {
@@ -282,7 +351,7 @@ export default function BookingPage() {
 							state: { success: true, booking: verifyData.booking },
 						});
 					} else {
-						alert("Payment verification failed. Please contact support.");
+						toast.error("Payment verification failed. Please contact support.");
 					}
 				} catch (err) {
 					console.error("Verification Error:", err);
@@ -304,7 +373,7 @@ export default function BookingPage() {
 				<div className="flex flex-col items-center gap-6">
 					<FadeLoader color="#8b5cf6" />
 					<p className="text-violet-200/70 animate-pulse font-medium tracking-wide">
-						Preparing your experience...
+						Preparing your booking experience...
 					</p>
 				</div>
 			</div>
@@ -329,9 +398,11 @@ export default function BookingPage() {
 					`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
 				);
 				const data = await res.json();
-				setTempAddress(data.display_name);
+				if (data && data.display_name) {
+					setTempAddress(data.display_name);
+				}
 			} catch {
-				toast.error("Could not resolve address", {
+				toast.error("Could not resolve address automatically", {
 					className:
 						"bricolage-grotesque font-semibold border border-red-500/20 bg-slate-900 text-red-400 rounded-2xl",
 				});
@@ -384,7 +455,7 @@ export default function BookingPage() {
 										<img
 											src={
 												provider.photo ||
-												`https://ui-avatars.com/api/?name=${provider.name}&background=6d28d9&color=fff`
+												`https://ui-avatars.com/api/?name=${encodeURIComponent(provider.name)}&background=6d28d9&color=fff`
 											}
 											alt={provider.name}
 											className="w-full h-full object-cover"
@@ -428,7 +499,7 @@ export default function BookingPage() {
 									<span className="text-gray-400">Time</span>
 									<span className="font-medium text-white">
 										{selectedTime
-											? `${formatTime(selectedTime.start_time)} - ${formatTime(selectedTime.end_time)}`
+											? `${formatTime(selectedTime.start_time || selectedTime.start)} - ${formatTime(selectedTime.end_time || selectedTime.end)}`
 											: "--"}
 									</span>
 								</div>
@@ -444,7 +515,7 @@ export default function BookingPage() {
 
 					{/* RIGHT COLUMN: Booking Form */}
 					<div className="inter lg:col-span-8 space-y-6 lg:space-y-8">
-						{/*  Date Selection */}
+						{/* Date Selection */}
 						<div className="space-y-3.5">
 							<div className="flex items-center gap-2 px-1">
 								<div className="p-1.5 rounded-md bg-violet-500/20">
@@ -466,10 +537,6 @@ export default function BookingPage() {
 									<div className="flex gap-2.5 overflow-x-auto pb-2 snap-x flex-nowrap px-1 custom-scrollbar-x momentum-scroll">
 										{Object.keys(groupedSlots)
 											.sort()
-											.filter(
-												(date) =>
-													date >= new Date().toISOString().split("T")[0],
-											)
 											.map((date) => {
 												const isSelected = selectedDate === date;
 												const d = formatDateDisplay(date);
@@ -482,10 +549,10 @@ export default function BookingPage() {
 														}}
 														className={`cursor-pointer snap-start flex-shrink-0 min-w-[76px] sm:min-w-[90px] p-2.5 sm:p-3 rounded-xl border transition-all duration-200 flex flex-col items-center justify-center gap-0.5
                                                         ${
-																													isSelected
-																														? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/40"
-																														: "bg-[#22194A] border-white/5 text-gray-400 hover:bg-[#2a1f5a]"
-																												}`}
+															isSelected
+																? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/40"
+																: "bg-[#22194A] border-white/5 text-gray-400 hover:bg-[#2a1f5a]"
+														}`}
 													>
 														<span
 															className={`text-[12px] uppercase tracking-wider font-semibold ${isSelected ? "text-violet-200" : "text-gray-500"}`}
@@ -528,22 +595,32 @@ export default function BookingPage() {
 								{visibleSlots.length > 0 ? (
 									<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
 										{visibleSlots.map((slot) => {
-											const isSelected =
-												selectedTime?.start_time === slot.start_time &&
-												selectedTime?.end_time === slot.end_time;
+											const slotStart = slot.start_time || slot.start;
+											const slotEnd = slot.end_time || slot.end;
+											const curStart = selectedTime?.start_time || selectedTime?.start;
+											const curEnd = selectedTime?.end_time || selectedTime?.end;
+											const isSelected = curStart === slotStart && curEnd === slotEnd;
+
 											return (
 												<button
-													key={`${slot.date}-${slot.start_time}-${slot.end_time}`}
-													onClick={() => setSelectedTime(slot)}
+													key={`${slot.date}-${slotStart}-${slotEnd}`}
+													onClick={() =>
+														setSelectedTime({
+															date: slot.date,
+															start_time: slotStart,
+															end_time: slotEnd,
+															start: slotStart,
+															end: slotEnd,
+														})
+													}
 													className={`cursor-pointer relative py-2.5 px-2 rounded-xl border text-[15px] sm:text-sm font-semibold transition-all duration-200
                                                     ${
-																											isSelected
-																												? "bg-white text-violet-900 border-white shadow-md shadow-violet-900/20"
-																												: "bg-[#22194A] border-white/5 text-gray-300 hover:bg-[#2a1f5a]"
-																										}`}
+														isSelected
+															? "bg-white text-violet-900 border-white shadow-md shadow-violet-900/20"
+															: "bg-[#22194A] border-white/5 text-gray-300 hover:bg-[#2a1f5a]"
+													}`}
 												>
-													{formatTime(slot.start_time)} -{" "}
-													{formatTime(slot.end_time)}
+													{formatTime(slotStart)} - {formatTime(slotEnd)}
 												</button>
 											);
 										})}
@@ -678,17 +755,17 @@ export default function BookingPage() {
 							</div>
 						</div>
 
-						{/* Desktop Confirm Button (Hidden on Mobile) */}
+						{/* Desktop Confirm Button */}
 						<div className="hidden lg:block pt-4">
 							<button
 								onClick={handleConfirm}
 								disabled={isSubmitting || !selectedTime || !address.trim()}
 								className={`w-full mx-auto py-3.5 rounded-full text-base font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group
                                 ${
-																	selectedTime && address.trim()
-																		? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white transform hover:-translate-y-0.5 cursor-pointer"
-																		: "bg-[#22194A] text-gray-500 cursor-not-allowed border border-white/5"
-																}`}
+									selectedTime && address.trim()
+										? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white transform hover:-translate-y-0.5 cursor-pointer"
+										: "bg-[#22194A] text-gray-500 cursor-not-allowed border border-white/5"
+								}`}
 							>
 								{isSubmitting ? (
 									<div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -707,7 +784,7 @@ export default function BookingPage() {
 				</div>
 			</div>
 
-			{/*  Mobile Footer */}
+			{/* Mobile Footer */}
 			<div className="font-inter lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-[#191034]/95 backdrop-blur-2xl border-t border-white/10 z-50">
 				<div className="flex items-center justify-between gap-4 max-w-md mx-auto">
 					<div>
@@ -727,12 +804,12 @@ export default function BookingPage() {
 					<button
 						onClick={handleConfirm}
 						disabled={isSubmitting || !selectedTime || !address.trim()}
-						className={` flex-1 py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-xl active:scale-95 transition-all duration-200 flex items-center justify-center gap-1.5
+						className={`flex-1 py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-xl active:scale-95 transition-all duration-200 flex items-center justify-center gap-1.5
                         ${
-													selectedTime && address.trim()
-														? "hover:opacity-75 bg-gradient-to-r from-violet-600 to-indigo-600 text-white cursor-pointer"
-														: "bg-[#22194A] text-gray-500 border border-white/5 cursor-not-allowed"
-												}`}
+							selectedTime && address.trim()
+								? "hover:opacity-75 bg-gradient-to-r from-violet-600 to-indigo-600 text-white cursor-pointer"
+								: "bg-[#22194A] text-gray-500 border border-white/5 cursor-not-allowed"
+						}`}
 					>
 						{isSubmitting ? (
 							<div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
