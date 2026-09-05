@@ -196,10 +196,10 @@ const SignIn = () => {
 
 					<div className="flex-1 flex flex-col justify-center items-center">
 						<div className="bg-[#ffffffbf] border border-[#5b21b613] backdrop-blur-2xl p-8 rounded-2xl shadow-xl w-full max-w-md ">
-							<h1 className="text-2xl text-center mb-2 w-full max-w-md flex flex-col gap-y-3">
+							<h1 className="text-2xl font-bold text-slate-900 text-center mb-2 w-full max-w-md flex flex-col gap-y-3">
 								Welcome Back
 							</h1>
-							<p className="text-gray-700 text-center mb-8">
+							<p className="text-slate-600 text-center mb-8">
 								Sign in to continue to your dashboard
 							</p>
 
@@ -214,7 +214,7 @@ const SignIn = () => {
 										type="button"
 										className="
                                             w-full flex items-center justify-center gap-2
-                                            text-gray-700 font-medium
+                                            text-slate-700 font-medium
                                             py-2 rounded-lg transition cursor-pointer
                                             bg-white border border-[#d4ceea]
                                             shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
@@ -231,59 +231,60 @@ const SignIn = () => {
 									</button>
 								</div>
 								<div className="flex items-center gap-4 my-4">
-									<div className="flex-1 h-px bg-gray-300"></div>
-									<span className="text-gray-600 text-sm">
+									<div className="flex-1 h-px bg-slate-300"></div>
+									<span className="text-slate-600 text-sm">
 										or continue with email
 									</span>
-									<div className="flex-1 h-px bg-gray-300"></div>
+									<div className="flex-1 h-px bg-slate-300"></div>
 								</div>
 
 								<form className="space-y-5" onSubmit={handleSubmit}>
-									<label htmlFor="email">Email</label>
-									<input
-										name="email"
-										value={form.email}
-										onChange={handleChange}
-										type="email"
-										className="
-                                            w-full rounded-lg px-3 py-2
-                                            border border-[#d4ceea]
-                                            shadow-sm
-                                            focus:outline-none
-                                            focus:border-violet-500
-                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                    "
-									/>
+									<div>
+										<label htmlFor="email" className="block text-sm font-semibold text-slate-800 mb-1">
+											Email
+										</label>
+										<input
+											name="email"
+											value={form.email}
+											onChange={handleChange}
+											type="email"
+											className="
+                                                w-full rounded-lg px-3 py-2
+                                                border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
+                                                shadow-sm
+                                                focus:outline-none
+                                                focus:border-violet-500
+                                                focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
+										/>
+									</div>
 
-									<label htmlFor="password">Password</label>
-									<input
-										name="password"
-										value={form.password}
-										onChange={handleChange}
-										type="password"
-										className="
-                                            w-full rounded-lg px-3 py-2
-                                            border border-[#d4ceea]
-                                            shadow-sm
-                                            focus:outline-none
-                                            focus:border-violet-500
-                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                    "
-									/>
-
-									<div className="space-y-2">
-										<div className="flex items-center justify-between">
-											<label
-												htmlFor="password"
-												className="block text-gray-700 font-medium"
-											></label>
+									<div>
+										<div className="flex items-center justify-between mb-1">
+											<label htmlFor="password" className="block text-sm font-semibold text-slate-800">
+												Password
+											</label>
 											<Link
 												to="/forgot-password"
-												className="text-sm text-violet-600 hover:text-violet-800 hover:underline transition-colors font-medium"
+												className="text-xs text-violet-700 hover:text-violet-900 hover:underline transition-colors font-medium"
 											>
 												Forgot password?
 											</Link>
 										</div>
+										<input
+											name="password"
+											value={form.password}
+											onChange={handleChange}
+											type="password"
+											className="
+                                                w-full rounded-lg px-3 py-2
+                                                border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
+                                                shadow-sm
+                                                focus:outline-none
+                                                focus:border-violet-500
+                                                focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
+										/>
 									</div>
 
 									<div className="flex justify-center">
@@ -299,16 +300,16 @@ const SignIn = () => {
 										/>
 									</div>
 
-									<button className="cursor-pointer w-full bg-[#7c3aed] text-white py-2 rounded-lg font-medium hover:bg-[#5b21b6] transition duration-250">
+									<button className="cursor-pointer w-full bg-[#7c3aed] text-white py-2.5 rounded-lg font-bold hover:bg-[#5b21b6] transition duration-250 shadow-md shadow-violet-500/20">
 										Sign In
 									</button>
 								</form>
 
 								<p className="flex gap-1 items-center justify-center text-sm">
-									<span className="text-gray-700">Don't have an account?</span>
+									<span className="text-slate-600">Don't have an account?</span>
 									<Link
 										to="/sign-up"
-										className="text-violet-900 hover:underline transition duration-250"
+										className="text-violet-700 font-bold hover:underline transition duration-250"
 									>
 										Create one
 									</Link>
@@ -319,18 +320,18 @@ const SignIn = () => {
 
 					<footer className="mx-auto mt-auto w-full max-w-md text-xs pt-18">
 						<div className="text-center">
-							<span className="text-gray-700">
+							<span className="text-slate-600">
 								By signing up you agree to our{" "}
 							</span>
 							<a
-								className="underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
+								className="text-slate-800 font-medium underline underline-offset-2 decoration-1 decoration-slate-400 hover:text-violet-700 transition-all"
 								href="#"
 							>
 								terms of service
 							</a>
-							<span className="text-gray-700"> and </span>
+							<span className="text-slate-600"> and </span>
 							<a
-								className="underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
+								className="text-slate-800 font-medium underline underline-offset-2 decoration-1 decoration-slate-400 hover:text-violet-700 transition-all"
 								href="#"
 							>
 								privacy policy

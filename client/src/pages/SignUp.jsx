@@ -215,10 +215,10 @@ const SignUp = () => {
 
 					<div className="flex-1 flex flex-col justify-center items-center">
 						<div className="bg-[#ffffffbf] border border-[#5b21b613] backdrop-blur-2xl p-8 rounded-2xl shadow-xl w-full max-w-md ">
-							<h1 className="text-2xl text-center mb-2 w-full max-w-md flex flex-col gap-y-3">
+							<h1 className="text-2xl font-bold text-slate-900 text-center mb-2 w-full max-w-md flex flex-col gap-y-3">
 								Sign up for an Account
 							</h1>
-							<p className="text-gray-700 text-center mb-8">
+							<p className="text-slate-600 text-center mb-8">
 								Join us to manage your tasks efficiently
 							</p>
 
@@ -233,7 +233,7 @@ const SignUp = () => {
 										type="button"
 										className="
             w-full flex items-center justify-center gap-2
-            text-gray-700 font-medium
+            text-slate-700 font-medium
             py-2 rounded-lg transition cursor-pointer
             bg-white border border-[#d4ceea]
             shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
@@ -251,17 +251,17 @@ const SignUp = () => {
 								</div>
 
 								<div className="flex items-center gap-4 my-4">
-									<div className="flex-1 h-px bg-gray-300"></div>
-									<span className="text-gray-600 text-sm">or</span>
-									<div className="flex-1 h-px bg-gray-300"></div>
+									<div className="flex-1 h-px bg-slate-300"></div>
+									<span className="text-slate-600 text-sm">or</span>
+									<div className="flex-1 h-px bg-slate-300"></div>
 								</div>
 
 								<form className="space-y-5" onSubmit={handleSubmit}>
 									<div className="space-y-2">
-										<label className="text-gray-700">I am signing up as:</label>
+										<label className="block text-sm font-semibold text-slate-800">I am signing up as:</label>
 
-										<div className="flex gap-4" onSubmit={handleSubmit}>
-											<label className="flex items-center gap-2 cursor-pointer">
+										<div className="flex gap-4">
+											<label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium text-sm">
 												<input
 													type="radio"
 													name="role"
@@ -272,7 +272,7 @@ const SignUp = () => {
 												Customer
 											</label>
 
-											<label className="flex items-center gap-2 cursor-pointer">
+											<label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium text-sm">
 												<input
 													type="radio"
 													name="role"
@@ -285,53 +285,59 @@ const SignUp = () => {
 										</div>
 									</div>
 
-									<label htmlFor="name">Full Name</label>
-									<input
-										name="name"
-										value={form.name}
-										onChange={handleChange}
-										type="text"
-										className="capitalize
-                                            w-full rounded-lg px-3 py-2
-                                            border border-[#d4ceea]
-                                            shadow-sm
-                                            focus:outline-none
-                                            focus:border-violet-500
-                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                    "
-									/>
+									<div>
+										<label htmlFor="name" className="block text-sm font-semibold text-slate-800 mb-1">Full Name</label>
+										<input
+											name="name"
+											value={form.name}
+											onChange={handleChange}
+											type="text"
+											className="capitalize
+                                                w-full rounded-lg px-3 py-2
+                                                border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
+                                                shadow-sm
+                                                focus:outline-none
+                                                focus:border-violet-500
+                                                focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
+										/>
+									</div>
 
-									<label htmlFor="name">Email</label>
-									<input
-										name="email"
-										value={form.email}
-										onChange={handleChange}
-										type="email"
-										className="
-                                            w-full rounded-lg px-3 py-2
-                                            border border-[#d4ceea]
-                                            shadow-sm
-                                            focus:outline-none
-                                            focus:border-violet-500
-                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                    "
-									/>
+									<div>
+										<label htmlFor="email" className="block text-sm font-semibold text-slate-800 mb-1">Email</label>
+										<input
+											name="email"
+											value={form.email}
+											onChange={handleChange}
+											type="email"
+											className="
+                                                w-full rounded-lg px-3 py-2
+                                                border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
+                                                shadow-sm
+                                                focus:outline-none
+                                                focus:border-violet-500
+                                                focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
+										/>
+									</div>
 
-									<label htmlFor="name">Password</label>
-									<input
-										name="password"
-										value={form.password}
-										onChange={handleChange}
-										type="password"
-										className="
-                                            w-full rounded-lg px-3 py-2
-                                            border border-[#d4ceea]
-                                            shadow-sm
-                                            focus:outline-none
-                                            focus:border-violet-500
-                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                    "
-									/>
+									<div>
+										<label htmlFor="password" className="block text-sm font-semibold text-slate-800 mb-1">Password</label>
+										<input
+											name="password"
+											value={form.password}
+											onChange={handleChange}
+											type="password"
+											className="
+                                                w-full rounded-lg px-3 py-2
+                                                border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
+                                                shadow-sm
+                                                focus:outline-none
+                                                focus:border-violet-500
+                                                focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
+										/>
+									</div>
 
 									<div className="flex justify-center">
 										<Turnstile
@@ -348,7 +354,7 @@ const SignUp = () => {
 
 									<button
 										disabled={loading}
-										className={`cursor-pointer w-full bg-[#7c3aed] text-white py-2 rounded-lg font-medium hover:bg-[#5b21b6] transition duration-250 ${
+										className={`cursor-pointer w-full bg-[#7c3aed] text-white py-2.5 rounded-lg font-bold hover:bg-[#5b21b6] transition duration-250 shadow-md shadow-violet-500/20 ${
 											loading ? "opacity-70 cursor-not-allowed" : ""
 										}`}
 									>
@@ -356,11 +362,11 @@ const SignUp = () => {
 									</button>
 								</form>
 
-								<p className="flex gap-1 items-center justify-center text-gray-700 text-sm">
+								<p className="flex gap-1 items-center justify-center text-slate-600 text-sm">
 									Already have an account?
 									<Link
 										to="/login"
-										className="text-violet-700 font-medium hover:underline transition duration-250"
+										className="text-violet-700 font-bold hover:underline transition duration-250"
 									>
 										Sign in
 									</Link>
@@ -371,18 +377,18 @@ const SignUp = () => {
 
 					<footer className="mx-auto mt-auto w-full max-w-md text-xs pt-6">
 						<div className="text-center">
-							<span className="text-gray-700">
+							<span className="text-slate-600">
 								By signing up you agree to our{" "}
 							</span>
 							<a
-								className="text-navy underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
+								className="text-slate-800 font-medium underline underline-offset-2 decoration-1 decoration-slate-400 hover:text-violet-700 transition-all"
 								href="#"
 							>
 								terms of service
 							</a>
-							<span className="text-gray-700"> and </span>
+							<span className="text-slate-600"> and </span>
 							<a
-								className="text-navy underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
+								className="text-slate-800 font-medium underline underline-offset-2 decoration-1 decoration-slate-400 hover:text-violet-700 transition-all"
 								href="#"
 							>
 								privacy policy
