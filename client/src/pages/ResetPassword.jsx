@@ -45,11 +45,11 @@ const ResetPassword = () => {
 
 	return (
 		<div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 bricolage-grotesque">
-			<div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-slate-100">
+			<div className="auth-card w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-slate-100" style={{ color: "#0f172a" }}>
 				<div className="text-center mb-8">
 					<img src={logoImg} alt="TaskGenie Logo" className="w-12 mx-auto mb-4" />
-					<h2 className="text-2xl font-bold text-slate-900">Set New Password</h2>
-					<p className="text-slate-600 mt-2">
+					<h2 className="text-2xl font-bold text-slate-900" style={{ color: "#0f172a" }}>Set New Password</h2>
+					<p className="auth-subtext text-slate-600 mt-2" style={{ color: "#475569" }}>
 						Please enter your new password below
 					</p>
 				</div>
@@ -70,6 +70,7 @@ const ResetPassword = () => {
 						<label
 							htmlFor="password"
 							className="block text-sm font-semibold text-slate-800 mb-1"
+							style={{ color: "#1e293b" }}
 						>
 							New Password
 						</label>
@@ -79,6 +80,7 @@ const ResetPassword = () => {
 							required
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
+							style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
 							className="w-full px-4 py-2 border border-slate-300 bg-white text-slate-900 placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition shadow-sm"
 							placeholder="At least 6 characters"
 						/>
@@ -88,6 +90,7 @@ const ResetPassword = () => {
 						<label
 							htmlFor="confirmPassword"
 							className="block text-sm font-semibold text-slate-800 mb-1"
+							style={{ color: "#1e293b" }}
 						>
 							Confirm New Password
 						</label>
@@ -97,6 +100,7 @@ const ResetPassword = () => {
 							required
 							value={confirmPassword}
 							onChange={(e) => setConfirmPassword(e.target.value)}
+							style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
 							className="w-full px-4 py-2 border border-slate-300 bg-white text-slate-900 placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition shadow-sm"
 							placeholder="Re-enter your password"
 						/>

@@ -1113,15 +1113,53 @@ text-container {
 	opacity: 0.2;
 	transform: matrix(0.82, 0.57, 0.72, -0.7, 0, 0);
 }
-
-@import "tailwindcss";
-
 @layer base {
 	body {
 		background-color: #090514;
 		color: #f8fafc;
 		font-family: "Plus Jakarta Sans", sans-serif;
 	}
+}
+
+/* Explicit high-contrast rules for auth pages overriding global body font color */
+.auth-card {
+	color: #0f172a !important;
+}
+
+.auth-card h1,
+.auth-card h2,
+.auth-card h3 {
+	color: #0f172a !important;
+}
+
+.auth-card label {
+	color: #1e293b !important;
+}
+
+.auth-card input:not([type="radio"]):not([type="checkbox"]) {
+	color: #0f172a !important;
+	background-color: #ffffff !important;
+}
+
+.auth-card input::placeholder {
+	color: #94a3b8 !important;
+}
+
+.auth-card .auth-subtext {
+	color: #475569 !important;
+}
+
+.auth-footer,
+.auth-footer span {
+	color: #475569 !important;
+}
+
+.auth-footer a {
+	color: #1e293b !important;
+}
+
+.auth-footer a:hover {
+	color: #6d28d9 !important;
 }
 
 @keyframes floatSlow {

@@ -214,11 +214,11 @@ const SignUp = () => {
 					</div>
 
 					<div className="flex-1 flex flex-col justify-center items-center">
-						<div className="bg-[#ffffffbf] border border-[#5b21b613] backdrop-blur-2xl p-8 rounded-2xl shadow-xl w-full max-w-md ">
-							<h1 className="text-2xl font-bold text-slate-900 text-center mb-2 w-full max-w-md flex flex-col gap-y-3">
+						<div className="auth-card bg-[#ffffffbf] border border-[#5b21b613] backdrop-blur-2xl p-8 rounded-2xl shadow-xl w-full max-w-md" style={{ color: "#0f172a" }}>
+							<h1 className="text-2xl font-bold text-slate-900 text-center mb-2 w-full max-w-md flex flex-col gap-y-3" style={{ color: "#0f172a" }}>
 								Sign up for an Account
 							</h1>
-							<p className="text-slate-600 text-center mb-8">
+							<p className="auth-subtext text-slate-600 text-center mb-8" style={{ color: "#475569" }}>
 								Join us to manage your tasks efficiently
 							</p>
 
@@ -240,6 +240,7 @@ const SignUp = () => {
             hover:shadow-[inset_0_3px_6px_#ddd6fe]         
             active:shadow-[inset_0_0_6px_#ddd6fe]         
         "
+										style={{ color: "#334155" }}
 									>
 										<img
 											src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
@@ -252,16 +253,16 @@ const SignUp = () => {
 
 								<div className="flex items-center gap-4 my-4">
 									<div className="flex-1 h-px bg-slate-300"></div>
-									<span className="text-slate-600 text-sm">or</span>
+									<span className="text-slate-600 text-sm" style={{ color: "#475569" }}>or</span>
 									<div className="flex-1 h-px bg-slate-300"></div>
 								</div>
 
 								<form className="space-y-5" onSubmit={handleSubmit}>
 									<div className="space-y-2">
-										<label className="block text-sm font-semibold text-slate-800">I am signing up as:</label>
+										<label className="block text-sm font-semibold text-slate-800" style={{ color: "#1e293b" }}>I am signing up as:</label>
 
 										<div className="flex gap-4">
-											<label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium text-sm">
+											<label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium text-sm" style={{ color: "#1e293b" }}>
 												<input
 													type="radio"
 													name="role"
@@ -272,7 +273,7 @@ const SignUp = () => {
 												Customer
 											</label>
 
-											<label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium text-sm">
+											<label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium text-sm" style={{ color: "#1e293b" }}>
 												<input
 													type="radio"
 													name="role"
@@ -286,12 +287,13 @@ const SignUp = () => {
 									</div>
 
 									<div>
-										<label htmlFor="name" className="block text-sm font-semibold text-slate-800 mb-1">Full Name</label>
+										<label htmlFor="name" className="block text-sm font-semibold text-slate-800 mb-1" style={{ color: "#1e293b" }}>Full Name</label>
 										<input
 											name="name"
 											value={form.name}
 											onChange={handleChange}
 											type="text"
+											style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
 											className="capitalize
                                                 w-full rounded-lg px-3 py-2
                                                 border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
@@ -304,12 +306,13 @@ const SignUp = () => {
 									</div>
 
 									<div>
-										<label htmlFor="email" className="block text-sm font-semibold text-slate-800 mb-1">Email</label>
+										<label htmlFor="email" className="block text-sm font-semibold text-slate-800 mb-1" style={{ color: "#1e293b" }}>Email</label>
 										<input
 											name="email"
 											value={form.email}
 											onChange={handleChange}
 											type="email"
+											style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
 											className="
                                                 w-full rounded-lg px-3 py-2
                                                 border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
@@ -322,12 +325,13 @@ const SignUp = () => {
 									</div>
 
 									<div>
-										<label htmlFor="password" className="block text-sm font-semibold text-slate-800 mb-1">Password</label>
+										<label htmlFor="password" className="block text-sm font-semibold text-slate-800 mb-1" style={{ color: "#1e293b" }}>Password</label>
 										<input
 											name="password"
 											value={form.password}
 											onChange={handleChange}
 											type="password"
+											style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
 											className="
                                                 w-full rounded-lg px-3 py-2
                                                 border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
@@ -362,7 +366,7 @@ const SignUp = () => {
 									</button>
 								</form>
 
-								<p className="flex gap-1 items-center justify-center text-slate-600 text-sm">
+								<p className="flex gap-1 items-center justify-center text-slate-600 text-sm" style={{ color: "#475569" }}>
 									Already have an account?
 									<Link
 										to="/login"
@@ -375,20 +379,22 @@ const SignUp = () => {
 						</div>
 					</div>
 
-					<footer className="mx-auto mt-auto w-full max-w-md text-xs pt-6">
+					<footer className="auth-footer mx-auto mt-auto w-full max-w-md text-xs pt-6" style={{ color: "#475569" }}>
 						<div className="text-center">
-							<span className="text-slate-600">
+							<span className="text-slate-600" style={{ color: "#475569" }}>
 								By signing up you agree to our{" "}
 							</span>
 							<a
 								className="text-slate-800 font-medium underline underline-offset-2 decoration-1 decoration-slate-400 hover:text-violet-700 transition-all"
+								style={{ color: "#1e293b" }}
 								href="#"
 							>
 								terms of service
 							</a>
-							<span className="text-slate-600"> and </span>
+							<span className="text-slate-600" style={{ color: "#475569" }}> and </span>
 							<a
 								className="text-slate-800 font-medium underline underline-offset-2 decoration-1 decoration-slate-400 hover:text-violet-700 transition-all"
+								style={{ color: "#1e293b" }}
 								href="#"
 							>
 								privacy policy
