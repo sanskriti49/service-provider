@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router-dom";
 import {
 	FilePenLine,
 	Users,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import AuroraBackground from "../ui/AuroraBackground";
+import { useAuth } from "../hooks/useAuth";
 
 const steps = [
 	{
@@ -54,6 +56,15 @@ const steps = [
 ];
 
 const HowItWorksSection = () => {
+	const { user } = useAuth();
+	const targetLink = !user
+		? "/sign-up"
+		: user.role === "customer"
+			? "/services"
+			: user.role === "provider"
+				? "/provider-dashboard"
+				: "/admin";
+
 	return (
 		<section
 			id="how-it-works"
@@ -141,13 +152,16 @@ const HowItWorksSection = () => {
 						<span className="text-xs sm:text-sm font-semibold text-slate-700">
 							Ready to get started? Post your first task in under 2 minutes.
 						</span>
-						<button className="group inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 px-6 py-2.5 rounded-full shadow-md shadow-purple-500/20 hover:shadow-pink-500/30 transition-all cursor-pointer">
+						<Link
+							to={targetLink}
+							className="group inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 px-6 py-2.5 rounded-full shadow-md shadow-purple-500/20 hover:shadow-pink-500/30 transition-all cursor-pointer hover:scale-105 active:scale-95"
+						>
 							<span>Get Started</span>
 							<ArrowRight
 								size={15}
 								className="transition-transform group-hover:translate-x-1"
 							/>
-						</button>
+						</Link>
 					</div>
 				</div>
 			</div>

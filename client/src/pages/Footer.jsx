@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { HashLink } from "react-router-hash-link";
 
 const Footer = () => {
 	return (
@@ -7,18 +8,22 @@ const Footer = () => {
 			<div className="container mx-auto px-6 lg:px-16">
 				<div className="flex flex-col md:flex-row md:justify-between gap-10">
 					<div className="md:w-1/4">
-						<a
-							href="/"
-							className="text-2xl tracking-wide font-semibold flex items-center gap-2"
+						<Link
+							to="/"
+							className="text-2xl tracking-wide font-semibold flex items-center gap-2 text-white hover:text-violet-300 transition"
 							style={{ fontFamily: "P22Mackinac, Cambria, sans-serif" }}
 						>
-							🧞 TaskGenie
-						</a>
+							<img
+								src="/images/taskgenie-logo.svg"
+								alt="TaskGenie Logo"
+								className="w-7 h-7 object-contain rounded-lg"
+							/>
+							<span>TaskGenie</span>
+						</Link>
 						<p className="text-sm text-[#A39AC1] mt-3 leading-relaxed">
 							Your wish, our command. From plumbers to stylists — TaskGenie
 							connects you with trusted professionals for every need.
 						</p>
-
 					</div>
 
 					<div className="flex-grow grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -27,18 +32,32 @@ const Footer = () => {
 								Company
 							</h3>
 							<div className="flex flex-col mt-3 space-y-2 text-[13px] text-[#A39AC1]">
-								<a className="cursor-pointer hover:text-violet-500 transition">
+								<HashLink
+									smooth
+									to="/#hero"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
 									About Us
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
-									Pricing
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
+								</HashLink>
+								<Link
+									to="/services"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
+									Services & Pricing
+								</Link>
+								<Link
+									to="/apply-now"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
 									Careers
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
-									Press
-								</a>
+								</Link>
+								<HashLink
+									smooth
+									to="/#services"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
+									Categories
+								</HashLink>
 							</div>
 						</div>
 
@@ -47,18 +66,25 @@ const Footer = () => {
 								For Customers
 							</h3>
 							<div className="flex flex-col mt-3 space-y-2 text-[13px] text-[#A39AC1]">
-								<a
-									href="#how-it-works"
-									className="cursor-pointer hover:text-violet-500 transition"
+								<HashLink
+									smooth
+									to="/#how-it-works"
+									className="cursor-pointer hover:text-violet-400 transition"
 								>
 									How It Works
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
-									Trust & Safety
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
+								</HashLink>
+								<Link
+									to="/services"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
+									Browse Pros
+								</Link>
+								<Link
+									to="/help"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
 									Help Center
-								</a>
+								</Link>
 							</div>
 						</div>
 
@@ -67,18 +93,31 @@ const Footer = () => {
 								For Providers
 							</h3>
 							<div className="flex flex-col mt-3 space-y-2 text-[13px] text-[#A39AC1]">
-								<a className="cursor-pointer hover:text-violet-500 transition">
+								<Link
+									to="/apply-now"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
 									Join as Provider
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
-									Dashboard
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
-									Provider Guidelines
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
-									Earnings
-								</a>
+								</Link>
+								<Link
+									to="/provider-dashboard"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
+									Pro Dashboard
+								</Link>
+								<HashLink
+									smooth
+									to="/#work-with-us"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
+									Benefits & Earnings
+								</HashLink>
+								<Link
+									to="/help"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
+									Support
+								</Link>
 							</div>
 						</div>
 
@@ -87,18 +126,25 @@ const Footer = () => {
 								Resources
 							</h3>
 							<div className="flex flex-col mt-3 space-y-2 text-[13px] text-[#A39AC1]">
-								<a className="cursor-pointer hover:text-violet-500 transition">
+								<Link
+									to="/help"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
 									FAQs
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
-									Terms of Service
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
-									Privacy Policy
-								</a>
-								<a className="cursor-pointer hover:text-violet-500 transition">
+								</Link>
+								<Link
+									to="/help"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
+									Terms & Safety
+								</Link>
+								<HashLink
+									smooth
+									to="/#contact"
+									className="cursor-pointer hover:text-violet-400 transition"
+								>
 									Contact Us
-								</a>
+								</HashLink>
 							</div>
 						</div>
 					</div>
