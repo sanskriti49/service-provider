@@ -21,7 +21,6 @@ const PRICING_GROUPS = {
 };
 
 const SERVICE_UNIT_WHITELIST = {
-	// --- Home Services Category ---
 	"house-cleaning": ["fixed", "starts at", "per hr"],
 	laundry: PRICING_GROUPS.laundry,
 	plumbing: PRICING_GROUPS.standardHome,
@@ -35,7 +34,6 @@ const SERVICE_UNIT_WHITELIST = {
 	"appliance-repair": PRICING_GROUPS.standardHome,
 	"driver-service": ["per hr", "fixed", "package"],
 
-	// --- Personal Care / Grooming ---
 	massage: ["per session", "per hr", "fixed"],
 	"mens-haircut": PRICING_GROUPS.grooming,
 	"mens-hair-spa": PRICING_GROUPS.grooming,
@@ -50,7 +48,6 @@ const SERVICE_UNIT_WHITELIST = {
 	waxing: ["per session", "fixed", "starts at"],
 	"nail-studio": ["per session", "fixed", "starts at"],
 
-	// --- Child & Health Services ---
 	babysitting: PRICING_GROUPS.timeBased,
 	"child-tutoring": PRICING_GROUPS.coaching,
 	nutritionist: ["per session", "package", "fixed"],

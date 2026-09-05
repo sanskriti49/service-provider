@@ -50,14 +50,12 @@ export default function ContactSection() {
 		const TEMPLATE_USER = "template_44pf72s";
 		const PUBLIC_KEY = "VSuB8cLKQ6u5BQFuj";
 
-		// 2. Create a promise-based toast for immediate user feedback (Loading -> Success/Error)
 		toast.promise(
 			emailjs
 				.sendForm(SERVICE_ID, TEMPLATE_ADMIN, formRef.current, {
 					publicKey: PUBLIC_KEY,
 				})
 				.then(() => {
-					// Send the auto-reply confirmation email to user
 					return emailjs.send(SERVICE_ID, TEMPLATE_USER, {
 						user_name: form.user_name,
 						user_email: form.user_email,
@@ -95,7 +93,6 @@ export default function ContactSection() {
 				<div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000" />
 
 				<div className="relative z-10 w-full max-w-6xl grid lg:grid-cols-2 gap-12 items-start">
-					{/* --- LEFT COLUMN --- */}
 					<motion.div
 						initial={{ opacity: 0, x: -50 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -117,7 +114,6 @@ export default function ContactSection() {
 							</p>
 						</div>
 
-						{/* LIST CONTAINER WITH SVGS */}
 						<div className="w-full lg:w-auto">
 							<ul className="relative text-lg text-slate-800 font-medium py-10">
 								<svg
@@ -175,7 +171,6 @@ export default function ContactSection() {
 						</div>
 					</motion.div>
 
-					{/* --- RIGHT COLUMN (FORM) --- */}
 					<motion.div
 						initial={{ opacity: 0, x: 50 }}
 						animate={{ opacity: 1, x: 0 }}

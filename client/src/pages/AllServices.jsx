@@ -66,7 +66,6 @@ export default function AllServices() {
 
 	return (
 		<div className="min-h-screen pt-32 pb-12 px-4 sm:px-8 relative overflow-hidden bg-slate-50">
-			{/* Background Ambience - Very Soft Pastel */}
 			<div className="absolute top-0 left-1/4 w-146 h-96 bg-purple-200/30 rounded-full blur-[100px] pointer-events-none" />
 			<div className="absolute bottom-0 right-1/4 w-96 h-96 bg-fuchsia-200/20 rounded-full blur-[100px] pointer-events-none" />
 
@@ -84,7 +83,6 @@ export default function AllServices() {
 					</p>
 				</div>
 
-				{/* Search Bar */}
 				<div className="inter relative max-w-2xl mx-auto mb-10 group">
 					<div className="absolute left-5 inset-y-0 flex items-center text-violet-300 group-focus-within:text-violet-600 transition-colors duration-300">
 						<Search className="h-5 w-5" />
@@ -110,7 +108,6 @@ export default function AllServices() {
 					)}
 				</div>
 
-				{/* Categories */}
 				<div className="flex flex-wrap justify-center gap-3 mb-16">
 					{CATEGORIES.map((cat) => (
 						<button
@@ -127,7 +124,6 @@ export default function AllServices() {
 					))}
 				</div>
 
-				{/* Content Area */}
 				{loading && (
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
 						{[...Array(8)].map((_, i) => (
@@ -233,7 +229,6 @@ function ServiceCard({ service }) {
 				<div className="relative h-64 overflow-hidden">
 					<ProgressiveImage src={imageUrl} alt={service.name} />
 
-					{/* Category Tag */}
 					<div className="inter absolute top-4 left-4 z-20">
 						<span className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-white/90 backdrop-blur-md text-violet-800 rounded-full shadow-sm border border-violet-100">
 							{service.category || "Service"}

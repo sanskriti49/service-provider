@@ -79,17 +79,14 @@ async function createBooking(req, res, next) {
 	try {
 		await client.query("BEGIN");
 
-		// Resolve provider UUID
 		const resolvedProviderId = await resolveProviderId(client, provider_id);
 		if (!resolvedProviderId) {
 			await client.query("ROLLBACK");
 			return res.status(404).json({ message: "Provider not found" });
 		}
 
-		// Normalize start and end time
 		start_time = String(start_time).slice(0, 5);
 
-		// Resolve service details & price
 		let resolvedServiceId = service_id;
 		let serviceName = "default";
 		let finalPrice = 0;
@@ -141,7 +138,6 @@ async function createBooking(req, res, next) {
 		const cleanDate = date.toString().substring(0, 10);
 		const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
-		// Payment Order Generation if Razorpay
 		let payment_status = "pending";
 		let razorpay_order_id = null;
 
@@ -159,7 +155,6 @@ async function createBooking(req, res, next) {
 			}
 		}
 
-		// Conflict Check (including active pending bookings in 15 min window)
 		const existingBookings = await client.query(
 			`SELECT start_time, end_time, latitude, longitude FROM bookings 
              WHERE provider_id = $1 AND date = $2::date 
@@ -174,7 +169,6 @@ async function createBooking(req, res, next) {
 			const existStart = toMins(String(slot.start_time).slice(0, 5));
 			const existEnd = toMins(String(slot.end_time).slice(0, 5));
 
-			// 1. Direct Overlap Check
 			if (!(reqEnd <= existStart || reqStart >= existEnd)) {
 				await client.query("ROLLBACK");
 				return res.status(409).json({
@@ -183,7 +177,6 @@ async function createBooking(req, res, next) {
 				});
 			}
 
-			// 2. Transit Buffer Check for Adjacent Jobs
 			let requiredBuffer = serviceConfig.buffer || 20;
 
 			if (latitude && longitude && slot.latitude && slot.longitude) {
@@ -249,7 +242,6 @@ async function createBooking(req, res, next) {
 
 		const createdBooking = r.rows[0];
 
-		// Real-time alerts to provider and customer
 		sendNotification({
 			userId: resolvedProviderId,
 			title: "New Booking Request 📅",
@@ -467,7 +459,6 @@ async function updateBookingStatus(req, res) {
 		await client.query("COMMIT");
 		sendEmailNotifications(status, userRole, currentBooking, refundPercentage);
 
-		// Real-time status update notifications
 		try {
 			if (status === "confirmed" || status === "booked") {
 				sendNotification({

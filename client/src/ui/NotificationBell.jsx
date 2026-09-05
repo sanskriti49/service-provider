@@ -69,7 +69,6 @@ export default function NotificationBell() {
 	useEffect(() => {
 		fetchNotifications();
 
-		// Initialize WebSocket listener
 		getSocket();
 
 		const handleRealtimeNotification = (e) => {
@@ -80,7 +79,6 @@ export default function NotificationBell() {
 
 		window.addEventListener("app:notification", handleRealtimeNotification);
 
-		// Click outside listener
 		const handleClickOutside = (e) => {
 			if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
 				setIsOpen(false);
@@ -130,7 +128,6 @@ export default function NotificationBell() {
 		}
 		setIsOpen(false);
 
-		// Navigate if booking related
 		if (notif.data?.booking_id) {
 			const role = localStorage.getItem("role");
 			if (role === "provider") {
@@ -158,10 +155,8 @@ export default function NotificationBell() {
 				)}
 			</button>
 
-			{/* Dropdown Menu */}
 			{isOpen && (
 				<div className="absolute right-0 mt-3 w-80 sm:w-96 bg-[#1b1238] border border-white/10 rounded-3xl shadow-2xl z-50 overflow-hidden animate-fade-in text-white backdrop-blur-xl">
-					{/* Header */}
 					<div className="p-4 border-b border-white/10 flex items-center justify-between bg-[#150d2f]">
 						<div className="flex items-center gap-2">
 							<span className="font-bold text-sm">Notifications</span>
@@ -183,7 +178,6 @@ export default function NotificationBell() {
 						)}
 					</div>
 
-					{/* Notification List */}
 					<div className="max-h-80 overflow-y-auto divide-y divide-white/5 custom-scrollbar-y">
 						{notifications.length === 0 ? (
 							<div className="p-8 text-center text-gray-400 space-y-2">
@@ -229,7 +223,6 @@ export default function NotificationBell() {
 						)}
 					</div>
 
-					{/* Footer */}
 					<div className="p-3 border-t border-white/10 bg-[#150d2f] text-center">
 						<Link
 							to="/notifications"

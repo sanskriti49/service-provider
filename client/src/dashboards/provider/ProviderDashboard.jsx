@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
-import { toast } from "react-hot-toast"; // Ensure toast is imported properly
+import { toast } from "sonner";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -655,12 +655,10 @@ const BookingRow = ({ booking }) => {
 			onClick={() => navigate("/provider/dashboard/bookings")}
 			className="w-full text-left flex items-center gap-3 px-4 py-3.5 hover:bg-slate-800/60 transition-colors group"
 		>
-			{/* Icon */}
 			<div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-500 shrink-0">
 				<Wrench size={13} />
 			</div>
 
-			{/* Service + ID */}
 			<div className="flex-1 min-w-0">
 				<p className="text-sm font-semibold text-slate-200 truncate group-hover:text-white transition-colors">
 					{booking.service_name || "Custom Service"}
@@ -675,7 +673,6 @@ const BookingRow = ({ booking }) => {
 				</p>
 			</div>
 
-			{/* Status + price */}
 			<div className="flex items-center gap-2.5 shrink-0">
 				<span
 					className={`text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-md border hidden sm:inline-flex ${status.cls}`}

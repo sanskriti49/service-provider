@@ -15,7 +15,6 @@ export default function HomeLayout() {
 		>
 			<Navbar />
 
-			{/* main wrapper keeps footer at the bottom of viewport */}
 			<main className="flex-1 flex flex-col w-full">
 				<AnimatePresence mode="wait">
 					<motion.div
@@ -28,7 +27,6 @@ export default function HomeLayout() {
 					>
 						<Suspense
 							fallback={
-								/* ⚡ min-h-[60vh] forces the wrapper to stay open and center the loader */
 								<div className="flex flex-col flex-grow items-center justify-center min-h-[60vh] w-full gap-3 text-slate-400">
 									<div className="relative flex items-center justify-center">
 										<div className="absolute w-12 h-12 rounded-full bg-violet-500/20 animate-ping duration-1000" />

@@ -1,4 +1,3 @@
-﻿// Fast in-memory client cache with TTL
 const cacheStore = new Map();
 
 export const apiCache = {
@@ -11,7 +10,7 @@ export const apiCache = {
 		}
 		return item.data;
 	},
-	set: (key, data, ttlMs = 120000) => { // 2 mins default
+	set: (key, data, ttlMs = 120000) => {
 		if (cacheStore.size > 200) {
 			const firstKey = cacheStore.keys().next().value;
 			cacheStore.delete(firstKey);

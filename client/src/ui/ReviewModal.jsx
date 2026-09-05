@@ -89,7 +89,6 @@ export default function ReviewModal({
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
 			<div className="relative w-full max-w-lg bg-[#1e153f] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl text-white overflow-hidden">
-				{/* Background glow */}
 				<div className="absolute top-0 right-0 w-48 h-48 bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
 
 				<button
@@ -113,7 +112,6 @@ export default function ReviewModal({
 				</div>
 
 				<form onSubmit={handleSubmit} className="space-y-5">
-					{/* Interactive Star Rating */}
 					<div className="flex flex-col items-center gap-2">
 						<div className="flex items-center gap-2">
 							{[1, 2, 3, 4, 5].map((star) => (
@@ -141,7 +139,6 @@ export default function ReviewModal({
 						</span>
 					</div>
 
-					{/* Tag Chips */}
 					<div>
 						<label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
 							What went well?
@@ -168,7 +165,6 @@ export default function ReviewModal({
 						</div>
 					</div>
 
-					{/* Review Text */}
 					<div>
 						<label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
 							Write your review
@@ -182,7 +178,6 @@ export default function ReviewModal({
 						/>
 					</div>
 
-					{/* Action Buttons */}
 					<div className="flex items-center justify-end gap-3 pt-2">
 						<button
 							type="button"

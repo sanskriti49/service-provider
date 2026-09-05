@@ -41,8 +41,7 @@ export default function ProviderServices() {
 	const [customPrice, setCustomPrice] = useState("");
 	const [priceUnit, setPriceUnit] = useState("fixed");
 
-	// Availability operational states
-	const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]); // Default Mon-Fri
+	const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]);
 	const [startTime, setStartTime] = useState("09:00");
 	const [endTime, setEndTime] = useState("18:00");
 
@@ -201,7 +200,6 @@ export default function ProviderServices() {
 
 	return (
 		<div className="space-y-8 relative bricolage-grotesque">
-			{/* Header section layout components */}
 			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
 				<div>
 					<h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
@@ -414,7 +412,6 @@ export default function ProviderServices() {
 				)}
 			</AnimatePresence>
 
-			{/* Price & availability configurations side drawer sheet */}
 			<AnimatePresence>
 				{selectedService && (
 					<>

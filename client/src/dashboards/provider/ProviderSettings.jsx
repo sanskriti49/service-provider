@@ -520,7 +520,6 @@ export default function ProviderSettings() {
 				)}
 			</div>
 
-			{/* ── 1. Profile ── */}
 			<Card
 				id="profile"
 				icon={User}
@@ -529,9 +528,7 @@ export default function ProviderSettings() {
 				accent="violet"
 			>
 				<form onSubmit={saveProfile} className="space-y-6">
-					{/* Innovative Avatar Dropzone Box */}
 					<div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 p-5 rounded-2xl border border-slate-800 bg-slate-950/40 relative overflow-hidden">
-						{/* Interactive Image Container - Group Hover localized here now */}
 						<div className="group relative w-20 h-20 rounded-2xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-violet-500/50 flex-shrink-0 flex items-center justify-center transition-all duration-300 shadow-xl overflow-hidden">
 							<input
 								type="file"
@@ -557,7 +554,6 @@ export default function ProviderSettings() {
 										alt="Profile"
 										className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
 									/>
-									{/* Overlay ONLY pops up when mousing explicitly inside this square */}
 									<label
 										htmlFor="avatar-picker"
 										className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all duration-200 text-violet-400 backdrop-blur-[2px]"
@@ -584,7 +580,6 @@ export default function ProviderSettings() {
 							)}
 						</div>
 
-						{/* Info Text & Alternative Controls */}
 						<div className="flex-1 space-y-2 min-w-0">
 							<div>
 								<Label>
@@ -599,7 +594,6 @@ export default function ProviderSettings() {
 								</Hint>
 							</div>
 
-							{/* Secondary Actions Row */}
 							{photo && (
 								<motion.div
 									initial={{ opacity: 0, x: -4 }}
@@ -628,7 +622,6 @@ export default function ProviderSettings() {
 						</div>
 					</div>
 
-					{/* Name + Email */}
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div>
 							<Label>
@@ -658,7 +651,6 @@ export default function ProviderSettings() {
 						</div>
 					</div>
 
-					{/* Phone */}
 					<div
 						ref={phoneBoxRef}
 						className={`rounded-xl p-4 border transition-all duration-300 ${phoneOk ? "border-slate-700 bg-transparent" : "border-amber-500/30 bg-amber-500/[0.04]"}`}
@@ -688,7 +680,6 @@ export default function ProviderSettings() {
 						<Hint>Indian mobile number: +91 followed by 10 digits.</Hint>
 					</div>
 
-					{/* State + City */}
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div>
 							<Label>
@@ -743,7 +734,6 @@ export default function ProviderSettings() {
 						</div>
 					</div>
 
-					{/* Bio */}
 					<div>
 						<Label>
 							<FileText size={11} /> Bio
@@ -845,7 +835,6 @@ export default function ProviderSettings() {
 				</form>
 			</Card>
 
-			{/* ── 2. Password ── */}
 			<Card
 				id="password"
 				icon={Lock}
@@ -911,7 +900,6 @@ export default function ProviderSettings() {
 				</form>
 			</Card>
 
-			{/* ── 3. Danger zone ── */}
 			<Card
 				id="danger"
 				icon={AlertTriangle}

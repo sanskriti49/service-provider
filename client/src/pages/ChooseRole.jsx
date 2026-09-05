@@ -22,9 +22,13 @@ const ChooseRole = () => {
 		try {
 			const decoded = jwtDecode(token);
 			if (decoded.role) {
-				navigate(
-					decoded.role === "customer" ? "/dashboard" : "/provider/dashboard",
-				);
+				if (decoded.role === "admin") {
+					navigate("/admin");
+				} else if (decoded.role === "customer") {
+					navigate("/dashboard");
+				} else {
+					navigate("/provider/dashboard");
+				}
 			}
 		} catch {
 			localStorage.removeItem("token");
@@ -63,7 +67,6 @@ const ChooseRole = () => {
 				transition={{ duration: 0.6, ease: "easeOut" }}
 				className="relative z-10 w-full max-w-xl text-center"
 			>
-				{/* Header Section */}
 				<div className="mb-2">
 					<motion.div
 						initial={{ scale: 0.8, opacity: 0 }}
@@ -82,9 +85,7 @@ const ChooseRole = () => {
 					</p>
 				</div>
 
-				{/* Role Cards */}
 				<div className="grid grid-cols-1 gap-5">
-					{/* Customer Option */}
 					<motion.button
 						whileHover={{ scale: 1.02, y: -4 }}
 						whileTap={{ scale: 0.98 }}
@@ -111,7 +112,6 @@ const ChooseRole = () => {
 						<ArrowRight className="text-gray-300 group-hover:text-sky-500 group-hover:translate-x-1 transition-all" />
 					</motion.button>
 
-					{/* Provider Option */}
 					<motion.button
 						whileHover={{ scale: 1.02, y: -4 }}
 						whileTap={{ scale: 0.98 }}
@@ -135,7 +135,6 @@ const ChooseRole = () => {
 					</motion.button>
 				</div>
 
-				{/* Loading State Overlay */}
 				<AnimatePresence>
 					{loading && (
 						<motion.div
@@ -155,7 +154,6 @@ const ChooseRole = () => {
 					)}
 				</AnimatePresence>
 
-				{/* Footer Note */}
 				<p className="mt-12 text-gray-400 text-xs">
 					You can switch your primary role later in settings.
 				</p>

@@ -372,7 +372,6 @@ export default function ProviderBookings() {
 					</div>
 				</div>
 
-				{/* Table implementation */}
 				<div className="bg-slate-900/60 border border-white/8 rounded-2xl shadow-sm overflow-hidden min-h-[300px]">
 					<div className="overflow-x-auto">
 						{loading ? (

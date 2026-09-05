@@ -24,7 +24,6 @@ const generateToken = (user) => {
 			role: user.role,
 			name: user.name,
 			email: user.email,
-			//photo: user.photo,
 			custom_id: user.custom_id,
 		},
 		process.env.JWT_SECRET,
@@ -34,6 +33,7 @@ const generateToken = (user) => {
 
 function generateCustomId(role) {
 	const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 15);
+	if (role === "admin") return "ADM" + nano();
 	if (role === "provider") return "SRV" + nano();
 	return "CUS" + nano();
 }
@@ -306,13 +306,11 @@ router.post("/forgot-password", async (req, res) => {
 		}
 		const resetToken = crypto.randomBytes(20).toString("hex");
 
-		// hash token before saving it to db
 		const resetPasswordToken = crypto
 			.createHash("sha256")
 			.update(resetToken)
 			.digest("hex");
 
-		// set expiration (1hr from now)
 		const resetPasswordExpire = Date.now() + 3600000;
 
 		await db.query(
@@ -320,7 +318,6 @@ router.post("/forgot-password", async (req, res) => {
 			[resetPasswordToken, resetPasswordExpire, user.id],
 		);
 
-		// create reset url, which points to ui
 		const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 		const message = `You have requested a password reset for your TaskGenie account.
             Please go to this link to reset your password:
@@ -337,7 +334,6 @@ router.post("/forgot-password", async (req, res) => {
 			});
 			res.json({ message: "Email sent successfully!" });
 		} catch (emailError) {
-			// rollback DB changes if email fails
 			await db.query(
 				"UPDATE users SET reset_password_token = NULL, reset_password_expires = NULL WHERE id = $1",
 				[user.id],

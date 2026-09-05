@@ -68,7 +68,6 @@ const Navbar = () => {
 	return (
 		<div className="absolute top-0 left-0 w-full z-50 pt-4 sm:pt-6 px-4 pointer-events-none">
 			<div className="max-w-7xl mx-auto relative flex items-center justify-between">
-				{/* 1. LOGO */}
 				<div className="pointer-events-auto flex-none z-50">
 					<Link
 						to="/"
@@ -88,7 +87,6 @@ const Navbar = () => {
 					</Link>
 				</div>
 
-				{/* 2. NAVBAR */}
 				<div className="pointer-events-auto absolute left-1/2 -translate-x-1/2 hidden md:block z-40">
 					<motion.header
 						className={cn(
@@ -107,7 +105,6 @@ const Navbar = () => {
 								hoveredTab={hoveredTab}
 							/>
 
-							{/* Services Dropdown */}
 							<div
 								className="bricolage-grotesque text-[16px] relative px-3 py-2 cursor-pointer z-10"
 								onMouseEnter={() => {
@@ -168,7 +165,6 @@ const Navbar = () => {
 					</motion.header>
 				</div>
 
-				{/* 3. ACTIONS (RIGHT) */}
 				<div className="bricolage-grotesque pointer-events-auto flex-none flex items-center gap-3 z-50">
 					{!user ? (
 						<div className="hidden md:flex flex-none items-center rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-1.5 py-1 text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
@@ -237,7 +233,6 @@ const Navbar = () => {
 				</div>
 			</div>
 
-			{/* Mobile Menu Overlay */}
 			<AnimatePresence>
 				{isMobileMenuOpen && (
 					<motion.div
@@ -296,7 +291,6 @@ const Navbar = () => {
 								</div>
 							) : (
 								<div className="mt-4 pt-4 border-t border-gray-100 flex flex-col gap-2">
-									{/* Option to view dashboard before logging out */}
 									<Link
 										to={
 											user.role === "provider"

@@ -60,7 +60,6 @@ const ServiceDetails = () => {
 
 	const isAnyExpanded = expandedIndex !== -1;
 
-	// Request browser geolocation once on mount
 	useEffect(() => {
 		if ("geolocation" in navigator) {
 			navigator.geolocation.getCurrentPosition(
@@ -300,7 +299,6 @@ const ServiceDetails = () => {
 						</p>
 					</div>
 
-					{/* Geolocation matching controls */}
 					<div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
 						{!userCoords ? (
 							<button
@@ -363,7 +361,7 @@ const ProviderCard = ({
 }) => {
 	const navigate = useNavigate();
 
-	const [activeTab, setActiveTab] = useState("schedule"); // 'schedule' or 'reviews'
+	const [activeTab, setActiveTab] = useState("schedule");
 	const [availability, setAvailability] = useState([]);
 	const [loadingSlots, setLoadingSlots] = useState(false);
 	const [hasLoadedSlots, setHasLoadedSlots] = useState(false);
@@ -641,7 +639,6 @@ const ProviderCard = ({
 						isExpanded ? "max-h-[460px] opacity-100" : "max-h-0 opacity-0"
 					}`}
 				>
-					{/* TAB: SCHEDULE */}
 					{activeTab === "schedule" && (
 						<div className="px-6 pb-6">
 							{!loadingSlots && validDates.length === 0 && (
@@ -761,7 +758,6 @@ const ProviderCard = ({
 						</div>
 					)}
 
-					{/* TAB: REVIEWS */}
 					{activeTab === "reviews" && (
 						<div className="px-6 pb-6 space-y-4">
 							{loadingReviews ? (
@@ -771,7 +767,6 @@ const ProviderCard = ({
 								</div>
 							) : (
 								<>
-									{/* Rating Overview */}
 									<div className="flex items-center justify-between p-3.5 bg-white/5 rounded-2xl border border-white/10">
 										<div className="flex items-center gap-3">
 											<div className="text-3xl font-bold text-white">
@@ -805,7 +800,6 @@ const ProviderCard = ({
 										</button>
 									</div>
 
-									{/* Reviews List */}
 									<div className="max-h-48 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar-y">
 										{reviewsData?.reviews && reviewsData.reviews.length > 0 ? (
 											reviewsData.reviews.map((rev) => (

@@ -69,7 +69,6 @@ export default function NotificationsPage() {
 	useEffect(() => {
 		fetchNotifications();
 
-		// Realtime websocket connection
 		getSocket();
 
 		const handleRealtime = (e) => {
@@ -169,13 +168,11 @@ export default function NotificationsPage() {
 
 	return (
 		<div className="min-h-screen bg-[#191034] text-white selection:bg-violet-500/30 pb-20">
-			{/* Ambient lighting */}
 			<div className="fixed inset-0 pointer-events-none overflow-hidden">
 				<div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-900/20 rounded-full blur-[120px]" />
 				<div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-900/20 rounded-full blur-[100px]" />
 			</div>
 
-			{/* Sticky Top Header */}
 			<div className="sticky top-0 z-40 bg-[#191034]/90 backdrop-blur-xl border-b border-white/5">
 				<div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
 					<div className="flex items-center gap-3">
@@ -207,9 +204,7 @@ export default function NotificationsPage() {
 				</div>
 			</div>
 
-			{/* Main Content */}
 			<div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-				{/* Filter Tabs & Clean Actions */}
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#22194A] p-2 sm:p-2.5 rounded-2xl border border-white/5">
 					<div className="flex gap-1.5 overflow-x-auto custom-scrollbar-x pb-1 sm:pb-0">
 						{[
@@ -264,7 +259,6 @@ export default function NotificationsPage() {
 					)}
 				</div>
 
-				{/* Notifications List */}
 				{loading ? (
 					<div className="py-20 flex flex-col items-center justify-center gap-4">
 						<FadeLoader color="#8b5cf6" />
@@ -330,7 +324,6 @@ export default function NotificationsPage() {
 											{notif.message}
 										</p>
 
-										{/* Action Link if booking */}
 										{notif.data?.booking_id && (
 											<div className="mt-3 flex items-center gap-3">
 												<button

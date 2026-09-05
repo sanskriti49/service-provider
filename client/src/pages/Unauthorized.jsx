@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 
 const Unauthorized = () => {
-	const { user, logout } = useAuth(); // Destructured logout function from your context
+	const { user, logout } = useAuth();
 	const navigate = useNavigate();
 	const isProvider = user?.role === "provider";
 
@@ -57,9 +57,7 @@ const Unauthorized = () => {
 			className="flex flex-col items-center justify-center h-screen bg-cover bg-center bg-no-repeat px-4 select-none"
 			style={{ backgroundImage: `url('/images/error.jpg')` }}
 		>
-			{/* Glassmorphic Container integrated with the image palette */}
 			<div className="inter max-w-md w-full backdrop-blur-xl bg-purple-950/40 border border-white/10 p-8 rounded-2xl shadow-2xl text-center flex flex-col items-center">
-				{/* Visual indicator blending with the horizon */}
 				<div className="w-16 h-16 bg-gradient-to-tr from-pink-500/20 to-purple-500/20 text-pink-300 rounded-full flex items-center justify-center mb-6 border border-pink-400/20 shadow-lg">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -99,11 +97,10 @@ const Unauthorized = () => {
 					)}
 				</p>
 
-				{/* Grounded Action Paths */}
 				<div className="w-full space-y-3">
 					{isProvider ? (
 						<Link
-							to="/provider/dashboard" // Swap with your actual provider home route
+							to="/provider/dashboard"
 							className="block w-full py-3 px-6 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-md transition duration-200 transform active:scale-[0.99] text-sm text-center"
 						>
 							Go to Provider Dashboard

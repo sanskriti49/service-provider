@@ -130,9 +130,6 @@ export const SearchBar = () => {
 			ref={searchContainerRef}
 			autoComplete="off"
 		>
-			{/* Main Container 
-                Added logic for 'isShaking' (animation) and 'showError' (red border)
-            */}
 			<div
 				className={`relative w-full h-16 flex items-center group transition-transform duration-100 ${
 					isShaking ? "translate-x-[-10px] animate-shake" : ""
@@ -143,7 +140,6 @@ export const SearchBar = () => {
 						: {}
 				}
 			>
-				{/* 1. INPUT FIELD */}
 				<input
 					type="text"
 					value={query}
@@ -247,7 +243,6 @@ export const SearchBar = () => {
 				</div>
 			)}
 
-			{/* CSS Animation for Shake */}
 			<style>{`
                 @keyframes shake {
                     10%, 90% { transform: translate3d(-1px, 0, 0); }

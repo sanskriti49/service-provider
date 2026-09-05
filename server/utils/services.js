@@ -6,7 +6,6 @@ const CATEGORIES = {
 };
 
 const SERVICE_NAMES = [
-	// --- Home Services ---
 	"House Cleaning",
 	"Laundry",
 	"Plumbing",
@@ -21,12 +20,10 @@ const SERVICE_NAMES = [
 	"Appliance Repair",
 	"Driver Service",
 
-	// --- Men's Grooming ---
 	"Men's Haircut",
 	"Men's Hair Spa",
 	"Shaving",
 
-	// --- Women's Beauty ---
 	"Women's Haircut",
 	"Women's Hair Spa",
 	"Bridal Makeup",
@@ -37,7 +34,6 @@ const SERVICE_NAMES = [
 	"Waxing",
 	"Nail Studio",
 
-	// --- Child & Health ---
 	"Babysitting",
 	"Child Tutoring",
 	"Nutritionist",
@@ -156,7 +152,6 @@ function getDescriptionForService(serviceName) {
 	);
 }
 
-// NOTE: This function is for FALLBACK only.
 function getImageForService(serviceName) {
 	const slug = slugify(serviceName);
 	return `/images/${slug}.jpg`;

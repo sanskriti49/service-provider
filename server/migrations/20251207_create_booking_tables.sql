@@ -1,7 +1,7 @@
 CREATE TABLE provider_master_availability(
     id SERIAL PRIMARY KEY,
     provider_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    day_of_week SMALLINT NOT NULL, --0=Sunday  ..6=Saturday
+    day_of_week SMALLINT NOT NULL, 
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
@@ -13,8 +13,8 @@ CREATE TABLE provider_date_exceptions(
     id SERIAL PRIMARY KEY,
     provider_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     date DATE NOT NULL,
-    is_available BOOLEAN NOT NULL DEFAULT false, --false=blcoked, true=available override
-    override_slots JSONB DEFAULT NULL, -- optional: [{start:"09:00",end:"11:00"},...]
+    is_available BOOLEAN NOT NULL DEFAULT false, 
+    override_slots JSONB DEFAULT NULL, 
     note TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     UNIQUE(provider_id,date)

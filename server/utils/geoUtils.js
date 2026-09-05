@@ -1,13 +1,5 @@
 ﻿const axios = require("axios");
 
-/**
- * Calculates great-circle distance between two points on the Earth using Haversine formula
- * @param {number} lat1 - Latitude of point 1 in decimal degrees
- * @param {number} lon1 - Longitude of point 1 in decimal degrees
- * @param {number} lat2 - Latitude of point 2 in decimal degrees
- * @param {number} lon2 - Longitude of point 2 in decimal degrees
- * @returns {number} Distance in kilometers
- */
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 	if (
 		lat1 == null ||
@@ -22,7 +14,7 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 		return null;
 	}
 
-	const R = 6371; // Earth's mean radius in km
+	const R = 6371;
 	const toRad = (deg) => (deg * Math.PI) / 180;
 
 	const dLat = toRad(lat2 - lat1);
@@ -37,33 +29,16 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	const distance = R * c;
 
-	return Math.round(distance * 10) / 10; // 1 decimal place
+	return Math.round(distance * 10) / 10;
 }
 
-/**
- * Estimates driving travel time in minutes based on distance and urban traffic model
- * @param {number} distanceKm - Distance in kilometers
- * @param {number} avgSpeedKmh - Average speed in km/h (default 28 km/h for urban transit)
- * @returns {number} Estimated transit duration in minutes
- */
 function estimateTravelTimeMinutes(distanceKm, avgSpeedKmh = 28) {
-	if (distanceKm == null || isNaN(distanceKm)) return 20; // safe default buffer
+	if (distanceKm == null || isNaN(distanceKm)) return 20;
 	if (distanceKm <= 0.5) return 5;
-	const minutes = Math.ceil((distanceKm / avgSpeedKmh) * 60) + 5; // +5 mins parking/arrival grace
+	const minutes = Math.ceil((distanceKm / avgSpeedKmh) * 60) + 5;
 	return Math.max(5, minutes);
 }
 
-/**
- * Computes a weighted matching score (0-100) between a user request and a provider
- * @param {Object} params
- * @param {number} params.distanceKm - Distance in km
- * @param {number} params.maxRadiusKm - Search radius in km
- * @param {number} params.rating - Provider rating (0-5)
- * @param {number} params.price - Provider service price
- * @param {number} params.avgPrice - Average price in category
- * @param {boolean} params.hasAvailableSlots - Whether provider has slots today/soon
- * @returns {number} Composite Match Score between 0 and 100
- */
 function calculateMatchScore({
 	distanceKm,
 	maxRadiusKm = 30,
@@ -72,8 +47,7 @@ function calculateMatchScore({
 	avgPrice = 500,
 	hasAvailableSlots = true,
 }) {
-	// 1. Proximity Score (Weight: 40%)
-	let proximityScore = 70; // default if distance unknown
+	let proximityScore = 70;
 	if (distanceKm != null && !isNaN(distanceKm)) {
 		if (distanceKm <= 2) {
 			proximityScore = 100;
@@ -87,29 +61,25 @@ function calculateMatchScore({
 		}
 	}
 
-	// 2. Rating Score (Weight: 30%)
 	const effectiveRating = rating != null && rating > 0 ? rating : 4.5;
 	const ratingScore = Math.min(100, Math.round((effectiveRating / 5.0) * 100));
 
-	// 3. Price Competitiveness Score (Weight: 20%)
 	let priceScore = 80;
 	if (price > 0 && avgPrice > 0) {
 		const priceRatio = price / avgPrice;
 		if (priceRatio <= 0.9) {
-			priceScore = 100; // Competitive / affordable
+			priceScore = 100;
 		} else if (priceRatio <= 1.1) {
-			priceScore = 85; // Standard market rate
+			priceScore = 85;
 		} else if (priceRatio <= 1.4) {
-			priceScore = 65; // Premium
+			priceScore = 65;
 		} else {
-			priceScore = 45; // High premium
+			priceScore = 45;
 		}
 	}
 
-	// 4. Availability & Readiness Score (Weight: 10%)
 	const availabilityScore = hasAvailableSlots ? 100 : 50;
 
-	// Weighted Total
 	const totalScore = Math.round(
 		proximityScore * 0.4 +
 			ratingScore * 0.3 +
@@ -120,12 +90,6 @@ function calculateMatchScore({
 	return Math.min(100, Math.max(0, totalScore));
 }
 
-/**
- * Batched travel time retrieval with OSRM engine and instant Haversine fallback
- * @param {[number, number]} origin - [lng, lat] of customer
- * @param {Array<[number, number]>} destinations - Array of [lng, lat]
- * @returns {Promise<Array<number>>} Array of travel durations in minutes
- */
 async function getBatchedTravelDurations(origin, destinations) {
 	if (!origin || !destinations || destinations.length === 0) return [];
 
@@ -136,7 +100,7 @@ async function getBatchedTravelDurations(origin, destinations) {
 	});
 
 	if (destinations.length > 25) {
-		return fallbackDurations; // avoid exceeding URL length limits on public OSRM demo
+		return fallbackDurations;
 	}
 
 	try {

@@ -3,9 +3,9 @@ import React, { useEffect, useRef, useState } from "react";
 import logoImg from "/images/la.png";
 import signInImg from "/images/sign-in.jpg";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import { toast } from "sonner";
 import { Turnstile } from "@marsidev/react-turnstile";
-import api from "../api/axios";
+import api from "../api/axiosInstance";
 
 const SignUp = () => {
 	const navigate = useNavigate();
@@ -79,22 +79,45 @@ const SignUp = () => {
 		setForm({ ...form, [e.target.name]: e.target.value });
 	};
 	useEffect(() => {
-		window.google.accounts.id.initialize({
-			client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-			callback: handleGoogleResponse,
-			itp_support: true,
-		});
+		const initGoogle = () => {
+			if (
+				window.google?.accounts?.id &&
+				document.getElementById("googleButtonDiv")
+			) {
+				window.google.accounts.id.initialize({
+					client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+					callback: handleGoogleResponse,
+					itp_support: true,
+				});
 
-		window.google.accounts.id.renderButton(
-			document.getElementById("googleButtonDiv"),
-			{
-				theme: "outline",
-				size: "large",
-				width: 340,
-				shape: "pill",
-				text: "continue_with",
-			},
-		);
+				window.google.accounts.id.renderButton(
+					document.getElementById("googleButtonDiv"),
+					{
+						theme: "outline",
+						size: "large",
+						width: 340,
+						shape: "pill",
+						text: "continue_with",
+					},
+				);
+			}
+		};
+
+		if (window.google?.accounts?.id) {
+			initGoogle();
+		} else {
+			const interval = setInterval(() => {
+				if (window.google?.accounts?.id) {
+					initGoogle();
+					clearInterval(interval);
+				}
+			}, 300);
+			const timer = setTimeout(() => clearInterval(interval), 4000);
+			return () => {
+				clearInterval(interval);
+				clearTimeout(timer);
+			};
+		}
 	}, []);
 
 	const handleGoogleResponse = async (response) => {
@@ -151,7 +174,6 @@ const SignUp = () => {
 				...form,
 				captchaToken: token,
 			});
-			// get token and user data from the response
 			const { token: authToken, user } = res.data;
 			localStorage.setItem("token", authToken);
 
@@ -202,13 +224,11 @@ const SignUp = () => {
 
 							<div className="space-y-4">
 								<div className="relative w-full">
-									{/* The hidden overlay that captures the click and mounts the native iframe */}
 									<div
 										id="googleButtonDiv"
 										className="absolute inset-0 z-10 opacity-0 overflow-hidden flex items-center justify-center cursor-pointer"
 									></div>
 
-									{/* Your styled custom UI button container beneath the invisible iframe layer */}
 									<button
 										type="button"
 										className="
@@ -380,7 +400,6 @@ const SignUp = () => {
 					alt=""
 				/>
 
-				{/* 3. Applied P22Mackinac Font Here */}
 				<blockquote
 					className="relative z-20 text-xl text-purple-900 animate-in fade-in duration-1000 leading-snug"
 					style={{ fontFamily: '"P22Mackinac", serif' }}

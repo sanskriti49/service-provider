@@ -1,13 +1,5 @@
 import React, { useId } from "react";
 
-/**
- * TaskGenie logo.
- *
- * <TaskGenieLogo />                       icon + wordmark
- * <TaskGenieLogo variant="icon" />        icon only (app icon / favicon use)
- * <TaskGenieLogo variant="wordmark" />    text only
- * <TaskGenieLogo size={64} />             scale it up or down
- */
 export default function Logo({ variant = "full", size = 40, className = "" }) {
 	const gradientId = useId();
 	const fill = `url(#${gradientId})`;
@@ -29,12 +21,10 @@ export default function Logo({ variant = "full", size = 40, className = "" }) {
 				</linearGradient>
 			</defs>
 
-			{/* magic dust trailing from the spout */}
 			<circle cx="1" cy="27" r="1.6" fill={fill} opacity="0.9" />
 			<circle cx="3" cy="21" r="1.2" fill={fill} opacity="0.6" />
 			<circle cx="7" cy="16" r="0.9" fill={fill} opacity="0.4" />
 
-			{/* lamp */}
 			<path d="M17,28 C11,26 5,28 2,32 C4,34 11,33 17,31 Z" fill={fill} />
 			<ellipse cx="26" cy="30" rx="10" ry="8.5" fill={fill} />
 			<rect x="23" y="21" width="6" height="5" rx="1" fill={fill} />
@@ -48,7 +38,6 @@ export default function Logo({ variant = "full", size = 40, className = "" }) {
 			/>
 			<rect x="16" y="40" width="20" height="3" rx="1.5" fill={fill} />
 
-			{/* task-complete badge */}
 			<circle
 				cx="37"
 				cy="15"

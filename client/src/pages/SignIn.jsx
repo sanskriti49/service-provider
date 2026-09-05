@@ -7,7 +7,7 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import logoImg from "/images/la.png";
 import signInImg from "/images/sign-in.jpg";
 import { Link, useNavigate } from "react-router-dom";
-import api from "../api/axios";
+import api from "../api/axiosInstance";
 
 const SignIn = () => {
 	const navigate = useNavigate();
@@ -78,34 +78,50 @@ const SignIn = () => {
 	};
 
 	useEffect(() => {
-		window.google.accounts.id.initialize({
-			client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-			callback: handleGoogleResponse,
-			itp_support: true,
-		});
+		const initGoogle = () => {
+			if (
+				window.google?.accounts?.id &&
+				document.getElementById("googleButtonDiv")
+			) {
+				window.google.accounts.id.initialize({
+					client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+					callback: handleGoogleResponse,
+					itp_support: true,
+				});
 
-		window.google.accounts.id.renderButton(
-			document.getElementById("googleButtonDiv"),
-			{
-				theme: "outline",
-				size: "large",
-				width: 400,
-			},
-		);
+				window.google.accounts.id.renderButton(
+					document.getElementById("googleButtonDiv"),
+					{
+						theme: "outline",
+						size: "large",
+						width: 400,
+					},
+				);
+			}
+		};
+
+		if (window.google?.accounts?.id) {
+			initGoogle();
+		} else {
+			const interval = setInterval(() => {
+				if (window.google?.accounts?.id) {
+					initGoogle();
+					clearInterval(interval);
+				}
+			}, 300);
+			const timer = setTimeout(() => clearInterval(interval), 4000);
+			return () => {
+				clearInterval(interval);
+				clearTimeout(timer);
+			};
+		}
 	}, []);
 
 	const handleGoogleResponse = async (response) => {
 		try {
-			// const position = await new Promise((resolve, reject) => {
-			// 	navigator.geolocation.getCurrentPosition(resolve, reject);
-			// });
-			// const lat = position.coords.latitude;
-			// const lng = position.coords.longitude;
 
 			const res = await api.post("/api/auth/google", {
 				googleToken: response.credential,
-				// lat,
-				// lng,
 			});
 
 			const { token } = res.data;

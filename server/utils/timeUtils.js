@@ -1,11 +1,9 @@
 function timeToMinutes(t) {
-	// "09:30" -> 570
 	const [h, m] = t.split(":").map(Number);
 	return h * 60 + m;
 }
 
 function minutesToTime(m) {
-	// 570 -> "09:30"
 	const hh = Math.floor(m / 60)
 		.toString()
 		.padStart(2, "0");
@@ -13,7 +11,6 @@ function minutesToTime(m) {
 	return `${hh}:${mm}`;
 }
 
-// split a slot into smaller fixed-size chunks
 function splitIntoChunks(start, end, chunkMinutes = 60) {
 	const s = timeToMinutes(start),
 		e = timeToMinutes(end);
@@ -66,7 +63,6 @@ const generateMasterSchedule = () => {
 
 	const persona = personas[Math.floor(Math.random() * personas.length)];
 
-	// Output: [{ day: 1, start: "09:00:00", end: "17:00:00" }, ...]
 	return persona.days.map((day) => ({
 		day: day,
 		start: persona.start,
@@ -74,33 +70,28 @@ const generateMasterSchedule = () => {
 	}));
 };
 
-/**
- * translates a Master Schedule (Rule) into actual Calendar Dates.
- * Looks ahead 30 days and creates specific slots.
- */
 const generateRealSlots = (masterSchedule) => {
 	const slots = [];
 	const today = new Date();
 
-	// a map for faster lookup: { 1: {start:..., end:...} }
 	const scheduleMap = {};
 	masterSchedule.forEach((s) => {
 		scheduleMap[s.day] = { start: s.start, end: s.end };
 	});
 
-	// generate slots for the next 30 days
 	for (let i = 0; i < 30; i++) {
 		const currentDate = new Date();
 		currentDate.setDate(today.getDate() + i);
 
-		const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday...
+		const dayOfWeek = currentDate.getDay();
 		const config = scheduleMap[dayOfWeek];
 
-		// if provider works on this day
 		if (config) {
-			const dateString = currentDate.toISOString().split("T")[0];
+			const year = currentDate.getFullYear();
+			const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+			const day = String(currentDate.getDate()).padStart(2, "0");
+			const dateString = `${year}-${month}-${day}`;
 
-			// assume 1-hour slots for simplicity in seeding
 			const currentStart = parseInt(config.start.split(":")[0]);
 			const currentEnd = parseInt(config.end.split(":")[0]);
 

@@ -40,14 +40,14 @@ const RetroGrid = () => {
 	);
 };
 
-const quickLinksData = {
+const getQuickLinksData = (role) => ({
 	common: [
 		{
 			title: "Settings",
 			icon: <User className="w-5 h-5 text-violet-600" />,
 			color: "bg-violet-50",
 			to:
-				userRole === "provider"
+				role === "provider"
 					? "/provider/dashboard/settings"
 					: "/account/settings",
 		},
@@ -71,10 +71,10 @@ const quickLinksData = {
 			title: "KYC Verification",
 			icon: <Shield className="w-5 h-5 text-emerald-600" />,
 			color: "bg-emerald-50",
-			to: "/provider/dashboard", // KYC usually lives in provider dashboard
+			to: "/provider/dashboard",
 		},
 	],
-};
+});
 
 const allFaqs = {
 	customer: [
@@ -155,14 +155,15 @@ const HelpCenter = () => {
 	}, []);
 
 	const visibleQuickLinks = useMemo(() => {
+		const ql = getQuickLinksData(userRole);
 		if (userRole === "customer")
-			return [...quickLinksData.customer, ...quickLinksData.common];
+			return [...ql.customer, ...ql.common];
 		if (userRole === "provider")
-			return [...quickLinksData.provider, ...quickLinksData.common];
+			return [...ql.provider, ...ql.common];
 		return [
-			...quickLinksData.customer,
-			...quickLinksData.provider,
-			...quickLinksData.common,
+			...ql.customer,
+			...ql.provider,
+			...ql.common,
 		];
 	}, [userRole]);
 
@@ -196,7 +197,6 @@ const HelpCenter = () => {
 		<div className="relative min-h-screen bg-white text-slate-900 selection:bg-violet-600 pt-8">
 			<RetroGrid />
 			<div className="max-w-5xl mx-auto px-4 pt-20 pb-20 relative z-10">
-				{/* --- HERO --- */}
 				<div className="text-center mb-10">
 					<motion.div
 						initial={{ opacity: 0, y: 10 }}
@@ -250,7 +250,6 @@ const HelpCenter = () => {
 
 				{!searchQuery && (
 					<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-						{/* FIX: Dynamic grid column count based on links available */}
 						<div
 							className={`grid gap-4 mb-16 ${visibleQuickLinks.length === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 md:grid-cols-4"}`}
 						>
@@ -304,7 +303,6 @@ const HelpCenter = () => {
 					</motion.div>
 				)}
 
-				{/* FAQ Results */}
 				<div className="flex flex-col md:flex-row gap-8 mb-24 items-start">
 					{filteredFaqs.length === 0 ? (
 						<div className="col-span-2 text-center py-20">
@@ -328,10 +326,7 @@ const HelpCenter = () => {
 					)}
 				</div>
 
-				{/* --- HUMAN SUPPORT --- */}
-				{/* --- HUMAN SUPPORT --- */}
 				<div className="mackinac bg-slate-900 rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden shadow-2xl">
-					{/* Background Glows */}
 					<div className="absolute top-0 right-0 w-64 h-64 bg-violet-600 rounded-full blur-[100px] opacity-20" />
 					<div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-600 rounded-full blur-[80px] opacity-10" />
 

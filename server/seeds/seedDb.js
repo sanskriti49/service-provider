@@ -169,7 +169,6 @@ const seedData = async () => {
 			const customId =
 				"SRV" + customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 12)();
 
-			// 1. users row
 			const userRes = await client.query(
 				`INSERT INTO users (name, email, role, custom_id, password, photo, location, lat, lng, bio, phone)
                  VALUES ($1,$2,'provider',$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
@@ -188,7 +187,6 @@ const seedData = async () => {
 			);
 			const userId = userRes.rows[0].id;
 
-			// 2. Price with variance
 			const pricingInfo = getPriceDetails(dbService.name);
 			const basePrice = Number(pricingInfo.price);
 			const variance = Math.floor(basePrice * 0.2);
@@ -204,7 +202,6 @@ const seedData = async () => {
 			const rating = getRandomRating();
 			const masterSchedule = generateMasterSchedule();
 
-			// 3. providers row (primary service — keeps booking JOINs working)
 			await client.query(
 				`INSERT INTO providers (user_id, rating, availability)
      VALUES ($1,$2,$3)
@@ -221,7 +218,6 @@ const seedData = async () => {
 				[userId, dbService.id, finalPrice, pricingInfo.unit],
 			);
 
-			// 5. Master availability schedule
 			for (const slot of masterSchedule) {
 				await client.query(
 					`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
@@ -230,7 +226,6 @@ const seedData = async () => {
 				);
 			}
 
-			// 6. Real calendar slots (next 30 days)
 			const realSlots = generateRealSlots(masterSchedule);
 			for (const s of realSlots) {
 				const cleanDateStr =

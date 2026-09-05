@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const cache = require("../utils/cache");
 
 const formatService = (row) => ({
 	id: row.id,
@@ -13,11 +14,17 @@ const formatService = (row) => ({
 
 async function getAllServices(req, res, next) {
 	try {
+		const cached = cache.get("all_services");
+		if (cached) {
+			return res.json(cached);
+		}
+
 		const result = await pool.query(
 			"SELECT * FROM services ORDER BY category, name",
 		);
 
 		const serviceList = result.rows.map(formatService);
+		cache.set("all_services", serviceList, 300000);
 
 		res.json(serviceList);
 	} catch (err) {
@@ -28,6 +35,12 @@ async function getAllServices(req, res, next) {
 async function getServiceBySlug(req, res, next) {
 	try {
 		const { slug } = req.params;
+		const cacheKey = `service_slug_${slug}`;
+		const cached = cache.get(cacheKey);
+		if (cached) {
+			return res.json(cached);
+		}
+
 		const result = await pool.query("SELECT * FROM services WHERE slug=$1", [
 			slug,
 		]);
@@ -38,7 +51,10 @@ async function getServiceBySlug(req, res, next) {
 			return res.status(404).json({ error: "Service not found" });
 		}
 
-		res.json(formatService(service));
+		const formatted = formatService(service);
+		cache.set(cacheKey, formatted, 300000);
+
+		res.json(formatted);
 	} catch (err) {
 		next(err);
 	}

@@ -1,4 +1,4 @@
-﻿import { useLocation, useParams, useNavigate } from "react-router-dom";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useMemo } from "react";
 import {
 	ArrowLeft,
@@ -18,13 +18,12 @@ import Alerts from "../../ui/Alerts";
 import { FadeLoader } from "react-spinners";
 import PaymentOptions from "../../pages/PaymentOptions";
 import { toast } from "sonner";
+import api from "../../api/axiosInstance";
 
 export default function BookingPage() {
 	const { customId } = useParams();
 	const navigate = useNavigate();
 	const { state } = useLocation();
-
-	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 	const [provider, setProvider] = useState(state?.provider || null);
 	const [availability, setAvailability] = useState(
@@ -91,23 +90,16 @@ export default function BookingPage() {
 				let currentProvider = provider;
 				if (!currentProvider) {
 					setLoading(true);
-					const provRes = await fetch(
-						`${API_URL}/api/providers/v1/${customId}`,
-					);
-					if (!provRes.ok) throw new Error("Provider not found");
-					const provData = await provRes.json();
-					currentProvider = provData.provider;
+					const provRes = await api.get(`/providers/v1/${customId}`);
+					currentProvider = provRes.data?.provider;
 					setProvider(currentProvider);
 				}
 
 				if (currentProvider && (currentProvider.id || currentProvider.user_id)) {
 					const provIdentifier = currentProvider.user_id || currentProvider.id;
-					const slotsRes = await fetch(
-						`${API_URL}/api/providers/v1/${provIdentifier}/availability`,
-					);
-					if (slotsRes.ok) {
-						const slotsData = await slotsRes.json();
-						setAvailability(slotsData);
+					const slotsRes = await api.get(`/providers/v1/${provIdentifier}/availability`);
+					if (slotsRes.data) {
+						setAvailability(slotsRes.data);
 					}
 				}
 			} catch (err) {
@@ -136,7 +128,6 @@ export default function BookingPage() {
 		raw.forEach((item) => {
 			if (!item) return;
 
-			// Format A: Day group { date: 'YYYY-MM-DD', free_slots: [ { start, end } ] }
 			if (item.date && Array.isArray(item.free_slots)) {
 				if (!acc[item.date]) acc[item.date] = [];
 				item.free_slots.forEach((s) => {
@@ -159,7 +150,6 @@ export default function BookingPage() {
 					}
 				});
 			}
-			// Format B: Flat slot { date: 'YYYY-MM-DD', start_time, end_time }
 			else if (item.date && (item.start_time || item.start)) {
 				if (!acc[item.date]) acc[item.date] = [];
 				const sStart = item.start_time || item.start;
@@ -258,29 +248,18 @@ export default function BookingPage() {
 			const endTimeVal = selectedTime.end_time || selectedTime.end;
 			const providerIdVal = provider.user_id || provider.id || provider.custom_id;
 
-			const res = await fetch(`${API_URL}/api/bookings`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`,
-				},
-				body: JSON.stringify({
-					provider_id: providerIdVal,
-					service_id: provider.service_id,
-					date: selectedDate,
-					start_time: startTimeVal,
-					end_time: endTimeVal,
-					address,
-					payment_method: paymentMethod,
-					latitude: coords.lat,
-					longitude: coords.lng,
-				}),
+			const res = await api.post("/bookings", {
+				provider_id: providerIdVal,
+				service_id: provider.service_id,
+				date: selectedDate,
+				start_time: startTimeVal,
+				end_time: endTimeVal,
+				address,
+				payment_method: paymentMethod,
+				latitude: coords.lat,
+				longitude: coords.lng,
 			});
-			const data = await res.json();
-
-			if (!res.ok) {
-				throw new Error(data.message || "Failed to create booking.");
-			}
+			const data = res.data;
 
 			if (paymentMethod === "online" && data.razorpay_order) {
 				handleRazorpayPayment(data.booking, data.razorpay_order);
@@ -293,7 +272,10 @@ export default function BookingPage() {
 		} catch (err) {
 			console.error("Booking error: ", err);
 			setAlert({
-				message: err.message || "Something went wrong. Try again.",
+				message:
+					err.response?.data?.message ||
+					err.message ||
+					"Something went wrong. Try again.",
 				type: "error",
 			});
 		} finally {
@@ -334,27 +316,20 @@ export default function BookingPage() {
 			order_id: orderId,
 			handler: async function (response) {
 				try {
-					const verifyRes = await fetch(
-						`${API_URL}/api/bookings/verify-payment`,
-						{
-							method: "POST",
-							headers: {
-								"Content-Type": "application/json",
-								Authorization: `Bearer ${localStorage.getItem("token")}`,
-							},
-							body: JSON.stringify(response),
-						},
+					const verifyRes = await api.post(
+						"/bookings/verify-payment",
+						response,
 					);
-					const verifyData = await verifyRes.json();
-					if (verifyRes.ok) {
+					if (verifyRes.data?.booking) {
 						navigate("/booking-success", {
-							state: { success: true, booking: verifyData.booking },
+							state: { success: true, booking: verifyRes.data.booking },
 						});
 					} else {
 						toast.error("Payment verification failed. Please contact support.");
 					}
 				} catch (err) {
 					console.error("Verification Error:", err);
+					toast.error("Payment verification failed. Please contact support.");
 				}
 			},
 			prefill: {
@@ -414,10 +389,9 @@ export default function BookingPage() {
 
 	return (
 		<div className="min-h-screen bg-[#191034] text-white selection:bg-violet-500/30 pb-32 lg:pb-12">
-			{/* Background Ambience */}
 			<div className="fixed inset-0 pointer-events-none overflow-hidden">
-				<div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-900/20 rounded-full blur-[120px]" />
-				<div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-900/20 rounded-full blur-[100px]" />
+				<div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-900/20 rounded-full blur-3xl" />
+				<div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-900/20 rounded-full blur-3xl" />
 			</div>
 
 			{alert && (
@@ -444,7 +418,6 @@ export default function BookingPage() {
 
 			<div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-12">
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start">
-					{/* LEFT COLUMN: Provider Card */}
 					<div className="lg:col-span-4 lg:sticky lg:top-28">
 						<div className="bg-[#22194A] rounded-2xl p-5 lg:p-6 border border-white/5 shadow-2xl relative overflow-hidden group">
 							<div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 opacity-80" />
@@ -487,7 +460,6 @@ export default function BookingPage() {
 								</div>
 							</div>
 
-							{/* Order Summary Preview (Desktop Only) */}
 							<div className="inter mt-6 pt-5 border-t border-white/5 space-y-3 hidden lg:block">
 								<div className="flex justify-between text-sm">
 									<span className="text-gray-400">Date</span>
@@ -513,9 +485,7 @@ export default function BookingPage() {
 						</div>
 					</div>
 
-					{/* RIGHT COLUMN: Booking Form */}
 					<div className="inter lg:col-span-8 space-y-6 lg:space-y-8">
-						{/* Date Selection */}
 						<div className="space-y-3.5">
 							<div className="flex items-center gap-2 px-1">
 								<div className="p-1.5 rounded-md bg-violet-500/20">
@@ -573,7 +543,6 @@ export default function BookingPage() {
 							)}
 						</div>
 
-						{/* Time Selection */}
 						{selectedDate && (
 							<div className="space-y-3.5">
 								<div className="flex items-center justify-between px-1">
@@ -635,7 +604,6 @@ export default function BookingPage() {
 							</div>
 						)}
 
-						{/* Address */}
 						<div className="space-y-3.5">
 							<div className="flex items-center justify-between px-1">
 								<div className="flex items-center gap-2">
@@ -724,7 +692,6 @@ export default function BookingPage() {
 							</div>
 						</div>
 
-						{/* Payment Method */}
 						<div className="space-y-3.5">
 							<div className="flex items-center gap-2 px-1">
 								<div className="p-1.5 rounded-md bg-violet-500/20">
@@ -755,7 +722,6 @@ export default function BookingPage() {
 							</div>
 						</div>
 
-						{/* Desktop Confirm Button */}
 						<div className="hidden lg:block pt-4">
 							<button
 								onClick={handleConfirm}
@@ -784,7 +750,6 @@ export default function BookingPage() {
 				</div>
 			</div>
 
-			{/* Mobile Footer */}
 			<div className="font-inter lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-[#191034]/95 backdrop-blur-2xl border-t border-white/10 z-50">
 				<div className="flex items-center justify-between gap-4 max-w-md mx-auto">
 					<div>

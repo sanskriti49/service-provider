@@ -1,8 +1,5 @@
-﻿/**
- * In-Memory LRU/TTL Cache for fast sub-millisecond retrieval of common queries
- */
 class MemoryCache {
-	constructor(defaultTtlMs = 180000) { // 3 minutes default
+	constructor(defaultTtlMs = 180000) {
 		this.cache = new Map();
 		this.defaultTtlMs = defaultTtlMs;
 	}
@@ -20,7 +17,6 @@ class MemoryCache {
 	}
 
 	set(key, value, ttlMs = this.defaultTtlMs) {
-		// Keep cache size bounded (max 500 items)
 		if (this.cache.size >= 500) {
 			const firstKey = this.cache.keys().next().value;
 			this.cache.delete(firstKey);

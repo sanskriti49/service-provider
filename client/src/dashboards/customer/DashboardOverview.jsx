@@ -149,7 +149,6 @@ export default function DashboardOverview() {
 				</Link>
 			</div>
 
-			{/* ── Stats Grid ──────────────────────────────────────────────────── */}
 			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 				<StatCard
 					label="Available Services"
@@ -174,7 +173,6 @@ export default function DashboardOverview() {
 			</div>
 
 			<div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-				{/* Upcoming bookings */}
 				<div className="lg:col-span-7 bg-white border border-gray-100 p-6 rounded-3xl shadow-sm flex flex-col h-full min-h-[420px]">
 					<div className="flex justify-between items-center mb-6">
 						<h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
@@ -238,7 +236,6 @@ export default function DashboardOverview() {
 					</div>
 				</div>
 
-				{/* Quick Book */}
 				<div className="lg:col-span-5 bg-white border border-gray-100 p-6 rounded-3xl shadow-sm h-full">
 					<h3 className="font-bold text-lg text-gray-900 mb-6 flex items-center gap-2">
 						<div className="p-2 bg-amber-50 rounded-xl text-amber-600 border border-amber-100">

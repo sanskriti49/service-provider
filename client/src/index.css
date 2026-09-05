@@ -69,7 +69,7 @@ html {
 	scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
-/* Chrome / Edge / Safari */
+
 *::-webkit-scrollbar {
 	width: 6px;
 	height: 6px;
@@ -85,12 +85,12 @@ html {
 	border: none;
 }
 
-/* Prevent white hover flash */
+
 *::-webkit-scrollbar-thumb:hover {
 	background-color: rgba(139, 92, 246, 0.45);
 }
 
-/* Prevent scrollbar widening on hover */
+
 *::-webkit-scrollbar {
 	-webkit-appearance: none;
 	appearance: none;
@@ -154,11 +154,11 @@ html {
 }
 
 .momentum-scroll {
-	-webkit-overflow-scrolling: touch; /* iOS + trackpad momentum */
+	-webkit-overflow-scrolling: touch; 
 	scroll-behavior: smooth;
 }
 
-/* Horizontal scrollbar for date selector */
+
 .custom-scrollbar-x {
 	--thumb-color: rgba(255, 255, 255, 0.18);
 }
@@ -176,13 +176,13 @@ html {
 	border-radius: 999px;
 }
 
-/* Firefox */
+
 .custom-scrollbar-x {
 	scrollbar-width: thin;
 	scrollbar-color: var(--thumb-color) transparent;
 }
 
-/* ===== Custom Vertical Scrollbar ===== */
+
 .custom-scrollbar-y {
 	scrollbar-width: thin;
 	scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
@@ -201,9 +201,7 @@ html {
 	border-radius: 999px;
 }
 
-/* .custom-scrollbar-y::-webkit-scrollbar-thumb:hover {
-	background-color: rgba(139, 92, 246, 0.6);
-} */
+
 
 .arrow {
 	border: solid black;
@@ -231,7 +229,7 @@ html {
 	transform: rotate(45deg);
 	-webkit-transform: rotate(45deg);
 }
-/* Gradient.css */
+
 .mesh-gradient {
 	animation: float 10s ease-in-out infinite;
 }
@@ -266,14 +264,14 @@ html {
 
 	--btn-inner-shadow-active: inset 0 0 6px #c4b5fd;
 
-	--btn-shadow: 0 2px 4px rgb(124 58 237 / 0.05); /* Added subtle outer violet glow */
+	--btn-shadow: 0 2px 4px rgb(124 58 237 / 0.05); 
 	--btn-shadow-active: 0 0 transparent;
 
-	--btn-text-color: #2e1065; /* violet-950 */
-	--btn-text-color-active: #6d28d9; /* violet-700 */
+	--btn-text-color: #2e1065; 
+	--btn-text-color-active: #6d28d9; 
 
 	--btn-bg-color: #fbfaff;
-	--btn-bg-color-active: #f5f3ff; /* violet-50 */
+	--btn-bg-color-active: #f5f3ff; 
 
 	--btn-border-color: rgb(139 92 246 / 0.25);
 	--btn-border-color-active: rgb(124 58 237 / 0.5);
@@ -288,7 +286,7 @@ html {
 	border-width: 1px;
 	box-shadow: var(--btn-inner-shadow), var(--btn-shadow);
 	display: inline-flex;
-	font-weight: 500; /* Bumped weight slightly for better legibility on violet */
+	font-weight: 500; 
 	justify-content: center;
 	letter-spacing: 0em;
 	white-space: nowrap;
@@ -298,7 +296,7 @@ html {
 		border-color 0.2s ease;
 }
 
-/* Optional: Add a hover state for better interactivity */
+
 .btn:hover {
 	--btn-bg-color: #f5f3ff;
 	--btn-border-color: rgb(124 58 237 / 0.35);
@@ -307,32 +305,32 @@ html {
 }
 
 .btn-dark {
-	/* Background: Deep rich violet */
-	--btn-bg-color: #774bbd; /* violet-800 */
-	--btn-bg-color-active: #4c1d95; /* violet-900 */
+	
+	--btn-bg-color: #774bbd; 
+	--btn-bg-color-active: #4c1d95; 
 
-	/* Text: White with a slight lavender tint */
+	
 	--btn-text-color: #f5f3ff;
 	--btn-text-color-active: #ddd6fe;
 
-	/* Shadow: Darker depth at the bottom, slight highlight at top */
+	
 	--btn-inner-shadow:
 		inset 0 1px 0 0 rgb(255 255 255 / 0.15),
 		inset 0 -3px 0px -1px rgb(0 0 0 / 0.2);
 	--btn-inner-shadow-active: inset 0 3px 6px rgb(0 0 0 / 0.3);
 
-	/* Outer glow */
+	
 	--btn-shadow:
 		0 4px 6px -1px rgb(0 0 0 / 0.2), 0 2px 4px -1px rgb(0 0 0 / 0.1);
 	--btn-shadow-active: 0 0 transparent;
 
-	/* Border: Subtle lighter violet to define edges */
-	--btn-border-color: rgb(139 92 246 / 0.5); /* violet-500 */
+	
+	--btn-border-color: rgb(139 92 246 / 0.5); 
 	--btn-border-color-active: rgb(139 92 246 / 0.3);
 
 	--btn-ring-color: rgb(124 58 237 / 0.5);
 
-	/* --- Shared Structural Styles (Same as light version) --- */
+	
 	align-items: center;
 	background-clip: padding-box;
 	background-color: var(--btn-bg-color);
@@ -349,9 +347,9 @@ html {
 	transition: 0.2s all ease-in-out;
 }
 
-/* Hover Effect for Dark Button */
+
 .btn-dark:hover {
-	--btn-bg-color: #7e45da; /* Lighter violet on hover */
+	--btn-bg-color: #7e45da; 
 	--btn-border-color: rgb(167 139 250 / 0.6);
 	transform: translateY(-1px);
 	box-shadow:
@@ -359,7 +357,7 @@ html {
 		0 6px 12px -2px rgb(0 0 0 / 0.3);
 }
 
-/* Active / Pressed State */
+
 .btn-dark:active {
 	transform: translateY(1px);
 	--btn-bg-color: #4c1d95;
@@ -409,7 +407,7 @@ html {
 	animation: scalePop 0.5s ease-out forwards;
 }
 
-/* Confetti */
+
 .confetti-animation::before,
 .confetti-animation::after {
 	content: "";
@@ -897,30 +895,19 @@ text-container {
 	text-shadow: 1px 1px rgba(0, 0, 0, 0.1);
 }
 
-/* :root {
-	--color-bg1: rgb(255, 255, 255);
-	--color-bg2: rgb(255, 255, 255);
-	--color1: 98, 113, 255;
-	--color2: 221, 74, 255;
-	--color3: 170, 179, 195;
-	--color4: 230, 50, 50;
-	--color5: 180, 180, 50;
-	--color-interactive: 140, 100, 255;
-	--circle-size: 60%;
-	--blending: hard-light;
-} */
-:root {
-	--color-bg1: rgb(255, 255, 255); /* Light background */
-	--color-bg2: rgb(245, 245, 255); /* Slight tint to distinguish areas */
 
-	--color1: 142, 84, 233; /* Purple */
-	--color2: 255, 190, 246; /* Pink */
-	--color3: 100, 200, 255; /* Light blue */
-	--color4: 134, 168, 231; /* Soft green */
-	--color5: 255, 193, 193; /* Light red */
+:root {
+	--color-bg1: rgb(255, 255, 255); 
+	--color-bg2: rgb(245, 245, 255); 
+
+	--color1: 142, 84, 233; 
+	--color2: 255, 190, 246; 
+	--color3: 100, 200, 255; 
+	--color4: 134, 168, 231; 
+	--color5: 255, 193, 193; 
 
 	--color-interactive:
-		165, 105, 255; /* Vibrant violet-pink blend for interactivity */
+		165, 105, 255; 
 
 	--circle-size: 70%;
 	--blending: hard-light;
@@ -1109,7 +1096,7 @@ text-container {
 }
 
 .cloud {
-	/* Ellipse 29 */
+	
 
 	position: absolute;
 	width: 200px;

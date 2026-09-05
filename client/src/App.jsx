@@ -1,16 +1,28 @@
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import PlainLayout from "./layouts/PlainLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import GuestRoute from "./auth/GuestRoute";
 import { Toaster } from "sonner";
 import PageLoader from "./ui/PageLoader";
-import ProviderBookings from "./dashboards/provider/ProviderBookings";
-import ProviderEarnings from "./dashboards/provider/ProviderEarnings";
-import ProviderServices from "./dashboards/provider/ProviderServices";
-import ProviderSettings from "./dashboards/provider/ProviderSettings";
-import ApplyProvider from "./pages/ApplyProvider";
+
+const ProviderBookings = lazy(
+	() => import("./dashboards/provider/ProviderBookings"),
+);
+const ProviderEarnings = lazy(
+	() => import("./dashboards/provider/ProviderEarnings"),
+);
+const ProviderServices = lazy(
+	() => import("./dashboards/provider/ProviderServices"),
+);
+const ProviderSettings = lazy(
+	() => import("./dashboards/provider/ProviderSettings"),
+);
+const ApplyProvider = lazy(() => import("./pages/ApplyProvider"));
+const AdminDashboard = lazy(
+	() => import("./dashboards/admin/AdminDashboard"),
+);
 
 const Home = lazy(() => import("./pages/Home"));
 const SignIn = lazy(() => import("./pages/SignIn"));
@@ -56,7 +68,6 @@ const router = createBrowserRouter([
 			{ path: "/notifications", element: <NotificationsPage /> },
 			{ path: "/unauthorized", element: <Unauthorized /> },
 
-			// customer-only routes
 			{
 				path: "/dashboard",
 				element: (
@@ -102,6 +113,7 @@ const router = createBrowserRouter([
 					</GuestRoute>
 				),
 			},
+			{ path: "/sign-in", element: <Navigate to="/login" replace /> },
 			{
 				path: "/sign-up",
 				element: (
@@ -136,7 +148,9 @@ const router = createBrowserRouter([
 		path: "/provider/dashboard",
 		element: (
 			<ProtectedRoute allowed={["provider"]}>
-				<ProviderDashboard />
+				<Suspense fallback={<PageLoader />}>
+					<ProviderDashboard />
+				</Suspense>
 			</ProtectedRoute>
 		),
 		children: [
@@ -146,6 +160,16 @@ const router = createBrowserRouter([
 			{ path: "services", element: <ProviderServices /> },
 			{ path: "settings", element: <ProviderSettings /> },
 		],
+	},
+	{
+		path: "/admin",
+		element: (
+			<ProtectedRoute allowed={["admin"]}>
+				<Suspense fallback={<PageLoader />}>
+					<AdminDashboard />
+				</Suspense>
+			</ProtectedRoute>
+		),
 	},
 ]);
 

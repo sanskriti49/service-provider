@@ -5,9 +5,7 @@ const Footer = () => {
 	return (
 		<footer className="mt-auto py-10 bg-[#191034] text-white bricolage-grotesque w-full">
 			<div className="container mx-auto px-6 lg:px-16">
-				{/* Top section */}
 				<div className="flex flex-col md:flex-row md:justify-between gap-10">
-					{/* Logo + small intro */}
 					<div className="md:w-1/4">
 						<a
 							href="/"
@@ -21,24 +19,6 @@ const Footer = () => {
 							connects you with trusted professionals for every need.
 						</p>
 
-						{/* <div className="flex gap-4 mt-5 text-white text-sm">
-							<a
-								href="https://www.linkedin.com/in/sanskriti49/"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="cursor-pointer hover:text-violet-500 transition"
-							>
-								LinkedIn
-							</a>
-							<a
-								href="https://www.instagram.com/sanskriti._4/"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="cursor-pointer hover:text-violet-500 transition"
-							>
-								Instagram
-							</a>
-						</div> */}
 					</div>
 
 					<div className="flex-grow grid grid-cols-2 md:grid-cols-4 gap-8">
