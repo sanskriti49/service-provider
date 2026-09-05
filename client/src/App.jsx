@@ -96,6 +96,9 @@ const router = createBrowserRouter([
 					</ProtectedRoute>
 				),
 			},
+			{ path: "/services/:slug", element: <ServiceDetails /> },
+			{ path: "/apply-now", element: <ApplyProvider /> },
+			{ path: "*", element: <Navigate to="/" replace /> },
 		],
 	},
 	{
@@ -124,8 +127,6 @@ const router = createBrowserRouter([
 			},
 			{ path: "/forgot-password", element: <ForgotPassword /> },
 			{ path: "/reset-password/:resetToken", element: <ResetPassword /> },
-			{ path: "/services/:slug", element: <ServiceDetails /> },
-			{ path: "/apply-now", element: <ApplyProvider /> },
 			{
 				path: "/book/:customId",
 				element: (
