@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import logoImg from "/images/la.png";
+import logoImg from "/images/taskgenie-logo.svg";
 import signInImg from "/images/sign-in.jpg";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -197,7 +197,7 @@ const SignUp = () => {
 	};
 
 	return (
-		<div className="bricolage-grotesque w-full overflow-hidden lg:grid lg:grid-cols-3">
+		<div className="bricolage-grotesque w-full min-h-screen overflow-hidden lg:grid lg:grid-cols-3">
 			<div className="relative lg:col-span-2 flex flex-col p-5 overflow-hidden h-full">
 				<div className="flex flex-col h-full z-10 relative">
 					<div className="flex items-center mb-8">
@@ -405,7 +405,7 @@ const SignUp = () => {
 				</div>
 			</div>
 
-			<aside className="relative hidden lg:block lg:w-[28rem] xl:w-[32rem]">
+			<aside className="relative hidden lg:block lg:w-[28rem] xl:w-[32rem] h-full p-16">
 				<img
 					src={signInImg}
 					className="absolute inset-0 max-w-none w-full h-full object-cover"

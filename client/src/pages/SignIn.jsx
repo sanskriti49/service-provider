@@ -4,7 +4,7 @@ import { jwtDecode } from "jwt-decode";
 import axios from "axios";
 import { Turnstile } from "@marsidev/react-turnstile";
 
-import logoImg from "/images/la.png";
+import logoImg from "/images/taskgenie-logo.svg";
 import signInImg from "/images/sign-in.jpg";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance";
@@ -178,7 +178,7 @@ const SignIn = () => {
 	};
 
 	return (
-		<div className="bricolage-grotesque w-full overflow-hidden lg:grid lg:grid-cols-3">
+		<div className="bricolage-grotesque w-full min-h-screen overflow-hidden lg:grid lg:grid-cols-3">
 			<div className="relative lg:col-span-2 flex flex-col p-5 overflow-hidden h-full">
 				<div className="flex flex-col h-full z-10 relative">
 					<div className="flex items-center mb-10">

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import api from "../api/axiosInstance";
 import { Link } from "react-router-dom";
-import logoImg from "/images/la.png";
+import logoImg from "/images/taskgenie-logo.svg";
 
 const ForgotPassword = () => {
 	const [email, setEmail] = useState("");

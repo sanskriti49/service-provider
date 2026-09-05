@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance";
-import logoImg from "/images/la.png";
+import logoImg from "/images/taskgenie-logo.svg";
 
 const ResetPassword = () => {
 	const { resetToken } = useParams();

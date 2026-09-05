@@ -76,7 +76,7 @@ const Navbar = () => {
 					>
 						<div className="h-12 w-12 overflow-hidden drop-shadow-sm">
 							<img
-								src="/images/lamp-logo-1.png"
+								src="/images/taskgenie-logo.svg"
 								className="h-full w-full object-contain"
 								alt="TaskGenie Logo"
 							/>
