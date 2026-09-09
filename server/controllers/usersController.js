@@ -166,7 +166,6 @@ async function updateUser(req, res, next) {
 	}
 
 	try {
-		// FORWARD GEOCODING (location text -> lat/lng)
 		if (
 			updates.location &&
 			updates.location.trim() !== "" &&
@@ -188,7 +187,6 @@ async function updateUser(req, res, next) {
 			}
 		}
 
-		// REVERSE GEOCODING (lat/lng -> location)
 		else if (updates.lat && updates.lng && !updates.location) {
 			try {
 				const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${updates.lat}&lon=${updates.lng}`;

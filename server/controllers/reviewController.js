@@ -23,9 +23,6 @@ async function resolveProviderId(clientOrPool, idOrCustomId) {
 	return result.rows[0]?.id ?? null;
 }
 
-/**
- * Creates a review & rating for a provider
- */
 async function createReview(req, res, next) {
 	const customerId = req.user.id;
 	const { provider_id, booking_id, rating, comment, tags } = req.body;
@@ -47,7 +44,6 @@ async function createReview(req, res, next) {
 			return res.status(404).json({ error: "Provider not found" });
 		}
 
-		// Prevent reviewing yourself
 		if (customerId === targetProviderId) {
 			await client.query("ROLLBACK");
 			return res
@@ -55,7 +51,6 @@ async function createReview(req, res, next) {
 				.json({ error: "You cannot review your own profile" });
 		}
 
-		// If booking_id provided, check booking ownership
 		let validBookingId = null;
 		if (booking_id && UUID_REGEX.test(booking_id)) {
 			const bCheck = await client.query(
@@ -70,7 +65,6 @@ async function createReview(req, res, next) {
 			}
 		}
 
-		// If booking already reviewed, update existing review instead of duplicate
 		let insertRes;
 		if (validBookingId) {
 			const existingReview = await client.query(
@@ -110,7 +104,6 @@ async function createReview(req, res, next) {
 			);
 		}
 
-		// Recalculate average rating for provider
 		const avgRes = await client.query(
 			`SELECT ROUND(AVG(rating)::numeric, 1) AS avg_rating, COUNT(*) AS total_reviews 
 			 FROM reviews 
@@ -126,7 +119,6 @@ async function createReview(req, res, next) {
 
 		await client.query("COMMIT");
 
-		// Fetch customer name for friendly alert
 		try {
 			const cRes = await db.query(`SELECT name FROM users WHERE id = $1`, [customerId]);
 			const customerName = cRes.rows[0]?.name || "A customer";
@@ -146,7 +138,6 @@ async function createReview(req, res, next) {
 			console.warn("Review notification error:", notifErr);
 		}
 
-		// Invalidate cache
 		cache.delPattern(`reviews_${targetProviderId}`);
 		cache.delPattern(`provider_${targetProviderId}`);
 
@@ -164,9 +155,6 @@ async function createReview(req, res, next) {
 	}
 }
 
-/**
- * Gets reviews and rating statistics for a provider
- */
 async function getProviderReviews(req, res, next) {
 	try {
 		const { provider_id } = req.params;
@@ -236,7 +224,7 @@ async function getProviderReviews(req, res, next) {
 			})),
 		};
 
-		cache.set(cacheKey, responsePayload, 120000); // 2 min cache
+		cache.set(cacheKey, responsePayload, 120000);
 		res.json(responsePayload);
 	} catch (err) {
 		console.error("Get provider reviews error:", err);
@@ -244,9 +232,6 @@ async function getProviderReviews(req, res, next) {
 	}
 }
 
-/**
- * Checks if a specific booking has a review
- */
 async function getBookingReview(req, res, next) {
 	try {
 		const { booking_id } = req.params;

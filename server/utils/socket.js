@@ -10,7 +10,6 @@ function initSocket(httpServer, corsOptions) {
 		pingInterval: 25000,
 	});
 
-	// Socket Authentication Middleware
 	io.use((socket, next) => {
 		const token =
 			socket.handshake.auth?.token ||

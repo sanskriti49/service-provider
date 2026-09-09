@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 const http = require("http");
 const express = require("express");
 const cors = require("cors");
@@ -20,10 +20,8 @@ const corsOptions = {
 	allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-// Initialize WebSocket with CORS
 initSocket(httpServer, corsOptions);
 
-// Performance compression for all outgoing JSON and text
 app.use(compression());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "5mb" }));
@@ -38,6 +36,7 @@ const usersRoutes = require("./routes/usersRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 app.use("/api/providers", providerRoutes);
@@ -50,6 +49,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/availability", availabilityRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.get("/", (req, res) => {
 	res.send("Backend running..");

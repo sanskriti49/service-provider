@@ -6,7 +6,6 @@ const BackgroundNavbar = () => {
 			<div className="relative w-full h-100 overflow-hidden -mt-24 pt-24">
 				<svg
 					className="mesh-gradient  pointer-events-none absolute left-1/2  top-0 w-full min-w-[80rem] h-100"
-					//-translate-x-1/2
 					width="1171"
 					height="241"
 					viewBox="0 0 1171 241"

@@ -1,5 +1,4 @@
 const pricingConfig = {
-	// --- MICRO SERVICES ---
 	Laundry: { min: 20, max: 60, unit: "per cloth", slotDuration: 30, buffer: 0 },
 	Shaving: { min: 70, max: 200, unit: "fixed", slotDuration: 30, buffer: 15 },
 	"Eyebrow Threading": {
@@ -10,7 +9,6 @@ const pricingConfig = {
 		buffer: 15,
 	},
 
-	// --- HOURLY / SESSION (Market Rates) ---
 	"Child Tutoring": {
 		min: 300,
 		max: 800,
@@ -47,7 +45,6 @@ const pricingConfig = {
 		buffer: 30,
 	},
 
-	// --- ESTIMATES / PACKAGES ---
 	"Moving Help": {
 		min: 1500,
 		max: 4000,
@@ -70,7 +67,6 @@ const pricingConfig = {
 		buffer: 60,
 	},
 
-	// --- STANDARD FIXED ---
 	"House Cleaning": {
 		min: 399,
 		max: 1200,
@@ -128,7 +124,6 @@ const pricingConfig = {
 		buffer: 30,
 	},
 
-	// --- GROOMING ---
 	"Men's Haircut": {
 		min: 100,
 		max: 400,
@@ -191,7 +186,6 @@ const pricingConfig = {
 	default: { min: 299, max: 999, unit: "fixed", slotDuration: 60, buffer: 30 },
 };
 
-// Returns structural properties based on Service Name
 function getPriceDetails(serviceName) {
 	const config = pricingConfig[serviceName] || pricingConfig["default"];
 	const { min, max, unit, slotDuration, buffer } = config;

@@ -1,6 +1,6 @@
--- Migration: 001_provider_services.sql
--- Creates the provider_services junction table that enables multi-service providers
--- Run once: psql -d service_app -f 001_provider_services.sql
+
+
+
 
 CREATE TABLE IF NOT EXISTS provider_services (
     id           SERIAL PRIMARY KEY,
@@ -14,15 +14,15 @@ CREATE TABLE IF NOT EXISTS provider_services (
     UNIQUE(provider_id, service_id)
 );
 
--- Backfill existing providers from the providers table
--- so nothing is lost on existing data
+
+
 INSERT INTO provider_services (provider_id, service_id, price, price_unit, is_visible)
 SELECT p.user_id, p.service_id, COALESCE(p.price, 0), COALESCE(p.price_unit, 'fixed'), TRUE
 FROM providers p
 WHERE p.service_id IS NOT NULL
 ON CONFLICT (provider_id, service_id) DO NOTHING;
 
--- Index for fast lookups by provider
+
 CREATE INDEX IF NOT EXISTS idx_provider_services_provider_id ON provider_services(provider_id);
 CREATE INDEX IF NOT EXISTS idx_provider_services_service_id  ON provider_services(service_id);
 
@@ -30,7 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_provider_services_service_id  ON provider_service
 
 CREATE TABLE public.reviews (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    booking_id uuid NOT NULL, -- Optional: links to a specific transaction
+    booking_id uuid NOT NULL, 
     customer_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     provider_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     rating int2 NOT NULL CHECK (rating >= 1 AND rating <= 5),
@@ -39,7 +39,7 @@ CREATE TABLE public.reviews (
     CONSTRAINT reviews_pkey PRIMARY KEY (id)
 );
 
--- TRIGGER FUNCTION
+
 CREATE OR REPLACE FUNCTION update_provider_average_rating()
 RETURNS TRIGGER AS $$
 BEGIN

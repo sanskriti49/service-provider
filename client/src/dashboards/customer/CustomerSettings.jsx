@@ -336,7 +336,6 @@ const CustomerSettings = () => {
 	return (
 		<div className="bricolage-grotesque min-h-screen text-[#191034] p-6 md:p-12 font-sans pt-24 md:pt-32">
 			<div className="max-w-6xl mx-auto space-y-8">
-				{/* Header */}
 				<div className="flex flex-col md:flex-row md:items-end justify-between border-b border-[#e7e6f4] pb-6 gap-4">
 					<div>
 						<h1 className="text-4xl font-bold bg-gradient-to-r from-violet-700 via-fuchsia-600 to-violet-700 bg-clip-text text-transparent bg-300% animate-gradient">
@@ -349,7 +348,6 @@ const CustomerSettings = () => {
 				</div>
 
 				<div className="grid lg:grid-cols-12 gap-8 items-start">
-					{/* Left Column: Avatar & Basic Info */}
 					<div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
 						<div className="bg-white border border-gray-100 p-8 rounded-3xl flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow duration-300">
 							<div className="relative w-32 h-32 mb-6 group">
@@ -401,7 +399,6 @@ const CustomerSettings = () => {
 
 								<div className="h-px bg-gray-100 w-full" />
 
-								{/* Email Input */}
 								<div className="text-left">
 									<label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">
 										Email Address
@@ -477,7 +474,6 @@ const CustomerSettings = () => {
 						</div>
 					</div>
 
-					{/* Right Column: Contact, Address, Security */}
 					<div className="lg:col-span-8 space-y-6">
 						<div className="bg-white border border-gray-100 p-8 rounded-3xl shadow-sm">
 							<h3 className="text-xl font-bold text-[#191034] mb-8 flex items-center gap-3">
@@ -488,7 +484,6 @@ const CustomerSettings = () => {
 							</h3>
 
 							<div className="grid md:grid-cols-2 gap-8">
-								{/* Phone Number */}
 								<div className="space-y-2">
 									<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">
 										Phone Number
@@ -514,7 +509,6 @@ const CustomerSettings = () => {
 									/>
 								</div>
 
-								{/* General Location / Service Region */}
 								<div className="space-y-2">
 									<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">
 										General Service Region (City, State)
@@ -557,7 +551,6 @@ const CustomerSettings = () => {
 								</div>
 							</div>
 
-							{/* Address Text Area */}
 							<div className="mt-8 pt-6 border-t border-gray-100">
 								<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 mb-2 block">
 									Permanent Doorstep Address (For Deliveries / Bookings)
@@ -578,7 +571,6 @@ const CustomerSettings = () => {
 							</div>
 						</div>
 
-						{/* Security Section */}
 						<div className="bg-white border border-gray-100 p-8 rounded-3xl shadow-sm">
 							<h3 className="text-xl font-bold text-[#191034] mb-8 flex items-center gap-3">
 								<div className="bg-amber-50 p-2.5 rounded-xl text-amber-600">
@@ -588,7 +580,6 @@ const CustomerSettings = () => {
 							</h3>
 
 							<div className="grid md:grid-cols-2 gap-10">
-								{/* Change Password Form */}
 								<div className="order-2 md:order-1 bg-gray-50/50 rounded-2xl p-6 border border-gray-100">
 									<h4 className="font-bold text-gray-700 mb-5 flex items-center gap-2">
 										<CheckCircle2 size={18} className="text-emerald-500" />
@@ -630,7 +621,6 @@ const CustomerSettings = () => {
 									</div>
 								</div>
 
-								{/* Current Status & Logout */}
 								<div className="order-1 md:order-2 flex flex-col justify-between h-full">
 									<div>
 										<label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">

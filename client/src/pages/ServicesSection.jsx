@@ -53,14 +53,16 @@ const SkeletonCard = () => (
 	<div className="h-[450px] w-full animate-pulse rounded-3xl bg-slate-200" />
 );
 
+const MotionLink = motion(Link);
+
 const ServiceCard = ({ service, isActive }) => {
 	const serviceUrl = `/services/${service.slug || service.id}`;
 
 	const imageUrl = service.image_url || "/images/default-service.jpg";
 
 	return (
-		<motion.a
-			href={serviceUrl}
+		<MotionLink
+			to={serviceUrl}
 			className="group relative block h-[450px] w-full overflow-hidden rounded-3xl shadow-lg border border-white/20"
 			initial={{ scale: 0.9, opacity: 0.5 }}
 			animate={{
@@ -72,7 +74,6 @@ const ServiceCard = ({ service, isActive }) => {
 			}}
 			transition={{ duration: 0.4, ease: "easeInOut" }}
 		>
-			{/* Image Layer */}
 			<div className="absolute inset-0 h-full w-full bg-slate-200">
 				<img
 					src={imageUrl}
@@ -82,10 +83,8 @@ const ServiceCard = ({ service, isActive }) => {
 				/>
 			</div>
 
-			{/* Gradient Overlay */}
 			<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-90" />
 
-			{/* Content Layer */}
 			<div className="relative z-10 flex h-full flex-col justify-end p-8 text-white">
 				<div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-md text-white/90 w-fit">
 					{service.category || "General"}
@@ -118,7 +117,7 @@ const ServiceCard = ({ service, isActive }) => {
 					<ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1 group-hover/cta:text-violet-400" />
 				</div>
 			</div>
-		</motion.a>
+		</MotionLink>
 	);
 };
 
@@ -209,7 +208,6 @@ const ServicesSection = () => {
 				</motion.div>
 			</div>
 
-			{/* Carousel Content */}
 			<div className="w-full relative z-10">
 				{loading && (
 					<div className="mt-16 grid grid-cols-1 gap-8 px-4 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">

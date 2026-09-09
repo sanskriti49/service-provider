@@ -1,8 +1,5 @@
 ﻿const db = require("../config/db");
 
-/**
- * Get all notifications for authenticated user + unread count
- */
 async function getNotifications(req, res, next) {
 	try {
 		const userId = req.user.id;
@@ -38,9 +35,6 @@ async function getNotifications(req, res, next) {
 	}
 }
 
-/**
- * Mark a single notification as read
- */
 async function markAsRead(req, res, next) {
 	try {
 		const userId = req.user.id;
@@ -65,9 +59,6 @@ async function markAsRead(req, res, next) {
 	}
 }
 
-/**
- * Mark all notifications as read
- */
 async function markAllAsRead(req, res, next) {
 	try {
 		const userId = req.user.id;
@@ -86,9 +77,6 @@ async function markAllAsRead(req, res, next) {
 	}
 }
 
-/**
- * Delete a notification
- */
 async function deleteNotification(req, res, next) {
 	try {
 		const userId = req.user.id;
@@ -107,9 +95,6 @@ async function deleteNotification(req, res, next) {
 	}
 }
 
-/**
- * Clear all read notifications
- */
 async function clearReadNotifications(req, res, next) {
 	try {
 		const userId = req.user.id;

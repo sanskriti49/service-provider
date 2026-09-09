@@ -19,52 +19,50 @@ import {
 	AlertCircle,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import api from "../api/axiosInstance";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
-// Fallback services list if API endpoint isn't connected in dev preview
 const DEFAULT_SERVICES = [
 	{
 		id: "1",
 		name: "Electrical Repair",
-		slug: "electrician",
+		slug: "electrical-repair",
 		category: "Repair",
 		icon: "⚡",
 	},
 	{
 		id: "2",
 		name: "Plumbing Services",
-		slug: "plumber",
+		slug: "plumbing",
 		category: "Plumbing",
 		icon: "🔧",
 	},
 	{
 		id: "3",
 		name: "House Deep Cleaning",
-		slug: "cleaning",
+		slug: "house-cleaning",
 		category: "Cleaning",
 		icon: "🧹",
 	},
 	{
 		id: "4",
-		name: "AC Maintenance",
-		slug: "ac-repair",
+		name: "Appliance Repair",
+		slug: "appliance-repair",
 		category: "Appliance",
 		icon: "❄️",
 	},
 	{
 		id: "5",
-		name: "Carpentry & Furniture",
-		slug: "carpenter",
-		category: "Woodwork",
-		icon: "🪚",
+		name: "Painting & Decorating",
+		slug: "painting",
+		category: "Home Improvement",
+		icon: "🎨",
 	},
 	{
 		id: "6",
-		name: "Painting & Decorating",
-		slug: "painter",
-		category: "Home Improvement",
-		icon: "🎨",
+		name: "Pest Control",
+		slug: "pest-control",
+		category: "Home Services",
+		icon: "🛡️",
 	},
 ];
 
@@ -86,7 +84,6 @@ export default function ApplyProvider() {
 
 	const [servicesList, setServicesList] = useState(DEFAULT_SERVICES);
 
-	// Form payload matching providerSchema in providerController.js
 	const [formData, setFormData] = useState({
 		name: "",
 		email: "",
@@ -94,9 +91,9 @@ export default function ApplyProvider() {
 		password: "",
 		location: "Mumbai, Maharashtra",
 		bio: "",
-		service: "electrician", // primary slug required by providerSchema
+		service: "electrical-repair",
 		price: 499,
-		price_unit: "fixed", // 'fixed' or 'hourly'
+		price_unit: "fixed",
 		availability: [
 			{ day: 1, start: "09:00", end: "18:00" },
 			{ day: 2, start: "09:00", end: "18:00" },
@@ -107,20 +104,16 @@ export default function ApplyProvider() {
 		],
 	});
 
-	// Fetch real services if API is reachable
 	useEffect(() => {
 		async function fetchServices() {
 			try {
-				const res = await fetch(`${API_URL}/api/services/v1`);
-				if (res.ok) {
-					const data = await res.json();
-					if (Array.isArray(data) && data.length > 0) {
-						setServicesList(data);
-						setFormData((prev) => ({ ...prev, service: data[0].slug }));
-					}
+				const res = await api.get("/services/v1");
+				if (Array.isArray(res.data) && res.data.length > 0) {
+					setServicesList(res.data);
+					setFormData((prev) => ({ ...prev, service: res.data[0].slug }));
 				}
 			} catch (err) {
-				console.log("Using default services list");
+				console.log("Using default services list", err);
 			}
 		}
 		fetchServices();
@@ -204,32 +197,15 @@ export default function ApplyProvider() {
 				availability: formData.availability,
 			};
 
-			const res = await fetch(`${API_URL}/api/providers/v1`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-
-			const data = await res.json();
-			if (!res.ok) {
-				throw new Error(data.error || "Failed to submit provider application");
-			}
-
-			setSuccessData(data);
+			const res = await api.post("/providers/v1", payload);
+			setSuccessData(res.data);
 		} catch (err) {
-			if (
-				err.message.includes("Unexpected token") ||
-				err.message.includes("Failed to fetch")
-			) {
-				// Dev preview mock success if API server isn't active
-				setSuccessData({
-					message: "Provider created successfully!",
-					custom_id:
-						"SRV" + Math.random().toString(36).substring(2, 10).toUpperCase(),
-				});
-			} else {
-				setErrorMsg(err.message);
-			}
+			const errorText =
+				err.response?.data?.error ||
+				err.response?.data?.message ||
+				err.message ||
+				"Failed to submit provider application";
+			setErrorMsg(errorText);
 		} finally {
 			setLoading(false);
 		}
@@ -237,11 +213,9 @@ export default function ApplyProvider() {
 
 	return (
 		<div className="min-h-screen bg-slate-50 text-slate-800 bricolage-grotesque relative overflow-hidden py-12 px-4 sm:px-6">
-			{/* Background Light Ambient Glows */}
-			<div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[750px] h-[380px] bg-gradient-to-r from-violet-200/50 via-purple-200/40 to-pink-200/50 blur-[130px] pointer-events-none rounded-full" />
+			<div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[750px] h-[380px] bg-gradient-to-r from-violet-200/50 via-purple-200/40 to-pink-200/50 blur-3xl pointer-events-none rounded-full" />
 
 			<div className="max-w-3xl mx-auto relative z-10 space-y-8">
-				{/* Header */}
 				<div className="text-center space-y-3">
 					<div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-violet-100/90 border border-violet-200 text-violet-700 text-xs font-bold uppercase tracking-wider">
 						<Sparkles size={13} className="text-pink-600" /> Join TaskGenie
@@ -260,7 +234,6 @@ export default function ApplyProvider() {
 					</p>
 				</div>
 
-				{/* Stepper Progress Indicator */}
 				{!successData && (
 					<div className="bg-white/90 backdrop-blur-md rounded-2xl border border-violet-100 p-4 shadow-sm flex items-center justify-between">
 						{[
@@ -304,7 +277,6 @@ export default function ApplyProvider() {
 					</div>
 				)}
 
-				{/* Form Card Container */}
 				<div className="bg-white/95 backdrop-blur-xl border border-violet-200/70 rounded-3xl p-6 sm:p-10 shadow-xl shadow-purple-900/5 relative">
 					{errorMsg && (
 						<div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2.5">
@@ -314,7 +286,6 @@ export default function ApplyProvider() {
 					)}
 
 					{successData ? (
-						/* Success Screen */
 						<motion.div
 							initial={{ opacity: 0, scale: 0.95 }}
 							animate={{ opacity: 1, scale: 1 }}
@@ -355,9 +326,7 @@ export default function ApplyProvider() {
 							</button>
 						</motion.div>
 					) : (
-						/* Form Steps */
 						<form onSubmit={handleSubmit} className="space-y-6">
-							{/* STEP 1: Personal Details */}
 							{step === 1 && (
 								<motion.div
 									initial={{ opacity: 0, x: -10 }}
@@ -374,7 +343,6 @@ export default function ApplyProvider() {
 									</div>
 
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-										{/* Full Name */}
 										<div>
 											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
 												Full Name *
@@ -397,7 +365,6 @@ export default function ApplyProvider() {
 											</div>
 										</div>
 
-										{/* Email */}
 										<div>
 											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
 												Email Address *
@@ -422,7 +389,6 @@ export default function ApplyProvider() {
 									</div>
 
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-										{/* Phone Number */}
 										<div>
 											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
 												Indian Mobile Phone *
@@ -448,7 +414,6 @@ export default function ApplyProvider() {
 											</span>
 										</div>
 
-										{/* Password */}
 										<div>
 											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
 												Account Password *
@@ -472,7 +437,6 @@ export default function ApplyProvider() {
 										</div>
 									</div>
 
-									{/* Location */}
 									<div>
 										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
 											Service City / Region
@@ -494,7 +458,6 @@ export default function ApplyProvider() {
 										</div>
 									</div>
 
-									{/* Bio */}
 									<div>
 										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
 											Short Bio & Experience
@@ -511,7 +474,6 @@ export default function ApplyProvider() {
 								</motion.div>
 							)}
 
-							{/* STEP 2: Primary Service & Pricing */}
 							{step === 2 && (
 								<motion.div
 									initial={{ opacity: 0, x: -10 }}
@@ -528,7 +490,6 @@ export default function ApplyProvider() {
 										</p>
 									</div>
 
-									{/* Service Selection Grid */}
 									<div>
 										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
 											Select Primary Service *
@@ -555,7 +516,6 @@ export default function ApplyProvider() {
 										</div>
 									</div>
 
-									{/* Pricing Inputs */}
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
 										<div>
 											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
@@ -598,7 +558,6 @@ export default function ApplyProvider() {
 								</motion.div>
 							)}
 
-							{/* STEP 3: Working Schedule */}
 							{step === 3 && (
 								<motion.div
 									initial={{ opacity: 0, x: -10 }}
@@ -679,7 +638,6 @@ export default function ApplyProvider() {
 								</motion.div>
 							)}
 
-							{/* Form Navigation Controls */}
 							<div className="pt-6 border-t border-slate-100 flex items-center justify-between">
 								{step > 1 ? (
 									<button

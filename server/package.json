@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "nodemon --max-http-header-size=16384 index.js",
 		"start": "node index.js",
+		"test": "node --test test/**/*.test.js",
 		"seed-services": "node seeds/seedServices.js",
 		"seed-db": "node seeds/seedDb.js",
 		"reset-db": "node resetDb.js"

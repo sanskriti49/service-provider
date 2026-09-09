@@ -1,9 +1,6 @@
 ﻿const db = require("../config/db");
 const { emitToUser } = require("./socket");
 
-/**
- * Creates a persistent notification in PostgreSQL and broadcasts it in real-time via WebSocket
- */
 async function sendNotification({ userId, title, message, type = "system", data = {} }) {
 	if (!userId || !title || !message) {
 		console.warn("sendNotification called with missing parameters:", { userId, title });
@@ -20,7 +17,6 @@ async function sendNotification({ userId, title, message, type = "system", data 
 
 		const notification = result.rows[0];
 
-		// Real-time WebSocket Push
 		emitToUser(userId, "notification:new", notification);
 
 		return notification;

@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import logoImg from "/images/la.png";
+import logoImg from "/images/taskgenie-logo.svg";
 import signInImg from "/images/sign-in.jpg";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import { toast } from "sonner";
 import { Turnstile } from "@marsidev/react-turnstile";
-import api from "../api/axios";
+import api from "../api/axiosInstance";
 
 const SignUp = () => {
 	const navigate = useNavigate();
@@ -79,22 +79,45 @@ const SignUp = () => {
 		setForm({ ...form, [e.target.name]: e.target.value });
 	};
 	useEffect(() => {
-		window.google.accounts.id.initialize({
-			client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-			callback: handleGoogleResponse,
-			itp_support: true,
-		});
+		const initGoogle = () => {
+			if (
+				window.google?.accounts?.id &&
+				document.getElementById("googleButtonDiv")
+			) {
+				window.google.accounts.id.initialize({
+					client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+					callback: handleGoogleResponse,
+					itp_support: true,
+				});
 
-		window.google.accounts.id.renderButton(
-			document.getElementById("googleButtonDiv"),
-			{
-				theme: "outline",
-				size: "large",
-				width: 340,
-				shape: "pill",
-				text: "continue_with",
-			},
-		);
+				window.google.accounts.id.renderButton(
+					document.getElementById("googleButtonDiv"),
+					{
+						theme: "outline",
+						size: "large",
+						width: 340,
+						shape: "pill",
+						text: "continue_with",
+					},
+				);
+			}
+		};
+
+		if (window.google?.accounts?.id) {
+			initGoogle();
+		} else {
+			const interval = setInterval(() => {
+				if (window.google?.accounts?.id) {
+					initGoogle();
+					clearInterval(interval);
+				}
+			}, 300);
+			const timer = setTimeout(() => clearInterval(interval), 4000);
+			return () => {
+				clearInterval(interval);
+				clearTimeout(timer);
+			};
+		}
 	}, []);
 
 	const handleGoogleResponse = async (response) => {
@@ -151,7 +174,6 @@ const SignUp = () => {
 				...form,
 				captchaToken: token,
 			});
-			// get token and user data from the response
 			const { token: authToken, user } = res.data;
 			localStorage.setItem("token", authToken);
 
@@ -175,7 +197,7 @@ const SignUp = () => {
 	};
 
 	return (
-		<div className="bricolage-grotesque w-full overflow-hidden lg:grid lg:grid-cols-3">
+		<div className="bricolage-grotesque w-full min-h-screen overflow-hidden lg:grid lg:grid-cols-3">
 			<div className="relative lg:col-span-2 flex flex-col p-5 overflow-hidden h-full">
 				<div className="flex flex-col h-full z-10 relative">
 					<div className="flex items-center mb-8">
@@ -192,34 +214,33 @@ const SignUp = () => {
 					</div>
 
 					<div className="flex-1 flex flex-col justify-center items-center">
-						<div className="bg-[#ffffffbf] border border-[#5b21b613] backdrop-blur-2xl p-8 rounded-2xl shadow-xl w-full max-w-md ">
-							<h1 className="text-2xl text-center mb-2 w-full max-w-md flex flex-col gap-y-3">
+						<div className="auth-card bg-[#ffffffbf] border border-[#5b21b613] backdrop-blur-2xl p-8 rounded-2xl shadow-xl w-full max-w-md" style={{ color: "#0f172a" }}>
+							<h1 className="text-2xl font-bold text-slate-900 text-center mb-2 w-full max-w-md flex flex-col gap-y-3" style={{ color: "#0f172a" }}>
 								Sign up for an Account
 							</h1>
-							<p className="text-gray-700 text-center mb-8">
+							<p className="auth-subtext text-slate-600 text-center mb-8" style={{ color: "#475569" }}>
 								Join us to manage your tasks efficiently
 							</p>
 
 							<div className="space-y-4">
 								<div className="relative w-full">
-									{/* The hidden overlay that captures the click and mounts the native iframe */}
 									<div
 										id="googleButtonDiv"
 										className="absolute inset-0 z-10 opacity-0 overflow-hidden flex items-center justify-center cursor-pointer"
 									></div>
 
-									{/* Your styled custom UI button container beneath the invisible iframe layer */}
 									<button
 										type="button"
 										className="
             w-full flex items-center justify-center gap-2
-            text-gray-700 font-medium
+            text-slate-700 font-medium
             py-2 rounded-lg transition cursor-pointer
             bg-white border border-[#d4ceea]
             shadow-[inset_0px_1px_6px_1px_#E7E6F4]       
             hover:shadow-[inset_0_3px_6px_#ddd6fe]         
             active:shadow-[inset_0_0_6px_#ddd6fe]         
         "
+										style={{ color: "#334155" }}
 									>
 										<img
 											src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
@@ -231,17 +252,17 @@ const SignUp = () => {
 								</div>
 
 								<div className="flex items-center gap-4 my-4">
-									<div className="flex-1 h-px bg-gray-300"></div>
-									<span className="text-gray-600 text-sm">or</span>
-									<div className="flex-1 h-px bg-gray-300"></div>
+									<div className="flex-1 h-px bg-slate-300"></div>
+									<span className="text-slate-600 text-sm" style={{ color: "#475569" }}>or</span>
+									<div className="flex-1 h-px bg-slate-300"></div>
 								</div>
 
 								<form className="space-y-5" onSubmit={handleSubmit}>
 									<div className="space-y-2">
-										<label className="text-gray-700">I am signing up as:</label>
+										<label className="block text-sm font-semibold text-slate-800" style={{ color: "#1e293b" }}>I am signing up as:</label>
 
-										<div className="flex gap-4" onSubmit={handleSubmit}>
-											<label className="flex items-center gap-2 cursor-pointer">
+										<div className="flex gap-4">
+											<label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium text-sm" style={{ color: "#1e293b" }}>
 												<input
 													type="radio"
 													name="role"
@@ -252,7 +273,7 @@ const SignUp = () => {
 												Customer
 											</label>
 
-											<label className="flex items-center gap-2 cursor-pointer">
+											<label className="flex items-center gap-2 cursor-pointer text-slate-800 font-medium text-sm" style={{ color: "#1e293b" }}>
 												<input
 													type="radio"
 													name="role"
@@ -265,53 +286,62 @@ const SignUp = () => {
 										</div>
 									</div>
 
-									<label htmlFor="name">Full Name</label>
-									<input
-										name="name"
-										value={form.name}
-										onChange={handleChange}
-										type="text"
-										className="capitalize
-                                            w-full rounded-lg px-3 py-2
-                                            border border-[#d4ceea]
-                                            shadow-sm
-                                            focus:outline-none
-                                            focus:border-violet-500
-                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                    "
-									/>
+									<div>
+										<label htmlFor="name" className="block text-sm font-semibold text-slate-800 mb-1" style={{ color: "#1e293b" }}>Full Name</label>
+										<input
+											name="name"
+											value={form.name}
+											onChange={handleChange}
+											type="text"
+											style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
+											className="capitalize
+                                                w-full rounded-lg px-3 py-2
+                                                border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
+                                                shadow-sm
+                                                focus:outline-none
+                                                focus:border-violet-500
+                                                focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
+										/>
+									</div>
 
-									<label htmlFor="name">Email</label>
-									<input
-										name="email"
-										value={form.email}
-										onChange={handleChange}
-										type="email"
-										className="
-                                            w-full rounded-lg px-3 py-2
-                                            border border-[#d4ceea]
-                                            shadow-sm
-                                            focus:outline-none
-                                            focus:border-violet-500
-                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                    "
-									/>
+									<div>
+										<label htmlFor="email" className="block text-sm font-semibold text-slate-800 mb-1" style={{ color: "#1e293b" }}>Email</label>
+										<input
+											name="email"
+											value={form.email}
+											onChange={handleChange}
+											type="email"
+											style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
+											className="
+                                                w-full rounded-lg px-3 py-2
+                                                border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
+                                                shadow-sm
+                                                focus:outline-none
+                                                focus:border-violet-500
+                                                focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
+										/>
+									</div>
 
-									<label htmlFor="name">Password</label>
-									<input
-										name="password"
-										value={form.password}
-										onChange={handleChange}
-										type="password"
-										className="
-                                            w-full rounded-lg px-3 py-2
-                                            border border-[#d4ceea]
-                                            shadow-sm
-                                            focus:outline-none
-                                            focus:border-violet-500
-                                            focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
-                                    "
-									/>
+									<div>
+										<label htmlFor="password" className="block text-sm font-semibold text-slate-800 mb-1" style={{ color: "#1e293b" }}>Password</label>
+										<input
+											name="password"
+											value={form.password}
+											onChange={handleChange}
+											type="password"
+											style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
+											className="
+                                                w-full rounded-lg px-3 py-2
+                                                border border-[#d4ceea] bg-white text-slate-900 placeholder-slate-400
+                                                shadow-sm
+                                                focus:outline-none
+                                                focus:border-violet-500
+                                                focus:shadow-[0_0_0_3px_rgba(139,92,246,0.2)] transition duration-250
+                                        "
+										/>
+									</div>
 
 									<div className="flex justify-center">
 										<Turnstile
@@ -328,7 +358,7 @@ const SignUp = () => {
 
 									<button
 										disabled={loading}
-										className={`cursor-pointer w-full bg-[#7c3aed] text-white py-2 rounded-lg font-medium hover:bg-[#5b21b6] transition duration-250 ${
+										className={`cursor-pointer w-full bg-[#7c3aed] text-white py-2.5 rounded-lg font-bold hover:bg-[#5b21b6] transition duration-250 shadow-md shadow-violet-500/20 ${
 											loading ? "opacity-70 cursor-not-allowed" : ""
 										}`}
 									>
@@ -336,11 +366,11 @@ const SignUp = () => {
 									</button>
 								</form>
 
-								<p className="flex gap-1 items-center justify-center text-gray-700 text-sm">
+								<p className="flex gap-1 items-center justify-center text-slate-600 text-sm" style={{ color: "#475569" }}>
 									Already have an account?
 									<Link
 										to="/login"
-										className="text-violet-700 font-medium hover:underline transition duration-250"
+										className="text-violet-700 font-bold hover:underline transition duration-250"
 									>
 										Sign in
 									</Link>
@@ -349,20 +379,22 @@ const SignUp = () => {
 						</div>
 					</div>
 
-					<footer className="mx-auto mt-auto w-full max-w-md text-xs pt-6">
+					<footer className="auth-footer mx-auto mt-auto w-full max-w-md text-xs pt-6" style={{ color: "#475569" }}>
 						<div className="text-center">
-							<span className="text-gray-700">
+							<span className="text-slate-600" style={{ color: "#475569" }}>
 								By signing up you agree to our{" "}
 							</span>
 							<a
-								className="text-navy underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
+								className="text-slate-800 font-medium underline underline-offset-2 decoration-1 decoration-slate-400 hover:text-violet-700 transition-all"
+								style={{ color: "#1e293b" }}
 								href="#"
 							>
 								terms of service
 							</a>
-							<span className="text-gray-700"> and </span>
+							<span className="text-slate-600" style={{ color: "#475569" }}> and </span>
 							<a
-								className="text-navy underline underline-offset-2 decoration-1 decoration-navy-300 hover:text-violet-600 transition-all"
+								className="text-slate-800 font-medium underline underline-offset-2 decoration-1 decoration-slate-400 hover:text-violet-700 transition-all"
+								style={{ color: "#1e293b" }}
 								href="#"
 							>
 								privacy policy
@@ -373,14 +405,13 @@ const SignUp = () => {
 				</div>
 			</div>
 
-			<aside className="relative hidden lg:block lg:w-[28rem] xl:w-[32rem]">
+			<aside className="relative hidden lg:block lg:w-[28rem] xl:w-[32rem] h-full p-16">
 				<img
 					src={signInImg}
 					className="absolute inset-0 max-w-none w-full h-full object-cover"
 					alt=""
 				/>
 
-				{/* 3. Applied P22Mackinac Font Here */}
 				<blockquote
 					className="relative z-20 text-xl text-purple-900 animate-in fade-in duration-1000 leading-snug"
 					style={{ fontFamily: '"P22Mackinac", serif' }}

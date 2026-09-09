@@ -24,14 +24,12 @@ function allowRoles(...roles) {
 router.post("/", authMiddleware, allowRoles("customer"), createBooking);
 router.post("/verify-payment", authMiddleware, verifyPayment);
 
-// GET USER HISTORY
 router.get(
 	"/user/history",
 	authMiddleware,
 	allowRoles("customer"),
 	getUserHistory,
 );
-// GET UPCOMING
 router.get(
 	"/user/upcoming",
 	authMiddleware,
@@ -39,7 +37,6 @@ router.get(
 	getUpcomingBookings,
 );
 
-// GET PROVIDER BOOKINGS
 router.get(
 	"/provider/history/all",
 	authMiddleware,
@@ -61,7 +58,6 @@ router.get(
 	},
 );
 
-// GET PROVIDER BOOKINGS WITH FILTERS & PAGINATION
 router.get(
 	"/provider/list",
 	authMiddleware,
@@ -75,7 +71,6 @@ router.get(
 	getRecentProviderBookings,
 );
 
-// ADMIN: GET ALL BOOKINGS
 router.get(
 	"/admin/all",
 	authMiddleware,
@@ -107,7 +102,6 @@ router.patch(
 
 router.put("/:booking_id/status", authMiddleware, updateBookingStatus);
 
-// GET SINGLE BOOKING
 router.get("/:booking_id", authMiddleware, async (req, res) => {
 	try {
 		const q = `SELECT * FROM bookings WHERE booking_id=$1`;

@@ -60,7 +60,6 @@ const getProviderMonthlyChartData = async (req, res) => {
 	const providerId = req.user.id;
 
 	try {
-		// sums completed earnings grouped by month for the last 6 calendar months
 		const query = `
             SELECT 
                 to_char(date, 'Mon') AS label,

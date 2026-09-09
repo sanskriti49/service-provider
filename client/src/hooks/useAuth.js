@@ -1,12 +1,6 @@
 import { useMemo } from "react";
 import { jwtDecode } from "jwt-decode";
 
-/**
- * Returns `{ user, isExpired, isValid }` derived from the stored JWT.
- *
- * user     — decoded payload, or null if no/invalid token
- * isValid  — token exists, parses, and is not expired
- */
 export function useAuth() {
 	return useMemo(() => {
 		const token = localStorage.getItem("token");
@@ -23,9 +17,8 @@ export function useAuth() {
 
 			return { user: decoded, isValid: true };
 		} catch {
-			// Corrupted / tampered token
 			localStorage.removeItem("token");
 			return { user: null, isValid: false };
 		}
-	}, []); // runs once per mount — re-mount happens on navigation anyway
+	}, []);
 }

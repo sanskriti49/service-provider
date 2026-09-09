@@ -118,7 +118,6 @@ export default function BookingDetailsSheet({
 				transition={{ type: "spring", damping: 28, stiffness: 220 }}
 				className="fixed inset-y-0 right-0 w-full max-w-md bg-slate-900 border-l border-white/8 shadow-[-20px_0_60px_rgba(0,0,0,0.4)] z-[201] flex flex-col bricolage-grotesque"
 			>
-				{/* Header */}
 				<div className="p-6 border-b border-white/8 flex justify-between items-start bg-slate-900">
 					<div>
 						<h2 className="text-xl font-extrabold text-white tracking-tight">
@@ -143,9 +142,7 @@ export default function BookingDetailsSheet({
 					</button>
 				</div>
 
-				{/* Scrollable body */}
 				<div className="flex-1 overflow-y-auto p-6 space-y-6">
-					{/* Status bar */}
 					<div
 						className={`flex items-center justify-between p-4 rounded-2xl border ${style.bar}`}
 					>
@@ -158,7 +155,6 @@ export default function BookingDetailsSheet({
 						<Shield size={16} className="opacity-30" />
 					</div>
 
-					{/* Info rows */}
 					<div className="space-y-5">
 						{[
 							{
@@ -232,7 +228,6 @@ export default function BookingDetailsSheet({
 
 					<div className="border-t border-white/8" />
 
-					{/* Provider Actions */}
 					{isPastStart &&
 						(booking.status === "booked" ||
 							booking.status === "confirmed" ||
@@ -287,7 +282,6 @@ export default function BookingDetailsSheet({
 						</div>
 					)}
 
-					{/* Payment breakdown */}
 					<section className="bg-slate-800/60 rounded-3xl p-6 border border-white/8 relative overflow-hidden">
 						<div className="flex items-center gap-2 mb-4">
 							<CreditCard
@@ -349,7 +343,6 @@ export default function BookingDetailsSheet({
 					</section>
 				</div>
 
-				{/* Footer */}
 				<div className="p-6 bg-slate-950/50 border-t border-white/8">
 					<div className="flex items-center gap-3 text-slate-500 text-xs">
 						<ShieldCheck size={14} className="text-emerald-500" />

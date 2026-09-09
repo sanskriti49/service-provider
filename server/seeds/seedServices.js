@@ -6,7 +6,6 @@ const db = require("../config/db");
 const { SERVICES, SERVICE_CATEGORIES } = require("../utils/services");
 const { getPriceDetails } = require("../utils/pricing");
 
-// Cloudinary Config
 cloudinary.config({
 	cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
 	api_key: process.env.CLOUDINARY_API_KEY,

@@ -11,9 +11,6 @@ import {
 	TrendingUp,
 } from "lucide-react";
 
-/**
- * Modern Light-Mode WorkWUs Component for TaskGenie
- */
 const BENEFITS = [
 	{
 		icon: CalendarSync,
@@ -87,7 +84,6 @@ const WorkWUs = () => {
 					</p>
 				</div>
 
-				{/* Right Column: Illustration Graphic */}
 				<div className="relative group shrink-0">
 					<div className="absolute inset-0 bg-gradient-to-tr from-violet-400/20 to-pink-400/20 rounded-3xl blur-2xl opacity-60 group-hover:opacity-90 transition-opacity duration-500" />
 
@@ -97,12 +93,10 @@ const WorkWUs = () => {
 							alt="Work with us illustration"
 							className="w-56 sm:w-64 lg:w-72 h-auto object-contain transition-transform duration-500 group-hover:scale-105"
 							onError={(e) => {
-								// Fallback graphic box if local image path isn't loaded
 								e.target.style.display = "none";
 								e.target.nextSibling.style.display = "flex";
 							}}
 						/>
-						{/* Fallback Graphic Badge */}
 						<div className="hidden w-60 h-60 rounded-2xl bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50 border border-violet-200 flex-col items-center justify-center text-center p-6 space-y-3">
 							<div className="w-14 h-14 rounded-2xl bg-violet-100 border border-violet-200 flex items-center justify-center">
 								<Users size={28} className="text-violet-600" />
@@ -118,16 +112,13 @@ const WorkWUs = () => {
 				</div>
 			</div>
 
-			{/* Light Mode Gradient Divider Bar */}
 			<div className="my-10 flex items-center justify-center gap-3">
 				<div className="h-[1px] w-24 bg-gradient-to-r from-transparent to-violet-300" />
 				<div className="h-1.5 w-14 rounded-full bg-gradient-to-r from-violet-500 via-purple-400 to-pink-500 shadow-sm shadow-purple-500/20" />
 				<div className="h-[1px] w-24 bg-gradient-to-l from-transparent to-pink-300" />
 			</div>
 
-			{/* Main Feature Section Card (Light Mode Pastel Gradient & Glass) */}
 			<div className="relative rounded-3xl p-6 sm:p-10 border border-violet-200/60 bg-gradient-to-br from-pink-100/80 via-violet-100/70 to-indigo-100/80 backdrop-blur-md shadow-xl shadow-purple-900/5">
-				{/* Card Header */}
 				<div className="text-center max-w-xl mx-auto mb-10 space-y-2">
 					<h3 className="text-2xl sm:text-3xl font-extrabold text-[#281950] tracking-tight">
 						Why Work With{" "}
@@ -141,7 +132,6 @@ const WorkWUs = () => {
 					</p>
 				</div>
 
-				{/* 2x2 Feature Grid */}
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 					{BENEFITS.map((item, index) => {
 						const IconComp = item.icon;
@@ -179,7 +169,6 @@ const WorkWUs = () => {
 					})}
 				</div>
 
-				{/* Call to Action Footer */}
 				<div className="mt-10 pt-8 border-t border-violet-200/80 flex flex-col sm:flex-row items-center justify-between gap-6">
 					<div className="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-700">
 						<span className="flex items-center gap-1.5 text-emerald-700 font-bold">

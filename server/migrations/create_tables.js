@@ -1,4 +1,4 @@
-﻿const db = require("../config/db");
+const db = require("../config/db");
 
 const queries = [
 	`CREATE TABLE IF NOT EXISTS public.users (
@@ -16,6 +16,11 @@ const queries = [
     created_at timestamptz DEFAULT now() NULL,
     phone varchar(15) NULL,
     address text NULL,
+    reset_password_token text NULL,
+    reset_password_expires int8 NULL,
+    temp_email text NULL,
+    temp_email_otp text NULL,
+    temp_email_expires int8 NULL,
     CONSTRAINT check_email_lowercase CHECK ((email = lower(email))),
     CONSTRAINT check_indian_ph_no CHECK (((phone)::text ~ '^\\+91 ?[6-9][0-9]{9}$'::text)),
     CONSTRAINT users_check CHECK ((((role IS NULL) AND (custom_id IS NULL)) OR ((role = 'customer'::text) AND (custom_id ~ '^CUS[A-Z0-9]{10,30}$'::text)) OR ((role = 'provider'::text) AND (custom_id ~ '^SRV[A-Z0-9]{10,30}$'::text)))),
@@ -27,6 +32,11 @@ const queries = [
 	`CREATE INDEX IF NOT EXISTS ix_users_custom_id ON public.users(custom_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_users_role ON public.users(role)`,
 	`CREATE INDEX IF NOT EXISTS ix_users_lat_lng ON public.users(lat, lng)`,
+	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS reset_password_token text NULL`,
+	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS reset_password_expires int8 NULL`,
+	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS temp_email text NULL`,
+	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS temp_email_otp text NULL`,
+	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS temp_email_expires int8 NULL`,
 
 	`CREATE TABLE IF NOT EXISTS public.services (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -41,7 +51,6 @@ const queries = [
     CONSTRAINT services_slug_key UNIQUE (slug)
   )`,
 
-	// 3. Providers
 	`CREATE TABLE IF NOT EXISTS public.providers (
     user_id uuid NOT NULL,
     price float4 NULL,
@@ -55,7 +64,6 @@ const queries = [
     CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
   )`,
 
-	// 4. Provider Services
 	`CREATE TABLE IF NOT EXISTS public.provider_services (
     id serial4 NOT NULL,
     provider_id uuid NOT NULL,
@@ -74,18 +82,18 @@ const queries = [
 	`CREATE INDEX IF NOT EXISTS ix_provider_services_provider ON public.provider_services(provider_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_provider_services_service ON public.provider_services(service_id)`,
 
-	// 5. Availability Slots
 	`CREATE TABLE IF NOT EXISTS public.availability_slots (
     provider_id uuid NULL,
     "date" date NULL,
     start_time time NOT NULL,
     end_time time NOT NULL,
+    is_booked bool DEFAULT false NOT NULL,
     created_at timestamptz DEFAULT now() NULL,
     CONSTRAINT availability_slots_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.providers(user_id)
   )`,
 	`CREATE INDEX IF NOT EXISTS ix_availability_slots_provider_date ON public.availability_slots(provider_id, date)`,
+	`ALTER TABLE public.availability_slots ADD COLUMN IF NOT EXISTS is_booked bool DEFAULT false NOT NULL`,
 
-	// 6. Bookings
 	`CREATE TABLE IF NOT EXISTS public.bookings (
     booking_id uuid DEFAULT gen_random_uuid() NOT NULL,
     provider_id uuid NOT NULL,
@@ -115,7 +123,6 @@ const queries = [
 	`CREATE INDEX IF NOT EXISTS ix_bookings_user_id ON public.bookings(user_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_status ON public.bookings(status)`,
 
-	// 7. Master Availability
 	`CREATE TABLE IF NOT EXISTS public.provider_master_availability (
     id serial4 NOT NULL,
     provider_id uuid NOT NULL,
@@ -128,7 +135,6 @@ const queries = [
   )`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS ux_provider_day_start_end ON public.provider_master_availability USING btree (provider_id, day_of_week, start_time, end_time)`,
 
-	// 8. Exceptions
 	`CREATE TABLE IF NOT EXISTS public.provider_date_exceptions (
     id serial4 NOT NULL,
     provider_id uuid NOT NULL,
@@ -143,7 +149,6 @@ const queries = [
   )`,
 	`CREATE INDEX IF NOT EXISTS ix_exceptions_provider_date ON public.provider_date_exceptions USING btree (provider_id, date)`,
 
-	// 9. Reviews & Ratings
 	`CREATE TABLE IF NOT EXISTS public.reviews (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     booking_id uuid NULL,
@@ -161,7 +166,6 @@ const queries = [
 	`CREATE INDEX IF NOT EXISTS ix_reviews_customer ON public.reviews(customer_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_reviews_booking ON public.reviews(booking_id)`,
 
-	// 10. Notifications
 	`CREATE TABLE IF NOT EXISTS public.notifications (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
@@ -175,6 +179,55 @@ const queries = [
     CONSTRAINT fk_notification_user FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
   )`,
 	`CREATE INDEX IF NOT EXISTS ix_notifications_user_unread ON public.notifications(user_id, is_read, created_at DESC)`,
+
+	// Admin & Ops Schema Updates
+	`ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check`,
+	`ALTER TABLE public.users ADD CONSTRAINT users_role_check CHECK (role = ANY (ARRAY['customer'::text, 'provider'::text, 'admin'::text]))`,
+	`ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_check`,
+	`ALTER TABLE public.users ADD CONSTRAINT users_check CHECK (
+    ((role IS NULL) AND (custom_id IS NULL)) OR
+    ((role = 'customer'::text) AND (custom_id ~ '^CUS[A-Z0-9]{10,30}$'::text)) OR
+    ((role = 'provider'::text) AND (custom_id ~ '^SRV[A-Z0-9]{10,30}$'::text)) OR
+    ((role = 'admin'::text) AND (custom_id ~ '^ADM[A-Z0-9]{10,30}$'::text))
+  )`,
+
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS status varchar(20) DEFAULT 'approved' NOT NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS rejection_reason text NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS approved_at timestamptz DEFAULT now() NULL`,
+
+	`CREATE TABLE IF NOT EXISTS public.disputes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    booking_id uuid NOT NULL,
+    raised_by uuid NOT NULL,
+    provider_id uuid NOT NULL,
+    reason text NOT NULL,
+    details text NULL,
+    status varchar(20) DEFAULT 'opened'::character varying NOT NULL,
+    refund_amount float4 DEFAULT 0,
+    resolution_notes text NULL,
+    resolved_by uuid NULL,
+    resolved_at timestamptz NULL,
+    created_at timestamptz DEFAULT now() NULL,
+    CONSTRAINT disputes_pkey PRIMARY KEY (id),
+    CONSTRAINT fk_dispute_booking FOREIGN KEY (booking_id) REFERENCES public.bookings(booking_id) ON DELETE CASCADE,
+    CONSTRAINT fk_dispute_raised_by FOREIGN KEY (raised_by) REFERENCES public.users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_dispute_provider FOREIGN KEY (provider_id) REFERENCES public.users(id) ON DELETE CASCADE
+  )`,
+	`CREATE INDEX IF NOT EXISTS ix_disputes_booking ON public.disputes(booking_id)`,
+	`CREATE INDEX IF NOT EXISTS ix_disputes_status ON public.disputes(status)`,
+	`CREATE INDEX IF NOT EXISTS ix_disputes_provider ON public.disputes(provider_id)`,
+
+	`CREATE TABLE IF NOT EXISTS public.platform_settings (
+    key varchar(50) NOT NULL,
+    value jsonb NOT NULL,
+    updated_at timestamptz DEFAULT now() NULL,
+    CONSTRAINT platform_settings_pkey PRIMARY KEY (key)
+  )`,
+	`INSERT INTO public.platform_settings (key, value)
+   VALUES 
+     ('commission_rate', '{"percentage": 15, "min_fee": 50}'::jsonb),
+     ('cancellation_fee', '{"customer_fee": 100, "provider_penalty": 150}'::jsonb)
+   ON CONFLICT (key) DO NOTHING`,
 ];
 
 const runMigration = async () => {

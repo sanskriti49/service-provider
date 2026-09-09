@@ -1,7 +1,8 @@
-﻿require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const { customAlphabet } = require("nanoid");
 const Joi = require("joi");
 const db = require("../config/db");
+const cache = require("../utils/cache");
 const { hashIfPresent } = require("../utils/hash");
 const { normalizeEmail } = require("../utils/normalizeEmail");
 const { getPriceDetails } = require("../utils/pricing");
@@ -97,7 +98,6 @@ const providerUpdateSchema = Joi.object({
 	availability: Joi.array().optional(),
 });
 
-// Timezone-safe Local YYYY-MM-DD Date Formatter
 function localDateStr(dt) {
 	const year = dt.getFullYear();
 	const month = String(dt.getMonth() + 1).padStart(2, "0");
@@ -111,7 +111,6 @@ async function insertSlots(client, userId, schedule) {
 		[userId],
 	);
 
-	// Deduplicate schedule rules by day, start, end
 	const seenRules = new Set();
 	const uniqueSchedule = [];
 	for (const rule of schedule) {
@@ -209,8 +208,8 @@ async function createProvider(req, res, next) {
 		const userId = userInsert.rows[0].id;
 
 		await client.query(
-			`INSERT INTO providers (user_id, rating, availability)
-             VALUES ($1,$2,$3)`,
+			`INSERT INTO providers (user_id, rating, availability, status)
+             VALUES ($1,$2,$3,'pending')`,
 			[userId, rating ?? null, JSON.stringify(availability ?? [])],
 		);
 
@@ -239,6 +238,7 @@ async function createProvider(req, res, next) {
 
 		await insertSlots(client, userId, availability ?? []);
 		await client.query("COMMIT");
+		cache.delPattern("providers_");
 		res.status(201).json({
 			message: "Provider created successfully",
 			user_id: userId,
@@ -252,13 +252,16 @@ async function createProvider(req, res, next) {
 	}
 }
 
-/**
- * Enhanced marketplace provider search with geolocation matching, proximity ranking, and filters
- */
 async function getProviders(req, res, next) {
 	try {
 		const { service, lat, lng, radius, sort_by, min_rating, max_price } =
 			req.query;
+
+		const cacheKey = `providers_${service || "all"}_${lat || ""}_${lng || ""}_${radius || ""}_${sort_by || ""}_${min_rating || ""}_${max_price || ""}`;
+		const cached = cache.get(cacheKey);
+		if (cached) {
+			return res.json(cached);
+		}
 
 		const userLat = parseFloat(lat);
 		const userLng = parseFloat(lng);
@@ -278,7 +281,7 @@ async function getProviders(req, res, next) {
             JOIN services s ON s.id = ps.service_id
         `;
 		const params = [];
-		const whereClauses = [];
+		const whereClauses = ["COALESCE(p.status, 'approved') = 'approved'"];
 
 		if (service) {
 			params.push(service);
@@ -304,14 +307,12 @@ async function getProviders(req, res, next) {
 		const result = await db.query(query, params);
 		let providers = result.rows;
 
-		// Average price in requested result set for score normalization
 		const avgPrice =
 			providers.length > 0
 				? providers.reduce((acc, p) => acc + (parseFloat(p.price) || 0), 0) /
 					providers.length
 				: 500;
 
-		// Calculate geolocation distance, estimated transit time, and composite match score
 		providers = providers.map((p) => {
 			const pLat = parseFloat(p.lat);
 			const pLng = parseFloat(p.lng);
@@ -343,12 +344,10 @@ async function getProviders(req, res, next) {
 			};
 		});
 
-		// Filter by radius if requested and coordinates exist
 		if (hasUserCoords && radius) {
 			providers = providers.filter((p) => p.is_nearby);
 		}
 
-		// Sorting logic
 		const sortMode = sort_by || (hasUserCoords ? "recommended" : "rating");
 
 		providers.sort((a, b) => {
@@ -367,7 +366,6 @@ async function getProviders(req, res, next) {
 			if (sortMode === "rating") {
 				return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
 			}
-			// Default "recommended": Highest match_score first, then distance, then rating
 			if (b.match_score !== a.match_score) {
 				return b.match_score - a.match_score;
 			}
@@ -377,6 +375,7 @@ async function getProviders(req, res, next) {
 			return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
 		});
 
+		cache.set(cacheKey, providers, 45000);
 		res.json(providers);
 	} catch (err) {
 		console.error("Fetch marketplace providers error:", err.message);
@@ -384,10 +383,6 @@ async function getProviders(req, res, next) {
 	}
 }
 
-/**
- * Dedicated Geolocation Matching Endpoint
- * GET /api/providers/v1/match?service=...&lat=...&lng=...&radius=...
- */
 async function matchProviders(req, res, next) {
 	return getProviders(req, res, next);
 }
@@ -418,7 +413,6 @@ async function getProviderById(req, res, next) {
 
 		const provider = providerRes.rows[0];
 
-		// Query provider_master_availability table for the true active schedule
 		const masterRes = await db.query(
 			`SELECT day_of_week AS day, 
                     TO_CHAR(start_time, 'HH24:MI') AS start, 
@@ -457,33 +451,45 @@ async function getProviderById(req, res, next) {
 			[provider.id],
 		);
 
-		const slotsRes = await db.query(
-			`SELECT 
-                TO_CHAR(date,'YYYY-MM-DD') AS date_str,
-                TO_CHAR(start_time, 'HH24:MI') AS start_time,
-                TO_CHAR(end_time, 'HH24:MI') AS end_time,
-                is_booked
-             FROM availability_slots
-             WHERE provider_id=$1 
-                    AND date >= CURRENT_DATE 
-                    AND date <= CURRENT_DATE + INTERVAL '30 days'
-             ORDER BY date, start_time`,
-			[provider.id],
-		);
+		let slots = [];
+		try {
+			const slotsRes = await db.query(
+				`SELECT 
+					TO_CHAR(s.date,'YYYY-MM-DD') AS date_str,
+					TO_CHAR(s.start_time, 'HH24:MI') AS start_time,
+					TO_CHAR(s.end_time, 'HH24:MI') AS end_time,
+					EXISTS (
+						SELECT 1 FROM bookings b
+						WHERE b.provider_id = s.provider_id
+						  AND b.date = s.date
+						  AND b.start_time = s.start_time
+						  AND b.status IN ('pending', 'booked', 'confirmed', 'in_progress')
+					) AS is_booked
+				 FROM availability_slots s
+				 WHERE s.provider_id = $1 
+				   AND s.date >= CURRENT_DATE 
+				   AND s.date <= CURRENT_DATE + INTERVAL '30 days'
+				 ORDER BY s.date, s.start_time`,
+				[provider.id],
+			);
+			slots = slotsRes.rows.map((s) => ({
+				date: s.date_str,
+				start_time: s.start_time,
+				end_time: s.end_time,
+				start: s.start_time,
+				end: s.end_time,
+				isBooked: s.is_booked === true,
+			}));
+		} catch (slotsErr) {
+			console.warn("Slots query fallback in getProviderById:", slotsErr.message);
+		}
 
 		res.json({
 			message: "Provider fetched",
 			provider: {
 				...provider,
 				availability: weeklyAvailability,
-				slots: slotsRes.rows.map((s) => ({
-					date: s.date_str,
-					start_time: s.start_time,
-					end_time: s.end_time,
-					start: s.start_time,
-					end: s.end_time,
-					isBooked: s.is_booked,
-				})),
+				slots,
 				services: servicesRes.rows,
 			},
 		});
@@ -570,6 +576,7 @@ async function updateProvider(req, res, next) {
 		}
 
 		await client.query("COMMIT");
+		cache.delPattern("providers_");
 		res.json({ message: "Provider updated successfully" });
 	} catch (err) {
 		await client.query("ROLLBACK");
@@ -666,6 +673,7 @@ async function addProviderService(req, res, next) {
 		}
 
 		await client.query("COMMIT");
+		cache.delPattern("providers_");
 		res
 			.status(201)
 			.json({ message: "Service added successfully", data: result.rows[0] });
@@ -691,6 +699,7 @@ async function removeProviderService(req, res, next) {
 			return res
 				.status(404)
 				.json({ error: "Service not found on this provider" });
+		cache.delPattern("providers_");
 		res.json({ message: "Service removed" });
 	} catch (err) {
 		next(err);
@@ -712,6 +721,7 @@ async function toggleServiceVisibility(req, res, next) {
              WHERE provider_id=$2 AND service_id=$3::uuid RETURNING *`,
 			[is_visible, providerId, req.params.service_id],
 		);
+		cache.delPattern("providers_");
 		if (!result.rowCount)
 			return res
 				.status(404)
@@ -726,14 +736,6 @@ async function toggleServiceVisibility(req, res, next) {
 	}
 }
 
-/**
- * Calculates provider availability taking into account:
- * - Master availability schedule
- * - Provider date exceptions (leave days & overrides)
- * - Confirmed, booked, in_progress, and active pending bookings
- * - Service slot duration and buffer
- * - Fast geolocation transit buffers between adjacent jobs
- */
 async function getProviderAvailability(req, res, next) {
 	try {
 		const providerIdParam = req.params.id;
@@ -747,12 +749,10 @@ async function getProviderAvailability(req, res, next) {
 
 		const serviceParam = req.query.service || req.query.service_id;
 
-		// Current local time setup
 		const now = new Date();
 		const todayStr = localDateStr(now);
 		const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-		// Local date extraction from query string or server time
 		const fromStr = req.query.from || todayStr;
 		const [year, month, day] = fromStr.split("-").map(Number);
 		const from = new Date(year, month - 1, day, 0, 0, 0, 0);
@@ -762,7 +762,6 @@ async function getProviderAvailability(req, res, next) {
 		endDate.setDate(from.getDate() + days - 1);
 		const endDateStr = localDateStr(endDate);
 
-		// Queries executed in parallel
 		let serviceQuery = `
 			SELECT s.name, s.slug, ps.price, ps.price_unit 
 			FROM provider_services ps 
@@ -845,16 +844,13 @@ async function getProviderAvailability(req, res, next) {
 			const dateStr = localDateStr(dt);
 			const dow = dt.getDay();
 
-			// 1. If date is in the past, return empty slots
 			if (dateStr < todayStr) {
 				results.push({ date: dateStr, free_slots: [] });
 				continue;
 			}
 
-			// 2. Check for Date Exceptions
 			const exception = exceptionsMap[dateStr];
 			if (exception && !exception.is_available) {
-				// Provider took off on this specific date
 				results.push({ date: dateStr, free_slots: [] });
 				continue;
 			}
@@ -879,7 +875,6 @@ async function getProviderAvailability(req, res, next) {
 
 			const bookedJobs = bookingsMap[dateStr] || [];
 
-			// Compute transit times for all booked jobs on this day in batch
 			const travelTimes = new Map();
 			if (hasCoords && bookedJobs.length > 0) {
 				const jobCoords = [];
@@ -916,7 +911,6 @@ async function getProviderAvailability(req, res, next) {
 					const currentSlotStart = sTime;
 					const currentSlotEnd = sTime + SLOT_DURATION;
 
-					// If today, skip slots that start at or before current time + 15 min buffer
 					if (dateStr === todayStr && currentSlotStart <= nowMinutes + 15) {
 						sTime += SLOT_DURATION;
 						continue;
@@ -929,13 +923,11 @@ async function getProviderAvailability(req, res, next) {
 						const jobStart = timeToMinutes(job.start_time);
 						const jobEnd = timeToMinutes(job.end_time);
 
-						// Direct Overlap check
 						if (!(currentSlotEnd <= jobStart || currentSlotStart >= jobEnd)) {
 							slotValid = false;
 							break;
 						}
 
-						// Transit buffer check for adjacent jobs
 						let bufferBefore = DEFAULT_BUFFER;
 						let bufferAfter = DEFAULT_BUFFER;
 
@@ -1009,6 +1001,7 @@ async function deleteProvider(req, res, next) {
 		]);
 		if (!r.rowCount)
 			return res.status(404).json({ error: "No provider found" });
+		cache.delPattern("providers_");
 		res.json({ message: "Provider deleted successfully" });
 	} catch (err) {
 		next(err);

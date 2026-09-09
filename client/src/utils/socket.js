@@ -31,13 +31,11 @@ export function getSocket() {
 		socketInstance.on("notification:new", (notification) => {
 			console.log("🔔 Incoming real-time notification:", notification);
 
-			// Trigger toast alert
 			toast(notification.title || "New Notification", {
 				description: notification.message,
 				duration: 5000,
 			});
 
-			// Broadcast event to React listeners
 			window.dispatchEvent(
 				new CustomEvent("app:notification", { detail: notification }),
 			);

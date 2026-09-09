@@ -1,13 +1,11 @@
 function normalizeEmail(email) {
-	if (!email) return "";
+	if (!email || typeof email !== "string") return "";
 
-	email = email.toLowerCase();
+	email = email.trim().toLowerCase();
 
 	let [local, domain] = email.split("@");
 
-	// 2. Handle Gmail / Googlemail specific rules
 	if (domain === "gmail.com" || domain === "googlemail.com") {
-		// Gmail ignores dots in the local part
 		local = local.replace(/\./g, "");
 		domain = "gmail.com";
 	}

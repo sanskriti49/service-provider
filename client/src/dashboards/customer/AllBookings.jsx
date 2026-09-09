@@ -16,6 +16,7 @@ import {
 import BookingDetailsSheet from "./BookingDetailsSheet";
 import { useNavigate } from "react-router-dom";
 import ConfirmModal from "../../ui/ConfirmModal";
+import api from "../../api/axiosInstance";
 
 const StatusBadge = ({ status, date, startTime }) => {
 	let displayStatus = status.toLowerCase();
@@ -119,16 +120,12 @@ export default function AllBookings() {
 		has_next_page: false,
 	});
 
-	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
-	// controls the inputs in the UI
 	const [tempFilters, setTempFilters] = useState({
 		dateRange: "All Time",
 		serviceName: "",
 		minPrice: "",
 	});
 
-	//  what actually triggers the API call
 	const [activeFilters, setActiveFilters] = useState({
 		dateRange: "All Time",
 		serviceName: "",
@@ -149,14 +146,11 @@ export default function AllBookings() {
 
 	useEffect(() => {
 		const controller = new AbortController();
-		const signal = controller.signal;
 
 		const fetchHistory = async () => {
 			setLoading(true);
 			try {
-				const token = localStorage.getItem("token");
-
-				const params = new URLSearchParams({
+				const params = {
 					page: meta.current_page,
 					limit: 5,
 					type: activeTab,
@@ -164,23 +158,21 @@ export default function AllBookings() {
 					date_filter: activeFilters.dateRange,
 					min_price: activeFilters.minPrice,
 					service_filter: activeFilters.serviceName,
+				};
+				const res = await api.get("/bookings/user/history", {
+					params,
+					signal: controller.signal,
 				});
-				const res = await fetch(
-					`${API_URL}/api/bookings/user/history?${params.toString()}`,
-					{ headers: { Authorization: `Bearer ${token}` }, signal: signal },
-				);
-				if (res.ok) {
-					const responseData = await res.json();
-					setHistory(responseData.data);
-					setMeta(responseData.meta);
+				if (res.data) {
+					setHistory(res.data.data || []);
+					setMeta(res.data.meta || { current_page: 1, total_pages: 1, has_next_page: false });
 				}
 			} catch (err) {
-				if (err.name !== "AbortError") {
+				if (err.name !== "CanceledError" && err.name !== "AbortError") {
 					console.error("Error fetching history", err);
 				}
 			} finally {
-				// only turn off loading if the request wasn't aborted
-				if (!signal.aborted) {
+				if (!controller.signal.aborted) {
 					setLoading(false);
 				}
 			}
@@ -214,7 +206,6 @@ export default function AllBookings() {
 
 	const handleStatusUpdate = async (bookingId, newStatus) => {
 		if (newStatus === "cancelled") {
-			//confirmMsg = "Are you sure you want to cancel this booking?";
 			setConfirmConfig({
 				isOpen: true,
 				bookingId,
@@ -234,38 +225,28 @@ export default function AllBookings() {
 	const executeApiUpdate = async (bookingId, newStatus) => {
 		setActionLoading(bookingId);
 		try {
-			const token = localStorage.getItem("token");
-			const res = await fetch(`${API_URL}/api/bookings/${bookingId}/status`, {
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`,
-				},
-				body: JSON.stringify({ status: newStatus }),
-			});
-			const data = await res.json();
-
-			if (res.ok) {
-				setHistory((prev) =>
-					prev.map((item) =>
-						item.booking_id === bookingId
-							? { ...item, status: newStatus }
-							: item,
-					),
-				);
-				if (selectedBooking && selectedBooking.booking_id === bookingId) {
-					setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
-				}
-			} else {
-				alert(data.message || "Failed to update status");
+			await api.put(`/bookings/${bookingId}/status`, { status: newStatus });
+			setHistory((prev) =>
+				prev.map((item) =>
+					item.booking_id === bookingId
+						? { ...item, status: newStatus }
+						: item,
+				),
+			);
+			if (selectedBooking && selectedBooking.booking_id === bookingId) {
+				setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
 			}
-			setConfirmConfig({ ...confirmConfig, isOpen: false }); // Close modal on success
+			setConfirmConfig({ ...confirmConfig, isOpen: false });
 			toast.success(`Booking ${newStatus.replace("_", " ")} successfully`, {
 				className:
 					"bricolage-grotesque font-semibold border-2 border-emerald-100 bg-white text-emerald-700 rounded-2xl shadow-xl",
 			});
 		} catch (err) {
-			toast.error(data.message || "Failed to update status");
+			const errMsg =
+				err.response?.data?.message ||
+				err.message ||
+				"Failed to update status";
+			toast.error(errMsg);
 			console.error("Error updating status:", err);
 		} finally {
 			setActionLoading(null);
@@ -283,7 +264,6 @@ export default function AllBookings() {
 			setMeta((prev) => ({ ...prev, current_page: prev.current_page - 1 }));
 		}
 	};
-	console.log("HISTORY: ", history);
 
 	return (
 		<div className="relative">
@@ -623,7 +603,6 @@ export default function AllBookings() {
 						)}
 					</div>
 
-					{/* Pagination */}
 					<div className="p-4 border-t border-gray-100 bg-gray-50/30 flex justify-between items-center">
 						<span className="text-xs text-gray-500 font-medium">
 							Showing page {meta.current_page} of {meta.total_pages}

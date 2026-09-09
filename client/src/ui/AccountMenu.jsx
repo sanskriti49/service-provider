@@ -15,6 +15,7 @@ import {
 	History,
 	Heart,
 	Bell,
+	ShieldCheck,
 } from "lucide-react";
 
 export default function AccountMenu({ user }) {
@@ -24,6 +25,7 @@ export default function AccountMenu({ user }) {
 		return `${parts[0][0] || ""}${parts[1]?.[0] || ""}`.toUpperCase();
 	};
 
+	const isAdmin = user?.role === "admin";
 	const isProvider = user?.role === "provider";
 
 	const nuclearSafeClass =
@@ -55,7 +57,6 @@ export default function AccountMenu({ user }) {
 				</Menu.Button>
 			</div>
 
-			{/* THE DROPDOWN PANEL */}
 			<Transition
 				as={Fragment}
 				enter="transition ease-out duration-200"
@@ -77,17 +78,30 @@ export default function AccountMenu({ user }) {
 							<span
 								className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide 
                                 ${
-																	isProvider
-																		? "bg-purple-100 text-purple-700"
-																		: "bg-blue-100 text-blue-700"
+																	isAdmin
+																		? "bg-rose-100 text-rose-700 font-bold"
+																		: isProvider
+																			? "bg-purple-100 text-purple-700"
+																			: "bg-blue-100 text-blue-700"
 																}`}
 							>
-								{isProvider ? "Provider" : "Customer"}
+								{isAdmin ? "Admin" : isProvider ? "Provider" : "Customer"}
 							</span>
 						</div>
 					</div>
 
-					{!isProvider && (
+					{isAdmin && (
+						<div className="p-1">
+							<MenuLink to="/admin" icon={ShieldCheck}>
+								Admin Ops Hub
+							</MenuLink>
+							<MenuLink to="/admin" icon={LayoutDashboard}>
+								Platform Analytics
+							</MenuLink>
+						</div>
+					)}
+
+					{!isAdmin && !isProvider && (
 						<div className="p-1">
 							<MenuLink to="/dashboard" icon={LayoutDashboard}>
 								Dashboard
@@ -104,7 +118,7 @@ export default function AccountMenu({ user }) {
 						</div>
 					)}
 
-					{isProvider && (
+					{!isAdmin && isProvider && (
 						<div className="p-1">
 							<MenuLink to="/provider/dashboard" icon={LayoutDashboard}>
 								Dashboard

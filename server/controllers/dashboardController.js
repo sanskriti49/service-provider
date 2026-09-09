@@ -54,7 +54,6 @@ const getProviderDashboardStats = async (req, res) => {
 
 	try {
 		const [metricsRes, ratingRes] = await Promise.all([
-			// Query 1: Calculate core booking aggregations for this provider
 			db.query(
 				`SELECT 
                     COALESCE(SUM(CASE WHEN status = 'completed' THEN price ELSE 0 END), 0) AS total_earnings,
@@ -66,7 +65,6 @@ const getProviderDashboardStats = async (req, res) => {
                  WHERE provider_id = $1`,
 				[providerId],
 			),
-			// Query 2: Get the provider's rating directly from the providers table
 			db.query(`SELECT rating FROM providers WHERE user_id = $1`, [providerId]),
 		]);
 

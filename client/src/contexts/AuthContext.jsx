@@ -17,7 +17,6 @@ export function AuthProvider({ children }) {
 				return null;
 			}
 
-			// Hydrate initially from persistent storage to minimize visual layout shifts
 			const cachedDetails = JSON.parse(localStorage.getItem("user") || "{}");
 			return { ...decoded, ...cachedDetails };
 		} catch {
@@ -26,7 +25,6 @@ export function AuthProvider({ children }) {
 		}
 	});
 
-	// Fetches fully fleshed database row to capture fields missing from JWT payload strings
 	useEffect(() => {
 		const hydrateDatabaseProfile = async () => {
 			const token = localStorage.getItem("token");

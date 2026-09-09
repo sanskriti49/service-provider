@@ -23,6 +23,7 @@ import { useState, useEffect, useMemo, useCallback, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../../api/axiosInstance";
+import { toast } from "sonner";
 
 const SERIF_FONT = { fontFamily: "P22Mackinac, Cambria, sans-serif" };
 const TEXT_MAIN = "text-[#281950]";
@@ -74,7 +75,6 @@ const StatPill = ({ icon: Icon, label, value, color, delay }) => (
 	</motion.div>
 );
 
-// ── Menu item ─────────────────────────────────────────────────────────────────
 const CustomMenuItem = forwardRef(
 	(
 		{
@@ -188,14 +188,12 @@ export default function CustomerProfile() {
 
 	return (
 		<div className="min-h-screen relative overflow-hidden bricolage-grotesque mt-20 pb-20">
-			{/* Background blobs */}
 			<div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
 				<div className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-300/30 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/4" />
 				<div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-fuchsia-300/20 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/4" />
 			</div>
 
 			<div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12">
-				{/* ── Header ──────────────────────────────────────────────────── */}
 				<header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
 					<motion.div
 						initial={{ opacity: 0, x: -20 }}
@@ -233,9 +231,7 @@ export default function CustomerProfile() {
 				</header>
 
 				<div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-					{/* ── Left column ─────────────────────────────────────────── */}
 					<div className="md:col-span-8 flex flex-col gap-8">
-						{/* Profile card */}
 						<BentoCard className="p-8 md:p-10 flex flex-col md:flex-row items-center md:items-start gap-10">
 							<div className="relative shrink-0">
 								<div className="absolute -inset-6 bg-gradient-to-tr from-violet-400 to-fuchsia-400 opacity-20 blur-2xl rounded-full" />
@@ -306,7 +302,6 @@ export default function CustomerProfile() {
 							</div>
 						</BentoCard>
 
-						{/* Stats row */}
 						<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 							<StatPill
 								icon={Clock}
@@ -326,7 +321,6 @@ export default function CustomerProfile() {
 								icon={Heart}
 								label="Saved"
 								value={stats.rating || "0"}
-								//value={stats.savedProviders}
 								color="rose"
 							/>
 							<StatPill
@@ -339,9 +333,6 @@ export default function CustomerProfile() {
 						</div>
 					</div>
 
-					{/* ── Upgrade card ─────────────────────────────────────────── */}
-					{/* ✅ Fixed: was bg-[#281950] with text-[#281950] — completely invisible. 
-                           Now uses white text on the dark background. */}
 					<div className="md:col-span-4 h-full">
 						<motion.div
 							initial={{ opacity: 0, y: 20, scale: 0.98 }}
@@ -360,7 +351,6 @@ export default function CustomerProfile() {
 								<div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10 mb-6">
 									<Zap className="text-yellow-300 fill-yellow-300" size={24} />
 								</div>
-								{/* ✅ White text on dark background */}
 								<h3
 									className="text-white text-2xl font-bold mb-2"
 									style={SERIF_FONT}
@@ -378,7 +368,6 @@ export default function CustomerProfile() {
 						</motion.div>
 					</div>
 
-					{/* ── Menu sections ─────────────────────────────────────────── */}
 					<div className="md:col-span-12 grid md:grid-cols-3 gap-6 mt-2">
 						<BentoCard delay={0.3} className="p-5">
 							<h3 className="text-xs font-black uppercase tracking-widest mb-4 pl-2 text-slate-600">

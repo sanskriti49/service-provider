@@ -253,7 +253,6 @@ export default function ProviderEarnings() {
 		},
 		scales: {
 			x: {
-				// grid: { color: "rgba(255, 255, 255, 0.04)" },
 				grid: { display: false },
 				ticks: {
 					color: "#94a3b8",
@@ -361,7 +360,6 @@ export default function ProviderEarnings() {
 					</div>
 				</motion.div>
 
-				{/* Month comparison card */}
 				<motion.div
 					initial={{ opacity: 0, y: 10 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -451,7 +449,6 @@ export default function ProviderEarnings() {
 					</div>
 				)}
 
-				{/* Pagination */}
 				<div className="p-4 border-t border-white/6 bg-slate-950/30 flex justify-between items-center">
 					<span className="text-xs text-slate-500">
 						Page {txPage} of {txMeta.total_pages || 1}

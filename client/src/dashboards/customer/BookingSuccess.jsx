@@ -12,29 +12,26 @@ import {
 	Mail,
 } from "lucide-react";
 import confetti from "canvas-confetti";
+import api from "../../api/axiosInstance";
 
 export default function BookingSuccess() {
 	const navigate = useNavigate();
 	const { state } = useLocation();
 
-	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
-	if (!state?.success || !state?.booking || !state?.booking?.booking_id) {
-		return <Navigate to="/" replace />;
-	}
-
-	const { booking } = state;
+	const isValid = Boolean(state?.success && state?.booking && state?.booking?.booking_id);
+	const booking = state?.booking || {};
 
 	const [address, setAddress] = useState(
-		state.address || booking.address || "",
+		state?.address || booking.address || "",
 	);
 	const [isEditing, setIsEditing] = useState(false);
-	const [tempAddress, setTempAddress] = useState(address);
+	const [tempAddress, setTempAddress] = useState(state?.address || booking.address || "");
 	const [timeLeft, setTimeLeft] = useState(0);
 	const [isSaving, setIsSaving] = useState(false);
 	const [errorMsg, setErrorMsg] = useState(null);
 
 	useEffect(() => {
+		if (!isValid || !booking.created_at) return;
 		const createdAt = new Date(booking.created_at || Date.now());
 		const deadline = new Date(createdAt.getTime() + 10 * 60000);
 
@@ -51,7 +48,32 @@ export default function BookingSuccess() {
 		}, 1000);
 
 		return () => clearInterval(timer);
-	}, [booking.created_at]);
+	}, [isValid, booking.created_at]);
+
+	useEffect(() => {
+		if (!isValid) return;
+		const duration = 3 * 1000;
+		const animationEnd = Date.now() + duration;
+		const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+		const randomInRange = (min, max) => Math.random() * (max - min) + min;
+
+		const interval = setInterval(function () {
+			const remainingTime = animationEnd - Date.now();
+			if (remainingTime <= 0) return clearInterval(interval);
+			const particleCount = 50 * (remainingTime / duration);
+			confetti({
+				...defaults,
+				particleCount,
+				origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+			});
+			confetti({
+				...defaults,
+				particleCount,
+				origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+			});
+		}, 250);
+		return () => clearInterval(interval);
+	}, [isValid]);
 
 	const formatCountDown = (ms) => {
 		const minutes = Math.floor(ms / 60000);
@@ -65,60 +87,22 @@ export default function BookingSuccess() {
 		setErrorMsg(null);
 
 		try {
-			const token = localStorage.getItem("token");
-			console.log("Updating address for ID:", booking.booking_id);
-
-			const res = await fetch(
-				`${API_URL}/api/bookings/${booking.booking_id}/address`,
-				{
-					method: "PATCH",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
-					},
-					body: JSON.stringify({ address: tempAddress }),
-				},
-			);
-
-			const data = await res.json();
-
-			if (res.ok) {
-				setAddress(tempAddress);
-				setIsEditing(false);
-			} else {
-				setErrorMsg(data.message || "Failed to update");
-			}
+			await api.patch(`/bookings/${booking.booking_id}/address`, {
+				address: tempAddress,
+			});
+			setAddress(tempAddress);
+			setIsEditing(false);
 		} catch (err) {
 			console.error(err);
-			setErrorMsg("Network error. Try again.");
+			setErrorMsg(err.response?.data?.message || "Failed to update address. Try again.");
 		} finally {
 			setIsSaving(false);
 		}
 	};
 
-	useEffect(() => {
-		const duration = 3 * 1000;
-		const animationEnd = Date.now() + duration;
-		const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-		const randomInRange = (min, max) => Math.random() * (max - min) + min;
-
-		const interval = setInterval(function () {
-			const timeLeft = animationEnd - Date.now();
-			if (timeLeft <= 0) return clearInterval(interval);
-			const particleCount = 50 * (timeLeft / duration);
-			confetti({
-				...defaults,
-				particleCount,
-				origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-			});
-			confetti({
-				...defaults,
-				particleCount,
-				origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-			});
-		}, 250);
-		return () => clearInterval(interval);
-	}, []);
+	if (!isValid) {
+		return <Navigate to="/" replace />;
+	}
 
 	const formatDate = (dateStr) =>
 		new Date(dateStr).toLocaleDateString("en-IN", {
