@@ -9,9 +9,14 @@ import {
 	Clock,
 	ChevronRight,
 	Download,
-	BarChart2,
+	BarChart3,
 	ArrowUpRight,
 	ArrowDownRight,
+	ShieldCheck,
+	Activity,
+	CreditCard,
+	FileText,
+	ChevronLeft,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 
@@ -26,6 +31,7 @@ import {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 ChartJS.register(
 	CategoryScale,
@@ -40,126 +46,11 @@ const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
 		style: "currency",
 		currency: "INR",
-		minimumFractionDigits: 0,
+		maximumFractionDigits: 0,
 	}).format(n || 0);
 
-const ACCENT_MAP = {
-	violet: {
-		card: "bg-violet-500/10 border-violet-500/20",
-		icon: "bg-violet-500/15 text-violet-300 border-violet-500/20",
-		val: "text-violet-100",
-	},
-	emerald: {
-		card: "bg-emerald-500/10 border-emerald-500/20",
-		icon: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
-		val: "text-emerald-100",
-	},
-	blue: {
-		card: "bg-blue-500/10 border-blue-500/20",
-		icon: "bg-blue-500/15 text-blue-300 border-blue-500/20",
-		val: "text-blue-100",
-	},
-	amber: {
-		card: "bg-amber-500/10 border-amber-500/20",
-		icon: "bg-amber-500/15 text-amber-300 border-amber-500/20",
-		val: "text-amber-100",
-	},
-};
-
-const StatCard = ({ label, value, icon: Icon, accent, sub, delay }) => {
-	const a = ACCENT_MAP[accent] || ACCENT_MAP.violet;
-	return (
-		<motion.div
-			initial={{ opacity: 0, y: 12 }}
-			animate={{ opacity: 1, y: 0 }}
-			transition={{ delay }}
-			className={`p-5 rounded-2xl border flex flex-col gap-3 ${a.card}`}
-		>
-			<div className="flex items-center justify-between">
-				<span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-					{label}
-				</span>
-				<div
-					className={`w-9 h-9 rounded-xl flex items-center justify-center border ${a.icon}`}
-				>
-					<Icon size={16} />
-				</div>
-			</div>
-			<div>
-				<p className={`text-2xl font-extrabold tracking-tight ${a.val}`}>
-					{value}
-				</p>
-				{sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
-			</div>
-		</motion.div>
-	);
-};
-
-const TxRow = ({ tx }) => {
-	const isCredit = tx.type !== "deduction";
-	const date = new Date(tx.date || tx.created_at);
-	const navigate = useNavigate();
-
-	return (
-		<div
-			onClick={() => navigate("/provider/dashboard/bookings")}
-			className="cursor-pointer flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors group"
-		>
-			<div className="flex items-center gap-4">
-				<div
-					className={`w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0 ${
-						isCredit
-							? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-							: "bg-red-500/10 text-red-400 border-red-500/20"
-					}`}
-				>
-					{isCredit ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
-				</div>
-				<div>
-					<p className="text-sm font-semibold text-white">
-						{tx.description || tx.service_name || "Service Payment"}
-					</p>
-					<p className="text-xs text-slate-500 mt-0.5">
-						{isNaN(date)
-							? "—"
-							: date.toLocaleDateString("en-IN", {
-									day: "numeric",
-									month: "short",
-									year: "numeric",
-								})}
-						{tx.booking_id
-							? ` · #${tx.booking_id.slice(0, 6).toUpperCase()}`
-							: ""}
-					</p>
-				</div>
-			</div>
-			<span
-				className={`text-sm font-bold tabular-nums ${isCredit ? "text-emerald-400" : "text-red-400"}`}
-			>
-				{isCredit ? "+" : "-"}
-				{formatCurrency(Math.abs(tx.amount))}
-			</span>
-		</div>
-	);
-};
-
-const EarningsSkeleton = () => (
-	<div className="space-y-8 animate-pulse">
-		<div className="h-10 bg-slate-800 rounded-2xl w-48" />
-		<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-			{[...Array(4)].map((_, i) => (
-				<div key={i} className="h-28 bg-slate-800/60 rounded-2xl" />
-			))}
-		</div>
-		<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-			<div className="lg:col-span-2 h-64 bg-slate-800/60 rounded-3xl" />
-			<div className="h-64 bg-slate-800/60 rounded-3xl" />
-		</div>
-		<div className="h-64 bg-slate-800/60 rounded-3xl" />
-	</div>
-);
-
 export default function ProviderEarnings() {
+	const navigate = useNavigate();
 	const [isLoading, setIsLoading] = useState(true);
 	const [summary, setSummary] = useState({
 		total_earnings: 0,
@@ -203,7 +94,7 @@ export default function ProviderEarnings() {
 			setTxLoading(true);
 			try {
 				const res = await api.get(
-					`/api/earnings/provider/transactions?page=${txPage}&limit=8`,
+					`/api/earnings/provider/transactions?page=${txPage}&limit=10`,
 				);
 				setTransactions(res.data?.data || []);
 				setTxMeta(res.data?.meta || {});
@@ -217,17 +108,41 @@ export default function ProviderEarnings() {
 	}, [txPage]);
 
 	const growthPositive = (summary.growth_pct ?? 0) >= 0;
+
+	// Export CSV
+	const handleExportCSV = () => {
+		if (transactions.length === 0) {
+			toast.error("No transactions to export");
+			return;
+		}
+		const headers = "Date,Booking ID,Service,Type,Amount (INR)\n";
+		const rows = transactions
+			.map(
+				(t) =>
+					`"${t.date || t.created_at || ""}","${t.booking_id || ""}","${t.description || t.service_name || "Job"}","${t.type || "credit"}","${t.amount || 0}"`,
+			)
+			.join("\n");
+		const blob = new Blob([headers + rows], { type: "text/csv" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `earnings-report-${new Date().toISOString().slice(0, 10)}.csv`;
+		a.click();
+		URL.revokeObjectURL(url);
+		toast.success("Transaction statement exported as CSV");
+	};
+
 	const chartData = {
 		labels: monthlyData.map((m) => m.label),
 		datasets: [
 			{
-				label: "Revenue",
+				label: "Gross Revenue",
 				data: monthlyData.map((m) => m.amount),
-				backgroundColor: "rgba(139, 92, 246, 0.25)",
-				borderColor: "rgba(167, 139, 250, 1)",
-				borderWidth: 2,
-				borderRadius: 6,
-				hoverBackgroundColor: "rgba(139, 92, 246, 0.5)",
+				backgroundColor: "rgba(124, 58, 237, 0.4)",
+				borderColor: "rgba(168, 85, 247, 0.9)",
+				borderWidth: 1.5,
+				borderRadius: 8,
+				hoverBackgroundColor: "rgba(124, 58, 237, 0.7)",
 			},
 		],
 	};
@@ -238,15 +153,17 @@ export default function ProviderEarnings() {
 		plugins: {
 			legend: { display: false },
 			tooltip: {
-				backgroundColor: "#1e293b",
-				titleFont: { family: "Inter", size: 12 },
-				bodyFont: { family: "Inter", size: 13, weight: "bold" },
-				padding: 10,
-				borderColor: "rgba(255,255,255,0.08)",
+				backgroundColor: "#140b28",
+				titleColor: "#94a3b8",
+				bodyColor: "#f8fafc",
+				borderColor: "rgba(255,255,255,0.1)",
 				borderWidth: 1,
+				padding: 12,
+				cornerRadius: 12,
+				displayColors: false,
 				callbacks: {
 					label: function (context) {
-						return ` ${formatCurrency(context.raw)}`;
+						return ` Gross Volume: ${formatCurrency(context.raw)}`;
 					},
 				},
 			},
@@ -254,223 +171,328 @@ export default function ProviderEarnings() {
 		scales: {
 			x: {
 				grid: { display: false },
-				ticks: {
-					color: "#94a3b8",
-					font: { family: "Inter", size: 12 },
-				},
+				ticks: { color: "#64748b", font: { size: 11, weight: "bold" } },
 			},
 			y: {
-				grid: { color: "rgba(255, 255, 255, 0.04)" },
+				grid: { color: "rgba(255,255,255,0.04)" },
 				ticks: {
-					color: "#94a3b8",
-					font: { family: "Inter", size: 12 },
-					callback: (value) => "₹" + value,
+					color: "#64748b",
+					font: { size: 10 },
+					callback: (v) => `₹${v}`,
 				},
 			},
 		},
 	};
 
-	if (isLoading) return <EarningsSkeleton />;
+	if (isLoading) {
+		return <EarningsSkeleton />;
+	}
+
+	const estimatedNetRetention = Math.round(
+		(summary.total_earnings || 0) * 0.85,
+	);
 
 	return (
-		<motion.div
-			initial={{ opacity: 0, y: 10 }}
-			animate={{ opacity: 1, y: 0 }}
-			className="space-y-8"
-		>
-			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+		<div className="space-y-8">
+			{/* Top Bar */}
+			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.06]">
 				<div>
-					<h1 className="text-3xl font-bold text-white tracking-tight">
-						Earnings
-					</h1>
-					<p className="text-slate-400 mt-1 text-sm">
-						Your income breakdown and transaction history.
-					</p>
-				</div>
-				<button className="hidden sm:flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-xl font-medium border border-white/10 text-sm transition-all active:scale-95">
-					<Download size={15} />
-					Export Report
-				</button>
-			</div>
-
-			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-				<StatCard
-					label="Total Earnings"
-					value={formatCurrency(summary.total_earnings)}
-					icon={IndianRupee}
-					accent="violet"
-					delay={0}
-					sub="All time"
-				/>
-				<StatCard
-					label="This Month"
-					value={formatCurrency(summary.this_month)}
-					icon={TrendingUp}
-					accent="emerald"
-					delay={0.05}
-					sub={
-						summary.growth_pct != null
-							? `${growthPositive ? "+" : ""}${summary.growth_pct}% vs last month`
-							: undefined
-					}
-				/>
-				<StatCard
-					label="Pending Payout"
-					value={formatCurrency(summary.pending_payout)}
-					icon={Clock}
-					accent="amber"
-					delay={0.1}
-					sub="Processing"
-				/>
-				<StatCard
-					label="Jobs Completed"
-					value={summary.completed_jobs ?? 0}
-					icon={CheckCircle2}
-					accent="blue"
-					delay={0.15}
-				/>
-			</div>
-
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				<motion.div
-					initial={{ opacity: 0, y: 10 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.2 }}
-					className="lg:col-span-2 bg-slate-900/60 border border-white/8 rounded-3xl p-6"
-				>
-					<div className="flex items-center justify-between mb-6">
-						<h3 className="font-bold text-white flex items-center gap-2">
-							<div className="p-2 bg-violet-500/10 rounded-lg text-violet-400">
-								<BarChart2 size={16} />
-							</div>
-							Monthly Earnings
-						</h3>
-						<span className="text-xs text-slate-500">
-							Last {monthlyData.length || 6} months
+					<div className="flex items-center gap-2.5">
+						<h1 className="font-mackinac text-2xl sm:text-3xl font-black text-white tracking-tight">
+							Payouts & Finance Engine
+						</h1>
+						<span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-violet-500/15 text-violet-300 border border-violet-500/25">
+							Direct Bank Deposit
 						</span>
 					</div>
-					<div className="h-44 w-full flex-1 min-h-[180px]">
-						{monthlyData.length > 0 ? (
-							<Bar data={chartData} options={chartOptions} />
+					<p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
+						Audited transaction reconciliation, fee deductions, and scheduled
+						payouts.
+					</p>
+				</div>
+
+				<div className="flex items-center gap-2.5">
+					<button
+						onClick={handleExportCSV}
+						className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 border border-white/[0.08] text-xs font-bold transition-all cursor-pointer"
+					>
+						<Download size={14} className="text-violet-400" />
+						<span>Export CSV Statement</span>
+					</button>
+				</div>
+			</div>
+
+			{/* Financial Telemetry Architecture */}
+			<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+				{/* Main Payout Card (7 Cols) */}
+				<div className="lg:col-span-7 p-6 sm:p-7 rounded-3xl bg-gradient-to-br from-[#160d31] to-[#0e0820] border border-violet-500/20 shadow-xl shadow-black/50 relative overflow-hidden flex flex-col justify-between space-y-6">
+					<div className="flex items-center justify-between">
+						<span className="text-[11px] font-extrabold uppercase tracking-wider text-violet-300 flex items-center gap-1.5">
+							<ShieldCheck size={14} className="text-emerald-400" />
+							Net Realized Income
+						</span>
+						<span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+							Automatic Weekly Payout
+						</span>
+					</div>
+
+					<div className="space-y-1">
+						<div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+							{formatCurrency(estimatedNetRetention)}
+						</div>
+						<p className="text-xs text-slate-400">
+							Gross Platform Revenue:{" "}
+							<span className="font-bold text-slate-200">
+								{formatCurrency(summary.total_earnings)}
+							</span>{" "}
+							(less standard 15% marketplace commission)
+						</p>
+					</div>
+
+					{/* 3 Metrics Ribbon */}
+					<div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/[0.06]">
+						<div>
+							<span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+								This Month
+							</span>
+							<span className="text-sm sm:text-base font-extrabold text-white mt-0.5 block">
+								{formatCurrency(summary.this_month)}
+							</span>
+						</div>
+						<div>
+							<span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+								Last Month
+							</span>
+							<span className="text-sm sm:text-base font-extrabold text-slate-300 mt-0.5 block">
+								{formatCurrency(summary.last_month)}
+							</span>
+						</div>
+						<div>
+							<span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+								MoM Shift
+							</span>
+							<span
+								className={`text-sm sm:text-base font-extrabold mt-0.5 flex items-center gap-1 ${
+									growthPositive ? "text-emerald-400" : "text-slate-400"
+								}`}
+							>
+								{growthPositive ? (
+									<TrendingUp size={13} />
+								) : (
+									<TrendingDown size={13} />
+								)}
+								{summary.growth_pct !== null ? `${summary.growth_pct}%` : "—"}
+							</span>
+						</div>
+					</div>
+				</div>
+
+				{/* Volume & Telemetry (5 Cols) */}
+				<div className="lg:col-span-5 grid grid-cols-2 gap-4">
+					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
+						<span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+							Completed Jobs
+						</span>
+						<div className="mt-3">
+							<span className="text-2xl sm:text-3xl font-black text-white">
+								{summary.completed_jobs ?? 0}
+							</span>
+							<p className="text-[12.5px] text-slate-500 mt-1">
+								Paid customer visits
+							</p>
+						</div>
+					</div>
+
+					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
+						<span className="text-[12.5px] font-bold uppercase tracking-wider text-slate-400">
+							Avg Ticket Value
+						</span>
+						<div className="mt-3">
+							<span className="text-2xl sm:text-3xl font-black text-white">
+								{formatCurrency(
+									summary.completed_jobs > 0
+										? Math.round(
+												(summary.total_earnings || 0) / summary.completed_jobs,
+											)
+										: 499,
+								)}
+							</span>
+							<p className="text-[12.5px] text-slate-500 mt-1">
+								Gross job value
+							</p>
+						</div>
+					</div>
+
+					<div className="col-span-2 p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex items-center justify-between">
+						<div className="space-y-0.5">
+							<span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+								Next Estimated Disbursement
+							</span>
+							<span className="text-sm font-bold text-white">
+								Scheduled Every Monday • Direct NEFT/IMPS
+							</span>
+						</div>
+						<div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-300 border border-violet-500/20">
+							<CreditCard size={18} />
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{/* Chart & Activity Stream */}
+			<div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+				{/* Revenue History Chart (7 Cols) */}
+				<div className="lg:col-span-7 p-6 sm:p-7 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-xl space-y-6">
+					<div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
+						<div>
+							<h3 className="text-base font-extrabold text-white">
+								Revenue Progression
+							</h3>
+							<p className="text-sm text-slate-400">
+								Monthly billing volume over past quarters
+							</p>
+						</div>
+						<span className="text-xs text-slate-400 font-mono">FY 2026</span>
+					</div>
+
+					<div className="h-64 pt-2">
+						{monthlyData.length === 0 ? (
+							<div className="h-full flex items-center justify-center text-xs text-slate-500">
+								No historical monthly volume available
+							</div>
 						) : (
-							<div className="h-full flex items-center justify-center text-slate-600 text-sm">
-								No monthly data yet
+							<Bar data={chartData} options={chartOptions} />
+						)}
+					</div>
+				</div>
+
+				{/* Transactions Stream Ledger (5 Cols) */}
+				<div className="lg:col-span-5 p-6 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-xl flex flex-col justify-between space-y-4">
+					<div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+						<h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+							<Activity size={15} className="text-violet-400" />
+							Recent Transactions
+						</h3>
+						<span className="text-[11px] text-slate-500 font-mono">
+							Page {txPage} of {txMeta.total_pages || 1}
+						</span>
+					</div>
+
+					<div className="flex-1">
+						{txLoading ? (
+							<div className="py-16 text-center text-xs text-slate-500">
+								Loading records...
+							</div>
+						) : transactions.length === 0 ? (
+							<div className="py-16 text-center text-slate-500 space-y-2">
+								<FileText size={24} className="mx-auto text-slate-600" />
+								<p className="text-xs">No transactions recorded yet</p>
+							</div>
+						) : (
+							<div className="divide-y divide-white/[0.04]">
+								{transactions.map((tx, idx) => {
+									const isCredit = tx.type !== "deduction";
+									const date = new Date(tx.date || tx.created_at);
+
+									return (
+										<div
+											key={tx.id || idx}
+											onClick={() => navigate("/provider/dashboard/bookings")}
+											className="py-3 flex items-center justify-between gap-3 group cursor-pointer hover:bg-white/[0.02] px-2 rounded-xl transition-colors"
+										>
+											<div className="flex items-center gap-3 min-w-0">
+												<div
+													className={`w-7 h-7 rounded-lg flex items-center justify-center border shrink-0 ${
+														isCredit
+															? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+															: "bg-rose-500/10 text-rose-400 border-rose-500/20"
+													}`}
+												>
+													{isCredit ? (
+														<ArrowDownRight size={13} />
+													) : (
+														<ArrowUpRight size={13} />
+													)}
+												</div>
+												<div className="min-w-0">
+													<p className="text-sm font-bold text-slate-200 truncate group-hover:text-white transition-colors">
+														{tx.description ||
+															tx.service_name ||
+															"Job Settlement"}
+													</p>
+													<span className="text-[12px] text-slate-500 font-mono">
+														{isNaN(date)
+															? "—"
+															: date.toLocaleDateString("en-IN", {
+																	month: "short",
+																	day: "numeric",
+																})}
+														{tx.booking_id
+															? ` · #${tx.booking_id.slice(0, 6)}`
+															: ""}
+													</span>
+												</div>
+											</div>
+
+											<span
+												className={`text-sm font-extrabold font-mono shrink-0 ${
+													isCredit ? "text-emerald-400" : "text-rose-400"
+												}`}
+											>
+												{isCredit ? "+" : "-"}
+												{formatCurrency(Math.abs(tx.amount))}
+											</span>
+										</div>
+									);
+								})}
 							</div>
 						)}
 					</div>
-				</motion.div>
 
-				<motion.div
-					initial={{ opacity: 0, y: 10 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.25 }}
-					className="bg-slate-900/60 border border-white/8 rounded-3xl p-6 flex flex-col justify-between"
-				>
-					<h3 className="font-bold text-white flex items-center gap-2 mb-6">
-						<div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
-							<Calendar size={16} />
-						</div>
-						Month Comparison
-					</h3>
-					<div className="space-y-4 flex-1">
-						{[
-							{
-								label: "This Month",
-								value: summary.this_month,
-								accent: "text-emerald-400",
-							},
-							{
-								label: "Last Month",
-								value: summary.last_month,
-								accent: "text-slate-400",
-							},
-						].map(({ label, value, accent }) => (
-							<div
-								key={label}
-								className="flex justify-between items-center p-3 rounded-xl bg-slate-800/40 border border-white/6"
+					{/* Pagination Controls */}
+					{txMeta.total_pages > 1 && (
+						<div className="flex items-center justify-between pt-3 border-t border-white/[0.06] text-xs">
+							<button
+								disabled={txPage <= 1}
+								onClick={() => setTxPage((p) => Math.max(1, p - 1))}
+								className="flex items-center gap-1 text-slate-400 hover:text-white disabled:opacity-40 cursor-pointer"
 							>
-								<span className="text-sm text-slate-400">{label}</span>
-								<span className={`text-sm font-bold tabular-nums ${accent}`}>
-									{formatCurrency(value)}
-								</span>
-							</div>
-						))}
-						<div
-							className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-bold ${
-								growthPositive
-									? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-									: "bg-red-500/10 border-red-500/20 text-red-300"
-							}`}
-						>
-							{growthPositive ? (
-								<TrendingUp size={16} />
-							) : (
-								<TrendingDown size={16} />
-							)}
-							{summary.growth_pct != null
-								? `${growthPositive ? "+" : ""}${summary.growth_pct}% growth`
-								: "No comparison data"}
+								<ChevronLeft size={14} /> Previous
+							</button>
+							<button
+								disabled={!txMeta.has_next_page}
+								onClick={() => setTxPage((p) => p + 1)}
+								className="flex items-center gap-1 text-slate-400 hover:text-white disabled:opacity-40 cursor-pointer"
+							>
+								Next <ChevronRight size={14} />
+							</button>
 						</div>
-					</div>
-				</motion.div>
+					)}
+				</div>
 			</div>
-
-			<motion.div
-				initial={{ opacity: 0, y: 10 }}
-				animate={{ opacity: 1, y: 0 }}
-				transition={{ delay: 0.3 }}
-				className="bg-slate-900/60 border border-white/8 rounded-3xl overflow-hidden"
-			>
-				<div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
-					<h3 className="font-bold text-white flex items-center gap-2">
-						<div className="p-2 bg-slate-800 rounded-lg text-slate-400">
-							<IndianRupee size={16} />
-						</div>
-						Transaction History
-					</h3>
-				</div>
-
-				{txLoading ? (
-					<div className="flex items-center justify-center h-40 text-slate-500">
-						<div className="w-6 h-6 border-2 border-slate-700 border-t-violet-500 rounded-full animate-spin" />
-					</div>
-				) : transactions.length === 0 ? (
-					<div className="flex flex-col items-center justify-center h-40 text-slate-600">
-						<IndianRupee size={24} className="mb-2 opacity-30" />
-						<p className="text-sm font-medium text-slate-400">
-							No transactions yet
-						</p>
-					</div>
-				) : (
-					<div className="divide-y divide-white/5">
-						{transactions.map((tx, i) => (
-							<TxRow key={tx.id || i} tx={tx} />
-						))}
-					</div>
-				)}
-
-				<div className="p-4 border-t border-white/6 bg-slate-950/30 flex justify-between items-center">
-					<span className="text-xs text-slate-500">
-						Page {txPage} of {txMeta.total_pages || 1}
-					</span>
-					<div className="flex gap-2">
-						<button
-							onClick={() => setTxPage((p) => Math.max(1, p - 1))}
-							disabled={txPage === 1 || txLoading}
-							className="px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-800 border border-white/8 rounded-lg hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-						>
-							Previous
-						</button>
-						<button
-							onClick={() => setTxPage((p) => p + 1)}
-							disabled={!txMeta.has_next_page || txLoading}
-							className="px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-800 border border-white/8 rounded-lg hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-						>
-							Next
-						</button>
-					</div>
-				</div>
-			</motion.div>
-		</motion.div>
+		</div>
 	);
 }
+
+const EarningsSkeleton = () => (
+	<div className="space-y-8 animate-pulse">
+		<div className="flex justify-between items-center pb-6 border-b border-white/[0.06]">
+			<div className="space-y-2">
+				<div className="h-8 bg-white/[0.05] rounded-xl w-64" />
+				<div className="h-4 bg-white/[0.03] rounded-lg w-48" />
+			</div>
+			<div className="h-10 w-36 bg-white/[0.05] rounded-xl" />
+		</div>
+		<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+			<div className="lg:col-span-7 h-64 bg-white/[0.03] rounded-3xl border border-white/[0.05]" />
+			<div className="lg:col-span-5 grid grid-cols-2 gap-4">
+				{[...Array(4)].map((_, i) => (
+					<div
+						key={i}
+						className="h-28 bg-white/[0.03] rounded-3xl border border-white/[0.05]"
+					/>
+				))}
+			</div>
+		</div>
+	</div>
+);

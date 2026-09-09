@@ -8,6 +8,7 @@ import { twMerge } from "tailwind-merge";
 import AccountMenu from "./AccountMenu";
 import NavServices from "./NavServices";
 import NotificationBell from "./NotificationBell";
+import Logo from "./Logo";
 
 function cn(...inputs) {
 	return twMerge(clsx(inputs));
@@ -111,22 +112,12 @@ const Navbar = () => {
 			<div className="max-w-7xl mx-auto relative flex items-center justify-between">
 				{/* Logo */}
 				<div className="pointer-events-auto flex-none z-50">
-					<Link
+					<Logo
 						to="/"
-						className="flex items-center gap-2.5 group"
-						onMouseEnter={() => setHoveredTab(null)}
-					>
-						<div className="h-11 w-11 overflow-hidden drop-shadow-md transition-transform duration-300 group-hover:scale-105">
-							<img
-								src="/images/taskgenie-logo.svg"
-								className="h-full w-full object-contain"
-								alt="TaskGenie Logo"
-							/>
-						</div>
-						<span className="text-3xl sm:text-4xl lobster font-bold bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 bg-clip-text text-transparent pb-1 drop-shadow-lg tracking-tight">
-							TaskGenie
-						</span>
-					</Link>
+						size="xl"
+						theme="primary"
+						className="transition-transform duration-300 hover:scale-105"
+					/>
 				</div>
 
 				{/* Desktop Navigation Header */}
@@ -351,7 +342,9 @@ const Navbar = () => {
 										to={
 											user.role === "provider"
 												? "/provider/dashboard"
-												: "/dashboard"
+												: user.role === "admin"
+													? "/admin"
+													: "/dashboard"
 										}
 										onClick={() => setMobileMenuOpen(false)}
 										className="cursor-pointer bricolage-grotesque block text-center w-full p-3 rounded-xl text-lg font-medium text-gray-700 bg-gray-50 hover:bg-violet-50 hover:text-violet-700 transition-all"

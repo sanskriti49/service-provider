@@ -16,7 +16,7 @@ import {
 	Award,
 	Loader2,
 	DollarSign,
-	AlertCircle,
+	CircleAlert,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "../api/axiosInstance";
@@ -280,7 +280,7 @@ export default function ApplyProvider() {
 				<div className="bg-white/95 backdrop-blur-xl border border-violet-200/70 rounded-3xl p-6 sm:p-10 shadow-xl shadow-purple-900/5 relative">
 					{errorMsg && (
 						<div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2.5">
-							<AlertCircle size={16} className="text-red-500 shrink-0" />
+							<CircleAlert size={16} className="text-red-500 shrink-0" />
 							<span>{errorMsg}</span>
 						</div>
 					)}

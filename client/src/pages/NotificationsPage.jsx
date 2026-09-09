@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
 	Bell,
@@ -11,12 +11,13 @@ import {
 	Sparkles,
 	Clock,
 	CheckCircle2,
-	AlertCircle,
+	CircleAlert,
 	ChevronRight,
 } from "lucide-react";
 import { FadeLoader } from "react-spinners";
 import { toast } from "sonner";
 import { getSocket } from "../utils/socket";
+import ConfirmDialog from "../ui/ConfirmDialog";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -37,6 +38,7 @@ export default function NotificationsPage() {
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState("all");
 	const [unreadCount, setUnreadCount] = useState(0);
+	const [showClearConfirm, setShowClearConfirm] = useState(false);
 	const navigate = useNavigate();
 
 	const fetchNotifications = async () => {
@@ -161,8 +163,10 @@ export default function NotificationsPage() {
 	});
 
 	const getIcon = (type) => {
-		if (type?.includes("booking")) return <Calendar className="w-5 h-5 text-violet-400" />;
-		if (type?.includes("review")) return <Star className="w-5 h-5 text-yellow-400" />;
+		if (type?.includes("booking"))
+			return <Calendar className="w-5 h-5 text-violet-400" />;
+		if (type?.includes("review"))
+			return <Star className="w-5 h-5 text-yellow-400" />;
 		return <Sparkles className="w-5 h-5 text-cyan-400" />;
 	};
 
@@ -250,7 +254,7 @@ export default function NotificationsPage() {
 
 					{notifications.some((n) => n.is_read) && (
 						<button
-							onClick={handleClearRead}
+							onClick={() => setShowClearConfirm(true)}
 							className="text-xs text-gray-400 hover:text-red-400 flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
 						>
 							<Trash2 size={13} />
@@ -358,6 +362,21 @@ export default function NotificationsPage() {
 					</div>
 				)}
 			</div>
+
+			<ConfirmDialog
+				isOpen={showClearConfirm}
+				onClose={() => setShowClearConfirm(false)}
+				onConfirm={async () => {
+					setShowClearConfirm(false);
+					await handleClearRead();
+				}}
+				title="Clear read notifications?"
+				description="This will permanently delete all read notifications from your history."
+				confirmText="Clear read"
+				cancelText="Cancel"
+				variant="danger"
+				icon={Trash2}
+			/>
 		</div>
 	);
 }

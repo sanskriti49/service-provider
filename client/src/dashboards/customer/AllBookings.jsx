@@ -9,7 +9,7 @@ import {
 	Settings,
 	CheckCircle2,
 	ListFilter,
-	AlertCircle,
+	CircleAlert,
 	History as HistoryIcon,
 	X,
 } from "lucide-react";
@@ -57,11 +57,11 @@ const StatusBadge = ({ status, date, startTime }) => {
 			break;
 		case "cancelled":
 			styles = "cursor-default bg-red-50 text-red-700 border-red-200";
-			icon = <AlertCircle size={12} />;
+			icon = <CircleAlert size={12} />;
 			break;
 		case "no_show":
 			styles = "cursor-default bg-red-100 text-red-800 border-red-200";
-			icon = <AlertCircle size={12} />;
+			icon = <CircleAlert size={12} />;
 			break;
 		case "in progress":
 		case "in_progress":
@@ -80,7 +80,7 @@ const StatusBadge = ({ status, date, startTime }) => {
 			break;
 		case "expired":
 			styles = "cursor-default bg-orange-50 text-orange-700 border-orange-200";
-			icon = <AlertCircle size={12} />;
+			icon = <CircleAlert size={12} />;
 			break;
 		default:
 			icon = <Clock size={12} />;
@@ -165,7 +165,13 @@ export default function AllBookings() {
 				});
 				if (res.data) {
 					setHistory(res.data.data || []);
-					setMeta(res.data.meta || { current_page: 1, total_pages: 1, has_next_page: false });
+					setMeta(
+						res.data.meta || {
+							current_page: 1,
+							total_pages: 1,
+							has_next_page: false,
+						},
+					);
 				}
 			} catch (err) {
 				if (err.name !== "CanceledError" && err.name !== "AbortError") {
@@ -228,9 +234,7 @@ export default function AllBookings() {
 			await api.put(`/bookings/${bookingId}/status`, { status: newStatus });
 			setHistory((prev) =>
 				prev.map((item) =>
-					item.booking_id === bookingId
-						? { ...item, status: newStatus }
-						: item,
+					item.booking_id === bookingId ? { ...item, status: newStatus } : item,
 				),
 			);
 			if (selectedBooking && selectedBooking.booking_id === bookingId) {
@@ -243,9 +247,7 @@ export default function AllBookings() {
 			});
 		} catch (err) {
 			const errMsg =
-				err.response?.data?.message ||
-				err.message ||
-				"Failed to update status";
+				err.response?.data?.message || err.message || "Failed to update status";
 			toast.error(errMsg);
 			console.error("Error updating status:", err);
 		} finally {
@@ -643,8 +645,14 @@ export default function AllBookings() {
 				onConfirm={() =>
 					executeApiUpdate(confirmConfig.bookingId, confirmConfig.newStatus)
 				}
-				title={confirmConfig.title}
-				message={confirmConfig.message}
+				title={confirmConfig.title || "Cancel this booking?"}
+				message={
+					confirmConfig.message ||
+					"This will cancel your upcoming service and notify the provider."
+				}
+				confirmText="Cancel booking"
+				cancelText="Keep booking"
+				variant="danger"
 				loading={actionLoading === confirmConfig.bookingId}
 			/>
 		</div>

@@ -6,29 +6,29 @@ const popularSearches = ["Plumbing", "House Cleaning", "Laundry", "Haircut"];
 
 export const HeroSection = () => {
 	return (
-		<main className="relative w-full pb-36 mt-10 md:-mt-38 md:pb-68 lg:-mt-40 lg:pb-105 xl:-mt-40 xl:pb-75  overflow-hidden">
-			{" "}
-			<div className="absolute inset-0 w-full h-full mt-32 md:mt-50 lg:mt-70 xl:mt-40">
+		<main className="relative w-full pt-32 pb-24 md:pt-40 md:pb-32 lg:pt-44 lg:pb-36 overflow-hidden">
+			<div className="absolute inset-0 w-full h-full pointer-events-none opacity-80 pt-28 md:pt-36 lg:pt-40">
 				<BackgroundPattern />
 			</div>
-			<div className="relative z-10 mt-35 md:mt-90 lg:mt-90 xl:mt-80 2xl:mt-80 max-w-4xl mx-auto px-4 sm:px-6">
+
+			<div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6">
 				<div className="flex flex-col items-center text-center bricolage-grotesque">
-					<p className="font-medium text-violet-800/80  text-sm md:text-base tracking-wide">
+					<p className="font-semibold text-violet-900 text-xs sm:text-sm tracking-widest uppercase mb-3 backdrop-blur-md px-4 py-1.5 shadow-xs">
 						"Your Wish, Our Command" —{" "}
-						<span className=" text-violet-900">TaskGenie</span>
+						<span className="text-violet-950 font-bold">TaskGenie</span>
 					</p>
 
 					<h1
-						className="text-4xl sm:text-4xl md:text-4xl lg:text-5xl text-[#281950] font-medium leading-[1.1] tracking-tight mb-2"
+						className="text-4xl sm:text-5xl md:text-6xl text-[#281950] font-bold leading-[1.1] tracking-tight mb-3"
 						style={{ fontFamily: "P22Mackinac, Cambria, sans-serif" }}
 					>
 						From burst pipes to makeovers,
-						<div className="relative inline-block mx-2">
-							<span className="relative z-10">get any task done.</span>
-						</div>
+						<span className="block mt-1 bg-gradient-to-r from-[#4c1d95] via-[#3b0764] to-[#1e1b4b] bg-clip-text text-transparent font-extrabold [text-shadow:none]">
+							get any task done.
+						</span>
 					</h1>
 
-					<p className="text-[#281950]/80 text-base sm:text-lg md:text-lg  lg:text-xl xl:lg:text-xl mt-4 mb-10 max-w-lg md:max-w-2xl mx-auto leading-relaxed">
+					<p className="text-[#281950]/90 text-base sm:text-lg md:text-xl mt-2 mb-8 max-w-xl mx-auto leading-relaxed font-medium bg-white/40 backdrop-blur-xs px-4 py-1.5 rounded-2xl border border-white/40">
 						Need a handyman or a hair stylist? Our verified pros are just a tap
 						away. Fast, friendly, and always reliable.
 					</p>
@@ -37,15 +37,15 @@ export const HeroSection = () => {
 						<SearchBar />
 
 						<div className="flex flex-wrap items-center justify-center gap-2 mt-6">
-							<span className="text-sm font-medium text-gray-500 mr-1">
+							<span className="text-xs sm:text-sm font-semibold text-violet-950/80 mr-1">
 								Popular:
 							</span>
 							{popularSearches.map((term) => (
 								<Link
 									key={term}
 									to={`/services/${term.toLowerCase().replace(/\s+/g, "-")}`}
-									className="px-3 py-1.5 text-xs sm:text-sm font-medium text-violet-700 bg-violet-50/50 border border-violet-100 rounded-full
-                                    hover:bg-violet-100 hover:text-violet-900 hover:border-violet-200 hover:scale-105
+									className="px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-violet-900 bg-white/80 border border-violet-200/80 rounded-full
+                                    hover:bg-violet-600 hover:text-white hover:border-violet-600 hover:scale-105 shadow-xs backdrop-blur-md
                                     transition-all duration-200 ease-out cursor-pointer"
 								>
 									{term}

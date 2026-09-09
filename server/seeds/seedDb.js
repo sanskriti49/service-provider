@@ -8,6 +8,12 @@ const {
 	generateMasterSchedule,
 	generateRealSlots,
 } = require("../utils/timeUtils");
+const {
+	getGenderMatchedPhoto,
+	generateProfessionalBio,
+	FEMALE_SERVICES,
+	MALE_SERVICES,
+} = require("../utils/bioGenerator");
 
 const PROVIDER_COUNT = 20;
 const RESET_PROVIDERS_ONLY = false;
@@ -144,10 +150,16 @@ const seedData = async () => {
 			throw new Error("No services found — run seedServices.js first.");
 
 		console.log(`👨‍🔧 Creating ${PROVIDER_COUNT} providers...`);
-
+ 
 		for (let i = 0; i < PROVIDER_COUNT; i++) {
 			const dbService = faker.helpers.arrayElement(dbServices);
-			const firstName = faker.person.firstName();
+			let sex = faker.helpers.arrayElement(["male", "female"]);
+			if (FEMALE_SERVICES.has(dbService.slug)) {
+				sex = "female";
+			} else if (MALE_SERVICES.has(dbService.slug)) {
+				sex = "male";
+			}
+			const firstName = faker.person.firstName(sex);
 			const lastName = faker.person.lastName();
 			const name = `${firstName} ${lastName}`;
 			const phone =
@@ -158,8 +170,8 @@ const seedData = async () => {
 				.email({ firstName, lastName, provider: "gmail.com" })
 				.toLowerCase();
 			const password = await hashIfPresent("password123");
-			const photo = faker.image.avatar();
-			const bio = faker.person.bio();
+			const photo = getGenderMatchedPhoto(sex, i + 1);
+			const bio = generateProfessionalBio(dbService.name, dbService.slug);
 			const cityObj = faker.helpers.arrayElement(indianCities);
 			const location = `${cityObj.city}, ${cityObj.state}`;
 			const [lat, lng] = faker.location.nearbyGPSCoordinate({

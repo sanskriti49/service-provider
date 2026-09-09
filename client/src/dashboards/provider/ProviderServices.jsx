@@ -15,10 +15,14 @@ import {
 	Layers,
 	X,
 	Clock,
+	Check,
+	ShieldCheck,
+	ArrowUpRight,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../hooks/useAuth";
 import { UNIT_LABELS, getAllowedUnits } from "../../utils/pricingHelper";
+import ConfirmDialog from "../../ui/ConfirmDialog";
 
 const DAYS_OF_WEEK = [
 	{ label: "Sun", value: 0 },
@@ -29,6 +33,13 @@ const DAYS_OF_WEEK = [
 	{ label: "Fri", value: 5 },
 	{ label: "Sat", value: 6 },
 ];
+
+const formatCurrency = (n) =>
+	new Intl.NumberFormat("en-IN", {
+		style: "currency",
+		currency: "INR",
+		maximumFractionDigits: 0,
+	}).format(n || 0);
 
 export default function ProviderServices() {
 	const { user } = useAuth();
@@ -44,6 +55,7 @@ export default function ProviderServices() {
 	const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]);
 	const [startTime, setStartTime] = useState("09:00");
 	const [endTime, setEndTime] = useState("18:00");
+	const [pendingPauseService, setPendingPauseService] = useState(null);
 
 	useEffect(() => {
 		if (!user?.id) return;
@@ -129,7 +141,7 @@ export default function ProviderServices() {
 							: s,
 					),
 				);
-				toast.success("Service adjustments compiled successfully");
+				toast.success("Service parameters updated");
 			} else {
 				setMyServices((prev) => [
 					...prev,
@@ -140,7 +152,7 @@ export default function ProviderServices() {
 						is_visible: true,
 					},
 				]);
-				toast.success(`Added ${selectedService.name} to your services!`);
+				toast.success(`Published ${selectedService.name} to live catalog`);
 				setActiveTab("active");
 			}
 
@@ -167,7 +179,7 @@ export default function ProviderServices() {
 					s.id === serviceItem.id ? { ...s, is_visible: nextVis } : s,
 				),
 			);
-			toast.success(nextVis ? "Service is now live" : "Service paused");
+			toast.success(nextVis ? "Service is live on marketplace" : "Service visibility paused");
 		} catch (err) {
 			toast.error("Failed to update visibility");
 		} finally {
@@ -175,9 +187,17 @@ export default function ProviderServices() {
 		}
 	};
 
+	const handleToggleClick = (serviceItem) => {
+		if (serviceItem.is_visible) {
+			setPendingPauseService(serviceItem);
+		} else {
+			handleToggleVisibility(serviceItem);
+		}
+	};
+
 	const openEditDrawer = (service) => {
 		setSelectedService(service);
-		setCustomPrice(service.price ? String(service.price) : "500");
+		setCustomPrice(service.price ? String(service.price) : "499");
 
 		const allowed = getAllowedUnits(service.slug, service.price_unit);
 		const existingUnit = service.price_unit?.toLowerCase().trim();
@@ -191,39 +211,51 @@ export default function ProviderServices() {
 
 	if (loading) {
 		return (
-			<div className="flex flex-col items-center justify-center min-h-[350px] gap-4 text-slate-400">
-				<Loader2 size={32} className="animate-spin text-violet-500" />
-				<span className="text-sm font-medium">Loading services...</span>
+			<div className="flex flex-col items-center justify-center min-h-[350px] gap-3 text-slate-400">
+				<Loader2 size={24} className="animate-spin text-violet-500" />
+				<span className="text-xs font-bold">Loading merchant catalog...</span>
 			</div>
 		);
 	}
 
 	return (
 		<div className="space-y-8 relative bricolage-grotesque">
-			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
+			{/* Header Strip */}
+			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-white/[0.06]">
 				<div>
-					<h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-						<Wrench className="text-violet-400" size={26} />
-						My Services
-					</h1>
-					<p className="text-slate-400 text-sm mt-1">
-						Set up the jobs you offer, adjust prices, or pause services.
+					<div className="flex items-center gap-2.5">
+						<h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+							Service Catalog & Rates
+						</h1>
+					</div>
+					<p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
+						Manage your services, pricing, and availability.
 					</p>
 				</div>
-				<div className="flex bg-slate-900/60 border border-white/5 p-1 rounded-xl shrink-0">
+
+				{/* Active vs Discoverable Tabs */}
+				<div className="flex items-center gap-1.5 p-1 bg-white/[0.03] border border-white/[0.07] rounded-2xl">
 					<button
 						onClick={() => setActiveTab("active")}
-						className={`cursor-pointer px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 ${activeTab === "active" ? "bg-violet-600 text-white shadow-lg shadow-violet-900/30" : "text-slate-400 hover:text-slate-200"}`}
+						className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+							activeTab === "active"
+								? "bg-violet-600 text-white shadow-md shadow-violet-950"
+								: "text-slate-400 hover:text-white"
+						}`}
 					>
 						<Layers size={13} />
-						Active ({myServices.length})
+						Active Offerings ({myServices.length})
 					</button>
 					<button
 						onClick={() => setActiveTab("explore")}
-						className={`cursor-pointer px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 duration-200 ${activeTab === "explore" ? "bg-violet-600 text-white shadow-lg shadow-violet-900/30" : "text-slate-400 hover:text-slate-200"}`}
+						className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+							activeTab === "explore"
+								? "bg-violet-600 text-white shadow-md shadow-violet-950"
+								: "text-slate-400 hover:text-white"
+						}`}
 					>
-						<Sparkles size={13} />
-						Add New ({discoverableServices.length})
+						<Plus size={13} />
+						Marketplace Library ({discoverableServices.length})
 					</button>
 				</div>
 			</div>
@@ -232,117 +264,98 @@ export default function ProviderServices() {
 				{activeTab === "active" ? (
 					<motion.div
 						key="active"
-						initial={{ opacity: 0, y: 8 }}
+						initial={{ opacity: 0, y: 6 }}
 						animate={{ opacity: 1, y: 0 }}
-						exit={{ opacity: 0, y: -8 }}
-						className="space-y-3"
+						exit={{ opacity: 0, y: -6 }}
+						className="space-y-4"
 					>
 						{myServices.length === 0 ? (
-							<div className="flex flex-col items-center justify-center text-center p-12 border border-dashed border-white/10 bg-violet-900/5 rounded-2xl">
-								<Briefcase size={36} className="text-slate-600 mb-4" />
-								<p className="text-white font-bold text-lg">
-									No active services yet
+							<div className="flex flex-col items-center justify-center text-center p-14 border border-dashed border-white/[0.08] bg-white/[0.01] rounded-3xl space-y-3">
+								<Briefcase size={36} className="text-slate-600" />
+								<p className="text-white font-bold text-base">No active offerings in your catalog</p>
+								<p className="text-slate-400 text-xs max-w-sm leading-relaxed">
+									Customers cannot find or book you until you enable at least one trade service.
 								</p>
-								<p className="text-slate-400 text-xs mt-1 max-w-sm leading-relaxed">
-									You won't appear in customer searches. Click{" "}
-									<button
-										onClick={() => setActiveTab("explore")}
-										className="cursor-pointer text-violet-400 hover:text-violet-300 duration-200 underline"
-									>
-										Add New
-									</button>{" "}
-									to get started.
-								</p>
+								<button
+									onClick={() => setActiveTab("explore")}
+									className="mt-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl shadow-md shadow-violet-950 cursor-pointer transition-all"
+								>
+									Browse Marketplace Services
+								</button>
 							</div>
 						) : (
-							<div className="border border-white/5 bg-slate-900/20 rounded-2xl divide-y divide-white/5 overflow-hidden shadow-xl">
+							<div className="bg-[#120a22] border border-white/[0.07] rounded-3xl divide-y divide-white/[0.04] overflow-hidden shadow-xl">
 								{myServices.map((service) => (
 									<div
 										key={service.id}
-										className={`flex flex-col md:flex-row md:items-center justify-between p-5 gap-4 bg-slate-900/40 hover:bg-violet-900/10 transition-colors group relative ${!service.is_visible ? "opacity-50" : ""}`}
+										className={`flex flex-col md:flex-row md:items-center justify-between p-5 gap-4 hover:bg-white/[0.02] transition-colors group relative ${
+											!service.is_visible ? "opacity-60" : ""
+										}`}
 									>
-										<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-violet-500 opacity-0 group-hover:opacity-100 transition-opacity rounded-r" />
 										<div className="flex gap-4 items-center min-w-0 md:w-1/2">
-											<div className="w-15 h-15 rounded-xl overflow-hidden bg-slate-950 shrink-0 border border-white/10">
+											<div className="w-13 h-13 rounded-2xl overflow-hidden bg-black/40 shrink-0 border border-white/[0.08]">
 												<img
-													src={
-														service.image_url || "/images/default-service.jpg"
-													}
+													src={service.image_url || "/images/default-service.jpg"}
 													alt={service.name}
-													className="w-full h-full object-cover opacity-60"
+													className="w-full h-full object-cover"
 												/>
 											</div>
 											<div className="space-y-1 min-w-0">
 												<div className="flex items-center gap-2.5 flex-wrap">
-													<h3 className="text-md font-bold text-white truncate">
+													<h3 className="text-sm font-bold text-white truncate">
 														{service.name}
 													</h3>
 													<span
-														className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${service.is_visible ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-slate-800 text-slate-400 border-white/5"}`}
+														className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border ${
+															service.is_visible
+																? "bg-emerald-500/10 text-emerald-300 border-emerald-500/25"
+																: "bg-white/[0.04] text-slate-400 border-white/[0.06]"
+														}`}
 													>
-														{service.is_visible ? "Live" : "Paused"}
+														{service.is_visible ? "Live on App" : "Paused"}
 													</span>
 												</div>
-												<p className="text-sm text-slate-400 truncate pr-4">
+												<p className="text-xs text-slate-400 truncate pr-4">
 													{service.description}
 												</p>
 											</div>
 										</div>
-										<div className="flex items-center gap-8 shrink-0 md:w-1/4">
+
+										<div className="flex items-center gap-6 shrink-0 md:w-1/4">
 											<div>
-												<span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest block">
+												<span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
 													Your Rate
 												</span>
-												<span className="text-[13px] font-extrabold font-mono text-emerald-400 mt-0.5 block capitalize">
-													{service.price_unit === "fixed" ||
-													service.price_unit === "package" ? (
-														<div className="flex gap-1">
-															<span className="text-[15px]">
-																₹{service.price}
-															</span>
-															<span className="text-[15px] text-slate-400 font-normal lowercase ml-0.5">
-																(
-																{UNIT_LABELS[service.price_unit] ||
-																	service.price_unit}
-																)
-															</span>
-														</div>
-													) : (
-														<div className="flex gap-1">
-															<span className="text-[15px]">
-																₹{service.price}
-															</span>
-															<span className="text-[15px] text-slate-400 font-normal lowercase ml-0.5">
-																/ {service.price_unit}
-															</span>
-														</div>
-													)}
+												<span className="text-sm font-black text-emerald-400 mt-0.5 block font-mono">
+													₹{service.price}
+													<span className="text-xs text-slate-400 font-normal font-sans ml-1">
+														/{UNIT_LABELS[service.price_unit] || service.price_unit}
+													</span>
 												</span>
 											</div>
 										</div>
+
 										<div className="flex items-center gap-2 justify-end shrink-0 md:w-1/4">
 											<button
-												onClick={() => handleToggleVisibility(service)}
+												onClick={() => handleToggleClick(service)}
 												disabled={updatingId === service.id}
-												className="p-2.5 cursor-pointer bg-slate-950/40 hover:bg-slate-800 text-slate-400 hover:text-white border border-white/5 rounded-xl"
+												className="p-2.5 cursor-pointer bg-white/[0.03] hover:bg-white/[0.07] text-slate-400 hover:text-white border border-white/[0.06] rounded-xl transition-colors"
+												title={service.is_visible ? "Pause Service" : "Activate Service"}
 											>
 												{updatingId === service.id ? (
-													<Loader2
-														size={15}
-														className="animate-spin text-violet-400"
-													/>
+													<Loader2 size={15} className="animate-spin text-violet-400" />
 												) : service.is_visible ? (
-													<Eye size={17} />
+													<Eye size={15} />
 												) : (
-													<EyeOff size={17} />
+													<EyeOff size={15} />
 												)}
 											</button>
 											<button
 												onClick={() => openEditDrawer(service)}
-												className="cursor-pointer px-3 py-2 bg-violet-600/10 hover:bg-violet-600 border border-violet-500/20 hover:border-violet-500 text-violet-300 hover:text-white rounded-xl font-bold text-sm flex items-center gap-1.5"
+												className="cursor-pointer px-3 py-2 bg-violet-600/15 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/30 hover:border-violet-500 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all"
 											>
 												<SlidersHorizontal size={12} />
-												Change Settings
+												Configure
 											</button>
 										</div>
 									</div>
@@ -353,37 +366,35 @@ export default function ProviderServices() {
 				) : (
 					<motion.div
 						key="explore"
-						initial={{ opacity: 0, y: 8 }}
+						initial={{ opacity: 0, y: 6 }}
 						animate={{ opacity: 1, y: 0 }}
-						exit={{ opacity: 0, y: -8 }}
+						exit={{ opacity: 0, y: -6 }}
 						className="space-y-4"
 					>
-						<div className="p-4 rounded-xl bg-gradient-to-r from-violet-900/20 to-fuchsia-900/20 border border-violet-500/10 flex items-start gap-3">
-							<Sparkles className="text-amber-400 shrink-0 mt-0.5" size={15} />
-							<p className="text-xs text-violet-200/80 leading-relaxed">
-								Pick a service, set your rate, and go live. Customers will be
-								able to book you immediately.
+						<div className="p-4 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-start gap-3">
+							<Sparkles className="text-violet-400 shrink-0 mt-0.5" size={16} />
+							<p className="text-xs text-violet-200/90 leading-relaxed font-medium">
+								Add more services to your profile. Select a category, set your rates, and start taking bookings.
 							</p>
 						</div>
-						<div className="border border-white/5 bg-slate-900/20 rounded-2xl divide-y divide-white/5 overflow-hidden">
+
+						<div className="bg-[#120a22] border border-white/[0.07] rounded-3xl divide-y divide-white/[0.04] overflow-hidden shadow-xl">
 							{discoverableServices.length === 0 ? (
-								<div className="p-12 text-center text-slate-500 text-sm">
-									You've signed up for all available services! 🎉
+								<div className="p-12 text-center text-slate-400 text-xs font-semibold">
+									You have unlocked all currently supported platform services!
 								</div>
 							) : (
 								discoverableServices.map((service) => (
 									<div
 										key={service.id}
-										className="flex flex-col md:flex-row md:items-center justify-between p-5 gap-4 bg-slate-900/40 hover:bg-violet-900/10 transition-all group"
+										className="flex flex-col md:flex-row md:items-center justify-between p-5 gap-4 hover:bg-white/[0.02] transition-all group"
 									>
 										<div className="flex gap-4 items-center min-w-0 md:w-3/4">
-											<div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-950 shrink-0 border border-white/5">
+											<div className="w-13 h-13 rounded-2xl overflow-hidden bg-black/40 shrink-0 border border-white/[0.08]">
 												<img
-													src={
-														service.image_url || "/images/default-service.jpg"
-													}
+													src={service.image_url || "/images/default-service.jpg"}
 													alt={service.name}
-													className="w-full h-full object-cover opacity-60"
+													className="w-full h-full object-cover"
 												/>
 											</div>
 											<div className="space-y-1 min-w-0">
@@ -395,13 +406,14 @@ export default function ProviderServices() {
 												</p>
 											</div>
 										</div>
+
 										<div className="flex items-center justify-end shrink-0 md:w-1/4">
 											<button
 												onClick={() => openEditDrawer(service)}
-												className="cursor-pointer px-4 py-2.5 bg-violet-600 text-white rounded-xl font-bold text-xs tracking-wide transition-all hover:bg-violet-500 flex items-center gap-1.5 shadow-lg shadow-violet-900/20"
+												className="cursor-pointer px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold text-xs tracking-wide transition-all flex items-center gap-1.5 shadow-md shadow-violet-950"
 											>
 												<Plus size={14} />
-												Start Offering This
+												Add to Offerings
 											</button>
 										</div>
 									</div>
@@ -412,6 +424,7 @@ export default function ProviderServices() {
 				)}
 			</AnimatePresence>
 
+			{/* Edit Configurations Drawer */}
 			<AnimatePresence>
 				{selectedService && (
 					<>
@@ -420,85 +433,79 @@ export default function ProviderServices() {
 							animate={{ opacity: 1 }}
 							exit={{ opacity: 0 }}
 							onClick={() => setSelectedService(null)}
-							className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[150]"
+							className="fixed inset-0 bg-black/75 backdrop-blur-xs z-[150]"
 						/>
 						<motion.div
 							initial={{ x: "100%" }}
 							animate={{ x: 0 }}
 							exit={{ x: "100%" }}
-							transition={{ type: "spring", damping: 30, stiffness: 240 }}
-							className="fixed inset-y-0 right-0 w-full max-w-md bg-slate-900 border-l border-white/8 shadow-[-20px_0_50px_rgba(0,0,0,0.5)] z-[201] flex flex-col p-6 overflow-y-auto"
+							transition={{ type: "spring", damping: 30, stiffness: 280 }}
+							className="fixed inset-y-0 right-0 w-full max-w-md bg-[#100924] border-l border-white/[0.08] shadow-2xl z-[201] flex flex-col p-6 overflow-y-auto"
 						>
 							<div className="space-y-6 flex-1">
-								<div className="flex items-start justify-between">
+								<div className="flex items-start justify-between border-b border-white/[0.06] pb-4">
 									<div>
-										<h2 className="text-xl font-bold text-white tracking-tight">
-											Service Configurations
+										<h2 className="text-lg font-black text-white tracking-tight">
+											Catalog Service Parameters
 										</h2>
-										<p className="text-xs text-slate-400 mt-1">
-											Set up your pricing structures and operating hours.
+										<p className="text-xs text-slate-400 mt-0.5 font-medium">
+											Calibrate billing unit, rates, and working schedules.
 										</p>
 									</div>
 									<button
 										onClick={() => setSelectedService(null)}
-										className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/8 transition-colors cursor-pointer"
+										className="p-1.5 rounded-xl text-slate-400 hover:text-white bg-white/[0.03] border border-white/[0.06] cursor-pointer transition-colors"
 									>
-										<X size={18} />
+										<X size={16} />
 									</button>
 								</div>
 
-								<div className="p-4 bg-violet-900/20 border border-violet-500/15 rounded-xl flex gap-3 items-center">
-									<div className="w-12 h-12 rounded-xl bg-slate-950 overflow-hidden shrink-0 border border-white/10">
+								{/* Service Badge Header */}
+								<div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-2xl flex gap-3.5 items-center">
+									<div className="w-12 h-12 rounded-xl bg-black/40 overflow-hidden shrink-0 border border-white/[0.08]">
 										<img
-											src={
-												selectedService.image_url ||
-												"/images/default-service.jpg"
-											}
+											src={selectedService.image_url || "/images/default-service.jpg"}
 											alt={selectedService.name}
-											className="w-full h-full object-cover opacity-60"
+											className="w-full h-full object-cover"
 										/>
 									</div>
-									<div>
+									<div className="min-w-0">
 										<h4 className="text-sm font-bold text-white truncate">
 											{selectedService.name}
 										</h4>
-										<p className="text-[9px] text-violet-300 font-mono tracking-wider uppercase mt-0.5">
+										<span className="text-[10px] text-violet-300 font-bold uppercase tracking-wider block mt-0.5">
 											{myServices.some((s) => s.id === selectedService.id)
-												? "Update Settings"
+												? "Active In Catalog"
 												: "New Service Setup"}
-										</p>
+										</span>
 									</div>
 								</div>
 
-								<form onSubmit={handleSavePrice} className="space-y-6">
-									<div className="space-y-4">
-										<div className="space-y-2">
-											<label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-												Rate Structure
+								<form onSubmit={handleSavePrice} className="space-y-5 text-xs">
+									<div className="space-y-3.5">
+										<div className="space-y-1.5">
+											<label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
+												Pricing Unit Format
 											</label>
 											<select
 												value={priceUnit}
 												onChange={(e) => setPriceUnit(e.target.value)}
-												className="w-full px-3 py-2.5 bg-slate-800 border border-white/10 rounded-xl text-sm text-white capitalize focus:outline-none"
+												className="w-full px-3 py-2.5 bg-black/40 border border-white/[0.08] rounded-xl text-xs font-semibold text-white capitalize focus:outline-none focus:border-violet-500"
 											>
 												{currentAllowedUnits.map((unit) => (
-													<option
-														key={unit}
-														value={unit}
-														className="bg-slate-900"
-													>
+													<option key={unit} value={unit} className="bg-[#120a22]">
 														{UNIT_LABELS[unit] || unit}
 													</option>
 												))}
 											</select>
 										</div>
 
-										<div className="space-y-2">
-											<label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-												Base Fee (INR)
+										<div className="space-y-1.5">
+											<label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
+												Base Client Fee (INR)
 											</label>
 											<div className="relative">
-												<span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm font-bold">
+												<span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xs">
 													₹
 												</span>
 												<input
@@ -507,23 +514,19 @@ export default function ProviderServices() {
 													min="1"
 													value={customPrice}
 													onChange={(e) => setCustomPrice(e.target.value)}
-													className="w-full pl-8 pr-4 py-2.5 bg-slate-800 border border-white/10 rounded-xl text-sm text-white font-mono focus:outline-none"
+													className="w-full pl-8 pr-4 py-2.5 bg-black/40 border border-white/[0.08] rounded-xl text-xs font-extrabold text-white font-mono focus:outline-none focus:border-violet-500"
 												/>
 											</div>
 										</div>
 									</div>
 
-									<div className="border-t border-white/5 pt-4" />
+									{/* Operating Days */}
+									<div className="space-y-2.5 pt-2 border-t border-white/[0.06]">
+										<label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">
+											Weekly Operating Windows
+										</label>
 
-									<div className="space-y-3">
-										<div className="flex items-center gap-1.5 text-slate-400">
-											<Clock size={14} className="text-violet-400" />
-											<label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-												Weekly Operating Days
-											</label>
-										</div>
-
-										<div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+										<div className="flex gap-1.5 overflow-x-auto pb-1">
 											{DAYS_OF_WEEK.map((day) => {
 												const isSelected = selectedDays.includes(day.value);
 												return (
@@ -533,8 +536,8 @@ export default function ProviderServices() {
 														onClick={() => toggleDaySelection(day.value)}
 														className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 uppercase tracking-wider ${
 															isSelected
-																? "bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-900/20"
-																: "bg-slate-800 text-slate-400 border-white/5 hover:border-white/10 hover:text-slate-300"
+																? "bg-violet-600 text-white border-violet-500 shadow-xs"
+																: "bg-white/[0.03] text-slate-400 border-white/[0.06] hover:text-white"
 														}`}
 													>
 														{day.label}
@@ -543,66 +546,59 @@ export default function ProviderServices() {
 											})}
 										</div>
 
-										<div className="grid grid-cols-2 gap-3 bg-slate-950/40 p-3.5 rounded-xl border border-white/5">
+										<div className="grid grid-cols-2 gap-3 bg-white/[0.02] p-3 rounded-2xl border border-white/[0.06]">
 											<div>
-												<span className="text-[12px] text-slate-500 font-bold block mb-1">
+												<span className="text-[10px] text-slate-500 font-bold block mb-1">
 													START TIME
 												</span>
 												<input
 													type="time"
 													value={startTime}
 													onChange={(e) => setStartTime(e.target.value)}
-													className="w-full bg-slate-800 text-white font-mono text-sm p-2 rounded-lg border border-white/10 focus:outline-none"
+													className="w-full bg-black/40 text-white font-mono text-xs p-2 rounded-lg border border-white/[0.08] focus:outline-none"
 												/>
 											</div>
 											<div>
-												<span className="text-[12px] text-slate-500 font-bold block mb-1">
+												<span className="text-[10px] text-slate-500 font-bold block mb-1">
 													END TIME
 												</span>
 												<input
 													type="time"
 													value={endTime}
 													onChange={(e) => setEndTime(e.target.value)}
-													className="w-full bg-slate-800 text-white font-mono text-sm p-2 rounded-lg border border-white/10 focus:outline-none"
+													className="w-full bg-black/40 text-white font-mono text-xs p-2 rounded-lg border border-white/[0.08] focus:outline-none"
 												/>
 											</div>
 										</div>
 									</div>
 
-									<div className="border-t border-white/5 pt-4" />
-
-									<div className="p-4 rounded-xl bg-slate-950/50 border border-white/5 space-y-2.5 text-sm">
+									{/* Take Home Preview */}
+									<div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-1.5 text-xs">
 										<div className="flex justify-between text-slate-400">
-											<span>Platform Fee</span>
-											<span className="font-mono text-emerald-400 font-medium">
-												0% (Launch Offer)
+											<span>Estimated 15% Platform Take</span>
+											<span className="font-mono text-slate-300">
+												-₹{Math.round((Number(customPrice) || 0) * 0.15)}
 											</span>
 										</div>
-										<div className="flex justify-between items-center pt-2 border-t border-white/5">
-											<span className="font-bold text-white">
-												Your Take-Home Rate
-											</span>
-											<span className="font-mono font-bold text-emerald-400 text-md">
-												₹{customPrice || 0}
+										<div className="flex justify-between items-center pt-2 border-t border-white/[0.06]">
+											<span className="font-bold text-white">Estimated Net Payout</span>
+											<span className="font-mono font-extrabold text-emerald-400 text-sm">
+												₹{Math.round((Number(customPrice) || 0) * 0.85)}
 											</span>
 										</div>
 									</div>
 
 									<button
 										type="submit"
-										disabled={
-											updatingId ===
-											(selectedService.slug ?? selectedService.id)
-										}
-										className="w-full py-3 cursor-pointer bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 text-white font-bold text-sm rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+										disabled={updatingId === (selectedService.slug ?? selectedService.id)}
+										className="w-full py-2.5 cursor-pointer bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-violet-950 flex items-center justify-center gap-2"
 									>
-										{updatingId ===
-											(selectedService.slug ?? selectedService.id) && (
-											<Loader2 size={14} className="animate-spin" />
+										{updatingId === (selectedService.slug ?? selectedService.id) && (
+											<Loader2 size={13} className="animate-spin" />
 										)}
 										{myServices.some((s) => s.id === selectedService.id)
-											? "Save Adjustments"
-											: "Go Live with Service"}
+											? "Update Service Parameters"
+											: "Confirm & Launch Service"}
 									</button>
 								</form>
 							</div>
@@ -610,6 +606,22 @@ export default function ProviderServices() {
 					</>
 				)}
 			</AnimatePresence>
+
+			{/* Consequential Action Confirmation */}
+			<ConfirmDialog
+				isOpen={!!pendingPauseService}
+				onClose={() => setPendingPauseService(null)}
+				onConfirm={async () => {
+					const target = pendingPauseService;
+					setPendingPauseService(null);
+					await handleToggleVisibility(target);
+				}}
+				title="Pause service visibility?"
+				description={`"${pendingPauseService?.name}" will be hidden from customer marketplace searches until you activate it again.`}
+				confirmText="Pause service"
+				cancelText="Keep live"
+				variant="warning"
+			/>
 		</div>
 	);
 }

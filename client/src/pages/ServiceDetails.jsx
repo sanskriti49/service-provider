@@ -1,4 +1,4 @@
-﻿import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StarIcon } from "@heroicons/react/24/solid";
 import gsap from "gsap";
@@ -60,6 +60,7 @@ const ServiceDetails = () => {
 
 	const isAnyExpanded = expandedIndex !== -1;
 
+	// Request browser geolocation once on mount
 	useEffect(() => {
 		if ("geolocation" in navigator) {
 			navigator.geolocation.getCurrentPosition(
@@ -299,6 +300,7 @@ const ServiceDetails = () => {
 						</p>
 					</div>
 
+					{/* Geolocation matching controls */}
 					<div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
 						{!userCoords ? (
 							<button
@@ -361,7 +363,7 @@ const ProviderCard = ({
 }) => {
 	const navigate = useNavigate();
 
-	const [activeTab, setActiveTab] = useState("schedule");
+	const [activeTab, setActiveTab] = useState("schedule"); // 'schedule' or 'reviews'
 	const [availability, setAvailability] = useState([]);
 	const [loadingSlots, setLoadingSlots] = useState(false);
 	const [hasLoadedSlots, setHasLoadedSlots] = useState(false);
@@ -447,9 +449,13 @@ const ProviderCard = ({
 	};
 
 	const handleOpenReviews = () => {
-		setActiveTab("reviews");
-		if (!isExpanded) onToggleExpand();
-		loadReviews();
+		if (isExpanded && activeTab === "reviews") {
+			onToggleExpand();
+		} else {
+			setActiveTab("reviews");
+			if (!isExpanded) onToggleExpand();
+			loadReviews();
+		}
 	};
 
 	const processedData = useMemo(() => {
@@ -580,14 +586,6 @@ const ProviderCard = ({
 										"Fixed Rate"}
 								</span>
 							</div>
-
-							<button
-								onClick={handleOpenReviews}
-								className="text-xs text-violet-300 hover:text-white flex items-center gap-1 hover:underline cursor-pointer"
-							>
-								<MessageSquare size={12} />
-								<span>Reviews</span>
-							</button>
 						</div>
 					</div>
 				</div>
@@ -630,7 +628,7 @@ const ProviderCard = ({
 						}`}
 					>
 						<Star size={14} className="text-yellow-400" />
-						<span>Reviews</span>
+						<span>{isExpanded && activeTab === "reviews" ? "Close Reviews" : "Reviews"}</span>
 					</button>
 				</div>
 
@@ -639,6 +637,7 @@ const ProviderCard = ({
 						isExpanded ? "max-h-[460px] opacity-100" : "max-h-0 opacity-0"
 					}`}
 				>
+					{/* TAB: SCHEDULE */}
 					{activeTab === "schedule" && (
 						<div className="px-6 pb-6">
 							{!loadingSlots && validDates.length === 0 && (
@@ -758,6 +757,7 @@ const ProviderCard = ({
 						</div>
 					)}
 
+					{/* TAB: REVIEWS */}
 					{activeTab === "reviews" && (
 						<div className="px-6 pb-6 space-y-4">
 							{loadingReviews ? (
@@ -767,6 +767,7 @@ const ProviderCard = ({
 								</div>
 							) : (
 								<>
+									{/* Rating Overview */}
 									<div className="flex items-center justify-between p-3.5 bg-white/5 rounded-2xl border border-white/10">
 										<div className="flex items-center gap-3">
 											<div className="text-3xl font-bold text-white">
@@ -800,6 +801,7 @@ const ProviderCard = ({
 										</button>
 									</div>
 
+									{/* Reviews List */}
 									<div className="max-h-48 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar-y">
 										{reviewsData?.reviews && reviewsData.reviews.length > 0 ? (
 											reviewsData.reviews.map((rev) => (

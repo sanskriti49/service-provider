@@ -1,4 +1,4 @@
-import { Search, ArrowRight, X, AlertCircle } from "lucide-react";
+import { Search, ArrowRight, X, CircleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
@@ -220,7 +220,7 @@ export const SearchBar = () => {
 				<div className="absolute top-full left-0 right-0 mt-3 p-4 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-red-100 z-50 animate-in fade-in slide-in-from-top-2 duration-200 ring-1 ring-red-500/10">
 					<div className="flex items-start gap-4">
 						<div className="p-2 bg-red-50 rounded-full text-red-500 shrink-0">
-							<AlertCircle className="w-6 h-6" />
+							<CircleAlert className="w-6 h-6" />
 						</div>
 						<div className="flex-1">
 							<h3 className="font-semibold text-gray-900">No services found</h3>

@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import api from "../../api/axios";
 import { toast } from "sonner";
+import { useAuth } from "../../contexts/AuthContext";
+import ConfirmDialog from "../../ui/ConfirmDialog";
 
 const SaveButton = ({ loading, disabled, onClick, label, loadingLabel }) => (
 	<button
@@ -327,9 +329,16 @@ const CustomerSettings = () => {
 		}
 	}, [user]);
 
+	const { logout } = useAuth();
+	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
 	const handleLogout = () => {
-		localStorage.removeItem("token");
-		localStorage.removeItem("user");
+		setShowLogoutConfirm(true);
+	};
+
+	const executeLogout = () => {
+		setShowLogoutConfirm(false);
+		logout();
 		navigate("/login");
 	};
 
@@ -668,6 +677,17 @@ const CustomerSettings = () => {
 					</div>
 				</div>
 			</div>
+
+			<ConfirmDialog
+				isOpen={showLogoutConfirm}
+				onClose={() => setShowLogoutConfirm(false)}
+				onConfirm={executeLogout}
+				title="Log out from all devices?"
+				description="You'll need to sign in again to access your account."
+				confirmText="Log out"
+				cancelText="Cancel"
+				variant="danger"
+			/>
 		</div>
 	);
 };

@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import logoImg from "/images/taskgenie-logo.svg";
 import signInImg from "/images/sign-in.jpg";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Turnstile } from "@marsidev/react-turnstile";
 import api from "../api/axiosInstance";
+import Logo from "../ui/Logo";
 
 const SignUp = () => {
 	const navigate = useNavigate();
@@ -201,16 +201,7 @@ const SignUp = () => {
 			<div className="relative lg:col-span-2 flex flex-col p-5 overflow-hidden h-full">
 				<div className="flex flex-col h-full z-10 relative">
 					<div className="flex items-center mb-8">
-						<div className=" w-14 flex items-center cursor-pointer">
-							<img
-								src={logoImg}
-								className="h-full w-full"
-								alt="TaskGenie Logo"
-							/>
-						</div>
-						<p className="text-3xl lobster font-bold bg-gradient-to-r from-violet-700 via-fuchsia-700 to-fuchsia-700 bg-clip-text text-transparent drop-shadow-md tracking-tight cursor-pointer hover:scale-105 transition-transform">
-							TaskGenie
-						</p>
+						<Logo to="/" size="xl" theme="light" className="hover:scale-105 transition-transform" />
 					</div>
 
 					<div className="flex-1 flex flex-col justify-center items-center">

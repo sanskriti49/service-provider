@@ -1,7 +1,7 @@
 import { useState } from "react";
 import api from "../api/axiosInstance";
 import { Link } from "react-router-dom";
-import logoImg from "/images/taskgenie-logo.svg";
+import Logo from "../ui/Logo";
 
 const ForgotPassword = () => {
 	const [email, setEmail] = useState("");
@@ -28,8 +28,8 @@ const ForgotPassword = () => {
 	return (
 		<div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 bricolage-grotesque">
 			<div className="auth-card w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-slate-100" style={{ color: "#0f172a" }}>
-				<div className="text-center mb-8">
-					<img src={logoImg} alt="TaskGenie Logo" className="w-12 mx-auto mb-4" />
+				<div className="text-center mb-8 flex flex-col items-center">
+					<Logo to="/" size="xl" theme="light" className="mb-4 hover:scale-105 transition-transform" />
 					<h2 className="text-2xl font-bold text-slate-900" style={{ color: "#0f172a" }}>Forgot Password</h2>
 					<p className="auth-subtext text-slate-600 mt-2" style={{ color: "#475569" }}>
 						Enter your email to receive a password reset link

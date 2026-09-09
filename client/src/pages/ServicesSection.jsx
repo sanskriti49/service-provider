@@ -53,33 +53,21 @@ const SkeletonCard = () => (
 	<div className="h-[450px] w-full animate-pulse rounded-3xl bg-slate-200" />
 );
 
-const MotionLink = motion(Link);
-
-const ServiceCard = ({ service, isActive }) => {
+const ServiceCard = ({ service }) => {
 	const serviceUrl = `/services/${service.slug || service.id}`;
-
 	const imageUrl = service.image_url || "/images/default-service.jpg";
 
 	return (
-		<MotionLink
+		<Link
 			to={serviceUrl}
-			className="group relative block h-[450px] w-full overflow-hidden rounded-3xl shadow-lg border border-white/20"
-			initial={{ scale: 0.9, opacity: 0.5 }}
-			animate={{
-				scale: isActive ? 1 : 0.95,
-				opacity: isActive ? 1 : 0.7,
-				filter: isActive
-					? "grayscale(0%) brightness(1)"
-					: "grayscale(30%) brightness(0.9)",
-			}}
-			transition={{ duration: 0.4, ease: "easeInOut" }}
+			className="group relative block h-[440px] w-full overflow-hidden rounded-3xl shadow-lg border border-white/20 transition-transform duration-300 hover:-translate-y-1 hover:shadow-2xl"
 		>
 			<div className="absolute inset-0 h-full w-full bg-slate-200">
 				<img
 					src={imageUrl}
 					alt={service.name}
 					loading="lazy"
-					className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+					className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
 				/>
 			</div>
 
@@ -117,42 +105,22 @@ const ServiceCard = ({ service, isActive }) => {
 					<ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1 group-hover/cta:text-violet-400" />
 				</div>
 			</div>
-		</MotionLink>
+		</Link>
 	);
 };
 
 const ServicesCarousel = ({ services }) => {
-	const [activeIndex, setActiveIndex] = useState(0);
-
-	const getVisibleItems = () => {
-		const width = window.innerWidth;
-		if (width >= 1280) return 3;
-		if (width >= 768) return 2;
-		return 1;
-	};
-
-	useEffect(() => {
-		const visible = getVisibleItems();
-		setActiveIndex(Math.floor(visible / 2));
-	}, []);
-
 	return (
-		<div className="relative mt-12 w-full cursor-grab pb-12 active:cursor-grabbing select-none">
+		<div className="relative mt-8 w-full cursor-grab pb-6 active:cursor-grabbing select-none">
 			<Carousel
 				responsive={responsive}
 				infinite={true}
 				centerMode={window.innerWidth >= 1024}
-				afterChange={(previousSlide, { currentSlide }) => {
-					const visible = getVisibleItems();
-					const center =
-						(currentSlide + Math.floor(visible / 2)) % services.length;
-					setActiveIndex(center);
-				}}
 				keyBoardControl
 				swipeable
 				draggable
 				pauseOnHover
-				containerClass="w-full py-10"
+				containerClass="w-full py-6"
 				itemClass="px-3"
 				showDots={false}
 				customLeftArrow={<CustomArrow direction="left" />}
@@ -162,7 +130,6 @@ const ServicesCarousel = ({ services }) => {
 					<ServiceCard
 						key={service.slug || service.id}
 						service={service}
-						isActive={true}
 					/>
 				))}
 			</Carousel>

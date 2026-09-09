@@ -70,8 +70,6 @@ const HowItWorksSection = () => {
 			id="how-it-works"
 			className="relative py-16 sm:py-24 overflow-hidden text-slate-800"
 		>
-			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-gradient-to-r from-violet-200/30 via-purple-200/20 to-pink-200/30 blur-[140px] pointer-events-none rounded-full" />
-
 			<div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
 				<div className="flex justify-center mb-4">
 					<span className="bricolage-grotesque rounded-full bg-violet-100/90 border border-violet-200 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-violet-700 flex items-center gap-1.5">

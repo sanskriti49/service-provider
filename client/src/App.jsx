@@ -65,7 +65,6 @@ const router = createBrowserRouter([
 			{ path: "/choose-role", element: <ChooseRole /> },
 			{ path: "/services", element: <AllServices /> },
 			{ path: "/help", element: <HelpCenter /> },
-			{ path: "/notifications", element: <NotificationsPage /> },
 			{ path: "/unauthorized", element: <Unauthorized /> },
 
 			{
@@ -143,6 +142,7 @@ const router = createBrowserRouter([
 					</ProtectedRoute>
 				),
 			},
+			{ path: "/notifications", element: <NotificationsPage /> },
 		],
 	},
 	{
@@ -178,17 +178,26 @@ export default function App() {
 	return (
 		<>
 			<Toaster
-				richColors
-				position="top-center"
+				theme="dark"
+				position="bottom-right"
 				closeButton
-				expand={true}
-				visibleToasts={3}
+				gap={8}
+				offset={20}
+				visibleToasts={4}
 				toastOptions={{
-					unstyled: false,
+					className: "taskgenie-toast",
 					classNames: {
-						toast: "inter text-base font-sans rounded-2xl",
-						title: "text-base font-bold",
-						description: "text-sm",
+						toast: "bg-[#120a22]/95 backdrop-blur-md border border-white/10 text-slate-100 rounded-xl shadow-2xl shadow-black/80 px-4 py-3 text-xs flex items-start gap-3",
+						title: "text-xs font-bold text-white tracking-tight",
+						description: "text-[11px] text-slate-300 font-normal leading-relaxed mt-0.5",
+						actionButton: "bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold px-2.5 py-1 rounded-lg",
+						cancelButton: "bg-white/[0.04] text-slate-300 hover:text-white text-xs px-2.5 py-1 rounded-lg border border-white/10",
+						closeButton: "!bg-[#1a1130] !border-white/10 !text-slate-400 hover:!text-white",
+						success: "!border-emerald-500/20 [&_[data-icon]]:!text-emerald-400",
+						error: "!border-rose-500/20 [&_[data-icon]]:!text-rose-400",
+						warning: "!border-amber-500/20 [&_[data-icon]]:!text-amber-400",
+						info: "!border-violet-500/20 [&_[data-icon]]:!text-violet-400",
+						loading: "!border-violet-500/20 [&_[data-icon]]:!text-violet-400",
 					},
 				}}
 			/>

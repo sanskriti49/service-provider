@@ -1,6 +1,8 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { Menu, Transition } from "@headlessui/react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import ConfirmDialog from "./ConfirmDialog";
 import {
 	LayoutDashboard,
 	UserCircle,
@@ -19,6 +21,16 @@ import {
 } from "lucide-react";
 
 export default function AccountMenu({ user }) {
+	const { logout } = useAuth();
+	const navigate = useNavigate();
+	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+	const handleLogout = () => {
+		setShowLogoutConfirm(false);
+		logout();
+		navigate("/login");
+	};
+
 	const getInitials = (name) => {
 		if (!name) return "U";
 		const parts = name.split(" ");
@@ -161,10 +173,8 @@ export default function AccountMenu({ user }) {
 						<Menu.Item>
 							{({ active }) => (
 								<button
-									onClick={() => {
-										localStorage.removeItem("token");
-										window.location.reload();
-									}}
+									type="button"
+									onClick={() => setShowLogoutConfirm(true)}
 									className={`${
 										active ? "bg-red-50 text-red-600" : "text-gray-700"
 									} cursor-pointer group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors outline-none`}
@@ -183,6 +193,18 @@ export default function AccountMenu({ user }) {
 					</div>
 				</Menu.Items>
 			</Transition>
+
+			<ConfirmDialog
+				isOpen={showLogoutConfirm}
+				onClose={() => setShowLogoutConfirm(false)}
+				onConfirm={handleLogout}
+				title="Log out?"
+				description="You'll need to sign in again to access your account."
+				confirmText="Log out"
+				cancelText="Cancel"
+				variant="danger"
+				icon={LogOut}
+			/>
 		</Menu>
 	);
 }

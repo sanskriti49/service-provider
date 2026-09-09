@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Search, ArrowRight, AlertCircle, X, Filter } from "lucide-react";
+import { Search, ArrowRight, X, Filter, CircleAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 import gsap from "gsap";
@@ -138,7 +138,7 @@ export default function AllServices() {
 				{error && (
 					<div className="py-20 text-center bg-white rounded-3xl border border-red-100 shadow-sm">
 						<div className="inline-flex p-3 bg-red-50 rounded-full mb-4">
-							<AlertCircle size={32} className="text-red-500" />
+							<CircleAlert size={32} className="text-red-500" />
 						</div>
 						<h3 className="text-xl font-bold text-slate-800 mb-2">
 							Unable to load services

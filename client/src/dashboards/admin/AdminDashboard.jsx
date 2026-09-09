@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
 	LayoutDashboard,
 	Users,
 	AlertTriangle,
-	Settings as SettingsIcon,
-	ShieldCheck,
+	Sliders,
 	CheckCircle2,
 	XCircle,
 	Clock,
@@ -12,21 +12,24 @@ import {
 	IndianRupee,
 	Search,
 	RefreshCw,
-	Sliders,
 	MapPin,
 	Calendar,
-	Briefcase,
-	ChevronRight,
-	AlertCircle,
 	Check,
 	Phone,
 	Mail,
 	Ban,
+	Download,
+	Eye,
+	X,
+	LogOut,
+	ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import api from "../../api/axiosInstance";
-import { useAuth } from "../../hooks/useAuth";
+import { useAuth } from "../../contexts/AuthContext";
+import ConfirmDialog from "../../ui/ConfirmDialog";
+import Logo from "../../ui/Logo";
 
 const formatCurrency = (val) =>
 	new Intl.NumberFormat("en-IN", {
@@ -36,7 +39,8 @@ const formatCurrency = (val) =>
 	}).format(val || 0);
 
 export default function AdminDashboard() {
-	const { user } = useAuth();
+	const { user, logout } = useAuth();
+	const navigate = useNavigate();
 	const [activeTab, setActiveTab] = useState("overview");
 
 	// Overview state
@@ -45,20 +49,31 @@ export default function AdminDashboard() {
 
 	// Providers state
 	const [providers, setProviders] = useState([]);
-	const [providersMeta, setProvidersMeta] = useState({ page: 1, total_pages: 1, total: 0 });
+	const [providersMeta, setProvidersMeta] = useState({
+		page: 1,
+		total_pages: 1,
+		total: 0,
+	});
 	const [providerStatusFilter, setProviderStatusFilter] = useState("all");
 	const [providerSearch, setProviderSearch] = useState("");
 	const [loadingProviders, setLoadingProviders] = useState(false);
-	const [selectedProviderForReject, setSelectedProviderForReject] = useState(null);
+	const [inspectingProvider, setInspectingProvider] = useState(null);
+	const [selectedProviderForReject, setSelectedProviderForReject] =
+		useState(null);
 	const [rejectionReason, setRejectionReason] = useState("");
 	const [actionInProgress, setActionInProgress] = useState(null);
 
 	// Disputes state
 	const [disputes, setDisputes] = useState([]);
-	const [disputesMeta, setDisputesMeta] = useState({ page: 1, total_pages: 1, total: 0 });
+	const [disputesMeta, setDisputesMeta] = useState({
+		page: 1,
+		total_pages: 1,
+		total: 0,
+	});
 	const [disputeStatusFilter, setDisputeStatusFilter] = useState("all");
 	const [loadingDisputes, setLoadingDisputes] = useState(false);
-	const [selectedDisputeForResolve, setSelectedDisputeForResolve] = useState(null);
+	const [selectedDisputeForResolve, setSelectedDisputeForResolve] =
+		useState(null);
 	const [resolveForm, setResolveForm] = useState({
 		status: "resolved",
 		refund_amount: 0,
@@ -73,72 +88,94 @@ export default function AdminDashboard() {
 	const [loadingSettings, setLoadingSettings] = useState(false);
 	const [savingSettings, setSavingSettings] = useState(false);
 
-	// --- 1. Fetch Overview ---
+	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+	const handleLogoutClick = () => {
+		setShowLogoutConfirm(true);
+	};
+
+	const executeLogout = () => {
+		setShowLogoutConfirm(false);
+		logout();
+		navigate("/login");
+	};
+
+	// 1. Fetch Overview
 	const fetchOverview = useCallback(async () => {
 		setLoadingOverview(true);
 		try {
-			const res = await api.get("/admin/overview");
+			const res = await api.get("/api/admin/overview");
 			if (res.data?.success) {
 				setOverviewData(res.data);
 			}
 		} catch (err) {
-			console.error("Failed to load admin overview:", err);
-			toast.error("Failed to load overview analytics");
+			console.error("Failed to load overview:", err);
+			toast.error("Could not load overview data");
 		} finally {
 			setLoadingOverview(false);
 		}
 	}, []);
 
-	// --- 2. Fetch Providers ---
-	const fetchProviders = useCallback(async (page = 1) => {
-		setLoadingProviders(true);
-		try {
-			const params = {
-				status: providerStatusFilter,
-				search: providerSearch,
-				page,
-				limit: 10,
-			};
-			const res = await api.get("/admin/providers", { params });
-			if (res.data?.success) {
-				setProviders(res.data.data || []);
-				setProvidersMeta(res.data.meta || { page: 1, total_pages: 1, total: 0 });
+	// 2. Fetch Providers
+	const fetchProviders = useCallback(
+		async (page = 1) => {
+			setLoadingProviders(true);
+			try {
+				const params = {
+					status: providerStatusFilter,
+					search: providerSearch,
+					page,
+					limit: 15,
+				};
+				const res = await api.get("/api/admin/providers", { params });
+				if (res.data?.success) {
+					setProviders(res.data.data || []);
+					setProvidersMeta(
+						res.data.meta || { page: 1, total_pages: 1, total: 0 },
+					);
+				}
+			} catch (err) {
+				console.error("Failed to load providers:", err);
+				toast.error("Could not load providers list");
+			} finally {
+				setLoadingProviders(false);
 			}
-		} catch (err) {
-			console.error("Failed to load providers:", err);
-			toast.error("Failed to load provider list");
-		} finally {
-			setLoadingProviders(false);
-		}
-	}, [providerStatusFilter, providerSearch]);
+		},
+		[providerStatusFilter, providerSearch],
+	);
 
-	// --- 3. Fetch Disputes ---
-	const fetchDisputes = useCallback(async (page = 1) => {
-		setLoadingDisputes(true);
-		try {
-			const params = {
-				status: disputeStatusFilter,
-				page,
-				limit: 10,
-			};
-			const res = await api.get("/admin/disputes", { params });
-			if (res.data?.success) {
-				setDisputes(res.data.data || []);
-				setDisputesMeta(res.data.meta || { page: 1, total_pages: 1, total: 0 });
+	// 3. Fetch Disputes
+	const fetchDisputes = useCallback(
+		async (page = 1) => {
+			setLoadingDisputes(true);
+			try {
+				const params = {
+					status: disputeStatusFilter,
+					page,
+					limit: 10,
+				};
+				const res = await api.get("/api/admin/disputes", { params });
+				if (res.data?.success) {
+					setDisputes(res.data.data || []);
+					setDisputesMeta(
+						res.data.meta || { page: 1, total_pages: 1, total: 0 },
+					);
+				}
+			} catch (err) {
+				console.error("Failed to load disputes:", err);
+				toast.error("Could not load disputes list");
+			} finally {
+				setLoadingDisputes(false);
 			}
-		} catch (err) {
-			console.error("Failed to load disputes:", err);
-			toast.error("Failed to load disputes list");
-		} finally {
-			setLoadingDisputes(false);
-		}
-	}, [disputeStatusFilter]);
+		},
+		[disputeStatusFilter],
+	);
 
-	// --- 4. Fetch Settings ---
+	// 4. Fetch Settings
 	const fetchSettings = useCallback(async () => {
 		setLoadingSettings(true);
 		try {
-			const res = await api.get("/admin/settings");
+			const res = await api.get("/api/admin/settings");
 			if (res.data?.success && res.data.settings) {
 				setSettings(res.data.settings);
 			}
@@ -149,7 +186,6 @@ export default function AdminDashboard() {
 		}
 	}, []);
 
-	// Load initial data based on active tab
 	useEffect(() => {
 		if (activeTab === "overview") fetchOverview();
 		else if (activeTab === "providers") fetchProviders(1);
@@ -157,11 +193,14 @@ export default function AdminDashboard() {
 		else if (activeTab === "settings") fetchSettings();
 	}, [activeTab, fetchOverview, fetchProviders, fetchDisputes, fetchSettings]);
 
-	// Update Provider Status Handler
-	const handleUpdateProviderStatus = async (providerId, newStatus, reason = null) => {
+	const handleUpdateProviderStatus = async (
+		providerId,
+		newStatus,
+		reason = null,
+	) => {
 		setActionInProgress(providerId);
 		try {
-			const res = await api.put(`/admin/providers/${providerId}/status`, {
+			const res = await api.put(`/api/admin/providers/${providerId}/status`, {
 				status: newStatus,
 				rejection_reason: reason,
 			});
@@ -169,9 +208,16 @@ export default function AdminDashboard() {
 				toast.success(`Provider status updated to ${newStatus}`);
 				fetchProviders(providersMeta.page);
 				if (overviewData) fetchOverview();
+				if (inspectingProvider?.user_id === providerId) {
+					setInspectingProvider((prev) =>
+						prev
+							? { ...prev, status: newStatus, rejection_reason: reason }
+							: null,
+					);
+				}
 			}
 		} catch (err) {
-			toast.error(err.response?.data?.error || "Failed to update provider status");
+			toast.error(err.response?.data?.error || "Failed to update status");
 		} finally {
 			setActionInProgress(null);
 			setSelectedProviderForReject(null);
@@ -179,20 +225,22 @@ export default function AdminDashboard() {
 		}
 	};
 
-	// Resolve Dispute Handler
 	const handleResolveDispute = async (e) => {
 		e.preventDefault();
 		if (!selectedDisputeForResolve) return;
 		setActionInProgress(selectedDisputeForResolve.dispute_id);
 
 		try {
-			const res = await api.put(`/admin/disputes/${selectedDisputeForResolve.dispute_id}/resolve`, {
-				status: resolveForm.status,
-				refund_amount: Number(resolveForm.refund_amount) || 0,
-				resolution_notes: resolveForm.resolution_notes,
-			});
+			const res = await api.put(
+				`/api/admin/disputes/${selectedDisputeForResolve.dispute_id}/resolve`,
+				{
+					status: resolveForm.status,
+					refund_amount: Number(resolveForm.refund_amount) || 0,
+					resolution_notes: resolveForm.resolution_notes,
+				},
+			);
 			if (res.data?.success) {
-				toast.success(`Dispute marked as ${resolveForm.status}`);
+				toast.success("Dispute resolved successfully");
 				fetchDisputes(disputesMeta.page);
 				if (overviewData) fetchOverview();
 				setSelectedDisputeForResolve(null);
@@ -204,14 +252,13 @@ export default function AdminDashboard() {
 		}
 	};
 
-	// Save Settings Handler
 	const handleSaveSettings = async (e) => {
 		e.preventDefault();
 		setSavingSettings(true);
 		try {
-			const res = await api.put("/admin/settings", settings);
+			const res = await api.put("/api/admin/settings", settings);
 			if (res.data?.success) {
-				toast.success("Platform settings saved successfully");
+				toast.success("Settings saved successfully");
 				fetchOverview();
 			}
 		} catch (err) {
@@ -221,445 +268,505 @@ export default function AdminDashboard() {
 		}
 	};
 
-	// Calculate live commission breakdown preview
-	const commissionPreview = useMemo(() => {
-		const baseAmount = 1000;
-		const pct = Number(settings.commission_rate?.percentage) || 15;
-		const commission = Math.round(baseAmount * (pct / 100));
-		const providerEarnings = baseAmount - commission;
-		return { baseAmount, commission, providerEarnings, pct };
-	}, [settings.commission_rate]);
+	const commissionRate = Number(settings.commission_rate?.percentage) || 15;
+	const sampleAmount = 1000;
+	const sampleCommission = Math.round(sampleAmount * (commissionRate / 100));
+	const samplePayout = sampleAmount - sampleCommission;
 
 	return (
-		<div className="min-h-screen bg-slate-950 text-slate-100 bricolage-grotesque selection:bg-violet-600/40">
-			{/* Top Bar */}
-			<header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-					<div className="flex items-center gap-3">
-						<div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-white font-bold shadow-lg shadow-violet-500/20">
-							<ShieldCheck size={22} />
+		<div className="min-h-screen bg-[#090514] text-slate-100 antialiased">
+			{/* Top Navbar */}
+			<header className="sticky top-0 z-40 bg-[#0e0822] border-b border-white/[0.08]">
+				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div className="flex items-center justify-between h-16">
+						{/* Brand / Logo */}
+						<div className="flex items-center gap-4">
+							<Logo to="/" size="md" theme="dark" />
+
+							<div className="hidden sm:block h-4 w-px bg-white/10" />
+							<span className="font-mackinac hidden sm:inline-block text-xs font-semibold text-slate-400">
+								Admin Console
+							</span>
 						</div>
-						<div>
-							<div className="flex items-center gap-2">
-								<h1 className="text-xl font-bold tracking-tight text-white">TaskGenie Ops Hub</h1>
-								<span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-violet-500/20 text-violet-300 border border-violet-500/30">
-									Admin
-								</span>
-							</div>
-							<p className="text-xs text-slate-400">Platform governance, approvals & financial analytics</p>
+
+						{/* Clean Tab Navigation */}
+						<nav className="font-bricolage flex items-center gap-1 sm:gap-2">
+							<button
+								onClick={() => setActiveTab("overview")}
+								className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
+									activeTab === "overview"
+										? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+										: "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+								}`}
+							>
+								Overview
+							</button>
+							<button
+								onClick={() => setActiveTab("providers")}
+								className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+									activeTab === "providers"
+										? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+										: "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+								}`}
+							>
+								<span>Providers</span>
+								{overviewData?.overview?.pending_approvals > 0 && (
+									<span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+										{overviewData.overview.pending_approvals}
+									</span>
+								)}
+							</button>
+							<button
+								onClick={() => setActiveTab("disputes")}
+								className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+									activeTab === "disputes"
+										? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+										: "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+								}`}
+							>
+								<span>Disputes</span>
+								{overviewData?.overview?.active_disputes > 0 && (
+									<span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+										{overviewData.overview.active_disputes}
+									</span>
+								)}
+							</button>
+							<button
+								onClick={() => setActiveTab("settings")}
+								className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
+									activeTab === "settings"
+										? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+										: "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+								}`}
+							>
+								Settings
+							</button>
+						</nav>
+
+						{/* User & Log Out */}
+						<div className="flex items-center gap-3">
+							<span className="hidden md:inline text-xs text-slate-400 font-medium truncate max-w-[160px]">
+								{user?.email || "admin@taskgenie.com"}
+							</span>
+							<button
+								onClick={handleLogoutClick}
+								className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors cursor-pointer"
+								title="Log out of admin session"
+							>
+								<LogOut size={13} />
+								<span>Log Out</span>
+							</button>
 						</div>
 					</div>
-
-					{/* Tab Navigation */}
-					<nav className="flex items-center gap-1.5 p-1 bg-slate-900/90 border border-slate-800 rounded-2xl overflow-x-auto w-full sm:w-auto">
-						<button
-							onClick={() => setActiveTab("overview")}
-							className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-								activeTab === "overview"
-									? "bg-violet-600 text-white shadow-md shadow-violet-600/30"
-									: "text-slate-400 hover:text-white hover:bg-slate-800/60"
-							}`}
-						>
-							<LayoutDashboard size={14} />
-							Overview
-						</button>
-						<button
-							onClick={() => setActiveTab("providers")}
-							className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-								activeTab === "providers"
-									? "bg-violet-600 text-white shadow-md shadow-violet-600/30"
-									: "text-slate-400 hover:text-white hover:bg-slate-800/60"
-							}`}
-						>
-							<Users size={14} />
-							Approvals
-							{overviewData?.overview?.pending_approvals > 0 && (
-								<span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950">
-									{overviewData.overview.pending_approvals}
-								</span>
-							)}
-						</button>
-						<button
-							onClick={() => setActiveTab("disputes")}
-							className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-								activeTab === "disputes"
-									? "bg-violet-600 text-white shadow-md shadow-violet-600/30"
-									: "text-slate-400 hover:text-white hover:bg-slate-800/60"
-							}`}
-						>
-							<AlertTriangle size={14} />
-							Disputes
-							{overviewData?.overview?.active_disputes > 0 && (
-								<span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white">
-									{overviewData.overview.active_disputes}
-								</span>
-							)}
-						</button>
-						<button
-							onClick={() => setActiveTab("settings")}
-							className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-								activeTab === "settings"
-									? "bg-violet-600 text-white shadow-md shadow-violet-600/30"
-									: "text-slate-400 hover:text-white hover:bg-slate-800/60"
-							}`}
-						>
-							<SettingsIcon size={14} />
-							Settings
-						</button>
-					</nav>
 				</div>
 			</header>
 
-			{/* Main Content Area */}
+			{/* Main Workspace */}
 			<main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-				{/* ----------------- TAB 1: OVERVIEW & ANALYTICS ----------------- */}
+				{/* -------------------- 1. OVERVIEW -------------------- */}
 				{activeTab === "overview" && (
-					<div className="space-y-8">
-						{/* Top KPI Cards */}
-						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-							<div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-xl relative overflow-hidden group hover:border-violet-500/30 transition-colors">
-								<div className="flex items-center justify-between text-slate-400 mb-2">
-									<span className="text-xs font-medium uppercase tracking-wider">Gross Platform GMV</span>
-									<span className="p-2 rounded-xl bg-violet-500/10 text-violet-400">
-										<IndianRupee size={16} />
-									</span>
+					<div className="space-y-6">
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+							<div>
+								<h2 className="font-mackinac text-xl sm:text-2xl font-bold text-white">
+									Platform Overview
+								</h2>
+								<p className="font-bricolage text-xs sm:text-sm text-slate-400">
+									Key transaction activity, revenue, and active operations.
+								</p>
+							</div>
+							<button
+								onClick={fetchOverview}
+								className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors cursor-pointer"
+							>
+								<RefreshCw
+									size={13}
+									className={
+										loadingOverview ? "animate-spin text-violet-400" : ""
+									}
+								/>
+								<span>Refresh Data</span>
+							</button>
+						</div>
+
+						{/* 4 Stats Cards */}
+						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+							<div className="p-5 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-2">
+								<span className="font-bricolage text-sm font-semibold text-slate-400">
+									Total Booking Volume (GMV)
+								</span>
+								<div className="font-mackinac text-2xl sm:text-3xl font-bold text-white">
+									{loadingOverview
+										? "..."
+										: formatCurrency(overviewData?.overview?.total_gmv)}
 								</div>
-								<div className="text-2xl sm:text-3xl font-bold text-white">
-									{loadingOverview ? "..." : formatCurrency(overviewData?.overview?.total_gmv)}
-								</div>
-								<p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
-									<TrendingUp size={12} className="text-emerald-400" />
-									Completed booking transaction volume
+								<p className="inter text-sm text-slate-400">
+									Gross completed transactions
 								</p>
 							</div>
 
-							<div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-xl relative overflow-hidden group hover:border-emerald-500/30 transition-colors">
-								<div className="flex items-center justify-between text-slate-400 mb-2">
-									<span className="text-xs font-medium uppercase tracking-wider">
-										Platform Take ({overviewData?.overview?.commission_percentage || 15}%)
-									</span>
-									<span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-										<TrendingUp size={16} />
-									</span>
+							<div className="p-5 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-2">
+								<span className="text-sm font-semibold text-slate-400">
+									Platform Commission (
+									{overviewData?.overview?.commission_percentage || 15}%)
+								</span>
+								<div className="font-mackinac text-2xl sm:text-3xl font-bold text-emerald-400">
+									{loadingOverview
+										? "..."
+										: formatCurrency(
+												overviewData?.overview?.platform_commission,
+											)}
 								</div>
-								<div className="text-2xl sm:text-3xl font-bold text-emerald-400">
-									{loadingOverview ? "..." : formatCurrency(overviewData?.overview?.platform_commission)}
-								</div>
-								<p className="text-xs text-slate-400 mt-2">Net platform commission revenue</p>
+								<p className="text-sm text-slate-400">Retained revenue</p>
 							</div>
 
-							<div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-xl relative overflow-hidden group hover:border-blue-500/30 transition-colors">
-								<div className="flex items-center justify-between text-slate-400 mb-2">
-									<span className="text-xs font-medium uppercase tracking-wider">Total Bookings</span>
-									<span className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
-										<Calendar size={16} />
-									</span>
+							<div className="p-5 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-2">
+								<span className="font-bricolage text-sm font-semibold text-slate-400">
+									Total Bookings
+								</span>
+								<div className="font-mackinac text-2xl sm:text-3xl font-bold text-white">
+									{loadingOverview
+										? "..."
+										: overviewData?.overview?.total_bookings || 0}
 								</div>
-								<div className="text-2xl sm:text-3xl font-bold text-white">
-									{loadingOverview ? "..." : overviewData?.overview?.total_bookings || 0}
-								</div>
-								<p className="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
-									<span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-									{overviewData?.overview?.active_bookings || 0} active / scheduled
+								<p className="inter text-sm text-blue-400">
+									{overviewData?.overview?.active_bookings || 0} active right
+									now
 								</p>
 							</div>
 
-							<div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-xl relative overflow-hidden group hover:border-amber-500/30 transition-colors">
-								<div className="flex items-center justify-between text-slate-400 mb-2">
-									<span className="text-xs font-medium uppercase tracking-wider">Provider Force</span>
-									<span className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-										<Users size={16} />
-									</span>
+							<div className="p-5 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-2">
+								<span className="font-bricolage text-sm font-semibold text-slate-400">
+									Active Providers
+								</span>
+								<div className="font-mackinac text-2xl sm:text-3xl font-bold text-white">
+									{loadingOverview
+										? "..."
+										: overviewData?.overview?.approved_providers || 0}
 								</div>
-								<div className="text-2xl sm:text-3xl font-bold text-white">
-									{loadingOverview ? "..." : overviewData?.overview?.approved_providers || 0}
-								</div>
-								<p className="text-xs text-amber-300/90 mt-2 font-medium">
-									{overviewData?.overview?.pending_approvals || 0} awaiting approval
+								<p className="text-sm text-amber-400">
+									{overviewData?.overview?.pending_approvals || 0} awaiting
+									approval
 								</p>
 							</div>
 						</div>
 
-						{/* Charts Row: Peak Booking Hours & Location Demand */}
+						{/* Charts & Breakdown */}
 						<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-							{/* Peak Booking Hours Distribution */}
-							<div className="lg:col-span-8 p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-xl space-y-6">
-								<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+							{/* Hourly Activity */}
+							<div className="lg:col-span-8 p-6 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-4">
+								<div className="flex items-center justify-between">
 									<div>
-										<h2 className="text-lg font-bold text-white flex items-center gap-2">
-											<Clock size={18} className="text-violet-400" />
-											Peak Booking Hours
-										</h2>
-										<p className="text-xs text-slate-400">Distribution of customer requested service time slots</p>
+										<h3 className="font-mackinac text-lg font-bold text-white">
+											Booking Activity by Hour
+										</h3>
+										<p className="inter text-sm text-slate-400">
+											Customer requested slots{" "}
+											<span className="font-editorial">(7 AM – 10 PM)</span>
+										</p>
 									</div>
-									<button
-										onClick={fetchOverview}
-										className="p-1.5 rounded-xl text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 cursor-pointer transition-colors w-fit"
-										title="Refresh data"
-									>
-										<RefreshCw size={14} className={loadingOverview ? "animate-spin" : ""} />
-									</button>
 								</div>
 
-								{/* Peak Hours Bar Chart */}
-								<div className="h-64 flex items-end gap-2 pt-6 pb-2 px-2 overflow-x-auto">
+								<div className="h-56 flex items-end gap-2 pt-6 pb-2 px-1 overflow-x-auto">
 									{overviewData?.peak_hours?.map((slot) => {
-										const maxCount = Math.max(...(overviewData?.peak_hours?.map((p) => p.bookings) || [1]), 1);
-										const heightPct = Math.max(8, Math.round((slot.bookings / maxCount) * 100));
-										const isPeak = heightPct > 60;
+										const maxCount = Math.max(
+											...(overviewData?.peak_hours?.map((p) => p.bookings) || [
+												1,
+											]),
+											1,
+										);
+										const heightPct = Math.max(
+											8,
+											Math.round((slot.bookings / maxCount) * 100),
+										);
+										const hasBookings = slot.bookings > 0;
 
 										return (
-											<div key={slot.hour} className="flex-1 min-w-[32px] flex flex-col items-center gap-2 group relative">
-												{/* Tooltip */}
-												<div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 px-2 py-1 rounded-md bg-slate-800 text-[10px] font-bold text-white shadow-md pointer-events-none whitespace-nowrap z-20">
+											<div
+												key={slot.hour}
+												className="flex-1 min-w-[28px] flex flex-col items-center gap-2 group relative"
+											>
+												<div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 px-2 py-1 rounded bg-[#1f1338] text-[10px] font-bold text-white pointer-events-none whitespace-nowrap z-20 border border-white/10">
 													{slot.bookings} Bookings
 												</div>
-												{/* Bar */}
-												<div
-													style={{ height: `${heightPct}%` }}
-													className={`w-full rounded-t-xl transition-all duration-500 ${
-														isPeak
-															? "bg-gradient-to-t from-violet-600 to-fuchsia-500 shadow-lg shadow-violet-500/20"
-															: "bg-slate-800 hover:bg-slate-700"
-													}`}
-												/>
-												{/* Label */}
-												<span className="text-[10px] text-slate-400 truncate rotate-[-45deg] origin-top-left mt-2">
+												<div className="font-editorial w-full h-36 bg-white/[0.03] rounded-lg flex items-end p-0.5 overflow-hidden">
+													<div
+														style={{ height: `${heightPct}%` }}
+														className={`w-full rounded-md transition-all ${
+															hasBookings
+																? "bg-violet-500 shadow-sm"
+																: "bg-white/[0.08]"
+														}`}
+													/>
+												</div>
+												<span className="font-editorial text-[11px] text-slate-400 truncate">
 													{slot.label}
 												</span>
 											</div>
 										);
 									})}
 								</div>
-								<div className="flex items-center justify-between text-xs text-slate-400 pt-4 border-t border-slate-800/80">
-									<span className="flex items-center gap-1.5">
-										<span className="h-2.5 w-2.5 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-500" />
-										High demand slots (Rush hours)
-									</span>
-									<span>7:00 AM – 10:00 PM Active Window</span>
-								</div>
 							</div>
 
-							{/* Location Demand Heatmap */}
-							<div className="lg:col-span-4 p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-xl space-y-6">
+							{/* Top Locations */}
+							<div className="lg:col-span-4 p-6 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-4">
 								<div>
-									<h2 className="text-lg font-bold text-white flex items-center gap-2">
-										<MapPin size={18} className="text-fuchsia-400" />
-										Demand Heatmap
-									</h2>
-									<p className="text-xs text-slate-400">Top geographic zones by customer bookings</p>
+									<h3 className="font-mackinac text-lg font-bold text-white">
+										Top Locations
+									</h3>
+									<p className="inter text-sm text-slate-400">
+										City booking distribution
+									</p>
 								</div>
 
-								<div className="space-y-4">
+								<div className="space-y-3 font-raleway">
 									{overviewData?.top_locations?.length > 0 ? (
 										overviewData.top_locations.map((loc, idx) => {
-											const maxLocBookings = Math.max(...overviewData.top_locations.map((l) => l.bookings), 1);
-											const pct = Math.round((loc.bookings / maxLocBookings) * 100);
+											const maxB = Math.max(
+												...overviewData.top_locations.map((l) => l.bookings),
+												1,
+											);
+											const pct = Math.round((loc.bookings / maxB) * 100);
 
 											return (
-												<div key={idx} className="space-y-1.5">
-													<div className="flex items-center justify-between text-xs">
-														<span className="font-semibold text-slate-200 truncate max-w-[180px]">{loc.city}</span>
-														<span className="text-slate-400 font-medium">
-															{loc.bookings} jobs ({formatCurrency(loc.revenue)})
+												<div
+													key={idx}
+													className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1.5"
+												>
+													<div className="flex justify-between text-sm">
+														<span className="font-semibold text-slate-200 truncate">
+															{loc.city}
+														</span>
+														<span className="font-editorial text-slate-400">
+															{loc.bookings} jobs ({formatCurrency(loc.revenue)}
+															)
 														</span>
 													</div>
-													<div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+													<div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
 														<div
 															style={{ width: `${pct}%` }}
-															className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
+															className="h-full rounded-full bg-violet-500"
 														/>
 													</div>
 												</div>
 											);
 										})
 									) : (
-										<p className="text-xs text-slate-500 py-6 text-center">No location booking records yet.</p>
+										<p className="text-xs text-slate-500 py-6 text-center">
+											No location booking records yet.
+										</p>
 									)}
 								</div>
 							</div>
 						</div>
 
-						{/* Booking Status Distribution */}
-						<div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-xl space-y-4">
-							<h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-								Lifecycle Status Distribution
+						{/* Booking Status Summary */}
+						<div className="p-5 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-3">
+							<h3 className="font-bricolage text-xs font-bold text-slate-400 uppercase tracking-wider">
+								Booking Status Summary
 							</h3>
-							<div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-								<div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-									<span className="text-xs font-semibold text-emerald-400">Completed</span>
-									<div className="text-2xl font-bold text-white mt-1">
+							<div className="font-mackinac grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+								<div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+									<span className="text-slate-400 block">Completed</span>
+									<span className="text-xl font-bold text-emerald-400 mt-1 block">
 										{overviewData?.status_distribution?.completed || 0}
-									</div>
+									</span>
 								</div>
-								<div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
-									<span className="text-xs font-semibold text-blue-400">Active / Booked</span>
-									<div className="text-2xl font-bold text-white mt-1">
+								<div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+									<span className="text-slate-400 block">
+										Active / Scheduled
+									</span>
+									<span className="text-xl font-bold text-blue-400 mt-1 block">
 										{overviewData?.status_distribution?.active || 0}
-									</div>
+									</span>
 								</div>
-								<div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20">
-									<span className="text-xs font-semibold text-rose-400">Cancelled</span>
-									<div className="text-2xl font-bold text-white mt-1">
+								<div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+									<span className="text-slate-400 block">Cancelled</span>
+									<span className="text-xl font-bold text-rose-400 mt-1 block">
 										{overviewData?.status_distribution?.cancelled || 0}
-									</div>
+									</span>
 								</div>
-								<div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20">
-									<span className="text-xs font-semibold text-amber-400">Reported No-Show</span>
-									<div className="text-2xl font-bold text-white mt-1">
+								<div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+									<span className="text-slate-400 block">No-Show</span>
+									<span className="text-xl font-bold text-amber-400 mt-1 block">
 										{overviewData?.status_distribution?.no_show || 0}
-									</div>
+									</span>
 								</div>
 							</div>
 						</div>
 					</div>
 				)}
 
-				{/* ----------------- TAB 2: PROVIDER APPROVAL PIPELINE ----------------- */}
+				{/* -------------------- 2. PROVIDERS -------------------- */}
 				{activeTab === "providers" && (
 					<div className="space-y-6">
-						{/* Header Controls */}
-						<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-3xl bg-slate-900/60 border border-slate-800/80">
-							{/* Status Filter Buttons */}
-							<div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-x-auto w-full sm:w-auto">
-								{["all", "pending", "approved", "rejected", "suspended"].map((st) => (
-									<button
-										key={st}
-										onClick={() => setProviderStatusFilter(st)}
-										className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize cursor-pointer transition-colors whitespace-nowrap ${
-											providerStatusFilter === st
-												? "bg-violet-600 text-white"
-												: "text-slate-400 hover:text-white"
-										}`}
-									>
-										{st}
-									</button>
-								))}
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+							<div>
+								<h2 className="font-mackinac text-xl sm:text-2xl font-bold text-white">
+									Service Providers
+								</h2>
+								<p className="font-bricolage text-xs sm:text-sm text-slate-400">
+									Manage provider applications, verify documents, and review
+									active listings.
+								</p>
 							</div>
 
-							{/* Search Input */}
+							{/* Search Box */}
 							<div className="relative w-full sm:w-72">
-								<Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+								<Search
+									size={14}
+									className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+								/>
 								<input
 									type="text"
-									placeholder="Search pro name, city, email..."
+									placeholder="Search name, city, email..."
 									value={providerSearch}
 									onChange={(e) => setProviderSearch(e.target.value)}
-									className="w-full pl-9 pr-4 py-2 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+									className="font-bricolage w-full pl-9 pr-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
 								/>
 							</div>
 						</div>
 
-						{/* Providers List / Table */}
+						{/* Filter Pills */}
+						<div className=" font-mackinac  flex items-center gap-1.5 overflow-x-auto pb-1">
+							{["all", "pending", "approved", "rejected", "suspended"].map(
+								(st) => (
+									<button
+										key={st}
+										onClick={() => setProviderStatusFilter(st)}
+										className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize cursor-pointer transition-colors ${
+											providerStatusFilter === st
+												? "bg-violet-600 text-white"
+												: "bg-white/[0.03] text-slate-400 hover:text-white border border-white/[0.06]"
+										}`}
+									>
+										{st}
+									</button>
+								),
+							)}
+						</div>
+
+						{/* Providers List */}
 						{loadingProviders ? (
-							<div className="py-20 text-center text-slate-400 flex items-center justify-center gap-2">
-								<RefreshCw size={18} className="animate-spin text-violet-400" />
-								Loading applications...
+							<div className="font-bricolage py-20 text-center text-slate-400 text-xs flex items-center justify-center gap-2">
+								<RefreshCw size={15} className="animate-spin text-violet-400" />
+								<span>Loading providers...</span>
 							</div>
 						) : providers.length === 0 ? (
-							<div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800/80 text-center space-y-2">
-								<Users size={32} className="mx-auto text-slate-600" />
-								<h3 className="text-base font-bold text-slate-300">No Providers Found</h3>
-								<p className="text-xs text-slate-500">
-									No providers match the status filter <span className="text-violet-400">"{providerStatusFilter}"</span>.
+							<div className="font-bricolage p-12 rounded-2xl bg-[#110a22] border border-white/[0.07] text-center space-y-2">
+								<p className="text-[17px] font-semibold text-slate-300">
+									No providers found
+								</p>
+								<p className="text-sm text-slate-500">
+									No results matching your search or filter.
 								</p>
 							</div>
 						) : (
-							<div className="grid grid-cols-1 gap-4">
+							<div className="space-y-3">
 								{providers.map((p) => {
 									const statusCls =
 										p.status === "approved"
-											? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+											? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
 											: p.status === "pending"
-												? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+												? "text-amber-300 bg-amber-500/10 border-amber-500/20"
 												: p.status === "rejected"
-													? "bg-rose-500/15 text-rose-300 border-rose-500/30"
-													: "bg-slate-700/30 text-slate-400 border-slate-700";
+													? "text-rose-400 bg-rose-500/10 border-rose-500/20"
+													: "text-slate-400 bg-white/5 border-white/10";
 
 									return (
 										<div
 											key={p.user_id}
-											className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700/80 transition-all flex flex-col md:flex-row md:items-center justify-between gap-6"
+											className="p-4 sm:p-5 rounded-2xl bg-[#110a22] border border-white/[0.07] flex flex-col md:flex-row md:items-center justify-between gap-4"
 										>
-											{/* Provider Info */}
-											<div className="flex items-start gap-4">
-												<div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center text-white font-bold text-lg shrink-0 overflow-hidden">
+											<div className="flex items-start gap-3.5">
+												<div className="font-mackinac w-11 h-11 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden">
 													{p.photo ? (
-														<img src={p.photo} alt={p.name} className="h-full w-full object-cover" />
+														<img
+															src={p.photo}
+															alt={p.name}
+															className="h-full w-full object-cover"
+														/>
 													) : (
 														p.name?.charAt(0) || "P"
 													)}
 												</div>
+
 												<div className="space-y-1">
 													<div className="flex items-center gap-2.5 flex-wrap">
-														<h4 className="font-bold text-white text-base">{p.name}</h4>
-														<span className="text-xs text-slate-500 font-mono">[{p.custom_id || "N/A"}]</span>
+														<span className="font-mackinac font-bold text-white text-[17px]">
+															{p.name}
+														</span>
+														<span className="text-[11px] font-mono text-slate-400">
+															{p.custom_id || ""}
+														</span>
 														<span
-															className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${statusCls}`}
+															className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${statusCls}`}
 														>
 															{p.status}
 														</span>
 													</div>
-													<div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
-														<span className="flex items-center gap-1">
-															<Mail size={12} /> {p.email}
-														</span>
-														<span className="flex items-center gap-1">
-															<Phone size={12} /> {p.phone || "No phone"}
-														</span>
-														<span className="flex items-center gap-1">
-															<MapPin size={12} /> {p.location || "City not set"}
-														</span>
+
+													<div className="flex items-center gap-5 text-xs text-slate-400 flex-wrap">
+														<span>{p.email}</span>
+														{p.phone && <span> • {p.phone}</span>}
+														{p.location && <span> • {p.location}</span>}
 													</div>
-													{p.bio && <p className="text-xs text-slate-400 italic line-clamp-1 mt-1">{p.bio}</p>}
+
+													{p.bio && (
+														<p className="font-bricolage text-[13.5px] text-slate-400 line-clamp-1 pt-2">
+															{p.bio}
+														</p>
+													)}
 													{p.rejection_reason && (
-														<p className="text-xs text-rose-400 font-medium">Reason: {p.rejection_reason}</p>
+														<p className="text-xs text-rose-400 font-medium">
+															Reason: {p.rejection_reason}
+														</p>
 													)}
 												</div>
 											</div>
 
-											{/* Services & Actions */}
-											<div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
-												<div className="text-right sm:pr-4 sm:border-r sm:border-slate-800">
-													<span className="text-[10px] uppercase text-slate-500 font-semibold block">Base Pricing</span>
-													<span className="text-sm font-bold text-violet-300">
-														{p.base_price ? formatCurrency(p.base_price) : "Custom Rate"}
-													</span>
-												</div>
+											{/* Actions */}
+											<div className="font-bricolage flex items-center justify-between md:justify-end gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
+												<button
+													onClick={() => setInspectingProvider(p)}
+													className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/10 text-sm font-semibold transition-colors cursor-pointer"
+												>
+													Details
+												</button>
 
-												{/* Action Buttons */}
-												<div className="flex items-center gap-2">
-													{p.status !== "approved" && (
-														<button
-															disabled={actionInProgress === p.user_id}
-															onClick={() => handleUpdateProviderStatus(p.user_id, "approved")}
-															className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
-														>
-															<Check size={14} />
-															Approve
-														</button>
-													)}
-													{p.status !== "rejected" && (
-														<button
-															disabled={actionInProgress === p.user_id}
-															onClick={() => setSelectedProviderForReject(p)}
-															className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
-														>
-															<XCircle size={14} />
-															Reject
-														</button>
-													)}
-													{p.status === "approved" && (
-														<button
-															disabled={actionInProgress === p.user_id}
-															onClick={() => handleUpdateProviderStatus(p.user_id, "suspended")}
-															className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
-														>
-															<Ban size={14} />
-															Suspend
-														</button>
-													)}
-												</div>
+												{p.status !== "approved" && (
+													<button
+														disabled={actionInProgress === p.user_id}
+														onClick={() =>
+															handleUpdateProviderStatus(p.user_id, "approved")
+														}
+														className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold cursor-pointer transition-colors disabled:opacity-50"
+													>
+														Approve
+													</button>
+												)}
+
+												{p.status !== "rejected" && (
+													<button
+														disabled={actionInProgress === p.user_id}
+														onClick={() => setSelectedProviderForReject(p)}
+														className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-sm font-semibold cursor-pointer transition-colors disabled:opacity-50"
+													>
+														Reject
+													</button>
+												)}
+
+												{p.status === "approved" && (
+													<button
+														disabled={actionInProgress === p.user_id}
+														onClick={() =>
+															handleUpdateProviderStatus(p.user_id, "suspended")
+														}
+														className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-slate-200 border border-white/10 text-sm font-semibold cursor-pointer transition-colors disabled:opacity-50"
+													>
+														Suspend
+													</button>
+												)}
 											</div>
 										</div>
 									);
@@ -669,25 +776,28 @@ export default function AdminDashboard() {
 					</div>
 				)}
 
-				{/* ----------------- TAB 3: DISPUTE & REFUND MANAGEMENT ----------------- */}
+				{/* -------------------- 3. DISPUTES -------------------- */}
 				{activeTab === "disputes" && (
 					<div className="space-y-6">
-						<div className="flex items-center justify-between p-4 rounded-3xl bg-slate-900/60 border border-slate-800/80">
-							<div className="flex items-center gap-2">
-								<AlertTriangle size={18} className="text-amber-400" />
-								<h2 className="text-sm font-bold text-white uppercase tracking-wider">Dispute Resolution Desk</h2>
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+							<div>
+								<h2 className="font-mackinac text-xl sm:text-2xl font-bold text-white">
+									Disputes & Refunds
+								</h2>
+								<p className="font-bricolage text-xs sm:text-sm text-slate-400">
+									Review customer complaints and process refund resolutions.
+								</p>
 							</div>
 
-							{/* Status Filter */}
-							<div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-2xl border border-slate-800">
+							<div className="font-mackinac flex items-center gap-1.5">
 								{["all", "opened", "resolved", "rejected"].map((st) => (
 									<button
 										key={st}
 										onClick={() => setDisputeStatusFilter(st)}
-										className={`px-3 py-1 rounded-xl text-xs font-semibold capitalize cursor-pointer transition-colors ${
+										className={`px-3 py-1.5 rounded-lg text-sm font-semibold capitalize cursor-pointer transition-colors ${
 											disputeStatusFilter === st
 												? "bg-violet-600 text-white"
-												: "text-slate-400 hover:text-white"
+												: "bg-white/[0.03] text-slate-400 hover:text-white border border-white/[0.06]"
 										}`}
 									>
 										{st}
@@ -697,79 +807,110 @@ export default function AdminDashboard() {
 						</div>
 
 						{loadingDisputes ? (
-							<div className="py-20 text-center text-slate-400 flex items-center justify-center gap-2">
-								<RefreshCw size={18} className="animate-spin text-violet-400" />
-								Loading disputes...
+							<div className="font-bricolage py-20 text-center text-slate-400 text-xs flex items-center justify-center gap-2">
+								<RefreshCw size={15} className="animate-spin text-violet-400" />
+								<span>Loading disputes...</span>
 							</div>
 						) : disputes.length === 0 ? (
-							<div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800/80 text-center space-y-2">
-								<CheckCircle2 size={32} className="mx-auto text-emerald-500" />
-								<h3 className="text-base font-bold text-slate-300">Clean Slate! No Open Disputes</h3>
-								<p className="text-xs text-slate-500">All customer claims and cancellation disputes have been addressed.</p>
+							<div className="font-bricolage p-12 rounded-2xl bg-[#110a22] border border-white/[0.07] text-center space-y-2">
+								<CheckCircle2 size={32} className="mx-auto text-emerald-400" />
+								<p className="text-[17px] font-semibold text-white">
+									No active disputes
+								</p>
+								<p className="text-sm text-slate-400">
+									All customer claims have been addressed.
+								</p>
 							</div>
 						) : (
-							<div className="grid grid-cols-1 gap-4">
+							<div className="space-y-4">
 								{disputes.map((d) => (
 									<div
 										key={d.dispute_id}
-										className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 space-y-4"
+										className="p-5 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-3"
 									>
-										<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+										<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-3">
 											<div>
 												<div className="flex items-center gap-2">
-													<span className="text-xs font-mono text-slate-400">Claim ID: {d.dispute_id.substring(0, 8)}</span>
+													<span className="text-xs font-mono text-slate-400">
+														Case #{d.dispute_id.slice(0, 8)}
+													</span>
 													<span
-														className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+														className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
 															d.status === "resolved"
-																? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+																? "text-emerald-400 bg-emerald-500/10"
 																: d.status === "opened"
-																	? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-																	: "bg-slate-800 text-slate-300"
+																	? "text-rose-400 bg-rose-500/10"
+																	: "text-slate-400 bg-white/5"
 														}`}
 													>
 														{d.status}
 													</span>
 												</div>
-												<h4 className="text-base font-bold text-white mt-1">{d.reason}</h4>
+												<h4 className="text-base font-bold text-white mt-1">
+													{d.reason}
+												</h4>
 											</div>
 											<div className="text-right">
-												<span className="text-[10px] text-slate-500 uppercase block">Booking Price</span>
-												<span className="text-sm font-bold text-violet-300">
+												<span className="text-[10px] text-slate-400 uppercase block">
+													Booking Amount
+												</span>
+												<span className="text-sm font-bold text-white">
 													{formatCurrency(d.booking_price)}
 												</span>
 											</div>
 										</div>
 
-										{/* Details */}
-										<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-400">
+										<div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-400">
 											<div>
-												<span className="text-[10px] text-slate-500 uppercase font-semibold block">Customer</span>
-												<p className="font-medium text-slate-200">{d.customer_name}</p>
+												<span className="text-[10px] text-slate-500 uppercase font-bold block">
+													Customer
+												</span>
+												<p className="text-slate-200 font-medium">
+													{d.customer_name}
+												</p>
 												<p>{d.customer_email}</p>
 											</div>
 											<div>
-												<span className="text-[10px] text-slate-500 uppercase font-semibold block">Provider</span>
-												<p className="font-medium text-slate-200">{d.provider_name}</p>
+												<span className="text-[10px] text-slate-500 uppercase font-bold block">
+													Provider
+												</span>
+												<p className="text-slate-200 font-medium">
+													{d.provider_name}
+												</p>
 												<p>{d.provider_email}</p>
 											</div>
 											<div>
-												<span className="text-[10px] text-slate-500 uppercase font-semibold block">Service & Date</span>
-												<p className="font-medium text-slate-200">{d.service_name || "General Service"}</p>
-												<p>{d.booking_date} at {d.start_time}</p>
+												<span className="text-[10px] text-slate-500 uppercase font-bold block">
+													Service & Date
+												</span>
+												<p className="text-slate-200 font-medium">
+													{d.service_name || "General Service"}
+												</p>
+												<p>
+													{d.booking_date} at {d.start_time}
+												</p>
 											</div>
 										</div>
 
 										{d.details && (
-											<div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 text-xs text-slate-300">
-												<span className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Customer Claim Details:</span>
+											<div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] text-xs text-slate-300">
+												<span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
+													Customer Claim:
+												</span>
 												{d.details}
 											</div>
 										)}
 
 										{d.status === "resolved" && (
-											<div className="p-3 rounded-2xl bg-emerald-950/30 border border-emerald-800/40 text-xs text-emerald-300">
-												<span className="font-bold">Resolution:</span> {d.resolution_notes || "Dispute resolved."}
-												{d.refund_amount > 0 && <span className="ml-2 font-bold">Refund Granted: {formatCurrency(d.refund_amount)}</span>}
+											<div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-center justify-between">
+												<span>
+													Resolution: {d.resolution_notes || "Resolved."}
+												</span>
+												{d.refund_amount > 0 && (
+													<span className="font-bold">
+														Refund: {formatCurrency(d.refund_amount)}
+													</span>
+												)}
 											</div>
 										)}
 
@@ -781,10 +922,11 @@ export default function AdminDashboard() {
 														setResolveForm({
 															status: "resolved",
 															refund_amount: d.booking_price || 0,
-															resolution_notes: "Refund granted following investigation.",
+															resolution_notes:
+																"Refund approved per customer satisfaction guarantee.",
 														});
 													}}
-													className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold cursor-pointer transition-colors"
+													className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold cursor-pointer transition-colors"
 												>
 													Take Action / Resolve
 												</button>
@@ -797,56 +939,57 @@ export default function AdminDashboard() {
 					</div>
 				)}
 
-				{/* ----------------- TAB 4: PLATFORM & COMMISSION SETTINGS ----------------- */}
+				{/* -------------------- 4. SETTINGS -------------------- */}
 				{activeTab === "settings" && (
 					<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-						{/* Settings Form */}
-						<div className="lg:col-span-7 p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-xl space-y-6">
+						<div className="lg:col-span-7 p-6 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-6">
 							<div>
-								<h2 className="text-lg font-bold text-white flex items-center gap-2">
-									<Sliders size={18} className="text-violet-400" />
-									Fee & Commission Controls
+								<h2 className="font-mackinac text-xl font-bold text-white">
+									Platform Settings
 								</h2>
-								<p className="text-xs text-slate-400">Configure marketplace commission rates and cancellation fee policies</p>
+								<p className="font-bricolage text-sm text-slate-400 mt-1">
+									Set marketplace commission rates and cancellation fee
+									policies.
+								</p>
 							</div>
 
-							<form onSubmit={handleSaveSettings} className="space-y-6">
-								{/* Commission Rate */}
-								<div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
-									<label className="text-xs font-bold text-slate-200 block uppercase tracking-wider">
-										Platform Take Rate (% Commission)
-									</label>
-									<div className="flex items-center gap-4">
-										<input
-											type="range"
-											min="0"
-											max="50"
-											step="1"
-											value={settings.commission_rate?.percentage || 15}
-											onChange={(e) =>
-												setSettings((prev) => ({
-													...prev,
-													commission_rate: {
-														...prev.commission_rate,
-														percentage: e.target.value,
-													},
-												}))
-											}
-											className="w-full accent-violet-500 cursor-pointer"
-										/>
-										<span className="text-base font-bold text-violet-400 w-16 text-right">
+							<form onSubmit={handleSaveSettings} className="space-y-5 text-xs">
+								{/* Commission */}
+								<div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-2.5">
+									<div className="flex justify-between items-center">
+										<label className="font-bricolage text-[15.5px] font-bold text-white">
+											Platform Commission (% Take Rate)
+										</label>
+										<span className="text-sm font-bold text-violet-400">
 											{settings.commission_rate?.percentage || 15}%
 										</span>
 									</div>
-									<p className="text-[11px] text-slate-400">
-										Applied to all completed booking transactions prior to provider payout transfer.
+									<input
+										type="range"
+										min="0"
+										max="40"
+										step="1"
+										value={settings.commission_rate?.percentage || 15}
+										onChange={(e) =>
+											setSettings((prev) => ({
+												...prev,
+												commission_rate: {
+													...prev.commission_rate,
+													percentage: Number(e.target.value),
+												},
+											}))
+										}
+										className="w-full accent-violet-500 cursor-pointer"
+									/>
+									<p className="font-bricolage text-[13.5px] text-slate-400">
+										Deducted from completed jobs before provider payout.
 									</p>
 								</div>
 
-								{/* Minimum Platform Fee */}
+								{/* Fees */}
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-									<div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
-										<label className="text-xs font-bold text-slate-200 block uppercase tracking-wider">
+									<div className="space-y-1.5">
+										<label className="font-bricolage text-[14px] font-semibold text-slate-300 block">
 											Minimum Platform Fee (₹)
 										</label>
 										<input
@@ -858,16 +1001,16 @@ export default function AdminDashboard() {
 													...prev,
 													commission_rate: {
 														...prev.commission_rate,
-														min_fee: e.target.value,
+														min_fee: Number(e.target.value),
 													},
 												}))
 											}
-											className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white font-bold"
+											className="inter w-full p-2.5 rounded-lg bg-black/40 border border-white/10 text-white font-bold"
 										/>
 									</div>
 
-									<div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
-										<label className="text-xs font-bold text-slate-200 block uppercase tracking-wider">
+									<div className="space-y-1.5">
+										<label className="font-bricolage text-[14px] font-semibold text-slate-300 block">
 											Customer Cancellation Fee (₹)
 										</label>
 										<input
@@ -879,11 +1022,11 @@ export default function AdminDashboard() {
 													...prev,
 													cancellation_fee: {
 														...prev.cancellation_fee,
-														customer_fee: e.target.value,
+														customer_fee: Number(e.target.value),
 													},
 												}))
 											}
-											className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white font-bold"
+											className="inter w-full p-2.5 rounded-lg bg-black/40 border border-white/10 text-white font-bold"
 										/>
 									</div>
 								</div>
@@ -892,73 +1035,225 @@ export default function AdminDashboard() {
 									<button
 										type="submit"
 										disabled={savingSettings}
-										className="px-6 py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold text-sm shadow-xl shadow-violet-600/30 cursor-pointer transition-all disabled:opacity-50"
+										className="font-bricolage text-sm px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold cursor-pointer transition-colors disabled:opacity-50"
 									>
-										{savingSettings ? "Saving Settings..." : "Save Platform Settings"}
+										{savingSettings ? "Saving..." : "Save Settings"}
 									</button>
 								</div>
 							</form>
 						</div>
 
-						{/* Live Calculation Preview */}
-						<div className="lg:col-span-5 p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-xl space-y-6">
+						{/* Simple Example Preview */}
+						<div className="lg:col-span-5 p-6 rounded-2xl bg-[#110a22] border border-white/[0.07] space-y-4 text-xs">
 							<div>
-								<h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-									Live Payout Preview Simulator
+								<h3 className="font-mackinac text-lg font-bold text-white">
+									Live Calculation Example
 								</h3>
-								<p className="text-xs text-slate-400">Hypothetical revenue distribution on a ₹1,000 job</p>
+								<p className="font-bricolage text-slate-400 text-sm">
+									Example split on a standard ₹1,000 job
+								</p>
 							</div>
 
-							<div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
-								<div className="flex justify-between text-sm">
-									<span className="text-slate-400">Service Base Total</span>
-									<span className="font-bold text-white">{formatCurrency(commissionPreview.baseAmount)}</span>
+							<div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-2.5">
+								<div className="flex justify-between">
+									<span className="font-bricolage text-slate-400">
+										Job Total
+									</span>
+									<span className="inter font-bold text-white">
+										{formatCurrency(sampleAmount)}
+									</span>
 								</div>
-								<div className="flex justify-between text-sm text-emerald-400 font-semibold border-t border-slate-800/80 pt-3">
-									<span>TaskGenie Platform Cut ({commissionPreview.pct}%)</span>
-									<span>+ {formatCurrency(commissionPreview.commission)}</span>
+								<div className="font-bricolage flex justify-between text-violet-400 border-t border-white/5 pt-2">
+									<span>TaskGenie Fee ({commissionRate}%)</span>
+									<span className="inter">
+										{formatCurrency(sampleCommission)}
+									</span>
 								</div>
-								<div className="flex justify-between text-sm text-violet-300 font-semibold border-t border-slate-800/80 pt-3">
-									<span>Provider Net Payout</span>
-									<span>{formatCurrency(commissionPreview.providerEarnings)}</span>
+								<div className="font-bricolage flex justify-between text-emerald-400 font-bold border-t border-white/5 pt-2">
+									<span>Provider Payout</span>
+									<span className="inter">{formatCurrency(samplePayout)}</span>
 								</div>
 							</div>
 
-							<div className="p-4 rounded-2xl bg-violet-950/20 border border-violet-800/30 text-xs text-violet-300 flex items-start gap-2">
-								<ShieldCheck size={16} className="shrink-0 mt-0.5" />
-								<span>
-									All platform updates apply in real time to dynamic revenue reporting and upcoming payout schedules.
-								</span>
-							</div>
+							<p className="font-bricolage text-slate-400 leading-relaxed text-[11px]">
+								Rate changes take effect immediately on newly completed
+								transactions and payout calculations.
+							</p>
 						</div>
 					</div>
 				)}
 			</main>
 
-			{/* Rejection Reason Modal */}
+			{/* ================= MODALS ================= */}
+
+			{/* 1. Inspect Provider Modal */}
+			<AnimatePresence>
+				{inspectingProvider && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75">
+						<motion.div
+							initial={{ opacity: 0, scale: 0.96 }}
+							animate={{ opacity: 1, scale: 1 }}
+							exit={{ opacity: 0, scale: 0.96 }}
+							className="w-full max-w-lg p-6 rounded-2xl bg-[#130b28] border border-white/10 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto text-xs"
+						>
+							<div className="flex items-start justify-between border-b border-white/10 pb-3">
+								<div className="flex items-center gap-3">
+									<div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-white font-bold text-base shrink-0 overflow-hidden">
+										{inspectingProvider.photo ? (
+											<img
+												src={inspectingProvider.photo}
+												alt={inspectingProvider.name}
+												className="h-full w-full object-cover"
+											/>
+										) : (
+											inspectingProvider.name?.charAt(0) || "P"
+										)}
+									</div>
+									<div>
+										<h3 className="text-base font-bold text-white">
+											{inspectingProvider.name}
+										</h3>
+										<p className="text-[11px] font-mono text-slate-400">
+											{inspectingProvider.custom_id || ""}
+										</p>
+									</div>
+								</div>
+								<button
+									onClick={() => setInspectingProvider(null)}
+									className="p-1 rounded-lg text-slate-400 hover:text-white"
+								>
+									<X size={16} />
+								</button>
+							</div>
+
+							<div className="grid grid-cols-2 gap-3 text-slate-300">
+								<div>
+									<span className="text-[10px] uppercase text-slate-500 font-bold block">
+										Status
+									</span>
+									<span className="font-semibold text-white capitalize">
+										{inspectingProvider.status}
+									</span>
+								</div>
+								<div>
+									<span className="text-[10px] uppercase text-slate-500 font-bold block">
+										Base Rate
+									</span>
+									<span className="font-semibold text-emerald-400">
+										{inspectingProvider.base_price
+											? formatCurrency(inspectingProvider.base_price)
+											: "Standard"}
+									</span>
+								</div>
+								<div>
+									<span className="text-[10px] uppercase text-slate-500 font-bold block">
+										Phone
+									</span>
+									<span>{inspectingProvider.phone || "Not set"}</span>
+								</div>
+								<div>
+									<span className="text-[10px] uppercase text-slate-500 font-bold block">
+										Location
+									</span>
+									<span>{inspectingProvider.location || "Not set"}</span>
+								</div>
+							</div>
+
+							{inspectingProvider.bio && (
+								<div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+									<span className="text-[10px] text-slate-500 uppercase font-bold block mb-1">
+										Bio
+									</span>
+									<p className="text-slate-300 leading-relaxed">
+										{inspectingProvider.bio}
+									</p>
+								</div>
+							)}
+
+							{inspectingProvider.services?.length > 0 && (
+								<div className="space-y-2">
+									<span className="text-[10px] text-slate-500 uppercase font-bold block">
+										Services Offered
+									</span>
+									<div className="flex flex-wrap gap-2">
+										{inspectingProvider.services.map((s, idx) => (
+											<div
+												key={idx}
+												className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs flex items-center gap-1.5"
+											>
+												<span className="font-medium text-white">{s.name}</span>
+												<span className="text-emerald-400 font-bold">
+													{formatCurrency(s.price)}
+												</span>
+												<span className="text-slate-500 text-[10px]">
+													/{s.price_unit || "unit"}
+												</span>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+
+							<div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+								{inspectingProvider.status !== "approved" && (
+									<button
+										onClick={() =>
+											handleUpdateProviderStatus(
+												inspectingProvider.user_id,
+												"approved",
+											)
+										}
+										className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer transition-colors"
+									>
+										Approve Provider
+									</button>
+								)}
+								{inspectingProvider.status !== "rejected" && (
+									<button
+										onClick={() =>
+											setSelectedProviderForReject(inspectingProvider)
+										}
+										className="px-4 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 font-semibold cursor-pointer transition-colors"
+									>
+										Reject Provider
+									</button>
+								)}
+							</div>
+						</motion.div>
+					</div>
+				)}
+			</AnimatePresence>
+
+			{/* 2. Rejection Reason Modal */}
 			<AnimatePresence>
 				{selectedProviderForReject && (
-					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75">
 						<motion.div
-							initial={{ opacity: 0, scale: 0.95 }}
+							initial={{ opacity: 0, scale: 0.96 }}
 							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, scale: 0.95 }}
-							className="w-full max-w-md p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl space-y-4"
+							exit={{ opacity: 0, scale: 0.96 }}
+							className="w-full max-w-md p-6 rounded-2xl bg-[#130b28] border border-white/10 shadow-2xl space-y-4 text-xs"
 						>
 							<div className="flex items-center gap-2 text-rose-400">
-								<XCircle size={20} />
-								<h3 className="font-bold text-base text-white">Reject Provider Application</h3>
+								<XCircle size={18} />
+								<h3 className="font-bold text-base text-white">
+									Reject Provider Application
+								</h3>
 							</div>
-							<p className="text-xs text-slate-400">
-								State the reason for rejecting <span className="text-white font-semibold">{selectedProviderForReject.name}</span>. This feedback will be sent via system notification.
+							<p className="text-slate-300">
+								Please provide a reason for rejecting{" "}
+								<span className="font-bold text-white">
+									{selectedProviderForReject.name}
+								</span>
+								.
 							</p>
 
 							<textarea
 								rows="3"
-								placeholder="e.g. Incomplete credentials, invalid phone, or unverified trade certificate."
+								placeholder="e.g. Incomplete credentials, invalid contact info..."
 								value={rejectionReason}
 								onChange={(e) => setRejectionReason(e.target.value)}
-								className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+								className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
 							/>
 
 							<div className="flex justify-end gap-2 pt-2">
@@ -968,13 +1263,15 @@ export default function AdminDashboard() {
 										setSelectedProviderForReject(null);
 										setRejectionReason("");
 									}}
-									className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+									className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white"
 								>
 									Cancel
 								</button>
 								<button
 									type="button"
-									disabled={actionInProgress === selectedProviderForReject.user_id}
+									disabled={
+										actionInProgress === selectedProviderForReject.user_id
+									}
 									onClick={() =>
 										handleUpdateProviderStatus(
 											selectedProviderForReject.user_id,
@@ -982,7 +1279,7 @@ export default function AdminDashboard() {
 											rejectionReason,
 										)
 									}
-									className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+									className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold cursor-pointer disabled:opacity-50"
 								>
 									Confirm Rejection
 								</button>
@@ -992,46 +1289,74 @@ export default function AdminDashboard() {
 				)}
 			</AnimatePresence>
 
-			{/* Dispute Resolution Modal */}
+			{/* 3. Dispute Resolve Modal */}
 			<AnimatePresence>
 				{selectedDisputeForResolve && (
-					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75">
 						<motion.div
-							initial={{ opacity: 0, scale: 0.95 }}
+							initial={{ opacity: 0, scale: 0.96 }}
 							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, scale: 0.95 }}
-							className="w-full max-w-lg p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl space-y-4"
+							exit={{ opacity: 0, scale: 0.96 }}
+							className="w-full max-w-lg p-6 rounded-2xl bg-[#130b28] border border-white/10 shadow-2xl space-y-4 text-xs"
 						>
-							<div className="flex items-center gap-2 text-violet-400">
-								<ShieldCheck size={20} />
-								<h3 className="font-bold text-base text-white">Resolve Dispute Claim</h3>
+							<div className="flex items-center justify-between border-b border-white/10 pb-3">
+								<h3 className="font-bold text-base text-white">
+									Resolve Dispute
+								</h3>
+								<button
+									onClick={() => setSelectedDisputeForResolve(null)}
+									className="p-1 rounded-lg text-slate-400 hover:text-white"
+								>
+									<X size={16} />
+								</button>
 							</div>
 
 							<form onSubmit={handleResolveDispute} className="space-y-4">
-								<div className="space-y-1 text-xs">
-									<span className="text-slate-400">Customer: {selectedDisputeForResolve.customer_name}</span>
-									<span className="block text-slate-400">Provider: {selectedDisputeForResolve.provider_name}</span>
-									<span className="block text-slate-200 font-semibold">
-										Claim: {selectedDisputeForResolve.reason}
-									</span>
+								<div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1">
+									<p>
+										<span className="text-slate-500">Customer:</span>{" "}
+										<span className="font-medium text-white">
+											{selectedDisputeForResolve.customer_name}
+										</span>
+									</p>
+									<p>
+										<span className="text-slate-500">Provider:</span>{" "}
+										<span className="font-medium text-white">
+											{selectedDisputeForResolve.provider_name}
+										</span>
+									</p>
+									<p>
+										<span className="text-slate-500">Amount:</span>{" "}
+										<span className="font-bold text-white">
+											{formatCurrency(selectedDisputeForResolve.booking_price)}
+										</span>
+									</p>
 								</div>
 
-								<div className="space-y-2">
-									<label className="text-xs font-bold text-slate-300 block uppercase">Resolution Action</label>
+								<div className="space-y-1.5">
+									<label className="font-semibold text-slate-300 block">
+										Resolution Action
+									</label>
 									<select
 										value={resolveForm.status}
-										onChange={(e) => setResolveForm({ ...resolveForm, status: e.target.value })}
-										className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
+										onChange={(e) =>
+											setResolveForm({ ...resolveForm, status: e.target.value })
+										}
+										className="w-full p-2.5 rounded-lg bg-black/40 border border-white/10 text-white"
 									>
-										<option value="resolved">Resolve & Grant Refund</option>
-										<option value="rejected">Dismiss Claim (No Refund)</option>
+										<option value="resolved" className="bg-[#130b28]">
+											Approve & Issue Refund
+										</option>
+										<option value="rejected" className="bg-[#130b28]">
+											Dismiss Dispute (No Refund)
+										</option>
 									</select>
 								</div>
 
 								{resolveForm.status === "resolved" && (
-									<div className="space-y-2">
-										<label className="text-xs font-bold text-slate-300 block uppercase">
-											Refund Amount (₹) - Max {formatCurrency(selectedDisputeForResolve.booking_price)}
+									<div className="space-y-1.5">
+										<label className="font-semibold text-slate-300 block">
+											Refund Amount (₹)
 										</label>
 										<input
 											type="number"
@@ -1039,39 +1364,49 @@ export default function AdminDashboard() {
 											max={selectedDisputeForResolve.booking_price || 99999}
 											value={resolveForm.refund_amount}
 											onChange={(e) =>
-												setResolveForm({ ...resolveForm, refund_amount: e.target.value })
+												setResolveForm({
+													...resolveForm,
+													refund_amount: e.target.value,
+												})
 											}
-											className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-bold"
+											className="w-full p-2.5 rounded-lg bg-black/40 border border-white/10 text-white font-bold"
 										/>
 									</div>
 								)}
 
-								<div className="space-y-2">
-									<label className="text-xs font-bold text-slate-300 block uppercase">Resolution Notes</label>
+								<div className="space-y-1.5">
+									<label className="font-semibold text-slate-300 block">
+										Resolution Notes
+									</label>
 									<textarea
 										rows="3"
 										required
-										placeholder="Provide reasoning for records..."
+										placeholder="State reason for resolution..."
 										value={resolveForm.resolution_notes}
 										onChange={(e) =>
-											setResolveForm({ ...resolveForm, resolution_notes: e.target.value })
+											setResolveForm({
+												...resolveForm,
+												resolution_notes: e.target.value,
+											})
 										}
-										className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+										className="w-full p-3 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none"
 									/>
 								</div>
 
-								<div className="flex justify-end gap-2 pt-2">
+								<div className="flex justify-end gap-2 pt-2 border-t border-white/10">
 									<button
 										type="button"
 										onClick={() => setSelectedDisputeForResolve(null)}
-										className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+										className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white"
 									>
 										Cancel
 									</button>
 									<button
 										type="submit"
-										disabled={actionInProgress === selectedDisputeForResolve.dispute_id}
-										className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+										disabled={
+											actionInProgress === selectedDisputeForResolve.dispute_id
+										}
+										className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold cursor-pointer disabled:opacity-50"
 									>
 										Finalize Resolution
 									</button>
@@ -1081,6 +1416,19 @@ export default function AdminDashboard() {
 					</div>
 				)}
 			</AnimatePresence>
+
+			{/* Logout Confirmation Modal */}
+			<ConfirmDialog
+				isOpen={showLogoutConfirm}
+				onClose={() => setShowLogoutConfirm(false)}
+				onConfirm={executeLogout}
+				title="Log out?"
+				description="You'll need to sign in again to access the admin console."
+				confirmText="Log out"
+				cancelText="Cancel"
+				variant="danger"
+				icon={LogOut}
+			/>
 		</div>
 	);
 }

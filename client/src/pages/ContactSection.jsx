@@ -263,7 +263,7 @@ export default function ContactSection() {
 										type="text"
 										placeholder="Your Name"
 										onChange={handleChange}
-										className="w-full pl-10 py-4 rounded-xl bg-white/70 border border-gray-200 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 outline-none transition-all"
+										className="w-full pl-10 py-4 rounded-xl text-gray-600 bg-white/70 border border-gray-200 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 outline-none transition-all"
 									/>
 								</div>
 
@@ -275,7 +275,7 @@ export default function ContactSection() {
 										type="email"
 										placeholder="Your Email"
 										onChange={handleChange}
-										className="w-full pl-10 py-4 rounded-xl bg-white/70 border border-gray-200 focus:border-violet-400 focus:ring-4 focus:ring-violet-100 outline-none transition-all"
+										className="w-full pl-10 py-4 rounded-xl text-gray-600 bg-white/70 border border-gray-200 focus:border-violet-400 focus:ring-4 focus:ring-violet-100 outline-none transition-all"
 									/>
 								</div>
 
@@ -286,7 +286,7 @@ export default function ContactSection() {
 										name="message"
 										placeholder="How can we help?"
 										onChange={handleChange}
-										className="w-full pl-10 py-4 h-40 rounded-xl bg-white/70 border border-gray-200 focus:border-violet-400 focus:ring-4 focus:ring-violet-100 outline-none resize-none transition-all"
+										className="w-full pl-10 py-4 h-40 rounded-xl text-gray-600 bg-white/70 border border-gray-200 focus:border-violet-400 focus:ring-4 focus:ring-violet-100 outline-none resize-none transition-all"
 									/>
 								</div>
 

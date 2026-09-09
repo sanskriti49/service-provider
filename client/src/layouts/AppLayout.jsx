@@ -54,12 +54,14 @@ export default function AppLayout() {
 		);
 	}, [pathname]);
 
+	const isServiceDetails = pathname.startsWith("/services/") && pathname !== "/services";
+
 	return (
 		<div
 			className="relative min-h-screen flex flex-col bg-cover bg-center bg-no-repeat bg-fixed w-full"
 			style={{ backgroundImage: "url('/images/background.webp')" }}
 		>
-			<Navbar />
+			{!isServiceDetails && <Navbar />}
 			<main
 				ref={mainRef}
 				className="flex-grow flex flex-col w-full max-w-[100vw]"
@@ -68,7 +70,7 @@ export default function AppLayout() {
 					<Outlet />
 				</Suspense>
 			</main>
-			<Footer />
+			{!isServiceDetails && <Footer />}
 		</div>
 	);
 }

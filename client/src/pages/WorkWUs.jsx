@@ -57,8 +57,6 @@ const BENEFITS = [
 const WorkWUs = () => {
 	return (
 		<section className="bricolage-grotesque max-w-6xl mx-auto px-4 py-10 relative overflow-hidden text-slate-800">
-			<div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-r from-violet-200/40 via-purple-200/30 to-pink-200/40 blur-[130px] pointer-events-none rounded-full" />
-
 			<div className="flex flex-col lg:flex-row items-center justify-between gap-10 py-6 text-center lg:text-left">
 				<div className="flex-1 space-y-4">
 					<div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-violet-100/80 border border-violet-200 text-violet-700 text-xs font-bold uppercase tracking-wider">

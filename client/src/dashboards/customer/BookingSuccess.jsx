@@ -8,7 +8,7 @@ import {
 	Navigation,
 	X,
 	Loader2,
-	AlertCircle,
+	CircleAlert,
 	Mail,
 } from "lucide-react";
 import confetti from "canvas-confetti";
@@ -18,14 +18,18 @@ export default function BookingSuccess() {
 	const navigate = useNavigate();
 	const { state } = useLocation();
 
-	const isValid = Boolean(state?.success && state?.booking && state?.booking?.booking_id);
+	const isValid = Boolean(
+		state?.success && state?.booking && state?.booking?.booking_id,
+	);
 	const booking = state?.booking || {};
 
 	const [address, setAddress] = useState(
 		state?.address || booking.address || "",
 	);
 	const [isEditing, setIsEditing] = useState(false);
-	const [tempAddress, setTempAddress] = useState(state?.address || booking.address || "");
+	const [tempAddress, setTempAddress] = useState(
+		state?.address || booking.address || "",
+	);
 	const [timeLeft, setTimeLeft] = useState(0);
 	const [isSaving, setIsSaving] = useState(false);
 	const [errorMsg, setErrorMsg] = useState(null);
@@ -94,7 +98,9 @@ export default function BookingSuccess() {
 			setIsEditing(false);
 		} catch (err) {
 			console.error(err);
-			setErrorMsg(err.response?.data?.message || "Failed to update address. Try again.");
+			setErrorMsg(
+				err.response?.data?.message || "Failed to update address. Try again.",
+			);
 		} finally {
 			setIsSaving(false);
 		}
@@ -217,7 +223,7 @@ export default function BookingSuccess() {
 										/>
 										{errorMsg && (
 											<div className="flex items-center gap-1 text-red-400 text-xs mb-2">
-												<AlertCircle size={12} /> {errorMsg}
+												<CircleAlert size={12} /> {errorMsg}
 											</div>
 										)}
 										<div className="flex gap-2 justify-end">

@@ -242,7 +242,7 @@ async function getProviders(req, res, next) {
 				u.created_at,
 				COALESCE(p.status, 'approved') AS status,
 				p.rating,
-				p.price AS base_price,
+				(SELECT MIN(ps.price) FROM provider_services ps WHERE ps.provider_id = u.id) AS base_price,
 				p.rejection_reason,
 				p.approved_at,
 				(

@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -7,19 +6,20 @@ import {
 	Clock,
 	Search,
 	ListFilter,
-	AlertCircle,
+	CircleAlert,
 	CheckCircle2,
 	X,
 	ChevronRight,
 	MapPin,
 	CreditCard,
-	Shield,
 	ShieldCheck,
-	AlertTriangle,
 	Users,
 	History as HistoryIcon,
 	Loader2,
-	Copy,
+	ArrowUpRight,
+	CalendarCheck,
+	SlidersHorizontal,
+	Check,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 import ConfirmModal from "../../ui/ConfirmModal";
@@ -56,31 +56,68 @@ function resolveDisplayStatus(status, date, startTime) {
 }
 
 const STATUS_STYLES = {
-	completed: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
-	cancelled: "bg-red-500/15 text-red-300 border-red-500/25",
-	no_show: "bg-red-500/20 text-red-300 border-red-500/30",
-	in_progress: "bg-blue-500/15 text-blue-300 border-blue-500/25",
-	"awaiting completion": "bg-amber-500/15 text-amber-300 border-amber-500/25",
-	awaiting_completion: "bg-amber-500/15 text-amber-300 border-amber-500/25",
-	booked: "bg-violet-500/15 text-violet-300 border-violet-500/25",
-	confirmed: "bg-violet-500/15 text-violet-300 border-violet-500/25",
-	expired: "bg-red-500/15 text-orange-300 border-orange-500/25",
-	pending: "bg-orange-400/25 text-slate-300 border-orange-400/25",
+	completed: {
+		badge: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
+		dot: "bg-emerald-400",
+		icon: CheckCircle2,
+	},
+	cancelled: {
+		badge: "bg-rose-500/10 text-rose-300 border-rose-500/20",
+		dot: "bg-rose-400",
+		icon: CircleAlert,
+	},
+	no_show: {
+		badge: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+		dot: "bg-rose-400",
+		icon: CircleAlert,
+	},
+	in_progress: {
+		badge: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
+		dot: "bg-indigo-400 animate-pulse",
+		icon: Clock,
+	},
+	"awaiting completion": {
+		badge: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+		dot: "bg-amber-400",
+		icon: Clock,
+	},
+	awaiting_completion: {
+		badge: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+		dot: "bg-amber-400",
+		icon: Clock,
+	},
+	booked: {
+		badge: "bg-violet-500/10 text-violet-300 border-violet-500/20",
+		dot: "bg-violet-400",
+		icon: Clock,
+	},
+	confirmed: {
+		badge: "bg-violet-500/10 text-violet-300 border-violet-500/20",
+		dot: "bg-violet-400",
+		icon: Clock,
+	},
+	expired: {
+		badge: "bg-rose-500/10 text-amber-300 border-amber-500/20",
+		dot: "bg-amber-400",
+		icon: CircleAlert,
+	},
+	pending: {
+		badge: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+		dot: "bg-amber-400",
+		icon: Clock,
+	},
 };
 
 const StatusBadge = ({ status, date, startTime }) => {
 	const display = resolveDisplayStatus(status, date, startTime);
-	const cls = STATUS_STYLES[display] || STATUS_STYLES.pending;
-	const IconComp = ["completed"].includes(display)
-		? CheckCircle2
-		: ["cancelled", "no_show", "expired"].includes(display)
-			? AlertCircle
-			: Clock;
+	const conf = STATUS_STYLES[display] || STATUS_STYLES.pending;
+	const IconComp = conf.icon;
+
 	return (
 		<span
-			className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border flex items-center gap-1.5 w-fit ${cls}`}
+			className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border inline-flex items-center gap-1.5 ${conf.badge}`}
 		>
-			<IconComp size={11} />
+			<span className={`h-1.5 w-1.5 rounded-full ${conf.dot}`} />
 			{display.replace(/_/g, " ")}
 		</span>
 	);
@@ -123,7 +160,7 @@ export default function ProviderBookings() {
 		const t = setTimeout(() => {
 			setDebouncedSearch(searchTerm);
 			setMeta((p) => ({ ...p, current_page: 1 }));
-		}, 500);
+		}, 400);
 		return () => clearTimeout(t);
 	}, [searchTerm]);
 
@@ -134,7 +171,7 @@ export default function ProviderBookings() {
 			try {
 				const params = new URLSearchParams({
 					page: meta.current_page,
-					limit: 8,
+					limit: 10,
 					type: activeTab,
 					search: debouncedSearch,
 					date_filter: activeFilters.dateRange,
@@ -189,9 +226,9 @@ export default function ProviderBookings() {
 				isOpen: true,
 				bookingId,
 				newStatus,
-				title: "Decline Booking?",
+				title: "Decline Booking Request?",
 				message:
-					"Are you sure you want to decline this booking? The customer will be notified.",
+					"Are you sure you want to decline this booking? The customer will receive an immediate notification and full payment refund.",
 			});
 			return;
 		}
@@ -214,15 +251,9 @@ export default function ProviderBookings() {
 					setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
 				}
 				setConfirmConfig((c) => ({ ...c, isOpen: false }));
-				toast.success(`Booking ${newStatus.replace(/_/g, " ")} successfully`, {
-					className:
-						"bricolage-grotesque font-semibold border border-emerald-500/20 bg-slate-900 text-emerald-400 rounded-2xl shadow-xl",
-				});
+				toast.success(`Booking ${newStatus.replace(/_/g, " ")} successfully`);
 			} catch (err) {
-				toast.error("Failed to update booking status", {
-					className:
-						"bricolage-grotesque font-semibold border border-red-500/20 bg-slate-900 text-red-400 rounded-2xl",
-				});
+				toast.error("Failed to update booking status");
 			} finally {
 				setActionLoading(null);
 			}
@@ -230,283 +261,324 @@ export default function ProviderBookings() {
 		[selectedBooking],
 	);
 
+	const isFilterActive =
+		activeFilters.dateRange !== "All Time" ||
+		Boolean(activeFilters.customerName) ||
+		Boolean(activeFilters.minPrice);
+
 	return (
-		<div className="relative">
-			<motion.div
-				initial={{ opacity: 0, y: 10 }}
-				animate={{ opacity: 1, y: 0 }}
-				className="space-y-6"
-			>
-				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-					<div>
-						<h2 className="text-xl font-bold text-white">Bookings</h2>
-						<p className="text-sm text-slate-400">
-							Manage and track your service bookings.
-						</p>
+		<div className="relative space-y-6">
+			{/* Top Control Bar */}
+			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.06]">
+				<div>
+					<div className="flex items-center gap-2.5">
+						<h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+							Bookings
+						</h1>
 					</div>
-					<div className="flex items-center gap-2">
-						<div className="relative">
-							<Search
-								className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-								size={15}
-							/>
-							<input
-								type="text"
-								placeholder="Search bookings..."
-								value={searchTerm}
-								onChange={(e) => setSearchTerm(e.target.value)}
-								className="pl-9 pr-4 py-2 bg-slate-800/60 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all w-full sm:w-56"
-							/>
-						</div>
+					<p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
+						Manage your service appointments, customer requests, and job schedules.
+					</p>
+				</div>
+
+				{/* Search & Filter Trigger */}
+				<div className="flex items-center gap-2.5">
+					<div className="relative w-full sm:w-64">
+						<Search
+							className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
+							size={14}
+						/>
+						<input
+							type="text"
+							placeholder="Search by service or client..."
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
+							className="w-full pl-9 pr-4 py-2 bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.12] focus:border-violet-500/50 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all"
+						/>
+					</div>
+
+					<div className="relative">
 						<button
 							onClick={() => setShowFilters(!showFilters)}
-							className={`p-2 border rounded-xl transition-colors cursor-pointer ${showFilters ? "bg-violet-500/15 text-violet-300 border-violet-500/30" : "bg-slate-800/60 text-slate-400 border-white/10 hover:bg-slate-700/60"}`}
+							className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-all cursor-pointer ${
+								showFilters || isFilterActive
+									? "bg-violet-600/20 text-violet-300 border-violet-500/40 shadow-xs"
+									: "bg-white/[0.03] text-slate-400 border-white/[0.08] hover:text-slate-200 hover:bg-white/[0.06]"
+							}`}
 						>
-							{showFilters ? <X size={18} /> : <ListFilter size={18} />}
+							<ListFilter size={14} />
+							<span>Filters</span>
+							{isFilterActive && (
+								<span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+							)}
 						</button>
-					</div>
 
-					<AnimatePresence>
-						{showFilters && (
-							<motion.div
-								initial={{ opacity: 0, y: -8 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0, y: -8 }}
-								className="absolute right-0 top-16 z-10 w-72 bg-slate-900 border border-white/10 shadow-2xl shadow-black/40 rounded-2xl p-4"
-							>
-								<div className="space-y-4">
-									<div>
-										<label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-											Date Range
-										</label>
-										<select
-											className="mt-1.5 w-full p-2 text-sm bg-slate-800 border border-white/10 rounded-lg text-white focus:outline-none"
-											value={tempFilters.dateRange}
-											onChange={(e) =>
-												setTempFilters({
-													...tempFilters,
-													dateRange: e.target.value,
-												})
-											}
-										>
-											<option value="All Time">All Time</option>
-											<option value="This Month">This Month</option>
-											<option value="Last 3 Months">Last 3 Months</option>
-										</select>
-									</div>
-									<div>
-										<label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-											Customer Name
-										</label>
-										<input
-											type="text"
-											value={tempFilters.customerName}
-											placeholder="e.g. Rahul"
-											onChange={(e) =>
-												setTempFilters({
-													...tempFilters,
-													customerName: e.target.value,
-												})
-											}
-											className="mt-1.5 w-full p-2 text-sm bg-slate-800 border border-white/10 rounded-lg text-white"
-										/>
-									</div>
-									<div>
-										<label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-											Min Price
-										</label>
-										<input
-											type="number"
-											placeholder="₹ 500"
-											value={tempFilters.minPrice}
-											onChange={(e) =>
-												setTempFilters({
-													...tempFilters,
-													minPrice: e.target.value,
-												})
-											}
-											className="mt-1.5 w-full p-2 text-sm bg-slate-800 border border-white/10 rounded-lg text-white"
-										/>
-									</div>
-									<div className="flex gap-2 pt-1">
+						{/* Filter Popover Dropdown */}
+						<AnimatePresence>
+							{showFilters && (
+								<motion.div
+									initial={{ opacity: 0, y: 6, scale: 0.98 }}
+									animate={{ opacity: 1, y: 0, scale: 1 }}
+									exit={{ opacity: 0, y: 6, scale: 0.98 }}
+									transition={{ duration: 0.15 }}
+									className="absolute right-0 top-12 z-30 w-80 bg-[#140b28] border border-white/[0.1] shadow-2xl shadow-black/80 rounded-2xl p-5 space-y-4"
+								>
+									<div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+										<span className="text-xs font-extrabold text-white uppercase tracking-wider">
+											Filter Bookings
+										</span>
 										<button
-											onClick={handleClearFilters}
-											className="flex-1 py-2 text-sm font-medium text-slate-400 bg-slate-800 rounded-lg border border-white/8 cursor-pointer"
+											onClick={() => setShowFilters(false)}
+											className="p-1 rounded-md text-slate-500 hover:text-slate-300"
 										>
-											Clear
-										</button>
-										<button
-											onClick={handleApplyFilters}
-											className="flex-1 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg cursor-pointer"
-										>
-											Apply
+											<X size={14} />
 										</button>
 									</div>
-								</div>
-							</motion.div>
-						)}
-					</AnimatePresence>
-				</div>
 
-				<div className="border-b border-white/8">
-					<div className="flex gap-8">
-						{[
-							{ key: "upcoming", label: "Upcoming", icon: Clock },
-							{ key: "history", label: "History", icon: HistoryIcon },
-						].map(({ key, label, icon: Icon }) => (
-							<button
-								key={key}
-								onClick={() => handleTabChange(key)}
-								className={`cursor-pointer pb-3 text-sm font-medium transition-colors relative flex items-center gap-2 ${activeTab === key ? "text-violet-400" : "text-slate-500 hover:text-slate-300"}`}
-							>
-								<Icon size={15} />
-								{label}
-								{activeTab === key && (
-									<motion.div
-										layoutId="providerActiveTab"
-										className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-t-full"
-									/>
-								)}
-							</button>
-						))}
+									<div className="space-y-3.5 text-xs">
+										<div>
+											<label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">
+												Date Window
+											</label>
+											<select
+												className="w-full p-2.5 text-xs bg-black/40 border border-white/[0.08] rounded-xl text-slate-200 focus:outline-none focus:border-violet-500"
+												value={tempFilters.dateRange}
+												onChange={(e) =>
+													setTempFilters({
+														...tempFilters,
+														dateRange: e.target.value,
+													})
+												}
+											>
+												<option value="All Time">All Time</option>
+												<option value="This Month">Current Month</option>
+												<option value="Last 3 Months">Past 90 Days</option>
+											</select>
+										</div>
+
+										<div>
+											<label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">
+												Customer Name
+											</label>
+											<input
+												type="text"
+												value={tempFilters.customerName}
+												placeholder="Search client name..."
+												onChange={(e) =>
+													setTempFilters({
+														...tempFilters,
+														customerName: e.target.value,
+													})
+												}
+												className="w-full p-2.5 text-xs bg-black/40 border border-white/[0.08] rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:border-violet-500"
+											/>
+										</div>
+
+										<div>
+											<label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">
+												Minimum Ticket Value (₹)
+											</label>
+											<input
+												type="number"
+												placeholder="e.g. 500"
+												value={tempFilters.minPrice}
+												onChange={(e) =>
+													setTempFilters({
+														...tempFilters,
+														minPrice: e.target.value,
+													})
+												}
+												className="w-full p-2.5 text-xs bg-black/40 border border-white/[0.08] rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:border-violet-500"
+											/>
+										</div>
+
+										<div className="flex gap-2 pt-2 border-t border-white/[0.06]">
+											<button
+												onClick={handleClearFilters}
+												className="flex-1 py-2 text-xs font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded-xl border border-white/[0.06] cursor-pointer transition-colors"
+											>
+												Reset
+											</button>
+											<button
+												onClick={handleApplyFilters}
+												className="flex-1 py-2 text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 rounded-xl cursor-pointer shadow-md shadow-violet-950 transition-colors"
+											>
+												Apply Filters
+											</button>
+										</div>
+									</div>
+								</motion.div>
+							)}
+						</AnimatePresence>
 					</div>
 				</div>
+			</div>
 
-				<div className="bg-slate-900/60 border border-white/8 rounded-2xl shadow-sm overflow-hidden min-h-[300px]">
-					<div className="overflow-x-auto">
-						{loading ? (
-							<div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-500">
-								<div className="w-8 h-8 border-2 border-slate-700 border-t-violet-500 rounded-full animate-spin" />
-								<span className="text-sm font-medium">Loading bookings...</span>
+			{/* Status Tabs Switcher */}
+			<div className="flex items-center gap-2 border-b border-white/[0.06] pb-3">
+				{[
+					{ key: "upcoming", label: "Active & Upcoming Queue", icon: Clock },
+					{ key: "history", label: "Completed & Archived", icon: HistoryIcon },
+				].map(({ key, label, icon: Icon }) => (
+					<button
+						key={key}
+						onClick={() => handleTabChange(key)}
+						className={`cursor-pointer px-4 py-2 rounded-xl text-xs font-bold transition-all relative flex items-center gap-2 ${
+							activeTab === key
+								? "bg-violet-600/15 text-white border border-violet-500/30 shadow-xs"
+								: "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
+						}`}
+					>
+						<Icon size={14} className={activeTab === key ? "text-violet-400" : "text-slate-500"} />
+						<span>{label}</span>
+					</button>
+				))}
+			</div>
+
+			{/* Bookings Table */}
+			<div className="bg-[#120a22] border border-white/[0.07] rounded-3xl shadow-xl overflow-hidden min-h-[350px]">
+				<div className="overflow-x-auto">
+					{loading ? (
+						<div className="flex flex-col items-center justify-center h-72 gap-3 text-slate-500">
+							<Loader2 size={24} className="animate-spin text-violet-500" />
+							<span className="text-xs font-bold">Loading bookings...</span>
+						</div>
+					) : bookings.length === 0 ? (
+						<div className="flex flex-col items-center justify-center h-72 text-center p-8 space-y-3">
+							<div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-slate-500">
+								<CalendarCheck size={22} />
 							</div>
-						) : bookings.length === 0 ? (
-							<div className="flex flex-col items-center justify-center h-64 text-slate-600">
-								<div className="p-4 bg-slate-800/60 rounded-full mb-3">
-									<Calendar size={24} />
-								</div>
-								<p className="font-medium text-slate-300">
+							<div>
+								<p className="font-bold text-sm text-slate-200">
 									{activeTab === "upcoming"
 										? "No upcoming bookings"
-										: "No booking history"}
+										: "No bookings match criteria"}
+								</p>
+								<p className="text-xs text-slate-500 mt-1">
+									{activeTab === "upcoming"
+										? "When customers book your services, they will appear here."
+										: "Completed jobs and cancelled bookings will appear here."}
 								</p>
 							</div>
-						) : (
-							<table className="w-full text-left border-collapse">
-								<thead>
-									<tr className="border-b border-white/6 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-										<th className="p-5">Service · Customer</th>
-										<th className="p-5">Date & Time</th>
-										<th className="p-5">Amount</th>
-										<th className="p-5">Status</th>
-										<th className="p-5 text-right">Action</th>
-									</tr>
-								</thead>
-								<tbody className="divide-y divide-white/5">
-									{Array.isArray(bookings) &&
-										bookings.map((item) => {
-											const rawDate = new Date(item.date);
-											const y = rawDate.getFullYear();
-											const mo = String(rawDate.getMonth() + 1).padStart(
-												2,
-												"0",
-											);
-											const d = String(rawDate.getDate()).padStart(2, "0");
-											const dateObj = new Date(`${y}-${mo}-${d}T00:00:00`);
-											if (item.start_time) {
-												const [h, m] = item.start_time.split(":");
-												dateObj.setHours(+h, +m);
-											}
-											return (
-												<tr
-													key={item.booking_id}
-													className="group hover:bg-white/[0.02] transition-colors"
-												>
-													<td className="p-5">
-														<div className="flex flex-col">
-															<span className="font-semibold text-white text-sm">
-																{item.service_name}
-															</span>
-															<div className="flex items-center gap-2 mt-1">
-																<div className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-300 flex items-center justify-center text-[10px] font-bold">
-																	{(item.customer_name || "C")[0]}
-																</div>
-																<span className="text-xs text-slate-400">
-																	{item.customer_name || "Customer"}
-																</span>
-																<span className="text-[10px] text-slate-600 font-mono">
-																	#{item.booking_id?.slice(0, 6).toUpperCase()}
-																</span>
-															</div>
-														</div>
-													</td>
-													<td className="p-5">
-														<div className="flex flex-col">
-															<span className="text-sm font-medium text-white">
-																{dateObj.toLocaleDateString("en-IN", {
-																	month: "short",
-																	day: "numeric",
-																	year: "numeric",
-																})}
-															</span>
-															<span className="text-xs text-slate-500 mt-0.5">
-																{dateObj.toLocaleDateString("en-IN", {
-																	weekday: "short",
-																})}{" "}
-																·{" "}
-																{dateObj.toLocaleTimeString("en-IN", {
-																	hour: "2-digit",
-																	minute: "2-digit",
-																	hour12: true,
-																})}
-															</span>
-														</div>
-													</td>
-													<td className="p-5">
-														<span className="font-mono text-sm font-semibold text-emerald-400">
-															{formatCurrency(item.price)}
-														</span>
-													</td>
-													<td className="p-5">
-														<StatusBadge
-															status={item.status}
-															date={item.date}
-															startTime={item.start_time}
-														/>
-													</td>
-													<td className="p-5 text-right">
-														<div className="flex items-center justify-end gap-2">
-															{item.status === "pending" && (
-																<button
-																	onClick={() =>
-																		handleStatusUpdate(
-																			item.booking_id,
-																			"confirmed",
-																		)
-																	}
-																	disabled={actionLoading === item.booking_id}
-																	className="cursor-pointer text-xs font-medium bg-violet-500/15 text-violet-300 border border-violet-500/25 px-3 py-1.5 rounded-lg"
-																>
-																	Accept
-																</button>
-															)}
-															<button
-																onClick={() => setSelectedBooking(item)}
-																className="cursor-pointer text-xs font-medium text-slate-400 hover:text-white px-3 py-1.5 hover:bg-slate-800 rounded-lg"
-															>
-																Details
-															</button>
-														</div>
-													</td>
-												</tr>
-											);
-										})}
-								</tbody>
-							</table>
-						)}
-					</div>
-				</div>
-			</motion.div>
+						</div>
+					) : (
+						<table className="w-full text-left border-collapse">
+							<thead>
+								<tr className="border-b border-white/[0.06] text-[10px] font-extrabold text-slate-400 uppercase tracking-widest bg-white/[0.01]">
+									<th className="py-4 px-6">Service & Client</th>
+									<th className="py-4 px-6">Scheduled Time</th>
+									<th className="py-4 px-6">Amount</th>
+									<th className="py-4 px-6">Status</th>
+									<th className="py-4 px-6 text-right">Actions</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y divide-white/[0.04] text-xs">
+								{bookings.map((item) => {
+									const rawDate = new Date(item.date);
+									const y = rawDate.getFullYear();
+									const mo = String(rawDate.getMonth() + 1).padStart(2, "0");
+									const d = String(rawDate.getDate()).padStart(2, "0");
+									const dateObj = new Date(`${y}-${mo}-${d}T00:00:00`);
+									if (item.start_time) {
+										const [h, m] = item.start_time.split(":");
+										dateObj.setHours(+h, +m);
+									}
 
+									return (
+										<tr
+											key={item.booking_id}
+											className="group hover:bg-white/[0.02] transition-colors"
+										>
+											{/* Service & Client */}
+											<td className="py-4 px-6">
+												<div className="space-y-1">
+													<span className="font-bold text-white text-sm block group-hover:text-violet-300 transition-colors">
+														{item.service_name || "On-Demand Service"}
+													</span>
+													<div className="flex items-center gap-2 text-slate-400">
+														<div className="w-5 h-5 rounded-md bg-violet-500/20 text-violet-300 flex items-center justify-center text-[10px] font-bold">
+															{(item.customer_name || "C")[0]?.toUpperCase()}
+														</div>
+														<span className="font-medium text-slate-300">
+															{item.customer_name || "Customer"}
+														</span>
+														<span className="text-[10px] text-slate-600 font-mono">
+															#{item.booking_id?.slice(0, 6).toUpperCase()}
+														</span>
+													</div>
+												</div>
+											</td>
+
+											{/* Scheduled Window */}
+											<td className="py-4 px-6">
+												<div className="space-y-0.5">
+													<span className="font-semibold text-white block">
+														{dateObj.toLocaleDateString("en-IN", {
+															month: "short",
+															day: "numeric",
+															year: "numeric",
+														})}
+													</span>
+													<span className="text-[11px] text-slate-400 flex items-center gap-1">
+														<Clock size={11} className="text-violet-400" />
+														{dateObj.toLocaleTimeString("en-IN", {
+															hour: "2-digit",
+															minute: "2-digit",
+															hour12: true,
+														})}
+													</span>
+												</div>
+											</td>
+
+											{/* Settlement Amount */}
+											<td className="py-4 px-6">
+												<span className="font-mono text-sm font-extrabold text-emerald-400">
+													{formatCurrency(item.price)}
+												</span>
+											</td>
+
+											{/* Status */}
+											<td className="py-4 px-6">
+												<StatusBadge
+													status={item.status}
+													date={item.date}
+													startTime={item.start_time}
+												/>
+											</td>
+
+											{/* Actions */}
+											<td className="py-4 px-6 text-right">
+												<div className="flex items-center justify-end gap-2">
+													{item.status === "pending" && (
+														<button
+															onClick={() =>
+																handleStatusUpdate(item.booking_id, "confirmed")
+															}
+															disabled={actionLoading === item.booking_id}
+															className="cursor-pointer px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all active:scale-95 disabled:opacity-50"
+														>
+															Accept Job
+														</button>
+													)}
+
+													<button
+														onClick={() => setSelectedBooking(item)}
+														className="cursor-pointer px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/[0.06] font-semibold text-xs transition-colors"
+													>
+														View Details
+													</button>
+												</div>
+											</td>
+										</tr>
+									);
+								})}
+							</tbody>
+						</table>
+					)}
+				</div>
+			</div>
+
+			{/* Slide-in Booking Inspection Details Sheet */}
 			<AnimatePresence>
 				{selectedBooking && (
 					<BookingDetailsSheet
@@ -518,14 +590,21 @@ export default function ProviderBookings() {
 				)}
 			</AnimatePresence>
 
+			{/* Confirmation Dialog */}
 			<ConfirmModal
 				isOpen={confirmConfig.isOpen}
 				onClose={() => setConfirmConfig((c) => ({ ...c, isOpen: false }))}
 				onConfirm={() =>
 					executeUpdate(confirmConfig.bookingId, confirmConfig.newStatus)
 				}
-				title={confirmConfig.title}
-				message={confirmConfig.message}
+				title={confirmConfig.title || "Decline Booking Request?"}
+				message={
+					confirmConfig.message ||
+					"The customer will receive an immediate notification and full payment refund."
+				}
+				confirmText="Decline booking"
+				cancelText="Keep booking"
+				variant="danger"
 				loading={actionLoading === confirmConfig.bookingId}
 			/>
 		</div>

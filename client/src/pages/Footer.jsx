@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { HashLink } from "react-router-hash-link";
+import Logo from "../ui/Logo";
 
 const Footer = () => {
 	return (
@@ -8,18 +9,7 @@ const Footer = () => {
 			<div className="container mx-auto px-6 lg:px-16">
 				<div className="flex flex-col md:flex-row md:justify-between gap-10">
 					<div className="md:w-1/4">
-						<Link
-							to="/"
-							className="text-2xl tracking-wide font-semibold flex items-center gap-2 text-white hover:text-violet-300 transition"
-							style={{ fontFamily: "P22Mackinac, Cambria, sans-serif" }}
-						>
-							<img
-								src="/images/taskgenie-logo.svg"
-								alt="TaskGenie Logo"
-								className="w-7 h-7 object-contain rounded-lg"
-							/>
-							<span>TaskGenie</span>
-						</Link>
+						<Logo to="/" size="md" theme="dark" />
 						<p className="text-sm text-[#A39AC1] mt-3 leading-relaxed">
 							Your wish, our command. From plumbers to stylists — TaskGenie
 							connects you with trusted professionals for every need.

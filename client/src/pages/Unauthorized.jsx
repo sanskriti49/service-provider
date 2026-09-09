@@ -1,55 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
+import ConfirmDialog from "../ui/ConfirmDialog";
 
 const Unauthorized = () => {
 	const { user, logout } = useAuth();
 	const navigate = useNavigate();
+	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 	const isProvider = user?.role === "provider";
 
 	const handleSwitchAccounts = (e) => {
 		e.preventDefault();
-
-		toast.custom(
-			(t) => (
-				<div className=" w-full max-w-sm bg-purple-950/95 backdrop-blur-md border border-white/10 p-5 rounded-xl shadow-2xl text-left">
-					<h3 className="text-sm font-semibold text-white mb-1">
-						Sign out to change profiles?
-					</h3>
-					<p className="text-xs text-purple-200/70 mb-4 leading-normal">
-						You'll be logged out of your current session to sign in with a
-						different profile ID.
-					</p>
-					<div className="flex items-center justify-end gap-2">
-						<button
-							onClick={() => toast.dismiss(t)}
-							className="cursor-pointer px-3 py-1.5 text-xs font-medium text-purple-200 hover:text-white transition rounded-md bg-white/5 hover:bg-white/10"
-						>
-							Cancel
-						</button>
-						<button
-							onClick={async () => {
-								toast.dismiss(t);
-								try {
-									if (logout) await logout();
-									navigate("/login");
-								} catch (error) {
-									toast.error("Failed to log out. Please try again.");
-								}
-							}}
-							className="cursor-pointer px-3 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition rounded-md shadow"
-						>
-							Log Out
-						</button>
-					</div>
-				</div>
-			),
-			{
-				duration: Infinity,
-				position: "bottom-center",
-			},
-		);
+		setShowLogoutConfirm(true);
 	};
 
 	return (
@@ -122,6 +85,21 @@ const Unauthorized = () => {
 					</button>
 				</div>
 			</div>
+
+			<ConfirmDialog
+				isOpen={showLogoutConfirm}
+				onClose={() => setShowLogoutConfirm(false)}
+				onConfirm={async () => {
+					setShowLogoutConfirm(false);
+					if (logout) await logout();
+					navigate("/login");
+				}}
+				title="Sign out to change profiles?"
+				description="You'll be logged out of your current session to sign in with a different profile ID."
+				confirmText="Log out"
+				cancelText="Cancel"
+				variant="danger"
+			/>
 		</div>
 	);
 };

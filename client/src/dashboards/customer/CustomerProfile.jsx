@@ -23,6 +23,8 @@ import { useState, useEffect, useMemo, useCallback, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../../api/axiosInstance";
+import { useAuth } from "../../contexts/AuthContext";
+import ConfirmDialog from "../../ui/ConfirmDialog";
 import { toast } from "sonner";
 
 const SERIF_FONT = { fontFamily: "P22Mackinac, Cambria, sans-serif" };
@@ -179,10 +181,18 @@ export default function CustomerProfile() {
 		return "Good Night";
 	}, [hour]);
 
+	const { logout } = useAuth();
+	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
 	const handleLogout = useCallback(() => {
-		localStorage.clear();
+		setShowLogoutConfirm(true);
+	}, []);
+
+	const executeLogout = useCallback(() => {
+		setShowLogoutConfirm(false);
+		logout();
 		navigate("/login");
-	}, [navigate]);
+	}, [logout, navigate]);
 
 	if (isLoading) return <ProfileSkeleton />;
 
@@ -455,6 +465,18 @@ export default function CustomerProfile() {
 					</div>
 				</div>
 			</div>
+
+			<ConfirmDialog
+				isOpen={showLogoutConfirm}
+				onClose={() => setShowLogoutConfirm(false)}
+				onConfirm={executeLogout}
+				title="Log out?"
+				description="You'll need to sign in again to access your customer account."
+				confirmText="Log out"
+				cancelText="Cancel"
+				variant="danger"
+				icon={LogOut}
+			/>
 		</div>
 	);
 }
