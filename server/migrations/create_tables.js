@@ -110,6 +110,7 @@ const queries = [
     razorpay_order_id varchar(255) NULL,
     razorpay_payment_id varchar(255) NULL,
     otp varchar(6) NULL,
+    completion_otp varchar(6) NULL,
     action_by varchar(20) NULL,
     cancellation_reason text NULL,
     latitude float4 NULL,
@@ -118,6 +119,8 @@ const queries = [
     updated_at timestamptz DEFAULT now() NULL,
     CONSTRAINT bookings_pkey PRIMARY KEY (booking_id)
   )`,
+	`ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS completion_otp varchar(6) NULL`,
+	`UPDATE public.bookings SET completion_otp = otp WHERE completion_otp IS NULL AND otp IS NOT NULL`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_booking_id ON public.bookings USING btree (booking_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_provider_date ON public.bookings USING btree (provider_id, date)`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_user_id ON public.bookings(user_id)`,
@@ -194,6 +197,15 @@ const queries = [
 	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS status varchar(20) DEFAULT 'approved' NOT NULL`,
 	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS rejection_reason text NULL`,
 	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS approved_at timestamptz DEFAULT now() NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS kyc_doc_type text NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS kyc_doc_number text NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS kyc_doc_front text NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS kyc_doc_back text NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS kyc_status varchar(20) DEFAULT 'pending' NOT NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS is_verified bool DEFAULT false NOT NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS verification_badge varchar(20) DEFAULT NULL NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS verified_at timestamptz NULL`,
+	`ALTER TABLE public.providers ADD COLUMN IF NOT EXISTS kyc_submitted_at timestamptz DEFAULT now() NULL`,
 
 	`CREATE TABLE IF NOT EXISTS public.disputes (
     id uuid DEFAULT gen_random_uuid() NOT NULL,

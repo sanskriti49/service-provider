@@ -2,6 +2,8 @@ const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const db = require("../config/db");
 const sendEmail = require("../utils/sendEmail");
+const eventQueue = require("../utils/eventQueue");
+const { bookingsTotal } = require("../utils/metrics");
 const { getPriceDetails } = require("../utils/pricing");
 const {
 	calculateHaversineDistance,
@@ -215,9 +217,9 @@ async function createBooking(req, res, next) {
 		const insertQ = `
             INSERT INTO bookings (
                 booking_id, provider_id, user_id, service_id, date, start_time, end_time, 
-                status, address, price, payment_method, payment_status, razorpay_order_id, otp, latitude, longitude
+                status, address, price, payment_method, payment_status, razorpay_order_id, otp, completion_otp, latitude, longitude
             )
-            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12, $13, $14)
+            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10, $11, $12, $12, $13, $14)
             RETURNING *;
         `;
 
@@ -368,15 +370,16 @@ async function updateBookingStatus(req, res) {
 				}
 			} else if (
 				currentBooking.status === "confirmed" ||
-				currentBooking.status === "booked"
+				currentBooking.status === "booked" ||
+				currentBooking.status === "in_progress"
 			) {
-				const allowedFromConfirmed = [
+				const allowedTransitions = [
 					"in_progress",
 					"completed",
 					"cancelled",
 					"no_show",
 				];
-				if (!allowedFromConfirmed.includes(status)) {
+				if (!allowedTransitions.includes(status)) {
 					await client.query("ROLLBACK");
 					return res.status(400).json({ message: "Invalid transition state." });
 				}
@@ -393,11 +396,36 @@ async function updateBookingStatus(req, res) {
 				}
 			}
 
-			if (status === "in_progress") {
-				if (
-					!otp_provided ||
-					otp_provided.toString().trim() !== currentBooking.otp?.toString().trim()
-				) {
+			if (status === "completed") {
+				const expectedOtp = (
+					currentBooking.completion_otp || currentBooking.otp
+				)
+					?.toString()
+					.trim();
+				const submittedOtp = (
+					otp_provided ||
+					req.body.otp ||
+					req.body.completion_otp
+				)
+					?.toString()
+					.trim();
+
+				if (!submittedOtp || !expectedOtp || submittedOtp !== expectedOtp) {
+					await client.query("ROLLBACK");
+					return res.status(400).json({
+						message:
+							"Invalid 4-digit completion OTP. Please request the completion code from the customer's dashboard to finalize this job.",
+					});
+				}
+			} else if (status === "in_progress") {
+				const expectedOtp = (
+					currentBooking.otp || currentBooking.completion_otp
+				)
+					?.toString()
+					.trim();
+				const submittedOtp = (otp_provided || req.body.otp)?.toString().trim();
+
+				if (!submittedOtp || !expectedOtp || submittedOtp !== expectedOtp) {
 					await client.query("ROLLBACK");
 					return res
 						.status(401)
@@ -439,7 +467,9 @@ async function updateBookingStatus(req, res) {
 				? "refunded"
 				: refundPercentage > 0
 					? "partially_refunded"
-					: currentBooking.payment_status;
+					: status === "completed" && currentBooking.payment_method === "cod"
+						? "paid"
+						: currentBooking.payment_status;
 
 		if (updateReliabilityMetric) {
 			await client.query(
@@ -457,6 +487,9 @@ async function updateBookingStatus(req, res) {
 		]);
 
 		await client.query("COMMIT");
+		try {
+			bookingsTotal.inc({ status });
+		} catch (_) {}
 		sendEmailNotifications(status, userRole, currentBooking, refundPercentage);
 
 		try {
@@ -608,6 +641,11 @@ async function getProviderHistory(req, res) {
 		const totalRows = parseInt(countResult.rows[0]?.count || 0);
 		const totalPages = Math.ceil(totalRows / limit) || 1;
 
+		const sanitizedRows = dataResult.rows.map((row) => {
+			const { otp, completion_otp, ...safeRow } = row;
+			return safeRow;
+		});
+
 		res.json({
 			meta: {
 				current_page: page,
@@ -616,7 +654,7 @@ async function getProviderHistory(req, res) {
 				total_pages: totalPages,
 				has_next_page: page < totalPages,
 			},
-			data: dataResult.rows,
+			data: sanitizedRows,
 		});
 	} catch (err) {
 		console.error("Provider Pagination Error:", err);
@@ -705,6 +743,25 @@ async function sendEmailNotifications(
 						signature,
 				});
 			}
+		} else if (status === "completed") {
+			if (user_email) {
+				emailsToSend.push({
+					email: user_email,
+					subject: `Service Completed 🎉 - ${service_name || "TaskGenie Service"}`,
+					message:
+						`Hi ${user_name || "Customer"},\n\nYour service for "${service_name || "Service"}" has been successfully completed and verified with your 4-digit completion OTP.\n\nThank you for choosing TaskGenie!` +
+						signature,
+				});
+			}
+			if (provider_email) {
+				emailsToSend.push({
+					email: provider_email,
+					subject: `Job Completed Successfully 💰 - ${service_name || "TaskGenie Service"}`,
+					message:
+						`Hi ${provider_name || "Partner"},\n\nYou have successfully completed the service for "${user_name || "Customer"}". The completion OTP was verified and your earnings have been credited.` +
+						signature,
+				});
+			}
 		} else if (status === "cancelled") {
 			const refundMsg =
 				refundPercentage === 100
@@ -729,9 +786,13 @@ async function sendEmailNotifications(
 			}
 		}
 
-		for (const { email, subject, message } of emailsToSend) {
-			await sendEmail(email, subject, message);
-		}
+		// Delegate asynchronous dispatch to the resilient Event Queue worker pool
+		eventQueue.publish("BOOKING_STATUS_CHANGED", {
+			status,
+			userRole,
+			currentBooking,
+			refundPercentage,
+		});
 	} catch (err) {
 		console.warn("Notification Error:", err.message);
 	}
@@ -878,6 +939,7 @@ async function getUserHistory(req, res) {
 
 		const dataQuery = `
             SELECT b.booking_id, b.service_id, b.date, b.status, b.price, b.start_time, b.end_time, b.address,
+                   COALESCE(b.completion_otp, b.otp) AS completion_otp, b.otp,
                    pu.id AS provider_id,
                    pu.custom_id AS custom_id,
                    pu.name AS provider_name,
@@ -923,6 +985,64 @@ async function getUserHistory(req, res) {
 	}
 }
 
+async function regenerateCompletionOtp(req, res) {
+	const { booking_id } = req.params;
+	const userId = req.user.id;
+	const userRole = req.user.role;
+
+	if (userRole !== "customer" && userRole !== "admin") {
+		return res
+			.status(403)
+			.json({ message: "Only customers can regenerate their completion OTP." });
+	}
+
+	try {
+		const checkQ = `SELECT booking_id, user_id, status FROM bookings WHERE booking_id = $1`;
+		const bookingRes = await db.query(checkQ, [booking_id]);
+
+		if (bookingRes.rows.length === 0) {
+			return res.status(404).json({ message: "Booking not found." });
+		}
+
+		const booking = bookingRes.rows[0];
+		if (booking.user_id !== userId && userRole !== "admin") {
+			return res
+				.status(403)
+				.json({ message: "Unauthorized access to this booking." });
+		}
+
+		const activeStatuses = ["pending", "booked", "confirmed", "in_progress"];
+		if (!activeStatuses.includes(booking.status)) {
+			return res.status(400).json({
+				message: `Cannot regenerate completion OTP for a booking with status '${booking.status}'.`,
+			});
+		}
+
+		const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
+		const updateQ = `
+			UPDATE bookings 
+			SET completion_otp = $1, otp = $1, updated_at = NOW() 
+			WHERE booking_id = $2 
+			RETURNING booking_id, completion_otp, otp;
+		`;
+		const updateRes = await db.query(updateQ, [newOtp, booking_id]);
+
+		res.json({
+			message: "New completion OTP generated successfully.",
+			completion_otp: newOtp,
+			otp: newOtp,
+			booking: updateRes.rows[0],
+		});
+	} catch (err) {
+		console.error("Error regenerating completion OTP:", err);
+		res.status(500).json({
+			message: "Failed to regenerate completion OTP.",
+			error: err.message,
+		});
+	}
+}
+
 module.exports = {
 	createBooking,
 	updateBookingAddress,
@@ -932,4 +1052,5 @@ module.exports = {
 	getRecentProviderBookings,
 	getUpcomingBookings,
 	getProviderHistory,
+	regenerateCompletionOtp,
 };

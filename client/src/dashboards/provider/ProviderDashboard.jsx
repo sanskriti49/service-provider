@@ -41,6 +41,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { toast } from "sonner";
 import ConfirmDialog from "../../ui/ConfirmDialog";
 import Logo from "../../ui/Logo";
+import VerifiedBadge from "../../ui/VerifiedBadge";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -168,12 +169,18 @@ function SidebarProfile({ user, notifications, onLogout, onLinkClick }) {
 							<p className="text-sm font-bold text-slate-100 truncate">
 								{user?.name || "Service Professional"}
 							</p>
-							<div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium truncate">
-								<span className="text-emerald-400 font-semibold">Online</span>
-								<span>•</span>
-								<span className="truncate">
-									{user?.location || "Verified Pro"}
-								</span>
+							<div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium truncate mt-0.5">
+								{user?.is_verified ? (
+									<VerifiedBadge size="xs" />
+								) : (
+									<>
+										<span className="text-emerald-400 font-semibold">Online</span>
+										<span>•</span>
+										<span className="truncate">
+											{user?.location || "Provider"}
+										</span>
+									</>
+								)}
 							</div>
 						</div>
 					</div>
@@ -478,10 +485,17 @@ function ProviderOverview({ user, stats, recentBookings }) {
 			{/* Operational Header Hero Strip */}
 			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.06]">
 				<div>
-					<div className="flex items-center gap-2.5">
+					<div className="flex items-center gap-3 flex-wrap">
 						<h1 className="font-mackinac text-2xl sm:text-3xl font-black text-white tracking-tight">
 							Dashboard
 						</h1>
+						{user?.is_verified ? (
+							<VerifiedBadge size="md" />
+						) : (
+							<span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 flex items-center gap-1.5">
+								<ShieldCheck size={13} /> KYC In Verification
+							</span>
+						)}
 					</div>
 					<p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
 						Overview of your earnings, upcoming bookings, and customer requests.

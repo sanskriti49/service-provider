@@ -20,6 +20,7 @@ router.get("/overview", adminController.getOverviewStats);
 // Provider Approval Pipeline
 router.get("/providers", adminController.getProviders);
 router.put("/providers/:id/status", adminController.updateProviderStatus);
+router.put("/providers/:id/kyc", adminController.updateProviderKyc);
 
 // Dispute Management & Refunds
 router.get("/disputes", adminController.getDisputes);

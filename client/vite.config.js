@@ -1,4 +1,4 @@
-﻿import { defineConfig } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -10,12 +10,29 @@ export default defineConfig({
 		cssMinify: true,
 		rollupOptions: {
 			output: {
-				manualChunks: {
-					"vendor-react": ["react", "react-dom", "react-router-dom"],
-					"vendor-motion": ["framer-motion"],
-					"vendor-icons": ["lucide-react", "@heroicons/react"],
-					"vendor-gsap": ["gsap"],
-					"vendor-charts": ["chart.js", "react-chartjs-2"],
+				manualChunks(id) {
+					if (
+						id.includes("node_modules/react/") ||
+						id.includes("node_modules/react-dom/") ||
+						id.includes("node_modules/react-router-dom/")
+					) {
+						return "vendor-react";
+					}
+					if (id.includes("node_modules/framer-motion/")) {
+						return "vendor-motion";
+					}
+					if (
+						id.includes("node_modules/lucide-react/") ||
+						id.includes("node_modules/@heroicons/")
+					) {
+						return "vendor-icons";
+					}
+					if (
+						id.includes("node_modules/chart.js/") ||
+						id.includes("node_modules/react-chartjs-2/")
+					) {
+						return "vendor-charts";
+					}
 				},
 			},
 		},

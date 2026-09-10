@@ -23,6 +23,9 @@ import {
 	X,
 	LogOut,
 	ChevronRight,
+	ShieldCheck,
+	FileText,
+	ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -30,6 +33,7 @@ import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
 import ConfirmDialog from "../../ui/ConfirmDialog";
 import Logo from "../../ui/Logo";
+import VerifiedBadge from "../../ui/VerifiedBadge";
 
 const formatCurrency = (val) =>
 	new Intl.NumberFormat("en-IN", {
@@ -222,6 +226,45 @@ export default function AdminDashboard() {
 			setActionInProgress(null);
 			setSelectedProviderForReject(null);
 			setRejectionReason("");
+		}
+	};
+
+	const handleUpdateProviderKyc = async (
+		providerId,
+		newKycStatus,
+		reason = null,
+	) => {
+		setActionInProgress(providerId);
+		try {
+			const res = await api.put(`/api/admin/providers/${providerId}/kyc`, {
+				kyc_status: newKycStatus,
+				rejection_reason: reason,
+			});
+			if (res.data?.success) {
+				toast.success(
+					newKycStatus === "verified"
+						? "Provider identity verified & Gold Verified Pro badge awarded!"
+						: `KYC status set to ${newKycStatus}`,
+				);
+				fetchProviders(providersMeta.page);
+				if (inspectingProvider?.user_id === providerId) {
+					setInspectingProvider((prev) =>
+						prev
+							? {
+									...prev,
+									kyc_status: newKycStatus,
+									is_verified: newKycStatus === "verified",
+									verification_badge:
+										newKycStatus === "verified" ? "verified_pro" : null,
+								}
+							: null,
+					);
+				}
+			}
+		} catch (err) {
+			toast.error(err.response?.data?.error || "Failed to update KYC status");
+		} finally {
+			setActionInProgress(null);
 		}
 	};
 
@@ -692,13 +735,19 @@ export default function AdminDashboard() {
 												</div>
 
 												<div className="space-y-1">
-													<div className="flex items-center gap-2.5 flex-wrap">
+													<div className="flex items-center gap-2 flex-wrap">
 														<span className="font-mackinac font-bold text-white text-[17px]">
 															{p.name}
 														</span>
 														<span className="text-[11px] font-mono text-slate-400">
 															{p.custom_id || ""}
 														</span>
+														{p.is_verified && <VerifiedBadge size="xs" />}
+														{p.kyc_status === "pending" && !p.is_verified && (
+															<span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+																KYC In Review
+															</span>
+														)}
 														<span
 															className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${statusCls}`}
 														>
@@ -1194,6 +1243,139 @@ export default function AdminDashboard() {
 								</div>
 							)}
 
+							{/* KYC & Identity Dossier */}
+							<div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-3">
+								<div className="flex items-center justify-between">
+									<div className="flex items-center gap-2">
+										<ShieldCheck size={16} className="text-amber-400" />
+										<span className="text-xs font-bold text-white uppercase tracking-wider">
+											KYC &amp; Background Check Dossier
+										</span>
+									</div>
+									{inspectingProvider.is_verified ? (
+										<VerifiedBadge size="sm" />
+									) : (
+										<span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 capitalize">
+											{inspectingProvider.kyc_status || "Pending Review"}
+										</span>
+									)}
+								</div>
+
+								<div className="grid grid-cols-2 gap-3 text-slate-300 text-xs">
+									<div>
+										<span className="text-[10px] uppercase text-slate-500 font-bold block">
+											Document Type
+										</span>
+										<span className="font-medium text-white capitalize">
+											{inspectingProvider.kyc_doc_type
+												? inspectingProvider.kyc_doc_type.replace("_", " ")
+												: "Aadhaar / Government ID"}
+										</span>
+									</div>
+									<div>
+										<span className="text-[10px] uppercase text-slate-500 font-bold block">
+											Document / ID Number
+										</span>
+										<span className="font-mono text-amber-300 font-medium">
+											{inspectingProvider.kyc_doc_number || "Not provided"}
+										</span>
+									</div>
+								</div>
+
+								{/* Document Previews */}
+								<div className="space-y-1.5 pt-1">
+									<span className="text-[10px] uppercase text-slate-500 font-bold block">
+										Uploaded Identity Proof
+									</span>
+									<div className="grid grid-cols-2 gap-2.5">
+										{inspectingProvider.kyc_doc_front ? (
+											<a
+												href={inspectingProvider.kyc_doc_front}
+												target="_blank"
+												rel="noreferrer"
+												className="group relative rounded-xl border border-white/10 overflow-hidden bg-black/40 aspect-[4/3] flex items-center justify-center cursor-pointer hover:border-violet-400 transition"
+											>
+												<img
+													src={inspectingProvider.kyc_doc_front}
+													alt="Front ID Document"
+													className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+												/>
+												<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 text-white font-semibold text-[11px]">
+													<ExternalLink size={13} /> View Front
+												</div>
+											</a>
+										) : (
+											<div className="rounded-xl border border-dashed border-white/10 p-3 text-center text-slate-500 text-[11px] flex flex-col items-center justify-center aspect-[4/3]">
+												<FileText size={20} className="mb-1 text-slate-600" />
+												<span>Front ID not uploaded</span>
+											</div>
+										)}
+
+										{inspectingProvider.kyc_doc_back ? (
+											<a
+												href={inspectingProvider.kyc_doc_back}
+												target="_blank"
+												rel="noreferrer"
+												className="group relative rounded-xl border border-white/10 overflow-hidden bg-black/40 aspect-[4/3] flex items-center justify-center cursor-pointer hover:border-violet-400 transition"
+											>
+												<img
+													src={inspectingProvider.kyc_doc_back}
+													alt="Back ID Document"
+													className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+												/>
+												<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 text-white font-semibold text-[11px]">
+													<ExternalLink size={13} /> View Back
+												</div>
+											</a>
+										) : (
+											<div className="rounded-xl border border-dashed border-white/10 p-3 text-center text-slate-500 text-[11px] flex flex-col items-center justify-center aspect-[4/3]">
+												<FileText size={20} className="mb-1 text-slate-600" />
+												<span>Back ID not uploaded</span>
+											</div>
+										)}
+									</div>
+								</div>
+
+								{/* Direct KYC Badge Action */}
+								<div className="flex items-center justify-between pt-2 border-t border-white/5">
+									<span className="text-[11px] text-slate-400">
+										Badge Status:{" "}
+										<strong className="text-white">
+											{inspectingProvider.is_verified ? "Verified Pro Active" : "Unverified"}
+										</strong>
+									</span>
+									<div className="flex items-center gap-2">
+										{!inspectingProvider.is_verified ? (
+											<button
+												disabled={actionInProgress === inspectingProvider.user_id}
+												onClick={() =>
+													handleUpdateProviderKyc(
+														inspectingProvider.user_id,
+														"verified",
+													)
+												}
+												className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-neutral-950 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md disabled:opacity-50"
+											>
+												<ShieldCheck size={14} /> Grant Verified Pro Badge
+											</button>
+										) : (
+											<button
+												disabled={actionInProgress === inspectingProvider.user_id}
+												onClick={() =>
+													handleUpdateProviderKyc(
+														inspectingProvider.user_id,
+														"rejected",
+													)
+												}
+												className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-rose-300 border border-rose-500/20 font-medium text-xs transition cursor-pointer disabled:opacity-50"
+											>
+												Revoke Badge
+											</button>
+										)}
+									</div>
+								</div>
+							</div>
+
 							<div className="flex justify-end gap-2 pt-3 border-t border-white/10">
 								{inspectingProvider.status !== "approved" && (
 									<button
@@ -1205,7 +1387,7 @@ export default function AdminDashboard() {
 										}
 										className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer transition-colors"
 									>
-										Approve Provider
+										Approve Provider &amp; Badge
 									</button>
 								)}
 								{inspectingProvider.status !== "rejected" && (

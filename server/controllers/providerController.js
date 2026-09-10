@@ -6,6 +6,14 @@ const cache = require("../utils/cache");
 const { hashIfPresent } = require("../utils/hash");
 const { normalizeEmail } = require("../utils/normalizeEmail");
 const { getPriceDetails } = require("../utils/pricing");
+const cloudinary = require("cloudinary").v2;
+const streamifier = require("streamifier");
+
+cloudinary.config({
+	cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+	api_key: process.env.CLOUDINARY_API_KEY,
+	api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 const {
 	calculateHaversineDistance,
 	estimateTravelTimeMinutes,
@@ -73,6 +81,13 @@ const providerSchema = Joi.object({
 			}),
 		)
 		.optional(),
+	kyc_doc_type: Joi.string()
+		.valid("aadhaar", "driving_license", "certificate")
+		.allow("")
+		.optional(),
+	kyc_doc_number: Joi.string().max(100).allow("").optional(),
+	kyc_doc_front: Joi.string().allow("").optional(),
+	kyc_doc_back: Joi.string().allow("").optional(),
 });
 
 const providerUpdateSchema = Joi.object({
@@ -170,6 +185,10 @@ async function createProvider(req, res, next) {
 		lng,
 		photo,
 		bio,
+		kyc_doc_type,
+		kyc_doc_number,
+		kyc_doc_front,
+		kyc_doc_back,
 	} = value;
 
 	const client = await db.connect();
@@ -208,9 +227,21 @@ async function createProvider(req, res, next) {
 		const userId = userInsert.rows[0].id;
 
 		await client.query(
-			`INSERT INTO providers (user_id, rating, availability, status)
-             VALUES ($1,$2,$3,'pending')`,
-			[userId, rating ?? null, JSON.stringify(availability ?? [])],
+			`INSERT INTO providers (
+                user_id, rating, availability, status,
+                kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back,
+                kyc_status, is_verified, kyc_submitted_at
+            )
+            VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,'pending',FALSE,NOW())`,
+			[
+				userId,
+				rating ?? null,
+				JSON.stringify(availability ?? []),
+				kyc_doc_type || null,
+				kyc_doc_number || null,
+				kyc_doc_front || null,
+				kyc_doc_back || null,
+			],
 		);
 
 		await client.query(
@@ -252,6 +283,53 @@ async function createProvider(req, res, next) {
 	}
 }
 
+async function uploadKycDocument(req, res, next) {
+	try {
+		if (!req.file) {
+			return res.status(400).json({ error: "No document file provided" });
+		}
+
+		let documentUrl;
+		if (
+			process.env.CLOUDINARY_CLOUD_NAME &&
+			process.env.CLOUDINARY_API_KEY &&
+			process.env.CLOUDINARY_API_SECRET
+		) {
+			try {
+				const result = await new Promise((resolve, reject) => {
+					const stream = cloudinary.uploader.upload_stream(
+						{ folder: "kyc_documents", resource_type: "auto" },
+						(err, res) => {
+							if (err) reject(err);
+							else resolve(res);
+						},
+					);
+					streamifier.createReadStream(req.file.buffer).pipe(stream);
+				});
+				documentUrl = result.secure_url;
+			} catch (uploadErr) {
+				console.warn(
+					"Cloudinary upload failed, using data URI fallback:",
+					uploadErr.message,
+				);
+				documentUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+			}
+		} else {
+			documentUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+		}
+
+		res.json({
+			success: true,
+			url: documentUrl,
+			filename: req.file.originalname,
+			mimetype: req.file.mimetype,
+			size: req.file.size,
+		});
+	} catch (err) {
+		next(err);
+	}
+}
+
 async function getProviders(req, res, next) {
 	try {
 		const { service, lat, lng, radius, sort_by, min_rating, max_price } =
@@ -274,7 +352,10 @@ async function getProviders(req, res, next) {
                    u.lat, u.lng,
                    s.name AS service, s.slug AS service_slug, s.id AS service_id,
                    ps.price, ps.price_unit, 
-                   COALESCE(p.rating, 4.5) AS rating, p.user_id, p.availability
+                   COALESCE(p.rating, 4.5) AS rating, p.user_id, p.availability,
+                   COALESCE(p.is_verified, FALSE) AS is_verified,
+                   p.verification_badge,
+                   COALESCE(p.kyc_status, 'pending') AS kyc_status
             FROM providers p
             JOIN users u ON p.user_id = u.id
             JOIN provider_services ps ON ps.provider_id = p.user_id AND ps.is_visible = TRUE
@@ -399,7 +480,11 @@ async function getProviderById(req, res, next) {
                     u.location, u.lat, u.lng, u.photo, u.bio,
                     COALESCE(p.rating, 5.0) AS rating, p.availability,
                     ps.price, ps.price_unit, 
-                    s.name AS service, s.slug AS service_slug, s.id AS service_id
+                    s.name AS service, s.slug AS service_slug, s.id AS service_id,
+                    COALESCE(p.is_verified, FALSE) AS is_verified,
+                    p.verification_badge,
+                    COALESCE(p.kyc_status, 'pending') AS kyc_status,
+                    p.kyc_doc_type
              FROM providers p
              JOIN users u ON u.id = p.user_id
              LEFT JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
@@ -442,6 +527,17 @@ async function getProviderById(req, res, next) {
 			}
 		}
 
+		if (weeklyAvailability.length === 0) {
+			weeklyAvailability = [
+				{ day: 1, start: "09:00", end: "18:00" },
+				{ day: 2, start: "09:00", end: "18:00" },
+				{ day: 3, start: "09:00", end: "18:00" },
+				{ day: 4, start: "09:00", end: "18:00" },
+				{ day: 5, start: "09:00", end: "18:00" },
+				{ day: 6, start: "10:00", end: "17:00" },
+			];
+		}
+
 		const servicesRes = await db.query(
 			`SELECT s.id, s.name, s.slug, s.description, s.image_url,
                     ps.price, ps.price_unit, ps.is_visible
@@ -480,6 +576,18 @@ async function getProviderById(req, res, next) {
 				end: s.end_time,
 				isBooked: s.is_booked === true,
 			}));
+
+			if (slots.length === 0 && weeklyAvailability.length > 0) {
+				const generated = generateRealSlots(weeklyAvailability);
+				slots = generated.map((s) => ({
+					date: typeof s.date === "string" ? s.date.slice(0, 10) : localDateStr(s.date),
+					start_time: s.start_time,
+					end_time: s.end_time,
+					start: s.start_time,
+					end: s.end_time,
+					isBooked: false,
+				}));
+			}
 		} catch (slotsErr) {
 			console.warn("Slots query fallback in getProviderById:", slotsErr.message);
 		}
@@ -809,20 +917,68 @@ async function getProviderAvailability(req, res, next) {
 				),
 			]);
 
-		if (masterRes.rows.length === 0) {
-			return res.json({ provider_id: providerIdValue, availability: [] });
+		let masterRows = masterRes.rows;
+		if (masterRows.length === 0) {
+			const provRow = await db.query(
+				"SELECT availability FROM providers WHERE user_id = $1",
+				[providerIdValue],
+			);
+			let rawAvail = provRow.rows[0]?.availability;
+			if (typeof rawAvail === "string") {
+				try {
+					rawAvail = JSON.parse(rawAvail);
+				} catch {
+					rawAvail = [];
+				}
+			}
+
+			if (Array.isArray(rawAvail) && rawAvail.length > 0) {
+				masterRows = rawAvail.map((a) => ({
+					day_of_week: parseInt(a.day, 10),
+					start_time: (a.start || a.start_time || "09:00").slice(0, 5),
+					end_time: (a.end || a.end_time || "18:00").slice(0, 5),
+				}));
+			} else {
+				// Standard operational business hours for mock / newly registered providers
+				masterRows = [
+					{ day_of_week: 1, start_time: "09:00", end_time: "18:00" },
+					{ day_of_week: 2, start_time: "09:00", end_time: "18:00" },
+					{ day_of_week: 3, start_time: "09:00", end_time: "18:00" },
+					{ day_of_week: 4, start_time: "09:00", end_time: "18:00" },
+					{ day_of_week: 5, start_time: "09:00", end_time: "18:00" },
+					{ day_of_week: 6, start_time: "10:00", end_time: "17:00" },
+				];
+			}
+
+			// Self-heal: Backfill into provider_master_availability table asynchronously
+			(async () => {
+				try {
+					for (const s of masterRows) {
+						await db.query(
+							`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
+							 VALUES ($1, $2, $3::time, $4::time)
+							 ON CONFLICT (provider_id, day_of_week, start_time, end_time) DO NOTHING`,
+							[providerIdValue, s.day_of_week, s.start_time, s.end_time],
+						);
+					}
+				} catch (healErr) {
+					console.warn("Self-heal master availability notice:", healErr.message);
+				}
+			})();
 		}
 
 		const serviceName = providerServiceRes.rows[0]?.name || "default";
 		const serviceConfig = getPriceDetails(serviceName);
 		const SLOT_DURATION = serviceConfig.slotDuration || 60;
-		const DEFAULT_BUFFER = serviceConfig.buffer || 20;
+		const DEFAULT_BUFFER = serviceConfig.buffer != null ? serviceConfig.buffer : 15;
+		const STEP_MINUTES = Math.min(60, SLOT_DURATION);
+		const MIN_LEAD_TIME_MINS = 45;
 
 		const masterMap = {};
-		for (const row of masterRes.rows) {
+		for (const row of masterRows) {
 			const d = parseInt(row.day_of_week, 10);
 			masterMap[d] = masterMap[d] || [];
-			masterMap[d].push({ start: row.start_time, end: row.end_time });
+			masterMap[d].push({ start: row.start_time.slice(0, 5), end: row.end_time.slice(0, 5) });
 		}
 
 		const exceptionsMap = {};
@@ -911,8 +1067,9 @@ async function getProviderAvailability(req, res, next) {
 					const currentSlotStart = sTime;
 					const currentSlotEnd = sTime + SLOT_DURATION;
 
-					if (dateStr === todayStr && currentSlotStart <= nowMinutes + 15) {
-						sTime += SLOT_DURATION;
+					// Same-day minimum lead time buffer (e.g. 45 min)
+					if (dateStr === todayStr && currentSlotStart < nowMinutes + MIN_LEAD_TIME_MINS) {
+						sTime += STEP_MINUTES;
 						continue;
 					}
 
@@ -976,7 +1133,7 @@ async function getProviderAvailability(req, res, next) {
 						});
 					}
 
-					sTime += SLOT_DURATION;
+					sTime += STEP_MINUTES;
 				}
 			}
 
@@ -1010,6 +1167,7 @@ async function deleteProvider(req, res, next) {
 
 module.exports = {
 	createProvider,
+	uploadKycDocument,
 	getProviders,
 	matchProviders,
 	getProviderById,

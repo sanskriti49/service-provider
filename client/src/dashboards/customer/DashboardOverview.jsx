@@ -335,7 +335,17 @@ const UpcomingCard = ({
 				</div>
 			</div>
 
-			<StatusBadge status={booking.status} dynamic={!isHero} />
+			<div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5">
+				<StatusBadge status={booking.status} dynamic={!isHero} />
+				{["booked", "confirmed", "in_progress"].includes(booking.status) && (booking.completion_otp || booking.otp) && (
+					<span
+						className="text-[10px] font-mono font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-200"
+						title="Completion OTP to share when work is done"
+					>
+						OTP: {booking.completion_otp || booking.otp}
+					</span>
+				)}
+			</div>
 		</div>
 
 		<div className="mt-4 pt-3 border-t border-gray-100/80 flex items-center justify-between gap-4">

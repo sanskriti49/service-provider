@@ -1,7 +1,11 @@
-﻿const express = require("express");
+const express = require("express");
 const router = express.Router();
 const c = require("../controllers/providerController");
 const authenticate = require("../middleware/authMiddleware");
+const upload = require("../middleware/upload");
+
+router.post("/v1/upload-kyc", upload.single("document"), c.uploadKycDocument);
+router.post("/upload-kyc", upload.single("document"), c.uploadKycDocument);
 
 router.post("/v1", c.createProvider);
 router.get("/v1", c.getProviders);

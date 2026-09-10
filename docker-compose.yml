@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # TaskGenie Express REST API
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: taskgenie_api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/taskgenie
+      - REDIS_URL=redis://redis:6379
+      - S3_ENDPOINT=http://localstack:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    depends_on:
+      - postgres
+      - redis
+      - localstack
+    networks:
+      - taskgenie_network
+
+  # Relational Database Tier
+  postgres:
+    image: postgres:15-alpine
+    container_name: taskgenie_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: taskgenie
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - taskgenie_network
+
+  # Distributed In-Memory Cache & Lock Store
+  redis:
+    image: redis:7-alpine
+    container_name: taskgenie_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - taskgenie_network
+
+  # LocalStack: $0 AWS Cloud Emulation (S3 & SQS)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: taskgenie_localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sqs
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - localstack_data:/var/lib/localstack
+    networks:
+      - taskgenie_network
+
+  # Prometheus: Cloud Observability & Metrics Scraper
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: taskgenie_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - taskgenie_network
+
+networks:
+  taskgenie_network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  localstack_data:

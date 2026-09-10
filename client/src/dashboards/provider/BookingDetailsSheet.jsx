@@ -18,6 +18,7 @@ import {
 	Wrench,
 	ArrowUpRight,
 } from "lucide-react";
+import CompletionOtpModal from "./CompletionOtpModal";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -35,6 +36,7 @@ export default function BookingDetailsSheet({
 	actionLoading,
 }) {
 	const [copied, setCopied] = useState(false);
+	const [showOtpModal, setShowOtpModal] = useState(false);
 
 	useEffect(() => {
 		document.body.style.overflow = "hidden";
@@ -222,29 +224,29 @@ export default function BookingDetailsSheet({
 					</div>
 
 					{/* Action Triggers */}
-					{isPastStart &&
-						(booking.status === "booked" ||
-							booking.status === "confirmed" ||
-							booking.status === "in_progress") && (
-							<div className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20 space-y-2.5">
-								<div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
-									<AlertTriangle size={14} />
-									<span>Job Status Reconciliation</span>
-								</div>
-								<button
-									onClick={() => onUpdateStatus(booking.booking_id, "completed")}
-									disabled={actionLoading === booking.booking_id}
-									className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-950 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-								>
-									{actionLoading === booking.booking_id ? (
-										<Loader2 size={14} className="animate-spin" />
-									) : (
-										<CheckCircle2 size={14} />
-									)}
-									Confirm Job Completion
-								</button>
+					{["booked", "confirmed", "in_progress"].includes(booking.status) && (
+						<div className="bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/20 space-y-2.5">
+							<div className="flex items-center gap-2 text-emerald-300 font-bold text-xs">
+								<ShieldCheck size={15} />
+								<span>Secure Job Completion</span>
 							</div>
-						)}
+							<p className="text-[11px] text-slate-300 leading-normal">
+								Completed this service? Ask the customer for their 4-digit Completion OTP to verify delivery and release payout.
+							</p>
+							<button
+								onClick={() => setShowOtpModal(true)}
+								disabled={actionLoading === booking.booking_id}
+								className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-950 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+							>
+								{actionLoading === booking.booking_id ? (
+									<Loader2 size={14} className="animate-spin" />
+								) : (
+									<CheckCircle2 size={14} />
+								)}
+								Complete Job (Enter Customer OTP)
+							</button>
+						</div>
+					)}
 
 					{booking.status === "pending" && (
 						<div className="space-y-2 pt-2">
@@ -317,6 +319,24 @@ export default function BookingDetailsSheet({
 					<span className="font-mono">Encrypted</span>
 				</div>
 			</motion.div>
+
+			<CompletionOtpModal
+				isOpen={showOtpModal}
+				onClose={() => setShowOtpModal(false)}
+				booking={booking}
+				loading={actionLoading === booking.booking_id}
+				onConfirm={async (otp, setError) => {
+					const success = await onUpdateStatus(
+						booking.booking_id,
+						"completed",
+						otp,
+						setError,
+					);
+					if (success !== false) {
+						setShowOtpModal(false);
+					}
+				}}
+			/>
 		</>,
 		document.body,
 	);

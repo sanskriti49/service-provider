@@ -220,7 +220,7 @@ export default function ProviderBookings() {
 		setShowFilters(false);
 	};
 
-	const handleStatusUpdate = (bookingId, newStatus) => {
+	const handleStatusUpdate = (bookingId, newStatus, otpProvided, setError) => {
 		if (newStatus === "cancelled") {
 			setConfirmConfig({
 				isOpen: true,
@@ -232,16 +232,18 @@ export default function ProviderBookings() {
 			});
 			return;
 		}
-		executeUpdate(bookingId, newStatus);
+		return executeUpdate(bookingId, newStatus, otpProvided, setError);
 	};
 
 	const executeUpdate = useCallback(
-		async (bookingId, newStatus) => {
+		async (bookingId, newStatus, otpProvided, setError) => {
 			setActionLoading(bookingId);
 			try {
-				await api.put(`/api/bookings/${bookingId}/status`, {
-					status: newStatus,
-				});
+				const payload = { status: newStatus };
+				if (otpProvided) {
+					payload.otp_provided = otpProvided;
+				}
+				await api.put(`/api/bookings/${bookingId}/status`, payload);
 				setBookings((prev) =>
 					prev.map((b) =>
 						b.booking_id === bookingId ? { ...b, status: newStatus } : b,
@@ -252,8 +254,15 @@ export default function ProviderBookings() {
 				}
 				setConfirmConfig((c) => ({ ...c, isOpen: false }));
 				toast.success(`Booking ${newStatus.replace(/_/g, " ")} successfully`);
+				return true;
 			} catch (err) {
-				toast.error("Failed to update booking status");
+				const errMsg =
+					err.response?.data?.message || "Failed to update booking status";
+				if (setError) {
+					setError(errMsg);
+				}
+				toast.error(errMsg);
+				return false;
 			} finally {
 				setActionLoading(null);
 			}

@@ -17,9 +17,12 @@ import {
 	Loader2,
 	DollarSign,
 	CircleAlert,
+	UploadCloud,
+	FileCheck,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "../api/axiosInstance";
+import VerifiedBadge from "../ui/VerifiedBadge";
 
 const DEFAULT_SERVICES = [
 	{
@@ -79,6 +82,7 @@ const DAYS = [
 export default function ApplyProvider() {
 	const [step, setStep] = useState(1);
 	const [loading, setLoading] = useState(false);
+	const [uploadingDoc, setUploadingDoc] = useState({ front: false, back: false });
 	const [successData, setSuccessData] = useState(null);
 	const [errorMsg, setErrorMsg] = useState("");
 
@@ -102,6 +106,11 @@ export default function ApplyProvider() {
 			{ day: 5, start: "09:00", end: "18:00" },
 			{ day: 6, start: "09:00", end: "18:00" },
 		],
+		kyc_doc_type: "aadhaar",
+		kyc_doc_number: "",
+		kyc_doc_front: "",
+		kyc_doc_back: "",
+		kyc_declaration: true,
 	});
 
 	useEffect(() => {
@@ -122,6 +131,33 @@ export default function ApplyProvider() {
 	const handleInputChange = (field, value) => {
 		setErrorMsg("");
 		setFormData((prev) => ({ ...prev, [field]: value }));
+	};
+
+	const handleFileUpload = async (side, file) => {
+		if (!file) return;
+		setUploadingDoc((prev) => ({ ...prev, [side]: true }));
+		setErrorMsg("");
+		try {
+			const uploadData = new FormData();
+			uploadData.append("document", file);
+			const res = await api.post("/providers/upload-kyc", uploadData, {
+				headers: { "Content-Type": "multipart/form-data" },
+			});
+			if (res.data?.url) {
+				handleInputChange(
+					side === "front" ? "kyc_doc_front" : "kyc_doc_back",
+					res.data.url,
+				);
+			}
+		} catch (err) {
+			console.error("KYC upload error:", err);
+			setErrorMsg(
+				err.response?.data?.error ||
+					"Failed to upload verification document. Please try again.",
+			);
+		} finally {
+			setUploadingDoc((prev) => ({ ...prev, [side]: false }));
+		}
 	};
 
 	const toggleDayAvailability = (dayId) => {
@@ -173,15 +209,43 @@ export default function ApplyProvider() {
 				setErrorMsg("Password must be at least 6 characters");
 				return;
 			}
+		} else if (step === 2) {
+			if (!formData.service) {
+				setErrorMsg("Please select a primary service");
+				return;
+			}
+			if (!formData.price || Number(formData.price) <= 0) {
+				setErrorMsg("Please enter a valid starting service rate");
+				return;
+			}
+		} else if (step === 3) {
+			if (!formData.availability || formData.availability.length === 0) {
+				setErrorMsg("Please select at least one working day in your schedule");
+				return;
+			}
 		}
 		setErrorMsg("");
-		setStep((s) => Math.min(s + 1, 3));
+		setStep((s) => Math.min(s + 1, 4));
 	};
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
-		setLoading(true);
 		setErrorMsg("");
+
+		if (!formData.kyc_doc_type) {
+			setErrorMsg("Please select a government ID document type for KYC verification.");
+			return;
+		}
+		if (!formData.kyc_doc_number || formData.kyc_doc_number.trim().length < 4) {
+			setErrorMsg("Please enter your valid identification document number.");
+			return;
+		}
+		if (!formData.kyc_declaration) {
+			setErrorMsg("Please accept the background verification consent declaration.");
+			return;
+		}
+
+		setLoading(true);
 
 		try {
 			const payload = {
@@ -195,6 +259,10 @@ export default function ApplyProvider() {
 				price: Number(formData.price),
 				price_unit: formData.price_unit,
 				availability: formData.availability,
+				kyc_doc_type: formData.kyc_doc_type,
+				kyc_doc_number: formData.kyc_doc_number.trim(),
+				kyc_doc_front: formData.kyc_doc_front || null,
+				kyc_doc_back: formData.kyc_doc_back || null,
 			};
 
 			const res = await api.post("/providers/v1", payload);
@@ -237,14 +305,15 @@ export default function ApplyProvider() {
 				{!successData && (
 					<div className="bg-white/90 backdrop-blur-md rounded-2xl border border-violet-100 p-4 shadow-sm flex items-center justify-between">
 						{[
-							{ num: 1, label: "Personal Info" },
-							{ num: 2, label: "Service & Rates" },
-							{ num: 3, label: "Working Schedule" },
+							{ num: 1, label: "Personal" },
+							{ num: 2, label: "Services" },
+							{ num: 3, label: "Schedule" },
+							{ num: 4, label: "Identity & KYC" },
 						].map((s, idx) => (
 							<React.Fragment key={s.num}>
-								<div className="flex items-center gap-2.5">
+								<div className="flex items-center gap-2">
 									<div
-										className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
+										className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
 											step >= s.num
 												? "bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/20"
 												: "bg-slate-100 text-slate-400 border border-slate-200"
@@ -253,19 +322,16 @@ export default function ApplyProvider() {
 										{step > s.num ? <CheckCircle2 size={16} /> : s.num}
 									</div>
 									<span
-										className={`text-xs font-semibold hidden sm:inline ${
-											step >= s.num
-												? "text-violet-950 font-bold"
-												: "text-slate-400"
+										className={`text-xs font-bold hidden sm:inline ${
+											step >= s.num ? "text-[#281950]" : "text-slate-400"
 										}`}
 									>
 										{s.label}
 									</span>
 								</div>
-
-								{idx < 2 && (
+								{idx < 3 && (
 									<div
-										className={`flex-1 h-[2px] mx-3 rounded-full transition-colors ${
+										className={`h-0.5 flex-1 mx-2 sm:mx-3 rounded-full transition-all ${
 											step > s.num
 												? "bg-gradient-to-r from-violet-500 to-pink-500"
 												: "bg-slate-200"
@@ -638,6 +704,280 @@ export default function ApplyProvider() {
 								</motion.div>
 							)}
 
+							{step === 4 && (
+								<motion.div
+									initial={{ opacity: 0, x: -10 }}
+									animate={{ opacity: 1, x: 0 }}
+									className="space-y-6"
+								>
+									<div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+										<div>
+											<h3 className="text-lg font-bold text-[#281950] flex items-center gap-2">
+												<span>Step 4: Identity &amp; Background Verification</span>
+											</h3>
+											<p className="text-xs text-slate-500 mt-0.5">
+												Upload government-approved documentation to earn your gold Verified Pro trust badge.
+											</p>
+										</div>
+										<VerifiedBadge size="md" />
+									</div>
+
+									{/* Trust & Safety Banner */}
+									<div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-yellow-500/10 border border-amber-400/30 flex items-start gap-3.5 text-slate-700">
+										<div className="p-2.5 bg-amber-500/15 rounded-xl text-amber-600 dark:text-amber-400 shrink-0">
+											<ShieldCheck size={22} className="stroke-[2.2]" />
+										</div>
+										<div className="space-y-1">
+											<div className="text-xs font-bold text-[#281950] flex items-center gap-2">
+												<span>TaskGenie Trust &amp; Safety Standard</span>
+												<span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-200/80 text-amber-950 font-bold">
+													Fraud Prevention
+												</span>
+											</div>
+											<p className="text-xs text-slate-600 leading-relaxed">
+												To protect homeowners from unauthorized personnel, every provider is checked by our administrative security team. Verified pros enjoy <strong>3.8x higher booking conversion</strong> and priority dispatch.
+											</p>
+										</div>
+									</div>
+
+									{/* Document Type Selector */}
+									<div className="space-y-2">
+										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+											Select Identification Document *
+										</label>
+										<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+											{[
+												{
+													id: "aadhaar",
+													label: "Aadhaar Card",
+													sub: "UIDAI 12-Digit ID",
+													icon: "🇮🇳",
+												},
+												{
+													id: "driving_license",
+													label: "Driving License",
+													sub: "State Transport Dept",
+													icon: "🪪",
+												},
+												{
+													id: "certificate",
+													label: "Trade Certificate",
+													sub: "Certified Professional",
+													icon: "📜",
+												},
+											].map((doc) => (
+												<button
+													key={doc.id}
+													type="button"
+													onClick={() => handleInputChange("kyc_doc_type", doc.id)}
+													className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+														formData.kyc_doc_type === doc.id
+															? "bg-violet-50/80 border-violet-500 shadow-sm ring-1 ring-violet-400/50"
+															: "bg-slate-50/50 border-slate-200 hover:bg-slate-100/70"
+													}`}
+												>
+													<div className="text-xl mb-1.5">{doc.icon}</div>
+													<div className="text-xs font-bold text-[#281950]">
+														{doc.label}
+													</div>
+													<div className="text-[10px] text-slate-500">
+														{doc.sub}
+													</div>
+												</button>
+											))}
+										</div>
+									</div>
+
+									{/* Document Number Input */}
+									<div>
+										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+											{formData.kyc_doc_type === "aadhaar"
+												? "Aadhaar Number (12 Digits) *"
+												: formData.kyc_doc_type === "driving_license"
+													? "Driving License Number *"
+													: "Trade Certificate / Registration ID *"}
+										</label>
+										<input
+											type="text"
+											value={formData.kyc_doc_number}
+											onChange={(e) =>
+												handleInputChange("kyc_doc_number", e.target.value)
+											}
+											placeholder={
+												formData.kyc_doc_type === "aadhaar"
+													? "e.g. 5482 1920 4412"
+													: formData.kyc_doc_type === "driving_license"
+														? "e.g. MH-02-2018-0091242"
+														: "e.g. CERT-PLUMB-90211"
+											}
+											className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-500 font-mono tracking-wide"
+										/>
+									</div>
+
+									{/* Document Image Uploads: Front & Back */}
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+										{/* Front Document */}
+										<div className="space-y-2">
+											<div className="flex items-center justify-between">
+												<label className="text-xs font-bold text-slate-700">
+													Document Front Photo *
+												</label>
+												{formData.kyc_doc_front && (
+													<span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+														<FileCheck size={13} /> Attached
+													</span>
+												)}
+											</div>
+											{formData.kyc_doc_front ? (
+												<div className="relative rounded-2xl border border-violet-200 overflow-hidden bg-slate-100 group aspect-[4/3] flex items-center justify-center shadow-inner">
+													<img
+														src={formData.kyc_doc_front}
+														alt="Document Front Preview"
+														className="w-full h-full object-cover"
+													/>
+													<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+														<button
+															type="button"
+															onClick={() => handleInputChange("kyc_doc_front", "")}
+															className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition cursor-pointer shadow-md"
+														>
+															Remove Photo
+														</button>
+													</div>
+												</div>
+											) : (
+												<label
+													className={`border-2 border-dashed rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition aspect-[4/3] ${
+														uploadingDoc.front
+															? "border-violet-400 bg-violet-50/50"
+															: "border-slate-200 hover:border-violet-400 hover:bg-slate-50"
+													}`}
+												>
+													<input
+														type="file"
+														accept="image/*,.pdf"
+														className="hidden"
+														disabled={uploadingDoc.front}
+														onChange={(e) =>
+															handleFileUpload("front", e.target.files[0])
+														}
+													/>
+													{uploadingDoc.front ? (
+														<div className="flex flex-col items-center gap-2 text-violet-600">
+															<Loader2 size={24} className="animate-spin" />
+															<span className="text-xs font-semibold">
+																Uploading Document...
+															</span>
+														</div>
+													) : (
+														<div className="flex flex-col items-center gap-2 text-slate-500">
+															<div className="w-10 h-10 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center">
+																<UploadCloud size={20} />
+															</div>
+															<div className="text-xs font-bold text-slate-700">
+																Upload Front Side
+															</div>
+															<div className="text-[10px] text-slate-400">
+																PNG, JPG, or PDF (Max 10MB)
+															</div>
+														</div>
+													)}
+												</label>
+											)}
+										</div>
+
+										{/* Back Document */}
+										<div className="space-y-2">
+											<div className="flex items-center justify-between">
+												<label className="text-xs font-bold text-slate-700">
+													Document Back Photo (Optional)
+												</label>
+												{formData.kyc_doc_back && (
+													<span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+														<FileCheck size={13} /> Attached
+													</span>
+												)}
+											</div>
+											{formData.kyc_doc_back ? (
+												<div className="relative rounded-2xl border border-violet-200 overflow-hidden bg-slate-100 group aspect-[4/3] flex items-center justify-center shadow-inner">
+													<img
+														src={formData.kyc_doc_back}
+														alt="Document Back Preview"
+														className="w-full h-full object-cover"
+													/>
+													<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+														<button
+															type="button"
+															onClick={() => handleInputChange("kyc_doc_back", "")}
+															className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition cursor-pointer shadow-md"
+														>
+															Remove Photo
+														</button>
+													</div>
+												</div>
+											) : (
+												<label
+													className={`border-2 border-dashed rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition aspect-[4/3] ${
+														uploadingDoc.back
+															? "border-violet-400 bg-violet-50/50"
+															: "border-slate-200 hover:border-violet-400 hover:bg-slate-50"
+													}`}
+												>
+													<input
+														type="file"
+														accept="image/*,.pdf"
+														className="hidden"
+														disabled={uploadingDoc.back}
+														onChange={(e) =>
+															handleFileUpload("back", e.target.files[0])
+														}
+													/>
+													{uploadingDoc.back ? (
+														<div className="flex flex-col items-center gap-2 text-violet-600">
+															<Loader2 size={24} className="animate-spin" />
+															<span className="text-xs font-semibold">
+																Uploading Document...
+															</span>
+														</div>
+													) : (
+														<div className="flex flex-col items-center gap-2 text-slate-500">
+															<div className="w-10 h-10 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center">
+																<UploadCloud size={20} />
+															</div>
+															<div className="text-xs font-bold text-slate-700">
+																Upload Back Side
+															</div>
+															<div className="text-[10px] text-slate-400">
+																PNG, JPG, or PDF (Max 10MB)
+															</div>
+														</div>
+													)}
+												</label>
+											)}
+										</div>
+									</div>
+
+									{/* Consent Checkbox */}
+									<div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+										<input
+											type="checkbox"
+											id="kyc_declaration"
+											checked={formData.kyc_declaration}
+											onChange={(e) =>
+												handleInputChange("kyc_declaration", e.target.checked)
+											}
+											className="w-4 h-4 accent-violet-600 rounded cursor-pointer mt-0.5"
+										/>
+										<label
+											htmlFor="kyc_declaration"
+											className="text-xs text-slate-600 cursor-pointer select-none leading-relaxed"
+										>
+											I declare that the identification details and documents provided belong to me and are authentic. I give consent to TaskGenie to verify these documents with authorized databases to issue my <strong>Verified Pro</strong> badge.
+										</label>
+									</div>
+								</motion.div>
+							)}
+
 							<div className="pt-6 border-t border-slate-100 flex items-center justify-between">
 								{step > 1 ? (
 									<button
@@ -651,7 +991,7 @@ export default function ApplyProvider() {
 									<div />
 								)}
 
-								{step < 3 ? (
+								{step < 4 ? (
 									<button
 										type="button"
 										onClick={handleNextStep}
@@ -662,7 +1002,7 @@ export default function ApplyProvider() {
 								) : (
 									<button
 										type="submit"
-										disabled={loading}
+										disabled={loading || uploadingDoc.front || uploadingDoc.back}
 										className="flex items-center gap-2 px-8 py-3 rounded-full font-bold text-sm text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 shadow-lg shadow-purple-500/25 disabled:opacity-50 transition-all cursor-pointer"
 									>
 										{loading ? (
@@ -670,7 +1010,7 @@ export default function ApplyProvider() {
 										) : (
 											<Sparkles size={16} />
 										)}
-										<span>Submit Application</span>
+										<span>Submit Application &amp; KYC</span>
 									</button>
 								)}
 							</div>

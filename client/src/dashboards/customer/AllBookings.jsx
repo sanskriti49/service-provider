@@ -549,6 +549,11 @@ export default function AllBookings() {
 														date={item.date}
 														startTime={item.start_time}
 													/>
+													{["booked", "confirmed", "in_progress"].includes(item.status) && (item.completion_otp || item.otp) && (
+														<span className="mt-1.5 flex items-center gap-1 text-[10px] font-mono font-bold text-violet-700 bg-violet-50/80 px-2 py-0.5 rounded-md border border-violet-200/70 w-fit">
+															OTP: {item.completion_otp || item.otp}
+														</span>
+													)}
 												</td>
 												<td className="p-5 text-right">
 													<div className="flex items-center justify-end gap-2">

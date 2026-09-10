@@ -9,6 +9,7 @@ const {
 	getRecentProviderBookings,
 	getUpcomingBookings,
 	getProviderHistory,
+	regenerateCompletionOtp,
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const db = require("../config/db");
@@ -100,6 +101,13 @@ router.patch(
 	updateBookingAddress,
 );
 
+router.post(
+	"/:booking_id/regenerate-otp",
+	authMiddleware,
+	allowRoles("customer"),
+	regenerateCompletionOtp,
+);
+
 router.put("/:booking_id/status", authMiddleware, updateBookingStatus);
 
 router.get("/:booking_id", authMiddleware, async (req, res) => {
@@ -118,6 +126,11 @@ router.get("/:booking_id", authMiddleware, async (req, res) => {
 			booking.provider_id !== req.user.id
 		) {
 			return res.status(403).json({ message: "Access denied" });
+		}
+
+		if (req.user.role === "provider") {
+			delete booking.otp;
+			delete booking.completion_otp;
 		}
 
 		res.json(booking);

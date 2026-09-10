@@ -245,6 +245,15 @@ async function getProviders(req, res, next) {
 				(SELECT MIN(ps.price) FROM provider_services ps WHERE ps.provider_id = u.id) AS base_price,
 				p.rejection_reason,
 				p.approved_at,
+				p.kyc_doc_type,
+				p.kyc_doc_number,
+				p.kyc_doc_front,
+				p.kyc_doc_back,
+				COALESCE(p.kyc_status, 'pending') AS kyc_status,
+				COALESCE(p.is_verified, false) AS is_verified,
+				p.verification_badge,
+				p.verified_at,
+				p.kyc_submitted_at,
 				(
 					SELECT json_agg(json_build_object(
 						'service_id', s.id,
@@ -307,12 +316,16 @@ async function updateProviderStatus(req, res, next) {
 		}
 		const user = userRes.rows[0];
 
-		// Upsert provider status
+		// Upsert provider status & sync KYC verification if approved
 		await db.query(
 			`UPDATE providers 
 			 SET status = $1, 
 			     rejection_reason = $2,
-			     approved_at = (CASE WHEN $1 = 'approved' THEN now() ELSE approved_at END)
+			     approved_at = (CASE WHEN $1 = 'approved' THEN now() ELSE approved_at END),
+			     kyc_status = (CASE WHEN $1 = 'approved' THEN 'verified' WHEN $1 = 'rejected' THEN 'rejected' ELSE kyc_status END),
+			     is_verified = (CASE WHEN $1 = 'approved' THEN TRUE WHEN $1 IN ('rejected', 'suspended') THEN FALSE ELSE is_verified END),
+			     verification_badge = (CASE WHEN $1 = 'approved' THEN 'verified_pro' ELSE verification_badge END),
+			     verified_at = (CASE WHEN $1 = 'approved' THEN now() ELSE verified_at END)
 			 WHERE user_id = $3`,
 			[status, rejection_reason, user.id],
 		);
@@ -320,14 +333,14 @@ async function updateProviderStatus(req, res, next) {
 		// Send in-app notification to provider
 		const notificationTitle =
 			status === "approved"
-				? "🎉 Application Approved!"
+				? "🎉 Application Approved & Verified!"
 				: status === "rejected"
 					? "Application Update"
 					: "Account Status Update";
 
 		const notificationMsg =
 			status === "approved"
-				? "Congratulations! Your service provider profile has been approved. You are now live and can receive bookings."
+				? "Congratulations! Your service provider profile and identity documents have been approved. You now hold the Gold 'Verified Pro' badge and can receive bookings."
 				: status === "rejected"
 					? `Your application was not approved at this time. Reason: ${rejection_reason || "Requirements not met."}`
 					: `Your provider account status has been updated to: ${status}.`;
@@ -355,6 +368,73 @@ async function updateProviderStatus(req, res, next) {
 			message: `Provider status updated to ${status}`,
 			provider_id: user.id,
 			status,
+		});
+	} catch (err) {
+		next(err);
+	}
+}
+
+/**
+ * PUT /api/admin/providers/:id/kyc
+ * Explicitly verify or reject a provider's KYC documents & toggle Verified Pro badge
+ */
+async function updateProviderKyc(req, res, next) {
+	try {
+		const providerId = req.params.id;
+		const { kyc_status, rejection_reason = null } = req.body;
+
+		const validKycStatuses = ["verified", "rejected", "pending"];
+		if (!validKycStatuses.includes(kyc_status)) {
+			return res.status(400).json({ error: `Invalid kyc_status. Allowed: ${validKycStatuses.join(", ")}` });
+		}
+
+		const userRes = await db.query(
+			"SELECT id, name, email FROM users WHERE (id::text = $1 OR custom_id = $1) AND role = 'provider'",
+			[providerId],
+		);
+		if (userRes.rows.length === 0) {
+			return res.status(404).json({ error: "Provider not found" });
+		}
+		const user = userRes.rows[0];
+
+		const isVerified = kyc_status === "verified";
+		const badge = isVerified ? "verified_pro" : null;
+
+		await db.query(
+			`UPDATE providers
+			 SET kyc_status = $1,
+			     is_verified = $2,
+			     verification_badge = $3,
+			     verified_at = (CASE WHEN $2 = TRUE THEN now() ELSE NULL END),
+			     rejection_reason = (CASE WHEN $1 = 'rejected' THEN $4 ELSE rejection_reason END)
+			 WHERE user_id = $5`,
+			[kyc_status, isVerified, badge, rejection_reason, user.id],
+		);
+
+		const title = isVerified ? "🎖️ Verified Pro Badge Awarded!" : "KYC Document Verification Update";
+		const msg = isVerified
+			? "Congratulations! Your identity & background check documents have been verified. You have been awarded the Gold 'Verified Pro' badge!"
+			: `Your KYC verification was not approved. Reason: ${rejection_reason || "Documents could not be verified."}`;
+
+		try {
+			await db.query(
+				`INSERT INTO notifications (user_id, title, message, type, data)
+				 VALUES ($1, $2, $3, 'system', $4)`,
+				[user.id, title, msg, JSON.stringify({ kyc_status, is_verified: isVerified })],
+			);
+		} catch (notifErr) {
+			console.warn("Could not dispatch KYC status notification:", notifErr.message);
+		}
+
+		cache.delPattern("provider");
+
+		res.json({
+			success: true,
+			message: `Provider KYC updated to ${kyc_status}`,
+			provider_id: user.id,
+			kyc_status,
+			is_verified: isVerified,
+			verification_badge: badge,
 		});
 	} catch (err) {
 		next(err);
@@ -623,6 +703,7 @@ module.exports = {
 	getOverviewStats,
 	getProviders,
 	updateProviderStatus,
+	updateProviderKyc,
 	getDisputes,
 	createDispute,
 	resolveDispute,

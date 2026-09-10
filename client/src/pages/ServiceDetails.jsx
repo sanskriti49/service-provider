@@ -21,6 +21,7 @@ import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { UNIT_LABELS } from "../utils/pricingHelper";
 import ReviewModal from "../ui/ReviewModal";
 import { apiCache } from "../utils/apiCache";
+import VerifiedBadge from "../ui/VerifiedBadge";
 
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
@@ -563,10 +564,14 @@ const ProviderCard = ({
 							{provider.name}
 						</h3>
 						<div className="flex items-center gap-2 text-xs text-violet-300/80 mt-1 mb-2.5">
-							<div className="flex items-center gap-1">
-								<CheckCircle2 size={12} className="text-green-400" />
-								<span>Verified</span>
-							</div>
+							{provider.is_verified ? (
+								<VerifiedBadge size="sm" />
+							) : (
+								<div className="flex items-center gap-1 text-slate-300/80">
+									<CheckCircle2 size={12} className="text-violet-400" />
+									<span>Pro Partner</span>
+								</div>
+							)}
 
 							{provider.distance_km != null && (
 								<div className="flex items-center gap-1 text-violet-300 bg-violet-500/10 px-2 py-0.5 rounded-md text-[11px] font-medium border border-violet-500/20">

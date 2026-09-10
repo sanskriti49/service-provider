@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -15,8 +15,10 @@ import {
 	Copy,
 	KeyRound,
 	Star,
+	RotateCw,
 } from "lucide-react";
 import ReviewModal from "../../ui/ReviewModal";
+import api from "../../api/axiosInstance";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -32,7 +34,49 @@ export default function BookingDetailsSheet({
 	actionLoading,
 }) {
 	const [copied, setCopied] = useState(false);
+	const [otpCopied, setOtpCopied] = useState(false);
+	const [currentOtp, setCurrentOtp] = useState(
+		booking?.completion_otp || booking?.otp || "",
+	);
+	const [isRegenerating, setIsRegenerating] = useState(false);
 	const [showReviewModal, setShowReviewModal] = useState(false);
+
+	useEffect(() => {
+		setCurrentOtp(booking?.completion_otp || booking?.otp || "");
+	}, [booking?.completion_otp, booking?.otp]);
+
+	const handleRegenerateOtp = async () => {
+		if (isRegenerating || !booking?.booking_id) return;
+		setIsRegenerating(true);
+		try {
+			const res = await api.post(
+				`/api/bookings/${booking.booking_id}/regenerate-otp`,
+			);
+			const newCode = res.data.completion_otp || res.data.otp;
+			if (newCode) {
+				setCurrentOtp(newCode);
+				if (booking) {
+					booking.completion_otp = newCode;
+					booking.otp = newCode;
+				}
+				toast.success("New 4-digit Completion OTP generated!");
+			}
+		} catch (err) {
+			toast.error(
+				err.response?.data?.message || "Failed to regenerate Completion OTP",
+			);
+		} finally {
+			setIsRegenerating(false);
+		}
+	};
+
+	const handleCopyOtp = (code) => {
+		if (!code) return;
+		navigator.clipboard.writeText(code);
+		setOtpCopied(true);
+		toast.success("Completion OTP copied to clipboard");
+		setTimeout(() => setOtpCopied(false), 2000);
+	};
 
 	useEffect(() => {
 		document.body.style.overflow = "hidden";
@@ -106,19 +150,65 @@ export default function BookingDetailsSheet({
 				</div>
 
 				<div className="flex-1 overflow-y-auto p-6 space-y-6">
-					{["booked", "confirmed"].includes(booking.status) && booking.otp && (
-						<div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-5 rounded-2xl border border-violet-500/30 space-y-2">
-							<div className="flex items-center gap-2 text-violet-300 font-bold text-sm">
-								<KeyRound size={16} />
-								<span>Secure Start OTP</span>
+					{["booked", "confirmed", "in_progress"].includes(booking.status) && (
+						<div className="bg-gradient-to-br from-violet-950/50 via-purple-900/20 to-fuchsia-950/40 p-5 rounded-2xl border border-violet-500/30 shadow-lg space-y-3">
+							<div className="flex items-center justify-between">
+								<div className="flex items-center gap-2 text-violet-300 font-bold text-sm">
+									<KeyRound size={17} className="text-violet-400" />
+									<span>Secure Completion OTP</span>
+								</div>
+								<button
+									onClick={handleRegenerateOtp}
+									disabled={isRegenerating}
+									className="flex items-center gap-1.5 text-[11px] font-semibold text-violet-300 hover:text-white bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 px-2.5 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+									title="Regenerate code"
+								>
+									<RotateCw
+										size={12}
+										className={isRegenerating ? "animate-spin" : ""}
+									/>
+									<span>{isRegenerating ? "Generating..." : "New Code"}</span>
+								</button>
 							</div>
-							<p className="text-3xl font-mono font-black tracking-widest text-white text-center py-2 bg-slate-950/40 rounded-xl border border-white/5">
-								{booking.otp}
+
+							<div className="flex items-center justify-center gap-3 py-3 bg-slate-950/60 rounded-xl border border-white/10">
+								<p className="text-3xl font-mono font-black tracking-widest text-emerald-400 select-all">
+									{currentOtp || "••••"}
+								</p>
+								<button
+									onClick={() => handleCopyOtp(currentOtp)}
+									className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 border border-white/5 transition-all cursor-pointer"
+									title="Copy OTP"
+								>
+									{otpCopied ? (
+										<CheckCircle2 size={16} className="text-emerald-400" />
+									) : (
+										<Copy size={16} />
+									)}
+								</button>
+							</div>
+
+							<p className="text-xs text-slate-300 text-center leading-relaxed">
+								Share this 4-digit completion code with your provider{" "}
+								<strong className="text-white">
+									only after the work is completely done
+								</strong>
+								. The booking cannot transition to completed without this OTP.
 							</p>
-							<p className="text-xs text-slate-400 text-center leading-normal">
-								Share this 4-digit code with the provider <b>only after</b> they
-								arrive at your location to safely log the job start.
-							</p>
+						</div>
+					)}
+
+					{booking.status === "completed" && (
+						<div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+							<ShieldCheck size={22} className="text-emerald-400 shrink-0" />
+							<div>
+								<p className="text-xs font-bold text-white">
+									Job Completed & Verified
+								</p>
+								<p className="text-[11px] text-slate-400 mt-0.5">
+									Verified via secure customer 4-digit completion handshake.
+								</p>
+							</div>
 						</div>
 					)}
 
