@@ -69,7 +69,7 @@ export default function VerifiedBadge({
 					style={{ filter: "drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))" }}
 				>
 					<div className="bg-neutral-900 border border-amber-500/30 text-neutral-100 text-[11px] rounded-md px-2.5 py-1.5 whitespace-nowrap flex items-center gap-1.5 shadow-xl">
-						<span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+						<span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
 						<span>Govt ID &amp; Background Check Verified by TaskGenie</span>
 					</div>
 					<div className="w-2 h-2 bg-neutral-900 border-b border-r border-amber-500/30 transform rotate-45 mx-auto -mt-1" />

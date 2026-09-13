@@ -23,9 +23,8 @@ import ReviewModal from "../ui/ReviewModal";
 import { apiCache } from "../utils/apiCache";
 import VerifiedBadge from "../ui/VerifiedBadge";
 
+import { API_URL } from "../config";
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const formatTime = (timeStr) => {
 	if (!timeStr) return "";

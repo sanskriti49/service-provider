@@ -9,7 +9,7 @@ export default function PlainLayout() {
 
 	return (
 		<div
-			className="min-h-screen w-full bg-cover bg-center bg-no-repeat bg-fixed overflow-x-hidden"
+			className="min-h-screen w-full bg-cover bg-center bg-no-repeat overflow-x-hidden"
 			style={{ backgroundImage: "url('/images/background.webp')" }}
 		>
 			<AnimatePresence mode="wait">

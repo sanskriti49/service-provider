@@ -11,7 +11,6 @@ import {
 	CircleAlert,
 	Mail,
 } from "lucide-react";
-import confetti from "canvas-confetti";
 import api from "../../api/axiosInstance";
 
 export default function BookingSuccess() {
@@ -54,30 +53,6 @@ export default function BookingSuccess() {
 		return () => clearInterval(timer);
 	}, [isValid, booking.created_at]);
 
-	useEffect(() => {
-		if (!isValid) return;
-		const duration = 3 * 1000;
-		const animationEnd = Date.now() + duration;
-		const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-		const randomInRange = (min, max) => Math.random() * (max - min) + min;
-
-		const interval = setInterval(function () {
-			const remainingTime = animationEnd - Date.now();
-			if (remainingTime <= 0) return clearInterval(interval);
-			const particleCount = 50 * (remainingTime / duration);
-			confetti({
-				...defaults,
-				particleCount,
-				origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-			});
-			confetti({
-				...defaults,
-				particleCount,
-				origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-			});
-		}, 250);
-		return () => clearInterval(interval);
-	}, [isValid]);
 
 	const formatCountDown = (ms) => {
 		const minutes = Math.floor(ms / 60000);
@@ -91,7 +66,7 @@ export default function BookingSuccess() {
 		setErrorMsg(null);
 
 		try {
-			await api.patch(`/bookings/${booking.booking_id}/address`, {
+			await api.patch(`/api/bookings/${booking.booking_id}/address`, {
 				address: tempAddress,
 			});
 			setAddress(tempAddress);
@@ -207,7 +182,7 @@ export default function BookingSuccess() {
 											onClick={() => setIsEditing(true)}
 											className="cursor-pointer flex items-center gap-1.5 text-xs font-bold bg-white/10 hover:bg-white/20 px-2 py-1 rounded-full text-white transition-colors border border-white/5"
 										>
-											<span className="text-green-400 animate-pulse">●</span>
+											<span className="text-green-400">●</span>
 											Change
 										</button>
 									)}

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Avatar } from "@mui/material";
 import {
 	MapPin,
 	Phone,
@@ -13,7 +12,7 @@ import {
 	EyeOff,
 	Save,
 } from "lucide-react";
-import api from "../../api/axios";
+import api from "../../api/axiosInstance";
 import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 import ConfirmDialog from "../../ui/ConfirmDialog";
@@ -368,17 +367,12 @@ const CustomerSettings = () => {
 											className="w-full h-full object-cover rounded-full"
 										/>
 									) : (
-										<Avatar
-											sx={{
-												width: "100%",
-												height: "100%",
-												fontSize: "2.5rem",
-												fontWeight: "bold",
-												background: "linear-gradient(135deg, #7c3aed, #c026d3)",
-											}}
+										<div
+											className="flex h-full w-full items-center justify-center rounded-full bg-violet-600 text-[2.5rem] font-bold text-white select-none"
+											aria-hidden="true"
 										>
 											{getInitials(user.name || user.email)}
-										</Avatar>
+										</div>
 									)}
 								</div>
 								<div className="absolute bottom-2 right-1 w-7 h-7 bg-green-500 border-4 border-white rounded-full shadow-sm" />

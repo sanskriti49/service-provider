@@ -303,7 +303,7 @@ async function updateBookingStatus(req, res) {
             JOIN users u ON b.user_id=u.id
             JOIN users p ON b.provider_id=p.id
             LEFT JOIN services s ON b.service_id=s.id
-            WHERE booking_id=$1 FOR UPDATE
+            WHERE b.booking_id=$1 FOR UPDATE OF b
         `;
 		const bookingRes = await client.query(checkQ, [booking_id]);
 		if (bookingRes.rows.length === 0) {

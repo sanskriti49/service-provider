@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../api/axiosInstance";
 
+import axios from "axios";
 export const useFetch = (url) => {
 	const [data, setData] = useState(null);
 	const [loading, setLoading] = useState(true);
@@ -17,7 +18,7 @@ export const useFetch = (url) => {
 			setLoading(true);
 			setError(null);
 			try {
-				const response = await axios.get(url, { signal: controller.signal });
+				const response = await api.get(url, { signal: controller.signal });
 				setData(response.data);
 			} catch (err) {
 				if (axios.isCancel(err)) {

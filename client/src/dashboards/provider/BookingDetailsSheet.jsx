@@ -71,7 +71,7 @@ export default function BookingDetailsSheet({
 		},
 		in_progress: {
 			bar: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
-			dot: "bg-indigo-400 animate-pulse",
+			dot: "bg-indigo-400",
 		},
 		no_show: {
 			bar: "bg-rose-500/10 text-rose-300 border-rose-500/20",

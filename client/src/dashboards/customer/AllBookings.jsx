@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import Swal from "sweetalert2";
 import { toast } from "sonner";
 import {
 	Calendar,
@@ -159,7 +158,7 @@ export default function AllBookings() {
 					min_price: activeFilters.minPrice,
 					service_filter: activeFilters.serviceName,
 				};
-				const res = await api.get("/bookings/user/history", {
+				const res = await api.get("/api/bookings/user/history", {
 					params,
 					signal: controller.signal,
 				});
@@ -231,7 +230,7 @@ export default function AllBookings() {
 	const executeApiUpdate = async (bookingId, newStatus) => {
 		setActionLoading(bookingId);
 		try {
-			await api.put(`/bookings/${bookingId}/status`, { status: newStatus });
+			await api.put(`/api/bookings/${bookingId}/status`, { status: newStatus });
 			setHistory((prev) =>
 				prev.map((item) =>
 					item.booking_id === bookingId ? { ...item, status: newStatus } : item,

@@ -3,12 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 
+import { API_URL } from "../config";
 export const SearchBar = () => {
 	const navigate = useNavigate();
-	const API_URL =
-		(import.meta.env && import.meta.env.VITE_API_URL) ||
-		"http://localhost:3000";
-
 	const [query, setQuery] = useState("");
 	const [suggestions, setSuggestions] = useState([]);
 	const [allServices, setAllServices] = useState([]);

@@ -90,14 +90,14 @@ export default function BookingPage() {
 				let currentProvider = provider;
 				if (!currentProvider) {
 					setLoading(true);
-					const provRes = await api.get(`/providers/v1/${customId}`);
+					const provRes = await api.get(`/api/providers/v1/${customId}`);
 					currentProvider = provRes.data?.provider;
 					setProvider(currentProvider);
 				}
 
 				if (currentProvider && (currentProvider.id || currentProvider.user_id)) {
 					const provIdentifier = currentProvider.user_id || currentProvider.id;
-					const slotsRes = await api.get(`/providers/v1/${provIdentifier}/availability`);
+					const slotsRes = await api.get(`/api/providers/v1/${provIdentifier}/availability`);
 					if (slotsRes.data) {
 						setAvailability(slotsRes.data);
 					}
@@ -248,7 +248,7 @@ export default function BookingPage() {
 			const endTimeVal = selectedTime.end_time || selectedTime.end;
 			const providerIdVal = provider.user_id || provider.id || provider.custom_id;
 
-			const res = await api.post("/bookings", {
+			const res = await api.post("/api/bookings", {
 				provider_id: providerIdVal,
 				service_id: provider.service_id,
 				date: selectedDate,
@@ -317,7 +317,7 @@ export default function BookingPage() {
 			handler: async function (response) {
 				try {
 					const verifyRes = await api.post(
-						"/bookings/verify-payment",
+						"/api/bookings/verify-payment",
 						response,
 					);
 					if (verifyRes.data?.booking) {
@@ -347,7 +347,7 @@ export default function BookingPage() {
 			<div className="min-h-screen bg-[#191034] text-white flex items-center justify-center">
 				<div className="flex flex-col items-center gap-6">
 					<FadeLoader color="#8b5cf6" />
-					<p className="text-violet-200/70 animate-pulse font-medium tracking-wide">
+					<p className="text-violet-200/70 font-medium tracking-wide">
 						Preparing your booking experience...
 					</p>
 				</div>

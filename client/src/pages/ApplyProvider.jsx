@@ -116,7 +116,7 @@ export default function ApplyProvider() {
 	useEffect(() => {
 		async function fetchServices() {
 			try {
-				const res = await api.get("/services/v1");
+				const res = await api.get("/api/services/v1");
 				if (Array.isArray(res.data) && res.data.length > 0) {
 					setServicesList(res.data);
 					setFormData((prev) => ({ ...prev, service: res.data[0].slug }));
@@ -140,7 +140,7 @@ export default function ApplyProvider() {
 		try {
 			const uploadData = new FormData();
 			uploadData.append("document", file);
-			const res = await api.post("/providers/upload-kyc", uploadData, {
+			const res = await api.post("/api/providers/upload-kyc", uploadData, {
 				headers: { "Content-Type": "multipart/form-data" },
 			});
 			if (res.data?.url) {
@@ -265,7 +265,7 @@ export default function ApplyProvider() {
 				kyc_doc_back: formData.kyc_doc_back || null,
 			};
 
-			const res = await api.post("/providers/v1", payload);
+			const res = await api.post("/api/providers/v1", payload);
 			setSuccessData(res.data);
 		} catch (err) {
 			const errorText =

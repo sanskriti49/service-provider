@@ -1,10 +1,4 @@
 /* ==========================================================================
-   Google Fonts Import
-   Consolidated into a single HTTP/2 optimized request
-   ========================================================================== */
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lobster+Two:ital,wght@0,400;0,700;1,400;1,700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap");
-
-/* ==========================================================================
    Tailwind CSS Engine & Theme Definition
    ========================================================================== */
 @import "tailwindcss";
@@ -27,25 +21,16 @@
 	--font-jakarta: "Plus Jakarta Sans", sans-serif;
 	--font-lobster: "Lobster Two", cursive, sans-serif;
 	--font-mackinac: "P22Mackinac", serif;
-	--font-daito: "Daito", sans-serif;
-	--font-white-dream: "WhiteDream", cursive, sans-serif;
 }
 
 /* ==========================================================================
    Local Font Faces (@font-face)
    ========================================================================== */
 @font-face {
-	font-family: "Daito";
-	src: url("/fonts/daito/Daito-ExtendedBold.otf") format("opentype");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
-}
-
-@font-face {
 	font-family: "P22Mackinac";
-	src: url("/fonts/P22-Mackinac/P22MackinacPro-Medium_26.otf")
-		format("opentype");
+	src:
+		url("/fonts/P22-Mackinac/P22MackinacPro-Medium.woff2") format("woff2"),
+		url("/fonts/P22-Mackinac/P22MackinacPro-Medium_26.otf") format("opentype");
 	font-weight: 800;
 	font-style: normal;
 	font-display: swap;
@@ -53,17 +38,9 @@
 
 @font-face {
 	font-family: "P22Mackinac-B";
-	src: url("/fonts/P22-Mackinac/P22MackinacPro-Medium_26.otf")
-		format("opentype");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: "WhiteDream";
-	src: url("/fonts/white-dream-font/WhiteDreamPersonalUseOnlyRegular-L37Rn.otf")
-		format("opentype");
+	src:
+		url("/fonts/P22-Mackinac/P22MackinacPro-Medium.woff2") format("woff2"),
+		url("/fonts/P22-Mackinac/P22MackinacPro-Medium_26.otf") format("opentype");
 	font-weight: 500;
 	font-style: normal;
 	font-display: swap;
@@ -219,14 +196,6 @@
 	font-family: "Quintessential", cursive, serif;
 	font-weight: 400;
 	font-style: normal;
-}
-
-.daito {
-	font-family: "Daito", sans-serif;
-}
-
-.white-dream {
-	font-family: "WhiteDream", cursive, sans-serif;
 }
 
 /* Transition utility */
@@ -539,56 +508,6 @@
 /* ==========================================================================
    Animation Keyframes & Utility Classes
    ========================================================================== */
-@keyframes float {
-	0%,
-	100% {
-		transform: translateX(-90%) scale(1) rotate(0deg);
-	}
-	50% {
-		transform: translateX(10%) scale(1.05) rotate(2deg);
-	}
-}
-
-@keyframes floatSlow {
-	0%,
-	100% {
-		transform: translateY(0px) rotate(0deg);
-	}
-	50% {
-		transform: translateY(-10px) rotate(1.5deg);
-	}
-}
-
-@keyframes pulseGlow {
-	0%,
-	100% {
-		opacity: 0.75;
-		filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.6));
-	}
-	50% {
-		opacity: 1;
-		filter: drop-shadow(0 0 40px rgba(236, 72, 153, 0.9));
-	}
-}
-
-@keyframes sparkle {
-	0%,
-	100% {
-		transform: scale(0.85) rotate(0deg);
-		opacity: 0.5;
-	}
-	50% {
-		transform: scale(1.25) rotate(180deg);
-		opacity: 1;
-	}
-}
-
-@keyframes shimmer {
-	100% {
-		transform: translateX(100%);
-	}
-}
-
 @keyframes fadeSlide {
 	0% {
 		opacity: 0;
@@ -611,57 +530,12 @@
 	}
 }
 
-@keyframes fall {
-	0% {
-		transform: translateY(0) rotate(0deg);
-	}
-	100% {
-		transform: translateY(120vh) rotate(360deg);
-	}
-}
-
-.mesh-gradient {
-	animation: float 10s ease-in-out infinite;
-}
-
-.animate-float {
-	animation: floatSlow 5s ease-in-out infinite;
-}
-
-.animate-pulse-glow {
-	animation: pulseGlow 3s ease-in-out infinite;
-}
-
-.animate-sparkle {
-	animation: sparkle 3s ease-in-out infinite;
-}
-
 .animate-fade-slide {
 	animation: fadeSlide 0.6s ease-out forwards;
 }
 
 .animate-scale-pop {
 	animation: scalePop 0.5s ease-out forwards;
-}
-
-.confetti-animation::before,
-.confetti-animation::after {
-	content: "";
-	position: absolute;
-	top: -100px;
-	left: 50%;
-	width: 10px;
-	height: 10px;
-	background: linear-gradient(45deg, #a855f7, #6366f1, #ec4899);
-	border-radius: 2px;
-	animation: fall 1.5s linear infinite;
-}
-
-.confetti-animation::after {
-	left: 40%;
-	width: 12px;
-	height: 12px;
-	animation-duration: 1.8s;
 }
 
 /* ==========================================================================
@@ -678,171 +552,6 @@
 	--color-interactive: 165, 105, 255;
 	--circle-size: 70%;
 	--blending: hard-light;
-}
-
-@keyframes moveInCircle {
-	0% {
-		transform: rotate(0deg);
-	}
-	50% {
-		transform: rotate(180deg);
-	}
-	100% {
-		transform: rotate(360deg);
-	}
-}
-
-@keyframes moveVertical {
-	0% {
-		transform: translateY(-50%);
-	}
-	50% {
-		transform: translateY(50%);
-	}
-	100% {
-		transform: translateY(-50%);
-	}
-}
-
-@keyframes moveHorizontal {
-	0% {
-		transform: translateX(-50%) translateY(-10%);
-	}
-	50% {
-		transform: translateX(50%) translateY(10%);
-	}
-	100% {
-		transform: translateX(-50%) translateY(-10%);
-	}
-}
-
-.gradient-bg {
-	width: 100vw;
-	height: 100vh;
-	position: absolute;
-	background: linear-gradient(40deg, var(--color-bg1), var(--color-bg2));
-	top: 0;
-	left: 0;
-
-	.hidden {
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: 0;
-		height: 0;
-	}
-
-	.gradients-container {
-		filter: url(#goo) blur(80px);
-		width: 100%;
-		height: 100%;
-	}
-
-	.g1 {
-		position: absolute;
-		background: radial-gradient(
-				circle at center,
-				rgba(var(--color1), 0.8) 0,
-				rgba(var(--color1), 0) 50%
-			)
-			no-repeat;
-		mix-blend-mode: var(--blending);
-		width: var(--circle-size);
-		height: var(--circle-size);
-		top: calc(50% - var(--circle-size) / 2);
-		left: calc(50% - var(--circle-size) / 2);
-		transform-origin: center center;
-		animation: moveVertical 30s ease infinite;
-		opacity: 1;
-	}
-
-	.g2 {
-		position: absolute;
-		background: radial-gradient(
-				circle at center,
-				rgba(var(--color2), 0.8) 0,
-				rgba(var(--color2), 0) 50%
-			)
-			no-repeat;
-		mix-blend-mode: var(--blending);
-		width: var(--circle-size);
-		height: var(--circle-size);
-		top: calc(50% - var(--circle-size) / 2);
-		left: calc(50% - var(--circle-size) / 2);
-		transform-origin: calc(50% - 400px);
-		animation: moveInCircle 20s reverse infinite;
-		opacity: 1;
-	}
-
-	.g3 {
-		position: absolute;
-		background: radial-gradient(
-				circle at center,
-				rgba(var(--color3), 0.8) 0,
-				rgba(var(--color3), 0) 50%
-			)
-			no-repeat;
-		mix-blend-mode: var(--blending);
-		width: var(--circle-size);
-		height: var(--circle-size);
-		top: calc(50% - var(--circle-size) / 2 + 200px);
-		left: calc(50% - var(--circle-size) / 2 - 500px);
-		transform-origin: calc(50% + 400px);
-		animation: moveInCircle 40s linear infinite;
-		opacity: 1;
-	}
-
-	.g4 {
-		position: absolute;
-		background: radial-gradient(
-				circle at center,
-				rgba(var(--color4), 0.8) 0,
-				rgba(var(--color4), 0) 50%
-			)
-			no-repeat;
-		mix-blend-mode: var(--blending);
-		width: var(--circle-size);
-		height: var(--circle-size);
-		top: calc(50% - var(--circle-size) / 2);
-		left: calc(50% - var(--circle-size) / 2);
-		transform-origin: calc(50% - 200px);
-		animation: moveHorizontal 40s ease infinite;
-		opacity: 0.7;
-	}
-
-	.g5 {
-		position: absolute;
-		background: radial-gradient(
-				circle at center,
-				rgba(var(--color5), 0.8) 0,
-				rgba(var(--color5), 0) 50%
-			)
-			no-repeat;
-		mix-blend-mode: var(--blending);
-		width: calc(var(--circle-size) * 2);
-		height: calc(var(--circle-size) * 2);
-		top: calc(50% - var(--circle-size));
-		left: calc(50% - var(--circle-size));
-		transform-origin: calc(50% - 800px) calc(50% + 200px);
-		animation: moveInCircle 20s ease infinite;
-		opacity: 1;
-	}
-
-	.interactive {
-		position: absolute;
-		background: radial-gradient(
-				circle at center,
-				rgba(var(--color-interactive), 0.8) 0,
-				rgba(var(--color-interactive), 0) 50%
-			)
-			repeat;
-		mix-blend-mode: var(--blending);
-		width: 100%;
-		height: 100%;
-		top: -50%;
-		left: -50%;
-		opacity: 0.7;
-	}
 }
 
 .cloud {

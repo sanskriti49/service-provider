@@ -73,7 +73,7 @@ const STATUS_STYLES = {
 	},
 	in_progress: {
 		badge: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
-		dot: "bg-indigo-400 animate-pulse",
+		dot: "bg-indigo-400",
 		icon: Clock,
 	},
 	"awaiting completion": {

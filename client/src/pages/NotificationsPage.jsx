@@ -19,8 +19,7 @@ import { toast } from "sonner";
 import { getSocket } from "../utils/socket";
 import ConfirmDialog from "../ui/ConfirmDialog";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
+import { API_URL } from "../config";
 function formatDate(dateString) {
 	if (!dateString) return "";
 	const date = new Date(dateString);
@@ -315,7 +314,7 @@ export default function NotificationsPage() {
 													{notif.title}
 												</h4>
 												{!notif.is_read && (
-													<span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+													<span className="w-2 h-2 rounded-full bg-violet-400" />
 												)}
 											</div>
 

@@ -13,8 +13,7 @@ import {
 } from "lucide-react";
 import { getSocket } from "../utils/socket";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
+import { API_URL } from "../config";
 function timeAgo(dateString) {
 	if (!dateString) return "";
 	const date = new Date(dateString);

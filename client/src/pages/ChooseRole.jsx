@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../api/axiosInstance";
 import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -41,7 +41,7 @@ const ChooseRole = () => {
 			setLoading(true);
 			const token = localStorage.getItem("token");
 
-			const res = await axios.post(
+			const res = await api.post(
 				"/api/auth/set-role",
 				{ role },
 				{ headers: { Authorization: `Bearer ${token}` } },
@@ -145,7 +145,7 @@ const ChooseRole = () => {
 						>
 							<div className="relative">
 								<div className="w-10 h-10 border-2 border-violet-500/20 border-t-violet-600 rounded-full animate-spin"></div>
-								<div className="absolute inset-0 blur-lg bg-violet-500/10 animate-pulse"></div>
+								
 							</div>
 							<p className="text-violet-600/80 text-sm font-medium tracking-wide">
 								Personalizing your dashboard...

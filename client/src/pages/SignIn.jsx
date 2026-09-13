@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import Iridescence from "../ui/Iridescence";
 import { jwtDecode } from "jwt-decode";
-import axios from "axios";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 import signInImg from "/images/sign-in.jpg";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance";
 import Logo from "../ui/Logo";
+import { loadGoogleIdentity } from "../utils/googleIdentity";
 
 const SignIn = () => {
 	const navigate = useNavigate();
@@ -100,21 +100,18 @@ const SignIn = () => {
 			}
 		};
 
-		if (window.google?.accounts?.id) {
-			initGoogle();
-		} else {
-			const interval = setInterval(() => {
-				if (window.google?.accounts?.id) {
-					initGoogle();
-					clearInterval(interval);
-				}
-			}, 300);
-			const timer = setTimeout(() => clearInterval(interval), 4000);
-			return () => {
-				clearInterval(interval);
-				clearTimeout(timer);
-			};
-		}
+		let cancelled = false;
+		loadGoogleIdentity()
+			.then(() => {
+				if (!cancelled) initGoogle();
+			})
+			.catch(() => {
+				// Google sign-in is optional; the email form still works without it.
+			});
+
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	const handleGoogleResponse = async (response) => {

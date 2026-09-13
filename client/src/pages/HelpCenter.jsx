@@ -204,9 +204,6 @@ const HelpCenter = () => {
 						className={`inline-flex items-center gap-2 px-3 py-1 rounded-full backdrop-blur-sm border shadow-sm mb-6 ${isSupportOnline ? "bg-white/80 border-violet-100" : "bg-slate-50/80 border-slate-200"}`}
 					>
 						<span className="relative flex h-2 w-2">
-							{isSupportOnline && (
-								<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-							)}
 							<span
 								className={`relative inline-flex rounded-full h-2 w-2 ${isSupportOnline ? "bg-emerald-500" : "bg-slate-400"}`}
 							></span>
@@ -349,19 +346,13 @@ const HelpCenter = () => {
 									<MessageCircle className="w-5 h-5 text-green-600" /> WhatsApp
 								</a>
 
-								<button
-									onClick={() => alert("Feature coming soon!")}
-									className="flex items-center gap-2 bg-violet-600 text-white px-6 py-3.5 rounded-2xl font-bold hover:bg-violet-500 transition-all border border-violet-400/30 active:scale-95 shadow-lg shadow-violet-900/20"
+								<Link
+									to="/#contact"
+									className="flex items-center gap-2 bg-violet-600 text-white px-6 py-3.5 rounded-2xl font-bold hover:bg-violet-500 transition-all border border-violet-400/30 active:scale-95"
 								>
-									<div className="relative">
-										<MessageCircle className="w-5 h-5" />
-										<span className="absolute -top-1 -right-1 flex h-2 w-2">
-											<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-											<span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-										</span>
-									</div>
-									Start Live Chat
-								</button>
+									<Mail className="w-5 h-5" />
+									Send us a message
+								</Link>
 							</div>
 						</div>
 
@@ -393,9 +384,6 @@ const HelpCenter = () => {
 
 								<div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-center md:justify-start gap-3">
 									<div className="relative flex h-3 w-3">
-										<span
-											className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSupportOnline ? "bg-emerald-400" : "bg-slate-500"}`}
-										></span>
 										<span
 											className={`relative inline-flex rounded-full h-3 w-3 ${isSupportOnline ? "bg-emerald-500" : "bg-slate-400"}`}
 										></span>

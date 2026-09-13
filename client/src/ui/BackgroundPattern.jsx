@@ -19,13 +19,13 @@ const BackgroundPattern = () => (
 				width="1"
 				height="1"
 			>
-				<use href="#image0_0_3777" transform="scale(0.000277772 0.000917431)" />
+				<use href="#image0_0_3777" transform="scale(0.000555544 0.001834862)" />
 			</pattern>
 
 			<image
 				id="image0_0_3777"
-				width="3600"
-				height="1090"
+				width="1800"
+				height="545"
 				preserveAspectRatio="none"
 				href="/images/background.png"
 			/>

@@ -13,6 +13,7 @@ import "./ServicesCarousel.css";
 import AuroraBackground from "../ui/AuroraBackground";
 import { Link } from "react-router-dom";
 
+import { API_URL } from "../config";
 const responsive = {
 	desktop: {
 		breakpoint: { max: 4000, min: 1280 },
@@ -138,8 +139,6 @@ const ServicesCarousel = ({ services }) => {
 };
 
 const ServicesSection = () => {
-	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
 	const {
 		data: apiResponse,
 		loading,

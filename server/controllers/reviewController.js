@@ -38,7 +38,16 @@ async function createReview(req, res, next) {
 	try {
 		await client.query("BEGIN");
 
-		const targetProviderId = await resolveProviderId(client, provider_id);
+		// Fall back to the booking's provider when the caller omits provider_id,
+		// so a review tied to a booking cannot fail on a missing field.
+		let targetProviderId = await resolveProviderId(client, provider_id);
+		if (!targetProviderId && booking_id && UUID_REGEX.test(booking_id)) {
+			const fromBooking = await client.query(
+				`SELECT provider_id FROM bookings WHERE booking_id = $1::uuid AND user_id = $2`,
+				[booking_id, customerId],
+			);
+			targetProviderId = fromBooking.rows[0]?.provider_id || null;
+		}
 		if (!targetProviderId) {
 			await client.query("ROLLBACK");
 			return res.status(404).json({ error: "Provider not found" });

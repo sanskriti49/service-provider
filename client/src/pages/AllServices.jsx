@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 import gsap from "gsap";
 
+import { API_URL } from "../config";
 const CATEGORIES = [
 	"All",
 	"Home Services",
@@ -13,8 +14,6 @@ const CATEGORIES = [
 ];
 
 export default function AllServices() {
-	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
 	const {
 		data: apiResponse,
 		loading,

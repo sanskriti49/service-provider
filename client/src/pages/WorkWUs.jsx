@@ -87,7 +87,9 @@ const WorkWUs = () => {
 
 					<div className="relative p-4 sm:p-6 rounded-3xl bg-white/80 border border-violet-100/80 backdrop-blur-xl shadow-xl shadow-violet-900/5 flex flex-col items-center">
 						<img
-							src="/images/globe.png"
+							src="/images/globe.webp"
+							loading="lazy"
+							decoding="async"
 							alt="Work with us illustration"
 							className="w-56 sm:w-64 lg:w-72 h-auto object-contain transition-transform duration-500 group-hover:scale-105"
 							onError={(e) => {

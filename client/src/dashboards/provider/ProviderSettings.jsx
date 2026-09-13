@@ -558,7 +558,7 @@ export default function ProviderSettings() {
 										htmlFor="avatar-picker"
 										className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all duration-200 text-violet-400 backdrop-blur-[2px]"
 									>
-										<ImageIcon size={16} className="animate-pulse" />
+										<ImageIcon size={16} />
 										<span className="text-[10px] font-bold uppercase tracking-wider text-white">
 											Change
 										</span>

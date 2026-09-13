@@ -53,7 +53,6 @@ const errorHandler = require("./middleware/errorHandler");
 app.use("/api/providers", providerRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/bookings", bookingRoutes);
-app.use("/bookings", bookingRoutes);
 app.use("/api/earnings", earningsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);

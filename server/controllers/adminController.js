@@ -319,13 +319,13 @@ async function updateProviderStatus(req, res, next) {
 		// Upsert provider status & sync KYC verification if approved
 		await db.query(
 			`UPDATE providers 
-			 SET status = $1, 
+			 SET status = $1::varchar,
 			     rejection_reason = $2,
-			     approved_at = (CASE WHEN $1 = 'approved' THEN now() ELSE approved_at END),
-			     kyc_status = (CASE WHEN $1 = 'approved' THEN 'verified' WHEN $1 = 'rejected' THEN 'rejected' ELSE kyc_status END),
-			     is_verified = (CASE WHEN $1 = 'approved' THEN TRUE WHEN $1 IN ('rejected', 'suspended') THEN FALSE ELSE is_verified END),
-			     verification_badge = (CASE WHEN $1 = 'approved' THEN 'verified_pro' ELSE verification_badge END),
-			     verified_at = (CASE WHEN $1 = 'approved' THEN now() ELSE verified_at END)
+			     approved_at = (CASE WHEN $1::text = 'approved' THEN now() ELSE approved_at END),
+			     kyc_status = (CASE WHEN $1::text = 'approved' THEN 'verified' WHEN $1::text = 'rejected' THEN 'rejected' ELSE kyc_status END),
+			     is_verified = (CASE WHEN $1::text = 'approved' THEN TRUE WHEN $1::text IN ('rejected', 'suspended') THEN FALSE ELSE is_verified END),
+			     verification_badge = (CASE WHEN $1::text = 'approved' THEN 'verified_pro' ELSE verification_badge END),
+			     verified_at = (CASE WHEN $1::text = 'approved' THEN now() ELSE verified_at END)
 			 WHERE user_id = $3`,
 			[status, rejection_reason, user.id],
 		);
@@ -402,11 +402,11 @@ async function updateProviderKyc(req, res, next) {
 
 		await db.query(
 			`UPDATE providers
-			 SET kyc_status = $1,
-			     is_verified = $2,
+			 SET kyc_status = $1::varchar,
+			     is_verified = $2::boolean,
 			     verification_badge = $3,
-			     verified_at = (CASE WHEN $2 = TRUE THEN now() ELSE NULL END),
-			     rejection_reason = (CASE WHEN $1 = 'rejected' THEN $4 ELSE rejection_reason END)
+			     verified_at = (CASE WHEN $2::boolean THEN now() ELSE NULL END),
+			     rejection_reason = (CASE WHEN $1::text = 'rejected' THEN $4 ELSE rejection_reason END)
 			 WHERE user_id = $5`,
 			[kyc_status, isVerified, badge, rejection_reason, user.id],
 		);

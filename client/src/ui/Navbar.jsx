@@ -10,6 +10,7 @@ import NavServices from "./NavServices";
 import NotificationBell from "./NotificationBell";
 import Logo from "./Logo";
 
+import { API_URL } from "../config";
 function cn(...inputs) {
 	return twMerge(clsx(inputs));
 }
@@ -34,7 +35,6 @@ const ChevronDown = ({ open }) => (
 );
 
 const Navbar = () => {
-	const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 	const [user, setUser] = useState(null);
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [hoveredTab, setHoveredTab] = useState(null);
