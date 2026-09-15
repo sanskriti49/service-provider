@@ -84,8 +84,5 @@
           fill="#ffffff" />
   </g>
 
-  <!-- Dynamic Service Tick / Spark Surge -->
-  <path d="M68 44 L75 52 L88 38"
-        stroke="url(#check-grad)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"
-        filter="url(#magic-glow)" />
+
 </svg>

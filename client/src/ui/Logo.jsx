@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 /**
  * Standardized TaskGenie Logo Component
- * 
+ *
  * Consistent across Landing, Admin Dashboard, Provider Dashboard, Auth, and Footer:
  * - Official Magic Lamp SVG (/images/taskgenie-logo.svg)
  * - Authentic brand Lobster Two cursive typography
@@ -28,12 +28,14 @@ export default function Logo({
 	};
 
 	const resolvedSize =
-		typeof size === "string" ? (sizeMap[size] || sizeMap.md) : {
-			icon: "",
-			text: "text-2xl",
-			customIconStyle: { width: `${size}px`, height: `${size}px` },
-			customTextStyle: { fontSize: `${Math.round(size * 0.75)}px` },
-		};
+		typeof size === "string"
+			? sizeMap[size] || sizeMap.md
+			: {
+					icon: "",
+					text: "text-2xl",
+					customIconStyle: { width: `${size}px`, height: `${size}px` },
+					customTextStyle: { fontSize: `${Math.round(size * 0.75)}px` },
+				};
 
 	// Typography gradient by theme
 	const themeGradients = {
