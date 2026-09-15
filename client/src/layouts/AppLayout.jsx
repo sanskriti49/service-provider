@@ -8,27 +8,11 @@ import { useEffect, useRef, Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Navbar from "../ui/Navbar";
 import Footer from "../pages/Footer";
-import { Loader2 } from "lucide-react";
+import TaskGenieLoader from "../ui/TaskGenieLoader";
 import nprogress from "nprogress";
 import "nprogress/nprogress.css";
 
 nprogress.configure({ showSpinner: false, speed: 400 });
-
-function ContentLoader() {
-	return (
-		<div className="flex flex-col flex-1 items-center justify-center min-h-[60vh] w-full gap-3 text-slate-400">
-			<div className="relative flex items-center justify-center">
-				<Loader2
-					size={36}
-					className="animate-spin text-violet-500 relative z-10"
-				/>
-			</div>
-			<p className="text-xs font-medium tracking-wide bricolage-grotesque">
-				Loading TaskGenie...
-			</p>
-		</div>
-	);
-}
 
 export default function AppLayout() {
 	const { pathname } = useLocation();
@@ -56,7 +40,7 @@ export default function AppLayout() {
 				ref={mainRef}
 				className="animate-fade-slide flex-grow flex flex-col w-full max-w-[100vw]"
 			>
-				<Suspense fallback={<ContentLoader />}>
+				<Suspense fallback={<TaskGenieLoader fullScreen />}>
 					<Outlet />
 				</Suspense>
 			</main>
@@ -64,3 +48,4 @@ export default function AppLayout() {
 		</div>
 	);
 }
+

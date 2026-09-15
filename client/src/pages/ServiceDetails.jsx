@@ -22,6 +22,7 @@ import { UNIT_LABELS } from "../utils/pricingHelper";
 import ReviewModal from "../ui/ReviewModal";
 import { apiCache } from "../utils/apiCache";
 import VerifiedBadge from "../ui/VerifiedBadge";
+import TaskGenieLoader from "../ui/TaskGenieLoader";
 
 import { API_URL } from "../config";
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
@@ -103,7 +104,7 @@ const ServiceDetails = () => {
 				setLoading(true);
 				setError(null);
 
-				const cacheKeyService = `service_${slug}`;
+				const cacheKeyService = `service_${slug.toLowerCase()}`;
 				let serviceData = apiCache.get(cacheKeyService);
 				if (!serviceData) {
 					const serviceRes = await fetch(`${API_URL}/api/services/v1/${slug}`);
@@ -120,15 +121,32 @@ const ServiceDetails = () => {
 					...(userCoords?.lng && { lng: String(userCoords.lng) }),
 				});
 
-				const cacheKeyProviders = `providers_${slug}_${sortBy}_${userCoords?.lat || ""}`;
+				const cacheKeyProviders = `providers_${slug.toLowerCase()}_${sortBy}_${userCoords?.lat || ""}`;
 				let providersData = apiCache.get(cacheKeyProviders);
-				if (!providersData) {
+				if (!providersData || (Array.isArray(providersData) && providersData.length === 0)) {
 					const providersRes = await fetch(
 						`${API_URL}/api/providers/v1?${params.toString()}`,
 					);
-					if (!providersRes.ok) throw new Error("Could not fetch providers");
-					providersData = await providersRes.json();
-					apiCache.set(cacheKeyProviders, providersData, 60000);
+					if (providersRes.ok) {
+						providersData = await providersRes.json();
+					}
+
+					// If 0 providers returned with geolocation coords, fallback to fetching all providers for the service
+					if ((!providersData || providersData.length === 0) && userCoords?.lat) {
+						const fallbackRes = await fetch(
+							`${API_URL}/api/providers/v1?service=${encodeURIComponent(slug)}&sort_by=recommended`,
+						);
+						if (fallbackRes.ok) {
+							const fallbackData = await fallbackRes.json();
+							if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+								providersData = fallbackData;
+							}
+						}
+					}
+
+					if (Array.isArray(providersData) && providersData.length > 0) {
+						apiCache.set(cacheKeyProviders, providersData, 60000);
+					}
 				}
 				setProviders(Array.isArray(providersData) ? providersData : []);
 			} catch (err) {
@@ -211,27 +229,44 @@ const ServiceDetails = () => {
 	};
 
 	if (loading) {
-		return <ServiceDetailsSkeleton />;
+		return (
+			<TaskGenieLoader
+				fullScreen
+				message="Loading Available Experts"
+				submessage="Finding verified professionals for your request..."
+			/>
+		);
 	}
 
 	if (!service || (providers.length === 0 && !loading)) {
 		return (
 			<section className="bg-[#191034] text-white min-h-screen flex items-center justify-center p-4">
-				<div className="text-center">
+				<div className="text-center max-w-lg mx-auto">
+					<div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400 shadow-xl shadow-violet-900/30">
+						<Sparkles size={32} />
+					</div>
 					<h2 className="text-3xl font-bold bricolage-grotesque">
 						{service ? "No Providers Available Yet" : "Service Not Found"}
 					</h2>
-					<p className="inter text-gray-400 mt-3 max-w-md">
+					<p className="inter text-gray-300 mt-3 text-sm leading-relaxed">
 						{service
-							? "We're working on adding experts for this service. Please check back later."
+							? "We're currently expanding our network of verified professionals for this category. In the meantime, check out other popular services or reach out to our support team."
 							: "The service you're looking for might have been moved or doesn't exist :("}
 					</p>
-					<Link
-						to="/"
-						className="inter mt-8 inline-block bg-violet-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-violet-700 transition-colors"
-					>
-						Go Back Home
-					</Link>
+					<div className="mt-8 flex items-center justify-center gap-4 flex-wrap">
+						<Link
+							to="/services"
+							className="inter inline-flex items-center gap-2 bg-violet-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/40 cursor-pointer"
+						>
+							<span>Explore All Services</span>
+						</Link>
+						<Link
+							to="/"
+							className="inter inline-flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white px-6 py-3 rounded-xl font-semibold border border-white/10 transition-all cursor-pointer"
+						>
+							<span>Go Back Home</span>
+						</Link>
+					</div>
 				</div>
 			</section>
 		);

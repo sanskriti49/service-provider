@@ -9,6 +9,7 @@
 		"test": "node --test test/**/*.test.js",
 		"seed-services": "node seeds/seedServices.js",
 		"seed-db": "node seeds/seedDb.js",
+		"ensure-providers": "node seeds/ensureAllProviders.js",
 		"reset-db": "node resetDb.js",
 		"migrate": "node migrations/create_tables.js"
 	},

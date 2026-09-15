@@ -9,7 +9,8 @@
 		"lint": "npm run lint --prefix client",
 		"reset-db": "npm --prefix server run reset-db",
 		"seed-db": "npm --prefix server run seed-db",
-		"seed-services": "npm --prefix server run seed-services"
+		"seed-services": "npm --prefix server run seed-services",
+		"ensure-providers": "npm --prefix server run ensure-providers"
 	},
 	"devDependencies": {
 		"concurrently": "^9.1.2"

@@ -41,9 +41,11 @@ async function getServiceBySlug(req, res, next) {
 			return res.json(cached);
 		}
 
-		const result = await pool.query("SELECT * FROM services WHERE slug=$1", [
-			slug,
-		]);
+		const normalizedSlug = String(slug).trim();
+		const result = await pool.query(
+			"SELECT * FROM services WHERE LOWER(slug) = LOWER($1) OR id::text = $1",
+			[normalizedSlug],
+		);
 
 		const service = result.rows[0];
 

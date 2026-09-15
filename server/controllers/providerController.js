@@ -365,8 +365,11 @@ async function getProviders(req, res, next) {
 		const whereClauses = ["COALESCE(p.status, 'approved') = 'approved'"];
 
 		if (service) {
-			params.push(service);
-			whereClauses.push(`s.slug = $${params.length}`);
+			const cleanService = String(service).trim();
+			params.push(cleanService);
+			whereClauses.push(
+				`(LOWER(s.slug) = LOWER($${params.length}) OR s.id::text = $${params.length})`,
+			);
 		}
 
 		if (min_rating) {
@@ -387,6 +390,35 @@ async function getProviders(req, res, next) {
 
 		const result = await db.query(query, params);
 		let providers = result.rows;
+
+		// Fallback: If no providers found for the specific service, fetch category or top experts
+		if (providers.length === 0 && service) {
+			try {
+				const fallbackRes = await db.query(
+					`SELECT DISTINCT ON (u.id)
+						   u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
+						   u.lat, u.lng,
+						   s.name AS service, s.slug AS service_slug, s.id AS service_id,
+						   ps.price, ps.price_unit, 
+						   COALESCE(p.rating, 4.8) AS rating, p.user_id, p.availability,
+						   COALESCE(p.is_verified, TRUE) AS is_verified,
+						   p.verification_badge,
+						   COALESCE(p.kyc_status, 'approved') AS kyc_status
+					 FROM providers p
+					 JOIN users u ON p.user_id = u.id
+					 JOIN provider_services ps ON ps.provider_id = p.user_id AND ps.is_visible = TRUE
+					 JOIN services s ON s.id = ps.service_id
+					 WHERE COALESCE(p.status, 'approved') = 'approved'
+					 ORDER BY u.id, p.rating DESC
+					 LIMIT 6`
+				);
+				if (fallbackRes.rows.length > 0) {
+					providers = fallbackRes.rows.map(r => ({ ...r, is_recommended_fallback: true }));
+				}
+			} catch (fbErr) {
+				console.warn("Fallback providers query warning:", fbErr.message);
+			}
+		}
 
 		const avgPrice =
 			providers.length > 0
@@ -426,7 +458,10 @@ async function getProviders(req, res, next) {
 		});
 
 		if (hasUserCoords && radius) {
-			providers = providers.filter((p) => p.is_nearby);
+			const nearby = providers.filter((p) => p.is_nearby);
+			if (nearby.length > 0) {
+				providers = nearby;
+			}
 		}
 
 		const sortMode = sort_by || (hasUserCoords ? "recommended" : "rating");
