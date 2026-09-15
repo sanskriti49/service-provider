@@ -443,7 +443,7 @@ export default function AdminDashboard() {
 										? "..."
 										: formatCurrency(overviewData?.overview?.total_gmv)}
 								</div>
-								<p className="inter text-sm text-slate-400">
+								<p className="font-geist text-sm text-slate-400">
 									Gross completed transactions
 								</p>
 							</div>
@@ -472,7 +472,7 @@ export default function AdminDashboard() {
 										? "..."
 										: overviewData?.overview?.total_bookings || 0}
 								</div>
-								<p className="inter text-sm text-blue-400">
+								<p className="font-geist text-sm text-blue-400">
 									{overviewData?.overview?.active_bookings || 0} active right
 									now
 								</p>
@@ -503,7 +503,7 @@ export default function AdminDashboard() {
 										<h3 className="font-mackinac text-lg font-bold text-white">
 											Booking Activity by Hour
 										</h3>
-										<p className="inter text-sm text-slate-400">
+										<p className="font-geist text-sm text-slate-400">
 											Customer requested slots{" "}
 											<span className="font-editorial">(7 AM – 10 PM)</span>
 										</p>
@@ -557,7 +557,7 @@ export default function AdminDashboard() {
 									<h3 className="font-mackinac text-lg font-bold text-white">
 										Top Locations
 									</h3>
-									<p className="inter text-sm text-slate-400">
+									<p className="font-geist text-sm text-slate-400">
 										City booking distribution
 									</p>
 								</div>
@@ -1054,7 +1054,7 @@ export default function AdminDashboard() {
 													},
 												}))
 											}
-											className="inter w-full p-2.5 rounded-lg bg-black/40 border border-white/10 text-white font-bold"
+											className="font-geist w-full p-2.5 rounded-lg bg-black/40 border border-white/10 text-white font-bold"
 										/>
 									</div>
 
@@ -1075,7 +1075,7 @@ export default function AdminDashboard() {
 													},
 												}))
 											}
-											className="inter w-full p-2.5 rounded-lg bg-black/40 border border-white/10 text-white font-bold"
+											className="font-geist w-full p-2.5 rounded-lg bg-black/40 border border-white/10 text-white font-bold"
 										/>
 									</div>
 								</div>
@@ -1108,19 +1108,21 @@ export default function AdminDashboard() {
 									<span className="font-bricolage text-slate-400">
 										Job Total
 									</span>
-									<span className="inter font-bold text-white">
+									<span className="font-geist font-bold text-white">
 										{formatCurrency(sampleAmount)}
 									</span>
 								</div>
 								<div className="font-bricolage flex justify-between text-violet-400 border-t border-white/5 pt-2">
 									<span>TaskGenie Fee ({commissionRate}%)</span>
-									<span className="inter">
+									<span className="font-geist">
 										{formatCurrency(sampleCommission)}
 									</span>
 								</div>
 								<div className="font-bricolage flex justify-between text-emerald-400 font-bold border-t border-white/5 pt-2">
 									<span>Provider Payout</span>
-									<span className="inter">{formatCurrency(samplePayout)}</span>
+									<span className="font-geist">
+										{formatCurrency(samplePayout)}
+									</span>
 								</div>
 							</div>
 
@@ -1341,13 +1343,17 @@ export default function AdminDashboard() {
 									<span className="text-[11px] text-slate-400">
 										Badge Status:{" "}
 										<strong className="text-white">
-											{inspectingProvider.is_verified ? "Verified Pro Active" : "Unverified"}
+											{inspectingProvider.is_verified
+												? "Verified Pro Active"
+												: "Unverified"}
 										</strong>
 									</span>
 									<div className="flex items-center gap-2">
 										{!inspectingProvider.is_verified ? (
 											<button
-												disabled={actionInProgress === inspectingProvider.user_id}
+												disabled={
+													actionInProgress === inspectingProvider.user_id
+												}
 												onClick={() =>
 													handleUpdateProviderKyc(
 														inspectingProvider.user_id,
@@ -1360,7 +1366,9 @@ export default function AdminDashboard() {
 											</button>
 										) : (
 											<button
-												disabled={actionInProgress === inspectingProvider.user_id}
+												disabled={
+													actionInProgress === inspectingProvider.user_id
+												}
 												onClick={() =>
 													handleUpdateProviderKyc(
 														inspectingProvider.user_id,

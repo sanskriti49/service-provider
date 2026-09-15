@@ -76,13 +76,13 @@ export default function AllServices() {
 							Service
 						</span>
 					</h1>
-					<p className="inter text-slate-600 text-lg max-w-2xl mx-auto">
+					<p className="font-geist text-slate-600 text-lg max-w-2xl mx-auto">
 						Search through our wide range of professional services tailored to
 						your needs.
 					</p>
 				</div>
 
-				<div className="inter relative max-w-2xl mx-auto mb-10 group">
+				<div className="font-geist relative max-w-2xl mx-auto mb-10 group">
 					<div className="absolute left-5 inset-y-0 flex items-center text-violet-300 group-focus-within:text-violet-600 transition-colors duration-300">
 						<Search className="h-5 w-5" />
 					</div>
@@ -112,7 +112,7 @@ export default function AllServices() {
 						<button
 							key={cat}
 							onClick={() => setSelectedCategory(cat)}
-							className={`inter cursor-pointer px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 border ${
+							className={`font-geist cursor-pointer px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 border ${
 								selectedCategory === cat
 									? "bg-violet-800 text-white border-violet-600 shadow-md shadow-violet-200 scale-105"
 									: "bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-700 hover:bg-violet-50"
@@ -228,7 +228,7 @@ function ServiceCard({ service }) {
 				<div className="relative h-64 overflow-hidden">
 					<ProgressiveImage src={imageUrl} alt={service.name} />
 
-					<div className="inter absolute top-4 left-4 z-20">
+					<div className="font-geist absolute top-4 left-4 z-20">
 						<span className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-white/90 backdrop-blur-md text-violet-800 rounded-full shadow-sm border border-violet-100">
 							{service.category || "Service"}
 						</span>
@@ -242,11 +242,11 @@ function ServiceCard({ service }) {
 						</h3>
 					</div>
 
-					<p className="inter text-slate-600 text-sm line-clamp-2 mb-6 flex-grow">
+					<p className="font-geist text-slate-600 text-sm line-clamp-2 mb-6 flex-grow">
 						{service.description}
 					</p>
 
-					<div className="inter flex items-center justify-between mt-auto pt-4 border-t border-violet-200/50">
+					<div className="font-geist flex items-center justify-between mt-auto pt-4 border-t border-violet-200/50">
 						<div className="flex flex-col">
 							<span className="text-xs text-slate-500 font-medium uppercase tracking-wide">
 								Starts from

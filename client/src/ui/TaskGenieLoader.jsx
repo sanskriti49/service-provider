@@ -107,7 +107,7 @@ export default function TaskGenieLoader({
 						className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-950/60 border border-violet-500/30 text-violet-200/90 text-xs font-medium backdrop-blur-sm shadow-inner"
 					>
 						<span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-						<span className="inter">
+						<span className="font-geist">
 							{message || LOADING_STEPS[stepIndex]}
 						</span>
 					</motion.div>

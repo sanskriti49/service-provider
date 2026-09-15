@@ -70,7 +70,10 @@ export default function BookingPage() {
 
 	function formatDateDisplay(dateString) {
 		if (!dateString) return { day: "", weekday: "", month: "", full: "" };
-		const [year, month, day] = String(dateString).substring(0, 10).split("-").map(Number);
+		const [year, month, day] = String(dateString)
+			.substring(0, 10)
+			.split("-")
+			.map(Number);
 		const date = new Date(year, month - 1, day);
 		return {
 			day: date.getDate(),
@@ -95,9 +98,14 @@ export default function BookingPage() {
 					setProvider(currentProvider);
 				}
 
-				if (currentProvider && (currentProvider.id || currentProvider.user_id)) {
+				if (
+					currentProvider &&
+					(currentProvider.id || currentProvider.user_id)
+				) {
 					const provIdentifier = currentProvider.user_id || currentProvider.id;
-					const slotsRes = await api.get(`/api/providers/v1/${provIdentifier}/availability`);
+					const slotsRes = await api.get(
+						`/api/providers/v1/${provIdentifier}/availability`,
+					);
 					if (slotsRes.data) {
 						setAvailability(slotsRes.data);
 					}
@@ -119,7 +127,12 @@ export default function BookingPage() {
 
 	const groupedSlots = useMemo(() => {
 		let raw = availability;
-		if (raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray(raw.availability)) {
+		if (
+			raw &&
+			typeof raw === "object" &&
+			!Array.isArray(raw) &&
+			Array.isArray(raw.availability)
+		) {
 			raw = raw.availability;
 		}
 		if (!Array.isArray(raw)) return {};
@@ -135,7 +148,8 @@ export default function BookingPage() {
 					const sEnd = s.end_time || s.end;
 					if (!sStart || !sEnd) return;
 					const exists = acc[item.date].some(
-						(existing) => existing.start_time === sStart && existing.end_time === sEnd,
+						(existing) =>
+							existing.start_time === sStart && existing.end_time === sEnd,
 					);
 					if (!exists) {
 						acc[item.date].push({
@@ -149,13 +163,13 @@ export default function BookingPage() {
 						});
 					}
 				});
-			}
-			else if (item.date && (item.start_time || item.start)) {
+			} else if (item.date && (item.start_time || item.start)) {
 				if (!acc[item.date]) acc[item.date] = [];
 				const sStart = item.start_time || item.start;
 				const sEnd = item.end_time || item.end;
 				const exists = acc[item.date].some(
-					(existing) => existing.start_time === sStart && existing.end_time === sEnd,
+					(existing) =>
+						existing.start_time === sStart && existing.end_time === sEnd,
 				);
 				if (!exists) {
 					acc[item.date].push({
@@ -172,7 +186,9 @@ export default function BookingPage() {
 		});
 
 		Object.keys(acc).forEach((d) => {
-			acc[d].sort((a, b) => (a.start_time || a.start).localeCompare(b.start_time || b.start));
+			acc[d].sort((a, b) =>
+				(a.start_time || a.start).localeCompare(b.start_time || b.start),
+			);
 		});
 
 		return acc;
@@ -199,7 +215,10 @@ export default function BookingPage() {
 		if (slotDate < todayStr) return true;
 		if (slotDate > todayStr) return false;
 
-		const timeVal = typeof slotTime === "string" ? slotTime : (slotTime.start_time || slotTime.start);
+		const timeVal =
+			typeof slotTime === "string"
+				? slotTime
+				: slotTime.start_time || slotTime.start;
 		if (!timeVal) return false;
 		const [hours, minutes] = timeVal.split(":").map(Number);
 		const slotDateTime = new Date();
@@ -212,7 +231,10 @@ export default function BookingPage() {
 
 		return groupedSlots[selectedDate].filter((slot) => {
 			const isBooked = slot.isBooked === true || slot.is_booked === true;
-			const isExpired = isSlotExpired(selectedDate, slot.start_time || slot.start);
+			const isExpired = isSlotExpired(
+				selectedDate,
+				slot.start_time || slot.start,
+			);
 			return !isBooked && !isExpired;
 		});
 	}, [selectedDate, groupedSlots]);
@@ -246,7 +268,8 @@ export default function BookingPage() {
 		try {
 			const startTimeVal = selectedTime.start_time || selectedTime.start;
 			const endTimeVal = selectedTime.end_time || selectedTime.end;
-			const providerIdVal = provider.user_id || provider.id || provider.custom_id;
+			const providerIdVal =
+				provider.user_id || provider.id || provider.custom_id;
 
 			const res = await api.post("/api/bookings", {
 				provider_id: providerIdVal,
@@ -446,12 +469,12 @@ export default function BookingPage() {
 									<h2 className="mackinac text-lg sm:text-2xl font-bold leading-tight text-white mb-1">
 										{provider.name}
 									</h2>
-									<div className="inter flex items-center gap-1 text-[11px] text-violet-300/80 mb-2">
+									<div className="font-geist flex items-center gap-1 text-[11px] text-violet-300/80 mb-2">
 										<ShieldCheck size={12} className="text-green-400" />
 										<span>Verified Expert</span>
 									</div>
 
-									<div className="inter inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-100">
+									<div className="font-geist inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-100">
 										<span className="text-base font-bold">
 											₹{provider.price}
 										</span>
@@ -460,7 +483,7 @@ export default function BookingPage() {
 								</div>
 							</div>
 
-							<div className="inter mt-6 pt-5 border-t border-white/5 space-y-3 hidden lg:block">
+							<div className="font-geist mt-6 pt-5 border-t border-white/5 space-y-3 hidden lg:block">
 								<div className="flex justify-between text-sm">
 									<span className="text-gray-400">Date</span>
 									<span className="font-medium text-white">
@@ -485,7 +508,7 @@ export default function BookingPage() {
 						</div>
 					</div>
 
-					<div className="inter lg:col-span-8 space-y-6 lg:space-y-8">
+					<div className="font-geist lg:col-span-8 space-y-6 lg:space-y-8">
 						<div className="space-y-3.5">
 							<div className="flex items-center gap-2 px-1">
 								<div className="p-1.5 rounded-md bg-violet-500/20">
@@ -519,10 +542,10 @@ export default function BookingPage() {
 														}}
 														className={`cursor-pointer snap-start flex-shrink-0 min-w-[76px] sm:min-w-[90px] p-2.5 sm:p-3 rounded-xl border transition-all duration-200 flex flex-col items-center justify-center gap-0.5
                                                         ${
-															isSelected
-																? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/40"
-																: "bg-[#22194A] border-white/5 text-gray-400 hover:bg-[#2a1f5a]"
-														}`}
+																													isSelected
+																														? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-900/40"
+																														: "bg-[#22194A] border-white/5 text-gray-400 hover:bg-[#2a1f5a]"
+																												}`}
 													>
 														<span
 															className={`text-[12px] uppercase tracking-wider font-semibold ${isSelected ? "text-violet-200" : "text-gray-500"}`}
@@ -566,9 +589,12 @@ export default function BookingPage() {
 										{visibleSlots.map((slot) => {
 											const slotStart = slot.start_time || slot.start;
 											const slotEnd = slot.end_time || slot.end;
-											const curStart = selectedTime?.start_time || selectedTime?.start;
-											const curEnd = selectedTime?.end_time || selectedTime?.end;
-											const isSelected = curStart === slotStart && curEnd === slotEnd;
+											const curStart =
+												selectedTime?.start_time || selectedTime?.start;
+											const curEnd =
+												selectedTime?.end_time || selectedTime?.end;
+											const isSelected =
+												curStart === slotStart && curEnd === slotEnd;
 
 											return (
 												<button
@@ -584,10 +610,10 @@ export default function BookingPage() {
 													}
 													className={`cursor-pointer relative py-2.5 px-2 rounded-xl border text-[15px] sm:text-sm font-semibold transition-all duration-200
                                                     ${
-														isSelected
-															? "bg-white text-violet-900 border-white shadow-md shadow-violet-900/20"
-															: "bg-[#22194A] border-white/5 text-gray-300 hover:bg-[#2a1f5a]"
-													}`}
+																											isSelected
+																												? "bg-white text-violet-900 border-white shadow-md shadow-violet-900/20"
+																												: "bg-[#22194A] border-white/5 text-gray-300 hover:bg-[#2a1f5a]"
+																										}`}
 												>
 													{formatTime(slotStart)} - {formatTime(slotEnd)}
 												</button>
@@ -728,10 +754,10 @@ export default function BookingPage() {
 								disabled={isSubmitting || !selectedTime || !address.trim()}
 								className={`w-full mx-auto py-3.5 rounded-full text-base font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group
                                 ${
-									selectedTime && address.trim()
-										? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white transform hover:-translate-y-0.5 cursor-pointer"
-										: "bg-[#22194A] text-gray-500 cursor-not-allowed border border-white/5"
-								}`}
+																	selectedTime && address.trim()
+																		? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white transform hover:-translate-y-0.5 cursor-pointer"
+																		: "bg-[#22194A] text-gray-500 cursor-not-allowed border border-white/5"
+																}`}
 							>
 								{isSubmitting ? (
 									<div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -750,7 +776,7 @@ export default function BookingPage() {
 				</div>
 			</div>
 
-			<div className="font-inter lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-[#191034]/95 backdrop-blur-2xl border-t border-white/10 z-50">
+			<div className="font-font-geist lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-[#191034]/95 backdrop-blur-2xl border-t border-white/10 z-50">
 				<div className="flex items-center justify-between gap-4 max-w-md mx-auto">
 					<div>
 						<p className="text-[9px] text-violet-300/60 uppercase tracking-widest font-bold">
@@ -771,10 +797,10 @@ export default function BookingPage() {
 						disabled={isSubmitting || !selectedTime || !address.trim()}
 						className={`flex-1 py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-xl active:scale-95 transition-all duration-200 flex items-center justify-center gap-1.5
                         ${
-							selectedTime && address.trim()
-								? "hover:opacity-75 bg-gradient-to-r from-violet-600 to-indigo-600 text-white cursor-pointer"
-								: "bg-[#22194A] text-gray-500 border border-white/5 cursor-not-allowed"
-						}`}
+													selectedTime && address.trim()
+														? "hover:opacity-75 bg-gradient-to-r from-violet-600 to-indigo-600 text-white cursor-pointer"
+														: "bg-[#22194A] text-gray-500 border border-white/5 cursor-not-allowed"
+												}`}
 					>
 						{isSubmitting ? (
 							<div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

@@ -319,7 +319,7 @@ const UpcomingCard = ({
 					{booking.service_name}
 				</h4>
 
-				<div className="font-inter flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
+				<div className="font-geist flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
 					<div className="flex items-center gap-1.5 text-gray-600">
 						<Calendar size={14} className="text-gray-500" />
 						<span className="text-xs font-semibold">
@@ -337,19 +337,20 @@ const UpcomingCard = ({
 
 			<div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5">
 				<StatusBadge status={booking.status} dynamic={!isHero} />
-				{["booked", "confirmed", "in_progress"].includes(booking.status) && (booking.completion_otp || booking.otp) && (
-					<span
-						className="text-[10px] font-mono font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-200"
-						title="Completion OTP to share when work is done"
-					>
-						OTP: {booking.completion_otp || booking.otp}
-					</span>
-				)}
+				{["booked", "confirmed", "in_progress"].includes(booking.status) &&
+					(booking.completion_otp || booking.otp) && (
+						<span
+							className="text-[10px] font-mono font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-200"
+							title="Completion OTP to share when work is done"
+						>
+							OTP: {booking.completion_otp || booking.otp}
+						</span>
+					)}
 			</div>
 		</div>
 
 		<div className="mt-4 pt-3 border-t border-gray-100/80 flex items-center justify-between gap-4">
-			<div className="flex font-inter items-center text-gray-500 font-medium min-w-0">
+			<div className="flex font-geist items-center text-gray-500 font-medium min-w-0">
 				<div className="flex items-center gap-1.5 truncate">
 					<User size={14} className="text-gray-400 shrink-0" />
 					<span className="text-[13px] truncate">
@@ -369,7 +370,7 @@ const UpcomingCard = ({
 						<span className="text-[13px]">Call Pro</span>
 					</a>
 				)}
-				<div className="text-base font-inter font-black text-gray-950">
+				<div className="text-base font-geist font-black text-gray-950">
 					{formatCurrency(booking.price)}
 				</div>
 			</div>

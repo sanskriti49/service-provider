@@ -123,7 +123,10 @@ const ServiceDetails = () => {
 
 				const cacheKeyProviders = `providers_${slug.toLowerCase()}_${sortBy}_${userCoords?.lat || ""}`;
 				let providersData = apiCache.get(cacheKeyProviders);
-				if (!providersData || (Array.isArray(providersData) && providersData.length === 0)) {
+				if (
+					!providersData ||
+					(Array.isArray(providersData) && providersData.length === 0)
+				) {
 					const providersRes = await fetch(
 						`${API_URL}/api/providers/v1?${params.toString()}`,
 					);
@@ -132,7 +135,10 @@ const ServiceDetails = () => {
 					}
 
 					// If 0 providers returned with geolocation coords, fallback to fetching all providers for the service
-					if ((!providersData || providersData.length === 0) && userCoords?.lat) {
+					if (
+						(!providersData || providersData.length === 0) &&
+						userCoords?.lat
+					) {
 						const fallbackRes = await fetch(
 							`${API_URL}/api/providers/v1?service=${encodeURIComponent(slug)}&sort_by=recommended`,
 						);
@@ -248,7 +254,7 @@ const ServiceDetails = () => {
 					<h2 className="text-3xl font-bold bricolage-grotesque">
 						{service ? "No Providers Available Yet" : "Service Not Found"}
 					</h2>
-					<p className="inter text-gray-300 mt-3 text-sm leading-relaxed">
+					<p className="font-geist text-gray-300 mt-3 text-sm leading-relaxed">
 						{service
 							? "We're currently expanding our network of verified professionals for this category. In the meantime, check out other popular services or reach out to our support team."
 							: "The service you're looking for might have been moved or doesn't exist :("}
@@ -256,13 +262,13 @@ const ServiceDetails = () => {
 					<div className="mt-8 flex items-center justify-center gap-4 flex-wrap">
 						<Link
 							to="/services"
-							className="inter inline-flex items-center gap-2 bg-violet-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/40 cursor-pointer"
+							className="font-geist inline-flex items-center gap-2 bg-violet-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/40 cursor-pointer"
 						>
 							<span>Explore All Services</span>
 						</Link>
 						<Link
 							to="/"
-							className="inter inline-flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white px-6 py-3 rounded-xl font-semibold border border-white/10 transition-all cursor-pointer"
+							className="font-geist inline-flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white px-6 py-3 rounded-xl font-semibold border border-white/10 transition-all cursor-pointer"
 						>
 							<span>Go Back Home</span>
 						</Link>
@@ -304,7 +310,7 @@ const ServiceDetails = () => {
 						<h1 className="text-5xl md:text-6xl lg:text-6xl bricolage-grotesque text-white font-bold [text-shadow:_0_2px_10px_rgb(0_0_0_/_0.5)]">
 							{service.name}
 						</h1>
-						<p className="inter mt-4 max-w-xl text-gray-300 text-base md:text-lg [text-shadow:_0_1px_5px_rgb(0_0_0_/_0.5)]">
+						<p className="font-geist mt-4 max-w-xl text-gray-300 text-base md:text-lg [text-shadow:_0_1px_5px_rgb(0_0_0_/_0.5)]">
 							{service.description}
 						</p>
 					</div>
@@ -323,7 +329,7 @@ const ServiceDetails = () => {
 
 			<div
 				ref={contentRef}
-				className="inter relative z-20 bg-[#191034] max-w-7xl mt-10 mx-auto py-16 sm:py-10 px-4 sm:px-6 lg:px-8 rounded-t-3xl border-t border-violet-800/50 shadow-2xl shadow-black/50"
+				className="font-geist relative z-20 bg-[#191034] max-w-7xl mt-10 mx-auto py-16 sm:py-10 px-4 sm:px-6 lg:px-8 rounded-t-3xl border-t border-violet-800/50 shadow-2xl shadow-black/50"
 			>
 				<div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8 pb-4 border-b border-white/5">
 					<div>
@@ -343,7 +349,10 @@ const ServiceDetails = () => {
 								disabled={isLocating}
 								className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 text-violet-300 text-xs font-semibold transition-all cursor-pointer"
 							>
-								<Navigation size={12} className={isLocating ? "animate-spin" : ""} />
+								<Navigation
+									size={12}
+									className={isLocating ? "animate-spin" : ""}
+								/>
 								<span>{isLocating ? "Locating..." : "Use My Location"}</span>
 							</button>
 						) : (
@@ -361,10 +370,18 @@ const ServiceDetails = () => {
 								onChange={(e) => setSortBy(e.target.value)}
 								className="bg-transparent text-white font-semibold outline-none cursor-pointer"
 							>
-								<option value="recommended" className="bg-[#191034]">Recommended</option>
-								<option value="distance" className="bg-[#191034]">Nearest First</option>
-								<option value="rating" className="bg-[#191034]">Top Rated</option>
-								<option value="price_asc" className="bg-[#191034]">Price: Low to High</option>
+								<option value="recommended" className="bg-[#191034]">
+									Recommended
+								</option>
+								<option value="distance" className="bg-[#191034]">
+									Nearest First
+								</option>
+								<option value="rating" className="bg-[#191034]">
+									Top Rated
+								</option>
+								<option value="price_asc" className="bg-[#191034]">
+									Price: Low to High
+								</option>
 							</select>
 						</div>
 					</div>
@@ -427,7 +444,8 @@ const ProviderCard = ({
 				...(userCoords?.lng && { lng: String(userCoords.lng) }),
 			});
 
-			const providerIdentifier = provider.user_id || provider.id || provider.custom_id;
+			const providerIdentifier =
+				provider.user_id || provider.id || provider.custom_id;
 			const cacheKey = `avail_${providerIdentifier}_${todayStr}_${userCoords?.lat || ""}`;
 			let data = apiCache.get(cacheKey);
 
@@ -456,12 +474,15 @@ const ProviderCard = ({
 		if (reviewsData) return;
 		setLoadingReviews(true);
 		try {
-			const providerIdentifier = provider.user_id || provider.id || provider.custom_id;
+			const providerIdentifier =
+				provider.user_id || provider.id || provider.custom_id;
 			const cacheKey = `reviews_${providerIdentifier}`;
 			let data = apiCache.get(cacheKey);
 
 			if (!data) {
-				const res = await fetch(`${API_URL}/api/reviews/provider/${providerIdentifier}`);
+				const res = await fetch(
+					`${API_URL}/api/reviews/provider/${providerIdentifier}`,
+				);
 				if (res.ok) {
 					data = await res.json();
 					apiCache.set(cacheKey, data, 120000);
@@ -563,12 +584,12 @@ const ProviderCard = ({
     relative flex flex-col bg-[#22194A] rounded-3xl overflow-hidden
     transition-all duration-300 border border-white/5
     ${
-		isExpanded
-			? "ring-2 ring-violet-500/60 shadow-2xl shadow-violet-900/30 scale-[1.02]"
-			: isAnyExpanded
-				? "opacity-60 pointer-events-none"
-				: "hover:-translate-y-2 hover:shadow-2xl hover:shadow-violet-900/30 hover:border-violet-500/30"
-	}
+			isExpanded
+				? "ring-2 ring-violet-500/60 shadow-2xl shadow-violet-900/30 scale-[1.02]"
+				: isAnyExpanded
+					? "opacity-60 pointer-events-none"
+					: "hover:-translate-y-2 hover:shadow-2xl hover:shadow-violet-900/30 hover:border-violet-500/30"
+		}
   `}
 		>
 			<div className="p-7">
@@ -667,7 +688,11 @@ const ProviderCard = ({
 						}`}
 					>
 						<Star size={14} className="text-yellow-400" />
-						<span>{isExpanded && activeTab === "reviews" ? "Close Reviews" : "Reviews"}</span>
+						<span>
+							{isExpanded && activeTab === "reviews"
+								? "Close Reviews"
+								: "Reviews"}
+						</span>
 					</button>
 				</div>
 
@@ -717,9 +742,7 @@ const ProviderCard = ({
 																weekday: "short",
 															})}
 														</div>
-														<div className="font-bold">
-															{dObj.getDate()}
-														</div>
+														<div className="font-bold">{dObj.getDate()}</div>
 													</button>
 												);
 											})}
@@ -774,9 +797,12 @@ const ProviderCard = ({
 														selectedDateStr,
 														selectedSlot: {
 															date: selectedDateStr,
-															start_time: selectedTime?.start_time || selectedTime?.start,
-															end_time: selectedTime?.end_time || selectedTime?.end,
-															start: selectedTime?.start_time || selectedTime?.start,
+															start_time:
+																selectedTime?.start_time || selectedTime?.start,
+															end_time:
+																selectedTime?.end_time || selectedTime?.end,
+															start:
+																selectedTime?.start_time || selectedTime?.start,
 															end: selectedTime?.end_time || selectedTime?.end,
 														},
 													},
@@ -810,7 +836,9 @@ const ProviderCard = ({
 									<div className="flex items-center justify-between p-3.5 bg-white/5 rounded-2xl border border-white/10">
 										<div className="flex items-center gap-3">
 											<div className="text-3xl font-bold text-white">
-												{reviewsData?.average_rating ? Number(reviewsData.average_rating).toFixed(1) : (provider.rating || "5.0")}
+												{reviewsData?.average_rating
+													? Number(reviewsData.average_rating).toFixed(1)
+													: provider.rating || "5.0"}
 											</div>
 											<div>
 												<div className="flex items-center gap-0.5">
@@ -819,7 +847,12 @@ const ProviderCard = ({
 															key={s}
 															size={13}
 															className={
-																s <= Math.round(reviewsData?.average_rating || provider.rating || 5)
+																s <=
+																Math.round(
+																	reviewsData?.average_rating ||
+																		provider.rating ||
+																		5,
+																)
 																	? "text-yellow-400 fill-yellow-400"
 																	: "text-gray-600"
 															}
@@ -864,10 +897,13 @@ const ProviderCard = ({
 															</div>
 														</div>
 														<span className="text-[10px] text-gray-500">
-															{new Date(rev.created_at).toLocaleDateString("en-US", {
-																month: "short",
-																day: "numeric",
-															})}
+															{new Date(rev.created_at).toLocaleDateString(
+																"en-US",
+																{
+																	month: "short",
+																	day: "numeric",
+																},
+															)}
 														</span>
 													</div>
 

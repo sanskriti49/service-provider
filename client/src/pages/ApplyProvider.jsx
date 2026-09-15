@@ -82,7 +82,10 @@ const DAYS = [
 export default function ApplyProvider() {
 	const [step, setStep] = useState(1);
 	const [loading, setLoading] = useState(false);
-	const [uploadingDoc, setUploadingDoc] = useState({ front: false, back: false });
+	const [uploadingDoc, setUploadingDoc] = useState({
+		front: false,
+		back: false,
+	});
 	const [successData, setSuccessData] = useState(null);
 	const [errorMsg, setErrorMsg] = useState("");
 
@@ -233,7 +236,9 @@ export default function ApplyProvider() {
 		setErrorMsg("");
 
 		if (!formData.kyc_doc_type) {
-			setErrorMsg("Please select a government ID document type for KYC verification.");
+			setErrorMsg(
+				"Please select a government ID document type for KYC verification.",
+			);
 			return;
 		}
 		if (!formData.kyc_doc_number || formData.kyc_doc_number.trim().length < 4) {
@@ -241,7 +246,9 @@ export default function ApplyProvider() {
 			return;
 		}
 		if (!formData.kyc_declaration) {
-			setErrorMsg("Please accept the background verification consent declaration.");
+			setErrorMsg(
+				"Please accept the background verification consent declaration.",
+			);
 			return;
 		}
 
@@ -296,7 +303,7 @@ export default function ApplyProvider() {
 							Verified Service Expert
 						</span>
 					</h1>
-					<p className="inter text-sm sm:text-base text-slate-600 max-w-lg mx-auto leading-relaxed">
+					<p className="font-geist text-sm sm:text-base text-slate-600 max-w-lg mx-auto leading-relaxed">
 						Set your own rates, choose your working hours, and connect with
 						thousands of local clients.
 					</p>
@@ -713,10 +720,13 @@ export default function ApplyProvider() {
 									<div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
 										<div>
 											<h3 className="text-lg font-bold text-[#281950] flex items-center gap-2">
-												<span>Step 4: Identity &amp; Background Verification</span>
+												<span>
+													Step 4: Identity &amp; Background Verification
+												</span>
 											</h3>
 											<p className="text-xs text-slate-500 mt-0.5">
-												Upload government-approved documentation to earn your gold Verified Pro trust badge.
+												Upload government-approved documentation to earn your
+												gold Verified Pro trust badge.
 											</p>
 										</div>
 										<VerifiedBadge size="md" />
@@ -735,7 +745,11 @@ export default function ApplyProvider() {
 												</span>
 											</div>
 											<p className="text-xs text-slate-600 leading-relaxed">
-												To protect homeowners from unauthorized personnel, every provider is checked by our administrative security team. Verified pros enjoy <strong>3.8x higher booking conversion</strong> and priority dispatch.
+												To protect homeowners from unauthorized personnel, every
+												provider is checked by our administrative security team.
+												Verified pros enjoy{" "}
+												<strong>3.8x higher booking conversion</strong> and
+												priority dispatch.
 											</p>
 										</div>
 									</div>
@@ -769,7 +783,9 @@ export default function ApplyProvider() {
 												<button
 													key={doc.id}
 													type="button"
-													onClick={() => handleInputChange("kyc_doc_type", doc.id)}
+													onClick={() =>
+														handleInputChange("kyc_doc_type", doc.id)
+													}
 													className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
 														formData.kyc_doc_type === doc.id
 															? "bg-violet-50/80 border-violet-500 shadow-sm ring-1 ring-violet-400/50"
@@ -838,7 +854,9 @@ export default function ApplyProvider() {
 													<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
 														<button
 															type="button"
-															onClick={() => handleInputChange("kyc_doc_front", "")}
+															onClick={() =>
+																handleInputChange("kyc_doc_front", "")
+															}
 															className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition cursor-pointer shadow-md"
 														>
 															Remove Photo
@@ -908,7 +926,9 @@ export default function ApplyProvider() {
 													<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
 														<button
 															type="button"
-															onClick={() => handleInputChange("kyc_doc_back", "")}
+															onClick={() =>
+																handleInputChange("kyc_doc_back", "")
+															}
 															className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition cursor-pointer shadow-md"
 														>
 															Remove Photo
@@ -972,7 +992,10 @@ export default function ApplyProvider() {
 											htmlFor="kyc_declaration"
 											className="text-xs text-slate-600 cursor-pointer select-none leading-relaxed"
 										>
-											I declare that the identification details and documents provided belong to me and are authentic. I give consent to TaskGenie to verify these documents with authorized databases to issue my <strong>Verified Pro</strong> badge.
+											I declare that the identification details and documents
+											provided belong to me and are authentic. I give consent to
+											TaskGenie to verify these documents with authorized
+											databases to issue my <strong>Verified Pro</strong> badge.
 										</label>
 									</div>
 								</motion.div>
@@ -1002,7 +1025,9 @@ export default function ApplyProvider() {
 								) : (
 									<button
 										type="submit"
-										disabled={loading || uploadingDoc.front || uploadingDoc.back}
+										disabled={
+											loading || uploadingDoc.front || uploadingDoc.back
+										}
 										className="flex items-center gap-2 px-8 py-3 rounded-full font-bold text-sm text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 shadow-lg shadow-purple-500/25 disabled:opacity-50 transition-all cursor-pointer"
 									>
 										{loading ? (

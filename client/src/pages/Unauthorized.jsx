@@ -20,7 +20,7 @@ const Unauthorized = () => {
 			className="flex flex-col items-center justify-center h-screen bg-cover bg-center bg-no-repeat px-4 select-none"
 			style={{ backgroundImage: `url('/images/error.jpg')` }}
 		>
-			<div className="inter max-w-md w-full backdrop-blur-xl bg-purple-950/40 border border-white/10 p-8 rounded-2xl shadow-2xl text-center flex flex-col items-center">
+			<div className="font-geist max-w-md w-full backdrop-blur-xl bg-purple-950/40 border border-white/10 p-8 rounded-2xl shadow-2xl text-center flex flex-col items-center">
 				<div className="w-16 h-16 bg-gradient-to-tr from-pink-500/20 to-purple-500/20 text-pink-300 rounded-full flex items-center justify-center mb-6 border border-pink-400/20 shadow-lg">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

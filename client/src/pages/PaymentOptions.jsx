@@ -13,7 +13,7 @@ export default function PaymentOptions({
 	return (
 		<button
 			onClick={() => setMethod(method)}
-			className="inter relative group outline-none w-full"
+			className="font-geist relative group outline-none w-full"
 		>
 			{isActive && (
 				<motion.div

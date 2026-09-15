@@ -95,11 +95,11 @@ const ServiceCard = ({ service }) => {
 					</p>
 				)}
 
-				<p className="inter line-clamp-2 text-sm text-gray-300 opacity-90 transition-opacity duration-300 group-hover:text-white">
+				<p className="font-geist line-clamp-2 text-sm text-gray-300 opacity-90 transition-opacity duration-300 group-hover:text-white">
 					{service.description}
 				</p>
 
-				<div className="inter group/cta mt-6 flex items-center gap-2 text-violet-300 font-medium">
+				<div className="font-geist group/cta mt-6 flex items-center gap-2 text-violet-300 font-medium">
 					<span className="transition-colors duration-200 group-hover/cta:text-violet-400">
 						View Providers
 					</span>
@@ -128,10 +128,7 @@ const ServicesCarousel = ({ services }) => {
 				customRightArrow={<CustomArrow direction="right" />}
 			>
 				{services.map((service) => (
-					<ServiceCard
-						key={service.slug || service.id}
-						service={service}
-					/>
+					<ServiceCard key={service.slug || service.id} service={service} />
 				))}
 			</Carousel>
 		</div>
@@ -164,10 +161,10 @@ const ServicesSection = () => {
 					<span className="bricolage-grotesque inline-block rounded-full bg-violet-100 px-4 py-1.5 text-sm font-semibold text-violet-700 mb-4">
 						Expert Services
 					</span>
-					<h2 className="bricolage-grotesque text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl mb-6">
+					<h2 className="bricolage-grotesque text-4xl font-bold text-[#281950] sm:text-5xl mb-6">
 						Find the right pro for every job.
 					</h2>
-					<p className="inter mx-auto max-w-2xl text-lg text-slate-600">
+					<p className="font-geist mx-auto max-w-2xl text-lg text-slate-600">
 						From home repairs to personal wellness, connect with trusted
 						professionals in your area instantly.
 					</p>
@@ -204,7 +201,9 @@ const ServicesSection = () => {
 				<div className="text-center mt-8 relative z-10">
 					<Link to="/services">
 						<button className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-slate-900 px-8 py-3 text-white transition-all hover:bg-slate-800 hover:scale-105 active:scale-95 shadow-xl shadow-slate-200">
-							<span className="font-medium inter">View All Categories</span>
+							<span className="font-medium font-geist">
+								View All Categories
+							</span>
 							<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
 						</button>
 					</Link>

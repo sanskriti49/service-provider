@@ -156,15 +156,9 @@ const HelpCenter = () => {
 
 	const visibleQuickLinks = useMemo(() => {
 		const ql = getQuickLinksData(userRole);
-		if (userRole === "customer")
-			return [...ql.customer, ...ql.common];
-		if (userRole === "provider")
-			return [...ql.provider, ...ql.common];
-		return [
-			...ql.customer,
-			...ql.provider,
-			...ql.common,
-		];
+		if (userRole === "customer") return [...ql.customer, ...ql.common];
+		if (userRole === "provider") return [...ql.provider, ...ql.common];
+		return [...ql.customer, ...ql.provider, ...ql.common];
 	}, [userRole]);
 
 	const filteredFaqs = useMemo(() => {
@@ -237,7 +231,7 @@ const HelpCenter = () => {
 										? `Search help for ${userRole}s...`
 										: "Search 'refund', 'invoice', 'KYC'..."
 								}
-								className="inter w-full p-4 bg-transparent text-lg outline-none placeholder:text-slate-400 text-slate-800"
+								className="font-geist w-full p-4 bg-transparent text-lg outline-none placeholder:text-slate-400 text-slate-800"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 							/>
@@ -276,7 +270,7 @@ const HelpCenter = () => {
 										<button
 											key={tab}
 											onClick={() => setActiveTab(tab)}
-											className={`inter px-8 py-3 rounded-xl text-sm font-medium transition-all relative z-10 ${activeTab === tab ? "text-violet-900" : "text-slate-500 hover:text-slate-700"}`}
+											className={`font-geist px-8 py-3 rounded-xl text-sm font-medium transition-all relative z-10 ${activeTab === tab ? "text-violet-900" : "text-slate-500 hover:text-slate-700"}`}
 										>
 											{activeTab === tab && (
 												<motion.div
@@ -284,7 +278,7 @@ const HelpCenter = () => {
 													className="absolute inset-0 bg-white shadow-md rounded-xl border border-slate-100"
 												/>
 											)}
-											<span className="inter relative z-20 capitalize flex items-center gap-2">
+											<span className="font-geist relative z-20 capitalize flex items-center gap-2">
 												{tab === "customer" ? (
 													<User size={14} />
 												) : (
@@ -373,10 +367,10 @@ const HelpCenter = () => {
 								</div>
 
 								<div className="space-y-1">
-									<p className="inter text-white font-semibold text-lg flex items-center justify-center md:justify-start gap-2">
+									<p className="font-geist text-white font-semibold text-lg flex items-center justify-center md:justify-start gap-2">
 										Meet the team
 									</p>
-									<p className="inter text-slate-400 text-sm">
+									<p className="font-geist text-slate-400 text-sm">
 										Typically replies in{" "}
 										<span className="text-emerald-400 font-bold">2 mins</span>
 									</p>

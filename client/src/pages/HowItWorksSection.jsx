@@ -84,7 +84,7 @@ const HowItWorksSection = () => {
 							Done in a Flash
 						</span>
 					</h2>
-					<p className="inter text-base sm:text-lg text-slate-600 max-w-xl mx-auto leading-relaxed">
+					<p className="font-geist text-base sm:text-lg text-slate-600 max-w-xl mx-auto leading-relaxed">
 						Getting help has never been easier. Here's how our seamless process
 						connects you with the perfect pro.
 					</p>
@@ -130,7 +130,7 @@ const HowItWorksSection = () => {
 										<div className="text-xs font-semibold text-violet-600/90">
 											{step.subtitle}
 										</div>
-										<p className="inter text-xs sm:text-sm text-slate-600 leading-relaxed pt-1">
+										<p className="font-geist text-xs sm:text-sm text-slate-600 leading-relaxed pt-1">
 											{step.description}
 										</p>
 									</div>
