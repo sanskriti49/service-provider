@@ -4,7 +4,6 @@ import {
 	Outlet,
 	Link,
 	useNavigate,
-	useOutlet,
 	useLocation,
 } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,37 +15,35 @@ import {
 	LogOut,
 	Bell,
 	Star,
-	TrendingUp,
-	Clock,
-	CheckCircle2,
-	ChevronRight,
 	Wrench,
 	Menu,
 	X,
-	IndianRupee,
-	Users,
 	ArrowUpRight,
+	ChevronRight,
 	Copy,
 	Check,
-	Sparkles,
-	Calendar,
 	ShieldCheck,
-	Activity,
-	MapPin,
-	SlidersHorizontal,
-	CircleDot,
 	AlertTriangle,
+	Clock,
 	LifeBuoy,
+	IndianRupee,
+	CheckCircle2,
+	Users,
+	Zap,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "sonner";
 import ConfirmDialog from "../../ui/ConfirmDialog";
+import useModal from "../../hooks/useModal";
 import Logo from "../../ui/Logo";
 import VerifiedBadge from "../../ui/VerifiedBadge";
 import KycVerificationModal from "../../ui/KycVerificationModal";
 import SupportTicketModal from "../../ui/SupportTicketModal";
+import ScrollToTop from "../../ui/ScrollToTop";
+
+const PLATFORM_FEE = 0.15; // Estimate only; replace with backend value if available
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -55,38 +52,59 @@ const formatCurrency = (n) =>
 		maximumFractionDigits: 0,
 	}).format(n || 0);
 
+/* Color language: violet = brand/action, amber = money/rating,
+   emerald = done/healthy, sky = in progress, rose = attention */
 const STATUS_MAP = {
 	pending: {
 		label: "Pending",
-		badge: "bg-amber-500/10 text-amber-300 border-amber-500/20",
-		dot: "bg-amber-400",
+		dot: "bg-amber-300",
+		text: "text-amber-200",
+		rail: "from-amber-300/25 to-amber-300/5 text-amber-200",
+		pulse: true,
 	},
 	booked: {
 		label: "Confirmed",
-		badge: "bg-violet-500/10 text-violet-300 border-violet-500/20",
-		dot: "bg-violet-400",
+		dot: "bg-violet-300",
+		text: "text-violet-200",
+		rail: "from-violet-400/25 to-violet-400/5 text-violet-200",
 	},
 	confirmed: {
 		label: "Confirmed",
-		badge: "bg-violet-500/10 text-violet-300 border-violet-500/20",
-		dot: "bg-violet-400",
+		dot: "bg-violet-300",
+		text: "text-violet-200",
+		rail: "from-violet-400/25 to-violet-400/5 text-violet-200",
 	},
 	in_progress: {
-		label: "In Progress",
-		badge: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
-		dot: "bg-indigo-400",
+		label: "In progress",
+		dot: "bg-sky-300",
+		text: "text-sky-200",
+		rail: "from-sky-300/25 to-sky-300/5 text-sky-200",
+		pulse: true,
 	},
 	completed: {
 		label: "Completed",
-		badge: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
-		dot: "bg-emerald-400",
+		dot: "bg-emerald-300",
+		text: "text-emerald-200",
+		rail: "from-emerald-300/25 to-emerald-300/5 text-emerald-200",
 	},
 	cancelled: {
 		label: "Cancelled",
-		badge: "bg-rose-500/10 text-rose-300 border-rose-500/20",
-		dot: "bg-rose-400",
+		dot: "bg-rose-300",
+		text: "text-rose-200",
+		rail: "from-rose-300/20 to-rose-300/5 text-rose-200",
 	},
 };
+
+const DEFAULT_STATS = {
+	total_earnings: 0,
+	active_jobs: 0,
+	completed_jobs: 0,
+	avg_rating: 0,
+	pending_jobs: 0,
+	total_customers: 0,
+};
+
+/* ───────────────────────── Sidebar ───────────────────────── */
 
 function NavItem({ to, icon: Icon, label, end = false, onClick, badge }) {
 	return (
@@ -95,37 +113,35 @@ function NavItem({ to, icon: Icon, label, end = false, onClick, badge }) {
 			end={end}
 			onClick={onClick}
 			className={({ isActive }) =>
-				`group relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-150 ${
+				`group relative flex items-center gap-3 h-10 px-3 rounded-lg text-sm transition-colors ${
 					isActive
-						? "bg-violet-600/15 text-white border border-violet-500/30 shadow-xs"
-						: "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"
+						? "bg-gradient-to-r from-violet-400/[0.16] to-violet-400/[0.03] text-white font-medium"
+						: "text-stone-400 hover:text-white hover:bg-white/[0.04]"
 				}`
 			}
 		>
 			{({ isActive }) => (
 				<>
-					<div className="flex items-center gap-3">
-						<Icon
-							size={16}
-							className={`transition-colors ${
-								isActive
-									? "text-violet-400"
-									: "text-slate-500 group-hover:text-slate-300"
-							}`}
-						/>
-						<span>{label}</span>
-					</div>
-					{badge !== undefined && badge > 0 && (
-						<span className="px-1.5 py-0.5 rounded-md text-[14px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
-							{badge}
-						</span>
-					)}
 					{isActive && (
-						<motion.div
-							layoutId="active-nav-indicator"
-							className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-violet-500"
-							transition={{ type: "spring", stiffness: 400, damping: 30 }}
+						<motion.span
+							layoutId="provider-nav-indicator"
+							className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-r-full bg-gradient-to-b from-violet-300 to-fuchsia-400"
+							transition={{ type: "spring", stiffness: 500, damping: 40 }}
 						/>
+					)}
+					<Icon
+						size={17}
+						className={
+							isActive
+								? "text-violet-300"
+								: "text-stone-500 group-hover:text-stone-300"
+						}
+					/>
+					<span className="flex-1">{label}</span>
+					{badge > 0 && (
+						<span className="min-w-[20px] h-5 px-1.5 rounded-full bg-gradient-to-br from-violet-300 to-fuchsia-300 text-[11px] font-bold text-[#0d0b12] flex items-center justify-center tabular-nums">
+							{badge > 99 ? "99+" : badge}
+						</span>
 					)}
 				</>
 			)}
@@ -133,184 +149,171 @@ function NavItem({ to, icon: Icon, label, end = false, onClick, badge }) {
 	);
 }
 
-function SidebarProfile({ user, notifications, onLogout, onLinkClick }) {
+function Sidebar({ user, notifications, onLogout, onLinkClick }) {
 	const [copied, setCopied] = useState(false);
 
 	const handleCopyId = useCallback(() => {
 		if (!user?.custom_id) return;
 		navigator.clipboard.writeText(user.custom_id);
 		setCopied(true);
-		toast.success("Provider ID copied to clipboard");
+		toast.success("Provider ID copied");
 		setTimeout(() => setCopied(false), 2000);
 	}, [user?.custom_id]);
 
 	return (
-		<aside className="w-full h-full flex flex-col justify-between py-6 px-4 bg-[#0d081d] border-r border-white/[0.07]">
-			<div className="space-y-6">
-				{/* Brand Logo & Tag */}
-				<div className="flex items-center justify-between px-2">
-					<Logo to="/" size="md" theme="dark" />
-				</div>
+		<aside className="h-full flex flex-col bg-[#0d0b12] border-r border-white/[0.06] relative overflow-hidden">
+			{/* soft warm wash behind the top of the sidebar */}
+			<div
+				aria-hidden
+				className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-violet-500/[0.10] via-fuchsia-500/[0.03] to-transparent pointer-events-none"
+			/>
 
-				{/* Provider Identity Badge */}
-				<div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-3">
-					<div className="flex items-center gap-3">
-						<div className="relative">
-							<div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-700 flex items-center justify-center text-white font-bold text-base overflow-hidden border border-white/10 shadow-sm">
+			<div className="relative h-16 px-5 flex items-center shrink-0">
+				<Logo to="/" size="md" theme="dark" />
+			</div>
+
+			{/* Identity */}
+			<div className="relative px-3 pb-4">
+				<div className="flex items-center gap-3 px-2 py-2">
+					<div className="relative shrink-0">
+						<div className="p-[2px] rounded-full bg-gradient-to-br from-violet-400 via-fuchsia-400 to-amber-300">
+							<div className="w-9 h-9 rounded-full bg-[#1a1428] flex items-center justify-center text-sm font-semibold text-white overflow-hidden">
 								{user?.photo ? (
 									<img
 										src={user.photo}
-										alt={user?.name || "Provider"}
+										alt=""
 										className="w-full h-full object-cover"
 									/>
 								) : (
 									<span>{user?.name?.[0]?.toUpperCase() || "P"}</span>
 								)}
 							</div>
-							<span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-[#0d081d]" />
 						</div>
-
-						<div className="min-w-0 flex-1">
-							<p className="text-sm font-bold text-slate-100 truncate">
-								{user?.name || "Service Professional"}
+						<span
+							aria-hidden
+							className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0d0b12]"
+						/>
+					</div>
+					<div className="min-w-0 flex-1">
+						<div className="flex items-center gap-1.5">
+							<p className="text-sm font-medium text-white truncate">
+								{user?.name || "Service professional"}
 							</p>
-							<div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium truncate mt-0.5">
-								{user?.is_verified ? (
-									<VerifiedBadge size="xs" />
-								) : (
-									<>
-										<span className="text-emerald-400 font-semibold">
-											Online
-										</span>
-										<span>•</span>
-										<span className="truncate">
-											{user?.location || "Provider"}
-										</span>
-									</>
-								)}
-							</div>
+							{user?.is_verified && <VerifiedBadge size="xs" />}
 						</div>
-					</div>
-
-					{user?.custom_id && (
-						<button
-							onClick={handleCopyId}
-							title="Click to copy Custom ID"
-							className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 border border-white/[0.05] hover:border-violet-500/30 text-left transition-all group cursor-pointer"
-						>
-							<div className="overflow-hidden pr-2">
-								<span className="block text-[9px] font-bold uppercase tracking-wider text-slate-500">
-									Merchant ID
-								</span>
-								<span className="block font-mono text-[11px] text-violet-300 truncate mt-0.5">
-									{user.custom_id}
-								</span>
-							</div>
-							<div className="p-1 rounded-md text-slate-400 group-hover:text-white transition-colors">
+						{user?.custom_id ? (
+							<button
+								type="button"
+								onClick={handleCopyId}
+								aria-label="Copy provider ID"
+								className="group flex items-center gap-1.5 text-xs text-stone-500 hover:text-violet-300 transition-colors"
+							>
+								<span className="font-mono truncate">{user.custom_id}</span>
 								{copied ? (
-									<Check size={12} className="text-emerald-400" />
+									<Check size={11} className="text-emerald-400 shrink-0" />
 								) : (
-									<Copy size={12} />
+									<Copy
+										size={11}
+										className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+									/>
 								)}
-							</div>
-						</button>
-					)}
+							</button>
+						) : (
+							<p className="text-xs text-stone-500 truncate">
+								{user?.location || "Provider"}
+							</p>
+						)}
+					</div>
 				</div>
-
-				{/* Primary Navigation */}
-				<nav className="space-y-1">
-					<div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-						Operations
-					</div>
-					<NavItem
-						to="/provider/dashboard"
-						end
-						icon={LayoutDashboard}
-						label="Overview"
-						onClick={onLinkClick}
-					/>
-					<NavItem
-						to="/provider/dashboard/bookings"
-						icon={CalendarCheck}
-						label="Bookings"
-						onClick={onLinkClick}
-					/>
-					<NavItem
-						to="/provider/dashboard/earnings"
-						icon={BarChart3}
-						label="Earnings"
-						onClick={onLinkClick}
-					/>
-					<NavItem
-						to="/provider/dashboard/services"
-						icon={Wrench}
-						label="Services"
-						onClick={onLinkClick}
-					/>
-
-					<div className="pt-4 px-3 pb-2 text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
-						Preferences
-					</div>
-					<NavItem
-						to="/notifications"
-						icon={Bell}
-						label="Notifications"
-						badge={notifications}
-						onClick={onLinkClick}
-					/>
-					<NavItem
-						to="/provider/dashboard/settings"
-						icon={Settings}
-						label="Account & Hours"
-						onClick={onLinkClick}
-					/>
-				</nav>
 			</div>
 
-			{/* Footer Actions */}
-			<div className="space-y-3 pt-6 border-t border-white/[0.06]">
+			<nav
+				className="relative flex-1 px-3 space-y-0.5 overflow-y-auto"
+				aria-label="Provider navigation"
+			>
+				<NavItem
+					to="/provider/dashboard"
+					end
+					icon={LayoutDashboard}
+					label="Overview"
+					onClick={onLinkClick}
+				/>
+				<NavItem
+					to="/provider/dashboard/bookings"
+					icon={CalendarCheck}
+					label="Bookings"
+					onClick={onLinkClick}
+				/>
+				<NavItem
+					to="/provider/dashboard/earnings"
+					icon={BarChart3}
+					label="Earnings"
+					onClick={onLinkClick}
+				/>
+				<NavItem
+					to="/provider/dashboard/services"
+					icon={Wrench}
+					label="Services"
+					onClick={onLinkClick}
+				/>
+				<NavItem
+					to="/provider/dashboard/reviews"
+					icon={Star}
+					label="Reviews"
+					onClick={onLinkClick}
+				/>
+
+				<div className="my-3 mx-3 h-px bg-white/[0.06]" />
+
+				<NavItem
+					to="/notifications"
+					icon={Bell}
+					label="Notifications"
+					badge={notifications}
+					onClick={onLinkClick}
+				/>
+				<NavItem
+					to="/provider/dashboard/settings"
+					icon={Settings}
+					label="Settings"
+					onClick={onLinkClick}
+				/>
+			</nav>
+
+			<div className="relative p-3 border-t border-white/[0.06] space-y-0.5">
 				<Link
 					to="/help"
 					onClick={onLinkClick}
-					className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.05] text-xs text-slate-400 hover:text-slate-200 transition-colors"
+					className="flex items-center gap-3 h-10 px-3 rounded-lg text-sm text-stone-400 hover:text-white hover:bg-white/[0.04] transition-colors"
 				>
-					<span className="flex items-center gap-2 font-medium">
-						<ShieldCheck size={14} className="text-violet-400" />
-						Provider Help & SLA
-					</span>
-					<ArrowUpRight size={13} className="text-slate-500" />
+					<LifeBuoy size={17} className="text-sky-300/70" />
+					Help & support
 				</Link>
-
 				<button
+					type="button"
 					onClick={onLogout}
-					className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer"
+					className="w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm text-stone-400 hover:text-rose-300 hover:bg-rose-400/[0.08] transition-colors"
 				>
-					<LogOut size={14} />
-					<span>Sign Out</span>
+					<LogOut size={17} />
+					Sign out
 				</button>
 			</div>
 		</aside>
 	);
 }
 
+/* ───────────────────────── Shell ───────────────────────── */
+
 export default function ProviderDashboard() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { user, logout } = useAuth();
-	const childOutlet = useOutlet();
 
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 	const [notifications, setNotifications] = useState(0);
-	const [stats, setStats] = useState({
-		total_earnings: 0,
-		active_jobs: 0,
-		completed_jobs: 0,
-		avg_rating: 0,
-		pending_jobs: 0,
-		total_customers: 0,
-	});
+	const [stats, setStats] = useState(DEFAULT_STATS);
 	const [recentBookings, setRecentBookings] = useState([]);
 	const [showKycModal, setShowKycModal] = useState(false);
 	const [showTicketModal, setShowTicketModal] = useState(false);
@@ -319,43 +322,32 @@ export default function ProviderDashboard() {
 		location.pathname === "/provider/dashboard" ||
 		location.pathname === "/provider/dashboard/";
 
-	// Detect ?openKyc=true in URL
 	useEffect(() => {
-		const searchParams = new URLSearchParams(location.search);
-		if (searchParams.get("openKyc") === "true") {
-			setShowKycModal(true);
-		}
+		const params = new URLSearchParams(location.search);
+		if (params.get("openKyc") === "true") setShowKycModal(true);
 	}, [location.search]);
 
-	useEffect(() => {
-		if (sidebarOpen) {
-			document.body.style.overflow = "hidden";
-		} else {
-			document.body.style.overflow = "auto";
-		}
-		return () => {
-			document.body.style.overflow = "auto";
-		};
-	}, [sidebarOpen]);
+	useModal({
+		isOpen: sidebarOpen,
+		onClose: () => setSidebarOpen(false),
+		id: "provider-mobile-sidebar",
+		lockScroll: true,
+	});
 
 	useEffect(() => {
-		// Resolve user ID from state or fallback directly to stored JWT token
 		let resolvedUserId = user?.id;
 		if (!resolvedUserId) {
 			const token = localStorage.getItem("token");
 			if (token) {
 				try {
 					const decoded = jwtDecode(token);
-					if (decoded.exp * 1000 >= Date.now()) {
-						resolvedUserId = decoded.id;
-					}
+					if (decoded.exp * 1000 >= Date.now()) resolvedUserId = decoded.id;
 				} catch (err) {
 					console.warn("Invalid token stored:", err);
 				}
 			}
 		}
 
-		// If no user could be verified, release loading skeleton immediately
 		if (!resolvedUserId) {
 			setIsLoading(false);
 			return;
@@ -366,45 +358,37 @@ export default function ProviderDashboard() {
 			if (isMounted) setIsLoading(false);
 		}, 4000);
 
-		const load = async () => {
+		(async () => {
 			try {
 				const [statsRes, bookingsRes] = await Promise.allSettled([
-					api.get(`/api/dashboard/provider`),
-					api.get(`/api/bookings/provider/history/recent`),
+					api.get("/api/dashboard/provider"),
+					api.get("/api/bookings/provider/history/recent"),
 				]);
-
 				if (!isMounted) return;
 
 				if (statsRes.status === "fulfilled") {
-					setStats(statsRes.value.data?.stats || {});
+					setStats({ ...DEFAULT_STATS, ...(statsRes.value.data?.stats || {}) });
 					setNotifications(statsRes.value.data?.pending_notifications || 0);
 				} else {
-					console.warn(
-						"Provider dashboard stats notice:",
-						statsRes.reason?.message,
-					);
+					console.warn("Provider stats notice:", statsRes.reason?.message);
 				}
 
 				if (bookingsRes.status === "fulfilled") {
 					setRecentBookings(bookingsRes.value.data || []);
 				} else {
 					console.warn(
-						"Provider recent bookings notice:",
+						"Provider bookings notice:",
 						bookingsRes.reason?.message,
 					);
 				}
 			} catch (err) {
 				console.error("Failed to sync provider metrics:", err);
-				toast.error("Failed to sync provider metrics");
+				toast.error("Couldn't refresh your dashboard");
 			} finally {
 				clearTimeout(safetyTimer);
-				if (isMounted) {
-					setIsLoading(false);
-				}
+				if (isMounted) setIsLoading(false);
 			}
-		};
-
-		load();
+		})();
 
 		return () => {
 			isMounted = false;
@@ -412,28 +396,22 @@ export default function ProviderDashboard() {
 		};
 	}, [user?.id]);
 
-	const handleLogout = useCallback(() => {
-		setShowLogoutConfirm(true);
-	}, []);
-
+	const handleLogout = useCallback(() => setShowLogoutConfirm(true), []);
 	const executeLogout = useCallback(() => {
 		setShowLogoutConfirm(false);
 		logout();
 		navigate("/login");
 	}, [logout, navigate]);
-
 	const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
-	return (
-		<div className="min-h-screen bg-[#090514] text-slate-100 bricolage-grotesque antialiased selection:bg-violet-600/30">
-			{/* Ambient Gradient Mesh Lighting */}
-			<div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-				<div className="absolute top-0 left-1/4 w-[600px] h-[300px] bg-violet-600/10 blur-[130px] rounded-full" />
-				<div className="absolute top-1/3 right-10 w-[500px] h-[350px] bg-indigo-600/10 blur-[140px] rounded-full" />
-				<div className="absolute bottom-10 left-1/3 w-[500px] h-[300px] bg-fuchsia-600/8 blur-[130px] rounded-full" />
-			</div>
+	const openKyc = () => setShowKycModal(true);
+	const openTicket = () => setShowTicketModal(true);
 
-			{/* Mobile Drawer Navigation */}
+	return (
+		<div className="min-h-screen bg-[#0d0b12] text-stone-200 bricolage-grotesque antialiased selection:bg-violet-400/30">
+			<ScrollToTop />
+
+			{/* Mobile drawer */}
 			<AnimatePresence>
 				{sidebarOpen && (
 					<>
@@ -443,40 +421,39 @@ export default function ProviderDashboard() {
 							animate={{ opacity: 1 }}
 							exit={{ opacity: 0 }}
 							onClick={closeSidebar}
-							className="fixed inset-0 bg-black/75 z-40 lg:hidden backdrop-blur-xs"
+							className="fixed inset-0 bg-black/70 z-40 lg:hidden"
 						/>
 						<motion.div
 							key="drawer"
 							initial={{ x: "-100%" }}
 							animate={{ x: 0 }}
 							exit={{ x: "-100%" }}
-							transition={{ type: "spring", stiffness: 350, damping: 35 }}
-							className="fixed top-0 left-0 bottom-0 w-[290px] z-50 lg:hidden"
+							transition={{ type: "spring", stiffness: 380, damping: 38 }}
+							className="fixed top-0 left-0 bottom-0 w-[280px] z-50 lg:hidden"
 						>
-							<div className="relative h-full">
-								<button
-									onClick={closeSidebar}
-									className="absolute top-4 right-3 p-1.5 rounded-lg text-slate-400 hover:text-white bg-white/5 cursor-pointer z-10"
-								>
-									<X size={16} />
-								</button>
-								<SidebarProfile
-									user={user}
-									notifications={notifications}
-									onLogout={handleLogout}
-									onLinkClick={closeSidebar}
-								/>
-							</div>
+							<button
+								type="button"
+								onClick={closeSidebar}
+								aria-label="Close menu"
+								className="absolute top-4 right-3 z-10 p-1.5 rounded-md text-stone-400 hover:text-white"
+							>
+								<X size={18} />
+							</button>
+							<Sidebar
+								user={user}
+								notifications={notifications}
+								onLogout={handleLogout}
+								onLinkClick={closeSidebar}
+							/>
 						</motion.div>
 					</>
 				)}
 			</AnimatePresence>
 
-			{/* Main Layout Shell */}
 			<div className="flex min-h-screen">
-				{/* Desktop Sidebar Rail */}
-				<div className="hidden lg:block w-72 shrink-0 sticky top-0 h-screen">
-					<SidebarProfile
+				{/* Desktop sidebar */}
+				<div className="hidden lg:block w-64 shrink-0 sticky top-0 h-screen">
+					<Sidebar
 						user={user}
 						notifications={notifications}
 						onLogout={handleLogout}
@@ -484,27 +461,37 @@ export default function ProviderDashboard() {
 					/>
 				</div>
 
-				{/* Primary Content Viewport */}
-				<div className="flex-1 flex flex-col min-w-0">
-					{/* Top Mobile Bar */}
-					<header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-[#0d081d]/90 backdrop-blur-md border-b border-white/[0.07]">
-						<Logo to="/" size="md" theme="dark" />
+				<div className="flex-1 flex flex-col min-w-0 relative">
+					{/* One warm wash anchored to the top of the content area */}
+					<div
+						aria-hidden
+						className="absolute inset-x-0 top-0 h-[420px] pointer-events-none bg-[radial-gradient(60%_100%_at_20%_0%,rgba(139,92,246,0.14),transparent_70%),radial-gradient(45%_80%_at_85%_0%,rgba(251,191,36,0.07),transparent_70%)]"
+					/>
 
-						<div className="flex items-center gap-2">
-							<Link
-								to="/notifications"
-								className="relative p-2 rounded-xl text-slate-300 hover:text-white bg-white/[0.04] border border-white/[0.06]"
-							>
-								<Bell size={16} />
-								{notifications > 0 && (
-									<span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-violet-400" />
-								)}
-							</Link>
-						</div>
+					{/* Mobile top bar */}
+					<header className="lg:hidden sticky top-0 z-30 h-14 px-4 flex items-center justify-between bg-[#0d0b12]/90 backdrop-blur-md border-b border-white/[0.06]">
+						<button
+							type="button"
+							onClick={() => setSidebarOpen(true)}
+							aria-label="Open menu"
+							className="p-2 -ml-2 rounded-md text-stone-300 hover:text-white"
+						>
+							<Menu size={20} />
+						</button>
+						<Logo to="/" size="md" theme="dark" />
+						<Link
+							to="/notifications"
+							aria-label="Notifications"
+							className="relative p-2 -mr-2 rounded-md text-stone-300 hover:text-white"
+						>
+							<Bell size={19} />
+							{notifications > 0 && (
+								<span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-fuchsia-400" />
+							)}
+						</Link>
 					</header>
 
-					{/* Workspace Main View */}
-					<main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 lg:px-10 py-8 lg:py-10">
+					<main className="relative flex-1 w-full max-w-5xl mx-auto px-4 sm:px-8 lg:px-12 py-8 lg:py-12">
 						{isLoading ? (
 							<ProviderSkeleton />
 						) : isOverviewPage ? (
@@ -512,8 +499,7 @@ export default function ProviderDashboard() {
 								user={user}
 								stats={stats}
 								recentBookings={recentBookings}
-								onOpenKyc={() => setShowKycModal(true)}
-								onOpenTicket={() => setShowTicketModal(true)}
+								onOpenKyc={openKyc}
 							/>
 						) : (
 							<Outlet
@@ -521,8 +507,8 @@ export default function ProviderDashboard() {
 									user,
 									stats,
 									recentBookings,
-									onOpenKyc: () => setShowKycModal(true),
-									onOpenTicket: () => setShowTicketModal(true),
+									onOpenKyc: openKyc,
+									onOpenTicket: openTicket,
 								}}
 							/>
 						)}
@@ -534,19 +520,17 @@ export default function ProviderDashboard() {
 				isOpen={showLogoutConfirm}
 				onClose={() => setShowLogoutConfirm(false)}
 				onConfirm={executeLogout}
-				title="Log out?"
+				title="Sign out?"
 				description="You'll need to sign in again to access your provider account."
-				confirmText="Log out"
+				confirmText="Sign out"
 				cancelText="Cancel"
 				variant="danger"
 				icon={LogOut}
 			/>
-
 			<KycVerificationModal
 				isOpen={showKycModal}
 				onClose={() => setShowKycModal(false)}
 			/>
-
 			<SupportTicketModal
 				isOpen={showTicketModal}
 				onClose={() => setShowTicketModal(false)}
@@ -557,551 +541,473 @@ export default function ProviderDashboard() {
 	);
 }
 
-function ProviderOverview({
-	user,
-	stats,
-	recentBookings,
-	onOpenKyc,
-	onOpenTicket,
-}) {
+/* ───────────────────────── Overview ───────────────────────── */
+
+const KYC_COPY = {
+	rejected: {
+		icon: AlertTriangle,
+		tone: "border-rose-400/25 bg-gradient-to-r from-rose-400/[0.10] to-rose-400/[0.02]",
+		iconTone: "bg-rose-400/15 text-rose-300",
+		title: "Verification needs your attention",
+		body: (u) =>
+			u?.rejection_reason ||
+			"We couldn't verify your document. Please upload a clear, well-lit photo.",
+		cta: "Resubmit",
+	},
+	pending: {
+		icon: Clock,
+		tone: "border-amber-300/25 bg-gradient-to-r from-amber-300/[0.10] to-amber-300/[0.02]",
+		iconTone: "bg-amber-300/15 text-amber-200",
+		title: "Documents under review",
+		body: () =>
+			"This usually takes 24–48 hours. We'll notify you as soon as it's done.",
+		cta: "View status",
+	},
+	none: {
+		icon: ShieldCheck,
+		tone: "border-violet-400/25 bg-gradient-to-r from-violet-400/[0.12] to-fuchsia-400/[0.03]",
+		iconTone: "bg-violet-400/15 text-violet-300",
+		title: "Get your Verified badge",
+		body: () =>
+			"Add a government ID to earn customer trust and rank higher in search results.",
+		cta: "Verify identity",
+	},
+};
+
+function KycBanner({ user, onOpenKyc }) {
+	if (user?.is_verified) return null;
+	const key =
+		user?.kyc_status === "rejected"
+			? "rejected"
+			: user?.kyc_status === "pending"
+				? "pending"
+				: "none";
+	const c = KYC_COPY[key];
+	const Icon = c.icon;
+
+	return (
+		<div
+			className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl border ${c.tone}`}
+		>
+			<div className="flex items-start gap-3 flex-1 min-w-0">
+				<span
+					className={`mt-0.5 shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${c.iconTone}`}
+				>
+					<Icon size={16} />
+				</span>
+				<div className="min-w-0">
+					<p className="text-sm font-medium text-white">{c.title}</p>
+					<p className="mt-0.5 text-sm text-stone-400 leading-relaxed">
+						{c.body(user)}
+					</p>
+				</div>
+			</div>
+			<button
+				type="button"
+				onClick={onOpenKyc}
+				className="shrink-0 h-9 px-4 rounded-lg bg-white text-[#0d0b12] text-sm font-semibold hover:bg-stone-200 transition-colors"
+			>
+				{c.cta}
+			</button>
+		</div>
+	);
+}
+
+/* Stat: tinted icon + value, each with its own meaning-color */
+const STAT_TONES = {
+	sky: {
+		chip: "bg-sky-300/12 text-sky-300",
+		value: "text-white",
+		glow: "group-hover:border-sky-300/25",
+	},
+	emerald: {
+		chip: "bg-emerald-300/12 text-emerald-300",
+		value: "text-white",
+		glow: "group-hover:border-emerald-300/25",
+	},
+	amber: {
+		chip: "bg-amber-300/12 text-amber-300",
+		value: "text-white",
+		glow: "group-hover:border-amber-300/25",
+	},
+	fuchsia: {
+		chip: "bg-fuchsia-300/12 text-fuchsia-300",
+		value: "text-white",
+		glow: "group-hover:border-fuchsia-300/25",
+	},
+};
+
+function Stat({ label, value, hint, icon: Icon, tone = "sky", to }) {
+	const t = STAT_TONES[tone];
+	const inner = (
+		<div
+			className={`h-full p-4 rounded-xl border border-white/[0.07] bg-white/[0.025] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:bg-white/[0.045] ${t.glow}`}
+		>
+			<div className="flex items-center justify-between">
+				<span
+					className={`w-8 h-8 rounded-lg flex items-center justify-center ${t.chip}`}
+				>
+					<Icon size={15} />
+				</span>
+				{to && (
+					<ArrowUpRight
+						size={14}
+						className="text-stone-600 group-hover:text-stone-300 transition-colors"
+					/>
+				)}
+			</div>
+			<p
+				className={`mt-4 font-mackinac text-3xl font-bold tabular-nums ${t.value}`}
+			>
+				{value}
+			</p>
+			<p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400">
+				{label}
+			</p>
+			{hint && <p className="mt-0.5 text-xs text-stone-500">{hint}</p>}
+		</div>
+	);
+	return to ? (
+		<Link to={to} className="group block h-full">
+			{inner}
+		</Link>
+	) : (
+		<div className="group h-full">{inner}</div>
+	);
+}
+
+/* Tiny decorative-but-honest bar strip: relative height of last bookings' prices */
+function PriceSpark({ bookings }) {
+	const prices = bookings
+		.slice(0, 8)
+		.map((b) => Number(b.price) || 0)
+		.reverse();
+	if (prices.length < 2 || Math.max(...prices) === 0) return null;
+	const max = Math.max(...prices);
+	return (
+		<div className="flex items-end gap-1.5 h-12" aria-hidden>
+			{prices.map((p, i) => (
+				<motion.span
+					key={i}
+					initial={{ height: 0 }}
+					animate={{ height: `${Math.max(12, (p / max) * 100)}%` }}
+					transition={{
+						delay: 0.15 + i * 0.05,
+						duration: 0.5,
+						ease: "easeOut",
+					}}
+					className={`w-2.5 rounded-sm ${
+						i === prices.length - 1
+							? "bg-gradient-to-t from-amber-300 to-amber-200"
+							: "bg-white/[0.14]"
+					}`}
+				/>
+			))}
+		</div>
+	);
+}
+
+const stagger = {
+	hidden: {},
+	show: { transition: { staggerChildren: 0.07 } },
+};
+const rise = {
+	hidden: { opacity: 0, y: 10 },
+	show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
+};
+
+function ProviderOverview({ user, stats, recentBookings, onOpenKyc }) {
 	const navigate = useNavigate();
 
-	// Calculate net payout estimation (assuming 15% platform take)
-	const grossTotal = stats.total_earnings || 0;
-	const estimatedNet = Math.round(grossTotal * 0.85);
+	const gross = stats.total_earnings || 0;
+	const estimatedNet = Math.round(gross * (1 - PLATFORM_FEE));
+	const avgPerBooking =
+		stats.completed_jobs > 0
+			? formatCurrency(Math.round(gross / stats.completed_jobs))
+			: "–";
+	const firstName = user?.name?.split(" ")[0];
+	const pending = stats.pending_jobs || 0;
 
 	return (
 		<motion.div
-			initial={{ opacity: 0, y: 8 }}
-			animate={{ opacity: 1, y: 0 }}
-			transition={{ duration: 0.25 }}
-			className="space-y-8"
+			variants={stagger}
+			initial="hidden"
+			animate="show"
+			className="space-y-10"
 		>
-			{/* Operational Header Hero Strip */}
-			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.06]">
+			{/* Header */}
+			<motion.header
+				variants={rise}
+				className="flex flex-col sm:flex-row sm:items-end justify-between gap-5"
+			>
 				<div>
-					<div className="flex items-center gap-3 flex-wrap">
-						<h1 className="font-mackinac text-2xl sm:text-3xl font-black text-white tracking-tight">
-							Dashboard
-						</h1>
-						{user?.is_verified ? (
-							<button
-								type="button"
-								onClick={onOpenKyc}
-								className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 transition-all cursor-pointer"
-								title="Click to view KYC Verification Details"
-							>
-								<VerifiedBadge size="md" />
-								<span className="text-xs font-bold">Verified Pro</span>
-							</button>
-						) : user?.kyc_status === "pending" ? (
-							<button
-								type="button"
-								onClick={onOpenKyc}
-								className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-all cursor-pointer"
-								title="Click to check verification status"
-							>
-								<Clock size={13} /> KYC In Verification
-							</button>
-						) : user?.kyc_status === "rejected" ? (
-							<button
-								type="button"
-								onClick={onOpenKyc}
-								className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 transition-all cursor-pointer"
-								title="Click to resolve KYC rejection"
-							>
-								<AlertTriangle size={13} /> Action Needed: Resubmit KYC
-							</button>
+					<h1 className="font-mackinac text-3xl sm:text-4xl font-bold text-white tracking-tight">
+						{firstName ? (
+							<>
+								Welcome back,{" "}
+								<span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-amber-200 bg-clip-text text-transparent">
+									{firstName}
+								</span>
+							</>
 						) : (
-							<button
-								type="button"
-								onClick={onOpenKyc}
-								className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25 transition-all cursor-pointer"
-								title="Click to submit verification documents"
-							>
-								<ShieldCheck size={13} /> Complete KYC for Verified Badge
-							</button>
+							"Overview"
 						)}
-					</div>
-					<p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
-						Overview of your earnings, upcoming bookings, and customer requests.
+					</h1>
+					<p className="mt-2 text-sm text-stone-400 flex items-center gap-2">
+						{pending > 0 ? (
+							<>
+								<span className="relative flex w-2 h-2">
+									<span className="absolute inline-flex w-full h-full rounded-full bg-amber-300 opacity-60 animate-ping" />
+									<span className="relative inline-flex w-2 h-2 rounded-full bg-amber-300" />
+								</span>
+								<span>
+									<span className="text-amber-200 font-medium">{pending}</span>{" "}
+									{pending === 1 ? "booking is" : "bookings are"} waiting for
+									your response.
+								</span>
+							</>
+						) : (
+							"You're all caught up. Here's how things look."
+						)}
 					</p>
 				</div>
-
-				<div className="flex items-center gap-2.5 w-full sm:w-auto">
+				<div className="flex items-center gap-2">
 					<Link
 						to="/provider/dashboard/services"
-						className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] text-slate-200 border border-white/[0.08] text-xs font-bold transition-all active:scale-95"
+						className="h-10 px-4 inline-flex items-center rounded-lg border border-white/15 text-sm font-medium text-stone-200 hover:bg-white/[0.06] hover:border-white/25 transition-colors"
 					>
-						<Wrench size={14} className="text-violet-400" />
-						My Services
+						Manage services
 					</Link>
 					<Link
 						to="/provider/dashboard/bookings"
-						className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-md shadow-violet-950 transition-all active:scale-95"
+						className="h-10 px-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-400 to-fuchsia-400 text-[#0d0b12] text-sm font-semibold hover:brightness-110 transition-all shadow-[0_6px_24px_-8px_rgba(167,139,250,0.7)]"
 					>
-						<CalendarCheck size={14} />
-						All Bookings
+						{pending > 0 ? "Review bookings" : "All bookings"}
+						<ArrowUpRight size={15} />
 					</Link>
 				</div>
-			</div>
+			</motion.header>
 
-			{/* Trust & Safety KYC Action Strip */}
-			{!user?.is_verified && (
-				<div
-					className={`p-4 sm:p-5 rounded-3xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs transition-all ${
-						user?.kyc_status === "rejected"
-							? "bg-rose-500/10 border-rose-500/30 text-rose-200"
-							: user?.kyc_status === "pending"
-								? "bg-amber-500/10 border-amber-500/30 text-amber-200"
-								: "bg-gradient-to-r from-violet-500/15 via-purple-500/10 to-amber-500/15 border-violet-500/30 text-slate-200"
-					}`}
-				>
-					<div className="flex items-start sm:items-center gap-3.5">
-						<div
-							className={`p-2.5 rounded-2xl shrink-0 ${
-								user?.kyc_status === "rejected"
-									? "bg-rose-500/20 text-rose-300"
-									: user?.kyc_status === "pending"
-										? "bg-amber-500/20 text-amber-300"
-										: "bg-violet-500/20 text-violet-300"
-							}`}
-						>
-							{user?.kyc_status === "rejected" ? (
-								<AlertTriangle size={20} />
-							) : user?.kyc_status === "pending" ? (
-								<Clock size={20} />
-							) : (
-								<ShieldCheck size={20} />
-							)}
-						</div>
-						<div>
-							<div className="flex items-center gap-2 flex-wrap">
-								<span className="font-bold text-white text-[14.5px] sm:text-base">
-									{user?.kyc_status === "rejected"
-										? "Identity Verification Needs Attention"
-										: user?.kyc_status === "pending"
-											? "KYC Documents In Review (24–48h)"
-											: "Unlock Gold Verified Pro Trust Badge"}
-								</span>
-								<span
-									className={`text-[11.5px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-										user?.kyc_status === "rejected"
-											? "bg-rose-500/20 text-rose-300"
-											: user?.kyc_status === "pending"
-												? "bg-amber-500/20 text-amber-300"
-												: "bg-violet-500/20 text-violet-300"
-									}`}
-								>
-									{user?.kyc_status === "rejected"
-										? "Action Required"
-										: user?.kyc_status === "pending"
-											? "Processing"
-											: "Verified"}
-								</span>
-							</div>
-							<p className="text-slate-400/95 mt-1 max-w-2xl text-[13.5px] leading-relaxed">
-								{user?.kyc_status === "rejected"
-									? user?.rejection_reason ||
-										"The verification team could not verify the submitted document. Please upload a clear photo."
-									: user?.kyc_status === "pending"
-										? "Your credentials are being reviewed by our verification team. You will receive an update as soon as they are approved."
-										: "Submit government identification (Aadhaar, Driving License, or Trade Certificate) to enjoy higher booking priority and instant customer trust."}
-							</p>
-						</div>
-					</div>
+			<motion.div variants={rise}>
+				<KycBanner user={user} onOpenKyc={onOpenKyc} />
+			</motion.div>
 
-					<button
-						type="button"
-						onClick={onOpenKyc}
-						className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm shrink-0 transition-all shadow-md active:scale-95 cursor-pointer self-stretch sm:self-auto text-center"
-					>
-						{user?.kyc_status === "rejected"
-							? "Resubmit KYC"
-							: user?.kyc_status === "pending"
-								? "View Status"
-								: "Verify Identity"}
-					</button>
-				</div>
-			)}
-
-			{/* Asymmetric Financial & Workload Core */}
-			<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-				{/* Primary Revenue Anchor (7 Cols) */}
-				<div className="lg:col-span-7 p-6 sm:p-7 rounded-3xl bg-gradient-to-br from-[#150d2e] to-[#0e0820] border border-violet-500/20 shadow-xl shadow-black/40 relative overflow-hidden flex flex-col justify-between space-y-6">
-					<div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
-
+			{/* Earnings hero + stats */}
+			<motion.section
+				variants={rise}
+				className="grid lg:grid-cols-12 gap-6 lg:gap-8"
+			>
+				{/* Hero: the one panel that earns a card */}
+				<div className="lg:col-span-6 relative overflow-hidden rounded-2xl border border-amber-300/15 bg-gradient-to-br from-amber-300/[0.09] via-white/[0.02] to-violet-400/[0.08] p-6 sm:p-7">
 					<div className="flex items-center justify-between">
-						<div className="space-y-1">
-							<span className="text-[11.5px] font-extrabold uppercase tracking-wider text-violet-300 flex items-center gap-1.5">
-								<Activity size={12} className="text-violet-400" />
-								Total Earnings
+						<p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-200/80">
+							<span className="w-6 h-6 rounded-md bg-amber-300/15 text-amber-300 flex items-center justify-center">
+								<IndianRupee size={13} />
 							</span>
-							<div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-								{formatCurrency(grossTotal)}
-							</div>
-						</div>
-
+							Total earnings
+						</p>
 						<Link
 							to="/provider/dashboard/earnings"
-							className="p-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-violet-300 hover:text-white transition-colors"
-							title="View Earnings & Payouts"
+							className="text-xs text-stone-300 hover:text-white inline-flex items-center gap-1 transition-colors"
 						>
-							<ArrowUpRight size={16} />
+							Payouts <ArrowUpRight size={12} />
 						</Link>
 					</div>
 
-					{/* Breakdown telemetry pills */}
-					<div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-white/[0.06]">
-						<div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
-							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400 block">
-								Estimated Net
-							</span>
-							<span className="text-base font-extrabold text-emerald-400 mt-0.5 block">
+					<div className="mt-5 flex items-end justify-between gap-4">
+						<p className="font-mackinac text-5xl sm:text-6xl font-bold text-white tabular-nums leading-none">
+							{formatCurrency(gross)}
+						</p>
+						<PriceSpark bookings={recentBookings} />
+					</div>
+
+					<div className="mt-7 grid grid-cols-2 gap-4 pt-5 border-t border-white/[0.08]">
+						<div>
+							<p className="text-[11px] uppercase tracking-[0.12em] text-stone-500">
+								Est. after fees
+							</p>
+							<p className="mt-1 text-lg font-semibold text-emerald-300 tabular-nums">
 								{formatCurrency(estimatedNet)}
-							</span>
-							<span className="text-[11.5px] text-slate-500/95 font-medium">
-								After 15% platform fee
-							</span>
+							</p>
 						</div>
-
-						<div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
-							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400 block">
-								Average Per Booking
-							</span>
-							<span className="text-base font-extrabold text-white mt-0.5 block">
-								{formatCurrency(
-									stats.completed_jobs > 0
-										? Math.round(grossTotal / stats.completed_jobs)
-										: 499,
-								)}
-							</span>
-							<span className="text-[11.5px] text-slate-500/95 font-medium">
-								Per completed booking
-							</span>
-						</div>
-
-						<div className="col-span-2 sm:col-span-1 p-3 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
-							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400 block">
-								Payout Status
-							</span>
-							<span className="text-base font-extrabold text-violet-300 mt-0.5 flex items-center gap-1.5">
-								<span className="h-2 w-2 rounded-full bg-emerald-400" />
-								Automated Weekly
-							</span>
-							<span className="text-[11.5px] text-slate-500/95 font-medium">
-								Direct bank transfer
-							</span>
+						<div>
+							<p className="text-[11px] uppercase tracking-[0.12em] text-stone-500">
+								Per booking
+							</p>
+							<p className="mt-1 text-lg font-semibold text-white tabular-nums">
+								{avgPerBooking}
+							</p>
 						</div>
 					</div>
+					<p className="mt-4 text-xs text-stone-500">
+						Estimated at a {Math.round(PLATFORM_FEE * 100)}% platform fee · paid
+						out weekly
+					</p>
 				</div>
 
-				{/* Workload Telemetry Strip (5 Cols) */}
-				<div className="lg:col-span-5 grid grid-cols-2 gap-4">
-					{/* Card 1: Active Jobs */}
-					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
-						<div className="flex items-center justify-between">
-							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">
-								Active Bookings
-							</span>
-							<span className="p-2 rounded-xl bg-blue-500/10 text-blue-300 border border-blue-500/20">
-								<Clock size={15} />
-							</span>
-						</div>
-						<div className="mt-4">
-							<div className="text-2xl sm:text-3xl font-black text-white">
-								{stats.active_jobs ?? 0}
-							</div>
-							<p className="text-[11.5px] text-slate-400 mt-1">
-								In transit or scheduled
-							</p>
-						</div>
-					</div>
-
-					{/* Card 2: Completed Jobs */}
-					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
-						<div className="flex items-center justify-between">
-							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">
-								Completed
-							</span>
-							<span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-								<CheckCircle2 size={15} />
-							</span>
-						</div>
-						<div className="mt-4">
-							<div className="text-2xl sm:text-3xl font-black text-white">
-								{stats.completed_jobs ?? 0}
-							</div>
-							<p className="text-[11.5px] text-slate-400 mt-1">
-								Successfully fulfilled
-							</p>
-						</div>
-					</div>
-
-					{/* Card 3: Quality Rating */}
-					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
-						<div className="flex items-center justify-between">
-							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">
-								Customer Rating
-							</span>
-							<span className="p-2 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20">
-								<Star size={15} />
-							</span>
-						</div>
-						<div className="mt-4">
-							<div className="text-2xl sm:text-3xl font-black text-white flex items-center gap-1.5">
-								<span>{stats.avg_rating ? `${stats.avg_rating}` : "5.0"}</span>
-								<span className="text-xs font-semibold text-slate-500">
-									/ 5.0
-								</span>
-							</div>
-							<p className="text-[11px] text-amber-300/90 mt-1 flex items-center gap-1">
-								<span>Verified customer reviews</span>
-							</p>
-						</div>
-					</div>
-
-					{/* Card 4: Clients Served */}
-					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
-						<div className="flex items-center justify-between">
-							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">
-								Total Customers
-							</span>
-							<span className="p-2 rounded-xl bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20">
-								<Users size={15} />
-							</span>
-						</div>
-						<div className="mt-4">
-							<div className="text-2xl sm:text-3xl font-black text-white">
-								{stats.total_customers ?? 0}
-							</div>
-							<p className="text-[11.5px] text-slate-400 mt-1">
-								Clients served
-							</p>
-						</div>
-					</div>
+				<div className="lg:col-span-6 grid grid-cols-2 gap-3 sm:gap-4">
+					<Stat
+						label="Active"
+						value={stats.active_jobs ?? 0}
+						hint="Scheduled or live"
+						icon={Zap}
+						tone="sky"
+					/>
+					<Stat
+						label="Completed"
+						value={stats.completed_jobs ?? 0}
+						hint="Jobs fulfilled"
+						icon={CheckCircle2}
+						tone="emerald"
+					/>
+					<Stat
+						label="Rating"
+						value={stats.avg_rating ? Number(stats.avg_rating).toFixed(1) : "–"}
+						hint="See reviews"
+						icon={Star}
+						tone="amber"
+						to="/provider/dashboard/reviews"
+					/>
+					<Stat
+						label="Customers"
+						value={stats.total_customers ?? 0}
+						hint="Served so far"
+						icon={Users}
+						tone="fuchsia"
+					/>
 				</div>
-			</div>
+			</motion.section>
 
-			{/* Operational Sections: Live Schedule Ledger & Fast Action Deck */}
-			<div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-				{/* Recent Appointments & Dispatch Ledger (7 Cols) */}
-				<div className="lg:col-span-7 p-6 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-xl flex flex-col justify-between space-y-6">
-					<div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
-						<div className="flex items-center gap-2.5">
-							<span className="p-2 rounded-xl bg-violet-500/10 text-violet-300 border border-violet-500/20">
-								<CalendarCheck size={16} />
-							</span>
-							<div>
-								<h3 className="text-base font-extrabold text-white">
-									Upcoming Bookings
-								</h3>
-								<p className="text-xs text-slate-400">
-									Your scheduled customer appointments
-								</p>
-							</div>
-						</div>
-
-						<Link
-							to="/provider/dashboard/bookings"
-							className="text-xs font-bold text-violet-300 hover:text-white px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors flex items-center gap-1"
-						>
-							View All <ChevronRight size={13} />
-						</Link>
-					</div>
-
-					<div className="flex-1">
-						{recentBookings.length === 0 ? (
-							<div className="py-12 text-center text-slate-500 space-y-2">
-								<CalendarCheck size={32} className="mx-auto text-slate-600" />
-								<p className="text-md font-bold text-slate-300">
-									No active bookings right now
-								</p>
-								<p className="text-sm text-slate-500/95">
-									When customers schedule service in your area, they will
-									populate here instantly.
-								</p>
-							</div>
-						) : (
-							<div className="divide-y divide-white/[0.05]">
-								{recentBookings.slice(0, 5).map((b, i) => {
-									const status = STATUS_MAP[b.status] || STATUS_MAP.pending;
-									const dateString = b.date
-										? b.date.split("T")[0]
-										: "Scheduled";
-
-									return (
-										<div
-											key={b.booking_id || i}
-											onClick={() => navigate("/provider/dashboard/bookings")}
-											className="py-3.5 flex items-center justify-between gap-4 group cursor-pointer hover:bg-white/[0.02] px-2 rounded-xl transition-colors"
-										>
-											<div className="flex items-center gap-3.5 min-w-0">
-												<div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-slate-300 shrink-0 group-hover:border-violet-500/30 transition-colors">
-													<Wrench size={15} />
-												</div>
-												<div className="min-w-0">
-													<p className="text-sm font-bold text-white truncate group-hover:text-violet-300 transition-colors">
-														{b.service_name || "Custom On-Site Service"}
-													</p>
-													<div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-														<span className="font-mono text-slate-500">
-															#{b.booking_id?.slice(0, 8).toUpperCase()}
-														</span>
-														<span>•</span>
-														<span className="flex items-center gap-1 text-slate-300">
-															<Clock size={11} className="text-violet-400" />
-															{dateString}{" "}
-															{b.start_time ? `at ${b.start_time}` : ""}
-														</span>
-													</div>
-												</div>
-											</div>
-
-											<div className="flex items-center gap-3 shrink-0">
-												<span
-													className={`px-2 py-0.5 rounded-full text-[11.5px] font-bold border flex items-center gap-1.5 ${status.badge}`}
-												>
-													<span
-														className={`h-1.5 w-1.5 rounded-full ${status.dot}`}
-													/>
-													{status.label}
-												</span>
-												<span className="text-sm font-extrabold text-white">
-													₹{b.price ?? "0"}
-												</span>
-												<ChevronRight
-													size={14}
-													className="text-slate-600 group-hover:text-slate-400 transition-colors"
-												/>
-											</div>
-										</div>
-									);
-								})}
-							</div>
-						)}
-					</div>
+			{/* Bookings */}
+			<motion.section variants={rise}>
+				<div className="flex items-center justify-between mb-4">
+					<h2 className="font-mackinac text-xl font-bold text-white">
+						Recent bookings
+					</h2>
+					<Link
+						to="/provider/dashboard/bookings"
+						className="text-sm text-violet-300 hover:text-violet-200 inline-flex items-center gap-1 transition-colors"
+					>
+						View all <ChevronRight size={14} />
+					</Link>
 				</div>
 
-				{/* Quick Controls & Operations Toolkit (5 Cols) */}
-				<div className="lg:col-span-5 space-y-6">
-					<div className="p-6 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-xl space-y-4">
-						<div className="flex items-center gap-2 border-b border-white/[0.06] pb-3">
-							<SlidersHorizontal size={16} className="text-violet-400" />
-							<h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-200">
-								Quick Actions
-							</h3>
-						</div>
-
-						<div className="space-y-2.5">
-							<Link
-								to="/provider/dashboard/services"
-								className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.05] hover:border-violet-500/20 transition-all group"
-							>
-								<div className="flex items-center gap-3">
-									<div className="p-2 rounded-xl bg-violet-500/10 text-violet-300 border border-violet-500/20">
-										<Wrench size={15} />
-									</div>
-									<div>
-										<p className="text-xs font-bold text-white">
-											Services & Pricing
-										</p>
-										<p className="text-[11px] text-slate-400">
-											Update pricing per hour or service package
-										</p>
-									</div>
-								</div>
-								<ArrowUpRight
-									size={14}
-									className="text-slate-500 group-hover:text-slate-300 transition-colors"
-								/>
-							</Link>
-
-							<Link
-								to="/provider/dashboard/earnings"
-								className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.05] hover:border-violet-500/20 transition-all group"
-							>
-								<div className="flex items-center gap-3">
-									<div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-										<BarChart3 size={15} />
-									</div>
-									<div>
-										<p className="text-xs font-bold text-white">
-											Payout History
-										</p>
-										<p className="text-[11px] text-slate-400">
-											Download earnings & fee invoices
-										</p>
-									</div>
-								</div>
-								<ArrowUpRight
-									size={14}
-									className="text-slate-500 group-hover:text-slate-300 transition-colors"
-								/>
-							</Link>
-
-							<Link
-								to="/provider/dashboard/settings"
-								className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.05] hover:border-violet-500/20 transition-all group"
-							>
-								<div className="flex items-center gap-3">
-									<div className="p-2 rounded-xl bg-blue-500/10 text-blue-300 border border-blue-500/20">
-										<Calendar size={15} />
-									</div>
-									<div>
-										<p className="text-xs font-bold text-white">
-											Weekly Working Hours
-										</p>
-										<p className="text-[11px] text-slate-400">
-											Set daily working hours and days off
-										</p>
-									</div>
-								</div>
-								<ArrowUpRight
-									size={14}
-									className="text-slate-500 group-hover:text-slate-300 transition-colors"
-								/>
-							</Link>
-						</div>
-					</div>
-
-					{/* Service Provider Protection Guarantee Box */}
-					<div className="p-5 rounded-3xl bg-gradient-to-tr from-violet-950/40 via-[#140b28] to-[#1a0f35] border border-violet-500/20 text-xs space-y-2">
-						<div className="flex items-center gap-2 text-violet-300 font-extrabold">
-							<ShieldCheck size={16} />
-							<span>Provider Protection Guarantee</span>
-						</div>
-						<p className="text-slate-300 text-[13px] leading-relaxed">
-							Customer cancellations within 2 hours of arrival automatically
-							qualify for compensation payouts under TaskGenie Provider
-							Protection.
+				{recentBookings.length === 0 ? (
+					<div className="py-16 text-center rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.015]">
+						<span className="mx-auto w-11 h-11 rounded-full bg-violet-400/10 text-violet-300 flex items-center justify-center">
+							<CalendarCheck size={20} />
+						</span>
+						<p className="mt-4 text-sm font-medium text-stone-100">
+							No bookings yet
+						</p>
+						<p className="mt-1 text-sm text-stone-500 max-w-xs mx-auto">
+							New requests from customers will appear here as soon as they come
+							in.
 						</p>
 					</div>
-				</div>
-			</div>
+				) : (
+					<ul className="rounded-2xl border border-white/[0.07] bg-white/[0.02] divide-y divide-white/[0.06] overflow-hidden">
+						{recentBookings.slice(0, 5).map((b, i) => {
+							const status = STATUS_MAP[b.status] || STATUS_MAP.pending;
+							const dateObj = b.date ? new Date(b.date) : null;
+							const validDate = dateObj && !isNaN(dateObj);
+							return (
+								<li key={b.booking_id || i}>
+									<button
+										type="button"
+										onClick={() => navigate("/provider/dashboard/bookings")}
+										className="w-full flex items-center gap-4 px-4 sm:px-5 py-4 text-left hover:bg-white/[0.03] transition-colors group"
+									>
+										{/* Date tile: color reflects status */}
+										<div
+											className={`w-12 h-12 shrink-0 rounded-xl bg-gradient-to-b flex flex-col items-center justify-center ${status.rail}`}
+										>
+											{validDate ? (
+												<>
+													<span className="text-[9px] font-bold uppercase tracking-wider opacity-80 leading-none">
+														{dateObj.toLocaleDateString("en-IN", {
+															month: "short",
+														})}
+													</span>
+													<span className="font-mackinac text-lg font-bold text-white leading-none mt-1 tabular-nums">
+														{dateObj.getDate()}
+													</span>
+												</>
+											) : (
+												<Clock size={16} />
+											)}
+										</div>
+
+										<div className="flex-1 min-w-0">
+											<p className="text-sm font-medium text-white truncate group-hover:text-violet-200 transition-colors">
+												{b.service_name || "On-site service"}
+											</p>
+											<p className="mt-0.5 text-xs text-stone-500 truncate">
+												{b.start_time ? `${b.start_time} · ` : ""}
+												<span className="font-mono">
+													#{b.booking_id?.slice(0, 8).toUpperCase()}
+												</span>
+											</p>
+										</div>
+
+										<div className="flex items-center gap-4 shrink-0">
+											<span
+												className={`hidden sm:inline-flex items-center gap-1.5 text-xs ${status.text}`}
+											>
+												<span className="relative flex w-1.5 h-1.5">
+													{status.pulse && (
+														<span
+															className={`absolute inline-flex w-full h-full rounded-full opacity-60 animate-ping ${status.dot}`}
+														/>
+													)}
+													<span
+														className={`relative inline-flex w-1.5 h-1.5 rounded-full ${status.dot}`}
+													/>
+												</span>
+												{status.label}
+											</span>
+											<span className="text-sm font-semibold text-white tabular-nums w-16 text-right">
+												{formatCurrency(b.price)}
+											</span>
+											<ChevronRight
+												size={15}
+												className="text-stone-600 group-hover:text-violet-300 group-hover:translate-x-0.5 transition-all"
+											/>
+										</div>
+									</button>
+								</li>
+							);
+						})}
+					</ul>
+				)}
+			</motion.section>
 		</motion.div>
 	);
 }
 
+/* ───────────────────────── Skeleton ───────────────────────── */
+
 const ProviderSkeleton = () => (
-	<div className="space-y-8 animate-pulse">
-		<div className="flex justify-between items-center pb-6 border-b border-white/[0.06]">
-			<div className="space-y-2">
-				<div className="h-8 bg-white/[0.05] rounded-xl w-64" />
-				<div className="h-4 bg-white/[0.03] rounded-lg w-48" />
-			</div>
-			<div className="h-10 w-36 bg-white/[0.05] rounded-xl" />
+	<div
+		className="space-y-10 animate-pulse"
+		aria-busy="true"
+		aria-label="Loading dashboard"
+	>
+		<div className="space-y-3">
+			<div className="h-10 w-72 rounded-lg bg-white/[0.05]" />
+			<div className="h-4 w-56 rounded bg-white/[0.03]" />
 		</div>
-		<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-			<div className="lg:col-span-7 h-64 bg-white/[0.03] rounded-3xl border border-white/[0.05]" />
-			<div className="lg:col-span-5 grid grid-cols-2 gap-4">
+		<div className="grid lg:grid-cols-12 gap-8">
+			<div className="lg:col-span-6 h-64 rounded-2xl bg-white/[0.04] border border-white/[0.05]" />
+			<div className="lg:col-span-6 grid grid-cols-2 gap-4">
 				{[...Array(4)].map((_, i) => (
 					<div
 						key={i}
-						className="h-28 bg-white/[0.03] rounded-3xl border border-white/[0.05]"
+						className="h-[136px] rounded-xl bg-white/[0.03] border border-white/[0.05]"
 					/>
 				))}
 			</div>
 		</div>
+		<div className="h-64 rounded-2xl bg-white/[0.03] border border-white/[0.05]" />
 	</div>
 );

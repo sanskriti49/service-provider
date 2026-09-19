@@ -1,5 +1,9 @@
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
+import {
+	createBrowserRouter,
+	RouterProvider,
+	Navigate,
+} from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import PlainLayout from "./layouts/PlainLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
@@ -16,13 +20,14 @@ const ProviderEarnings = lazy(
 const ProviderServices = lazy(
 	() => import("./dashboards/provider/ProviderServices"),
 );
+const ProviderReviews = lazy(
+	() => import("./dashboards/provider/ProviderReviews"),
+);
 const ProviderSettings = lazy(
 	() => import("./dashboards/provider/ProviderSettings"),
 );
 const ApplyProvider = lazy(() => import("./pages/ApplyProvider"));
-const AdminDashboard = lazy(
-	() => import("./dashboards/admin/AdminDashboard"),
-);
+const AdminDashboard = lazy(() => import("./dashboards/admin/AdminDashboard"));
 
 const Home = lazy(() => import("./pages/Home"));
 const SignIn = lazy(() => import("./pages/SignIn"));
@@ -41,6 +46,7 @@ const CustomerSettings = lazy(
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const Reviews = lazy(() => import("./pages/Reviews"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 
 const CustomerDashboard = lazy(
@@ -64,21 +70,10 @@ const router = createBrowserRouter([
 			{ path: "/", element: <Home /> },
 			{ path: "/choose-role", element: <ChooseRole /> },
 			{ path: "/services", element: <AllServices /> },
+
 			{ path: "/help", element: <HelpCenter /> },
 			{ path: "/unauthorized", element: <Unauthorized /> },
 
-			{
-				path: "/dashboard",
-				element: (
-					<ProtectedRoute allowed={["customer"]}>
-						<CustomerDashboard />
-					</ProtectedRoute>
-				),
-				children: [
-					{ index: true, element: <DashboardOverview /> },
-					{ path: "bookings", element: <AllBookings /> },
-				],
-			},
 			{
 				path: "/account/profile",
 				element: (
@@ -100,6 +95,21 @@ const router = createBrowserRouter([
 			{ path: "*", element: <Navigate to="/" replace /> },
 		],
 	},
+	{
+		path: "/dashboard",
+		element: (
+			<ProtectedRoute allowed={["customer"]}>
+				<Suspense fallback={<PageLoader />}>
+					<CustomerDashboard />
+				</Suspense>
+			</ProtectedRoute>
+		),
+		children: [
+			{ index: true, element: null }, // Handled by CustomerOverview in CustomerDashboard
+			{ path: "bookings", element: <AllBookings /> },
+		],
+	},
+
 	{
 		element: (
 			<Suspense fallback={<PageLoader />}>
@@ -143,6 +153,7 @@ const router = createBrowserRouter([
 				),
 			},
 			{ path: "/notifications", element: <NotificationsPage /> },
+			{ path: "/reviews", element: <Reviews /> },
 		],
 	},
 	{
@@ -159,6 +170,7 @@ const router = createBrowserRouter([
 			{ path: "bookings", element: <ProviderBookings /> },
 			{ path: "earnings", element: <ProviderEarnings /> },
 			{ path: "services", element: <ProviderServices /> },
+			{ path: "reviews", element: <ProviderReviews /> },
 			{ path: "settings", element: <ProviderSettings /> },
 		],
 	},
@@ -187,12 +199,17 @@ export default function App() {
 				toastOptions={{
 					className: "taskgenie-toast",
 					classNames: {
-						toast: "bg-[#120a22]/95 backdrop-blur-md border border-white/10 text-slate-100 rounded-xl shadow-2xl shadow-black/80 px-4 py-3 text-xs flex items-start gap-3",
+						toast:
+							"bg-[#120a22]/95 backdrop-blur-md border border-white/10 text-slate-100 rounded-xl shadow-2xl shadow-black/80 px-4 py-3 text-xs flex items-start gap-3",
 						title: "text-xs font-bold text-white tracking-tight",
-						description: "text-[11px] text-slate-300 font-normal leading-relaxed mt-0.5",
-						actionButton: "bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold px-2.5 py-1 rounded-lg",
-						cancelButton: "bg-white/[0.04] text-slate-300 hover:text-white text-xs px-2.5 py-1 rounded-lg border border-white/10",
-						closeButton: "!bg-[#1a1130] !border-white/10 !text-slate-400 hover:!text-white",
+						description:
+							"text-[11px] text-slate-300 font-normal leading-relaxed mt-0.5",
+						actionButton:
+							"bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold px-2.5 py-1 rounded-lg",
+						cancelButton:
+							"bg-white/[0.04] text-slate-300 hover:text-white text-xs px-2.5 py-1 rounded-lg border border-white/10",
+						closeButton:
+							"!bg-[#1a1130] !border-white/10 !text-slate-400 hover:!text-white",
 						success: "!border-emerald-500/20 [&_[data-icon]]:!text-emerald-400",
 						error: "!border-rose-500/20 [&_[data-icon]]:!text-rose-400",
 						warning: "!border-amber-500/20 [&_[data-icon]]:!text-amber-400",

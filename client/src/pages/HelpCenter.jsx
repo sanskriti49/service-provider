@@ -17,6 +17,8 @@ import { useAuth } from "../contexts/AuthContext";
 import KycVerificationModal from "../ui/KycVerificationModal";
 import SupportTicketModal from "../ui/SupportTicketModal";
 import SupportBanner from "./SupportBanner";
+import useKeyboardShortcut from "../hooks/useKeyboardShortcut";
+import gsap from "gsap";
 
 const RetroGrid = () => {
 	return (
@@ -306,63 +308,42 @@ const HelpCenter = () => {
 		setShowTicketModal(true);
 	};
 
-	// Global keyboard shortcuts
-	useEffect(() => {
-		const handleKeyDown = (e) => {
-			const isTyping =
-				["INPUT", "TEXTAREA", "SELECT"].includes(
-					document.activeElement?.tagName,
-				) || document.activeElement?.isContentEditable;
+	// Keyboard shortcuts using centralized hook & modalStack awareness
+	useKeyboardShortcut(
+		["ctrl+k", "cmd+k", "/"],
+		() => {
+			searchInputRef.current?.focus();
+			searchInputRef.current?.select();
+		},
+		{ ignoreWhenModalOpen: true },
+	);
 
-			// Focus search on '/' or Ctrl/Cmd+K
-			if (
-				(e.key === "/" && !isTyping) ||
-				((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")
-			) {
-				e.preventDefault();
-				searchInputRef.current?.focus();
-				searchInputRef.current?.select();
-				return;
+	useKeyboardShortcut(
+		"escape",
+		() => {
+			if (searchQuery) {
+				setSearchQuery("");
+				searchInputRef.current?.blur();
 			}
+		},
+		{ ignoreWhenModalOpen: true, enableInInputs: true },
+	);
 
-			if (e.key === "Escape") {
-				if (showKycModal) {
-					setShowKycModal(false);
-					return;
-				}
-				if (showTicketModal) {
-					setShowTicketModal(false);
-					return;
-				}
-				if (searchQuery) {
-					setSearchQuery("");
-					searchInputRef.current?.blur();
-				}
-				return;
-			}
+	useKeyboardShortcut(
+		"t",
+		() => {
+			handleOpenTicket(userRole === "provider" ? "kyc" : "booking");
+		},
+		{ ignoreWhenModalOpen: true },
+	);
 
-			// Single-key actions: ignore when typing, when a modal is open, or with modifiers (Ctrl+T etc.)
-			if (
-				!isTyping &&
-				!showKycModal &&
-				!showTicketModal &&
-				!e.ctrlKey &&
-				!e.metaKey &&
-				!e.altKey
-			) {
-				if (e.key.toLowerCase() === "t") {
-					e.preventDefault();
-					handleOpenTicket(userRole === "provider" ? "kyc" : "booking");
-				} else if (e.key.toLowerCase() === "k") {
-					e.preventDefault();
-					handleKycClick();
-				}
-			}
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [searchQuery, showKycModal, showTicketModal, userRole, user]);
+	useKeyboardShortcut(
+		"k",
+		() => {
+			handleKycClick();
+		},
+		{ ignoreWhenModalOpen: true },
+	);
 
 	// Common tasks, tailored to who's signed in
 	const quickLinks = useMemo(() => {
@@ -806,7 +787,7 @@ const FaqSection = ({ category, terms, showAudience }) => (
 		>
 			{category.category}
 		</h2>
-		<p className="mt-1.5 mb-5 text-slate-500">{category.blurb}</p>
+		<p className="mt-1.5 mb-5 text-slate-600">{category.blurb}</p>
 
 		<div className="border-y border-slate-200 divide-y divide-slate-200">
 			{category.questions.map((item, i) => (

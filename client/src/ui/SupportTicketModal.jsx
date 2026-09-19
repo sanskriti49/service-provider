@@ -17,6 +17,7 @@ import {
 import { FadeLoader } from "react-spinners";
 import api from "../api/axiosInstance";
 import { useAuth } from "../contexts/AuthContext";
+import useModal from "../hooks/useModal";
 
 const CATEGORIES_BY_ROLE = {
 	provider: [
@@ -60,36 +61,19 @@ export default function SupportTicketModal({
 
 	const submitButtonRef = useRef(null);
 
-	// Lock body scroll while modal is active
-	useEffect(() => {
-		if (isOpen) {
-			const prevOverflow = document.body.style.overflow;
-			document.body.style.overflow = "hidden";
-			return () => {
-				document.body.style.overflow = prevOverflow;
-			};
-		}
-	}, [isOpen]);
-
-	// Keyboard Shortcuts: Esc to close, Ctrl+Enter to submit
-	useEffect(() => {
-		if (!isOpen) return;
-
-		const handleKeyDown = (e) => {
-			if (e.key === "Escape") {
-				e.preventDefault();
-				onClose();
-			} else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-				if (submitButtonRef.current) {
-					e.preventDefault();
-					submitButtonRef.current.click();
-				}
+	// Centralized modal stack & Escape handling
+	useModal({
+		isOpen,
+		onClose,
+		id: "support-ticket-modal",
+		lockScroll: true,
+		submitOnCtrlEnter: !ticketResult,
+		onSubmit: () => {
+			if (submitButtonRef.current) {
+				submitButtonRef.current.click();
 			}
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [isOpen, onClose]);
+		},
+	});
 
 	useEffect(() => {
 		if (isOpen) {
@@ -163,7 +147,7 @@ export default function SupportTicketModal({
 					animate={{ opacity: 1 }}
 					exit={{ opacity: 0 }}
 					onClick={onClose}
-					className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+					className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
 				/>
 
 				{/* Modal Container */}

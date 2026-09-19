@@ -138,7 +138,9 @@ export default function NotificationsPage() {
 			}
 		} catch (err) {
 			console.error("Failed to load notifications:", err);
-			toast.error("Failed to load notifications. Please ensure backend is running.");
+			toast.error(
+				"Failed to load notifications. Please ensure backend is running.",
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -326,14 +328,9 @@ export default function NotificationsPage() {
 						</div>
 
 						<p className="text-sm text-slate-500 mt-1.5 font-medium leading-relaxed max-w-xl">
-							Stay up to speed with your live appointments, provider confirmations, and customer reviews.
+							Stay up to speed with your live appointments, provider
+							confirmations, and customer reviews.
 						</p>
-					</div>
-
-					{/* Live Connection Tag */}
-					<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200/90 text-xs font-medium text-slate-600 shadow-xs self-start sm:self-auto">
-						<span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
-						<span>Live socket sync active</span>
 					</div>
 				</div>
 
@@ -356,13 +353,15 @@ export default function NotificationsPage() {
 							{
 								id: "bookings",
 								label: "Bookings",
-								count: notifications.filter((n) => n.type?.includes("booking")).length,
+								count: notifications.filter((n) => n.type?.includes("booking"))
+									.length,
 								icon: CalendarCheck,
 							},
 							{
 								id: "reviews",
 								label: "Reviews",
-								count: notifications.filter((n) => n.type?.includes("review")).length,
+								count: notifications.filter((n) => n.type?.includes("review"))
+									.length,
 								icon: Star,
 							},
 						].map((tab) => {
@@ -378,7 +377,10 @@ export default function NotificationsPage() {
 											: "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
 									}`}
 								>
-									<Icon size={14} className={isActive ? "text-violet-300" : "text-slate-400"} />
+									<Icon
+										size={14}
+										className={isActive ? "text-violet-300" : "text-slate-400"}
+									/>
 									<span>{tab.label}</span>
 									{tab.count > 0 && (
 										<span
@@ -499,7 +501,9 @@ export default function NotificationsPage() {
 
 															<div className="flex items-center gap-1 text-xs font-medium text-slate-400 shrink-0">
 																<Clock size={12} />
-																<span>{formatRelativeTime(notif.created_at)}</span>
+																<span>
+																	{formatRelativeTime(notif.created_at)}
+																</span>
 															</div>
 														</div>
 
@@ -513,7 +517,9 @@ export default function NotificationsPage() {
 																<button
 																	onClick={(e) => {
 																		e.stopPropagation();
-																		const role = user?.role || localStorage.getItem("role");
+																		const role =
+																			user?.role ||
+																			localStorage.getItem("role");
 																		if (role === "provider") {
 																			navigate("/provider/dashboard/bookings");
 																		} else {

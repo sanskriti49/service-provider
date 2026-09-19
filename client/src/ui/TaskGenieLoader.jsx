@@ -26,10 +26,8 @@ export default function TaskGenieLoader({
 	className = "",
 }) {
 	const [stepIndex, setStepIndex] = useState(0);
-	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
-		setMounted(true);
 		const interval = setInterval(() => {
 			setStepIndex((prev) => (prev + 1) % SOULFUL_MESSAGES.length);
 		}, 2000);
@@ -186,7 +184,7 @@ export default function TaskGenieLoader({
 		</AnimatePresence>
 	);
 
-	if (fullScreen && mounted && typeof document !== "undefined") {
+	if (fullScreen && typeof document !== "undefined" && document.body) {
 		return createPortal(content, document.body);
 	}
 

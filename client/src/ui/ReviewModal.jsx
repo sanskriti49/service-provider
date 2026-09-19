@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Star, X, Sparkles, Check } from "lucide-react";
 import { FadeLoader } from "react-spinners";
 import { toast } from "sonner";
+import useModal from "../hooks/useModal";
 
 import { API_URL } from "../config";
 const RATING_LABELS = {
@@ -34,6 +35,13 @@ export default function ReviewModal({
 	const [comment, setComment] = useState("");
 	const [selectedTags, setSelectedTags] = useState([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	useModal({
+		isOpen,
+		onClose,
+		id: "review-modal",
+		lockScroll: true,
+	});
 
 	if (!isOpen) return null;
 

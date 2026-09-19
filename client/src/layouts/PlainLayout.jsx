@@ -3,6 +3,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { Outlet, useLocation } from "react-router-dom";
+import ScrollToTop from "../ui/ScrollToTop";
 
 export default function PlainLayout() {
 	const location = useLocation();
@@ -12,6 +13,7 @@ export default function PlainLayout() {
 			className="min-h-screen w-full bg-cover bg-center bg-no-repeat overflow-x-hidden"
 			style={{ backgroundImage: "url('/images/background.webp')" }}
 		>
+			<ScrollToTop />
 			<AnimatePresence mode="wait">
 				<motion.div
 					key={location.pathname}

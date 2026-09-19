@@ -184,6 +184,7 @@ const Navbar = () => {
 								setHoveredTab={setHoveredTab}
 								hoveredTab={hoveredTab}
 							/>
+
 							<NavPath
 								to="/#work-with-us"
 								label="Provider"
@@ -304,6 +305,12 @@ const Navbar = () => {
 								How It Works
 							</MobileLink>
 							<MobileLink
+								to="/reviews"
+								onClick={() => setMobileMenuOpen(false)}
+							>
+								Customer Reviews
+							</MobileLink>
+							<MobileLink
 								to="/#work-with-us"
 								onClick={() => setMobileMenuOpen(false)}
 							>
@@ -381,7 +388,8 @@ const NavPath = ({ to, label, setHoveredTab, hoveredTab }) => {
 				const elem = document.getElementById(hashId);
 				if (elem) {
 					const yOffset = -90;
-					const y = elem.getBoundingClientRect().top + window.pageYOffset + yOffset;
+					const y =
+						elem.getBoundingClientRect().top + window.pageYOffset + yOffset;
 					window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
 				}
 			}
@@ -428,7 +436,8 @@ const MobileLink = ({ to, children, onClick }) => {
 				const elem = document.getElementById(hashId);
 				if (elem) {
 					const yOffset = -90;
-					const y = elem.getBoundingClientRect().top + window.pageYOffset + yOffset;
+					const y =
+						elem.getBoundingClientRect().top + window.pageYOffset + yOffset;
 					window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
 				}
 			}

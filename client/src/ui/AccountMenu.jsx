@@ -144,11 +144,8 @@ export default function AccountMenu({ user }) {
 							<MenuLink to="/provider/dashboard/earnings" icon={Wallet}>
 								Earnings
 							</MenuLink>
-							<MenuLink to="/provider/reviews" icon={Star}>
+							<MenuLink to="/reviews" icon={Star}>
 								Reviews
-							</MenuLink>
-							<MenuLink to="/provider/analytics" icon={BarChart3}>
-								Analytics
 							</MenuLink>
 						</div>
 					)}

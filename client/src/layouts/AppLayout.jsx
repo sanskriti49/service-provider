@@ -6,9 +6,11 @@
 
 import { useEffect, useRef, Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import gsap from "gsap";
 import Navbar from "../ui/Navbar";
 import Footer from "../pages/Footer";
 import TaskGenieLoader from "../ui/TaskGenieLoader";
+import ScrollToTop from "../ui/ScrollToTop";
 import nprogress from "nprogress";
 import "nprogress/nprogress.css";
 
@@ -21,6 +23,22 @@ export default function AppLayout() {
 	useEffect(() => {
 		nprogress.start();
 		const timer = setTimeout(() => nprogress.done(), 200);
+
+		// GSAP smooth, natural page entrance
+		if (mainRef.current) {
+			gsap.fromTo(
+				mainRef.current,
+				{ opacity: 0, y: 10 },
+				{
+					opacity: 1,
+					y: 0,
+					duration: 0.35,
+					ease: "power2.out",
+					clearProps: "transform,opacity",
+				}
+			);
+		}
+
 		return () => {
 			clearTimeout(timer);
 			nprogress.done();
@@ -34,11 +52,11 @@ export default function AppLayout() {
 			className="relative min-h-screen flex flex-col bg-cover bg-center bg-no-repeat w-full"
 			style={{ backgroundImage: "url('/images/background.webp')" }}
 		>
+			<ScrollToTop />
 			{!isServiceDetails && <Navbar />}
 			<main
-				key={pathname}
 				ref={mainRef}
-				className="animate-fade-slide flex-grow flex flex-col w-full max-w-[100vw]"
+				className="flex-grow flex flex-col w-full max-w-[100vw]"
 			>
 				<Suspense fallback={<TaskGenieLoader fullScreen />}>
 					<Outlet />

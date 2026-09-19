@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { FadeLoader } from "react-spinners";
 import CompletionOtpModal from "./CompletionOtpModal";
+import useModal from "../../hooks/useModal";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -38,12 +39,12 @@ export default function BookingDetailsSheet({
 	const [copied, setCopied] = useState(false);
 	const [showOtpModal, setShowOtpModal] = useState(false);
 
-	useEffect(() => {
-		document.body.style.overflow = "hidden";
-		return () => {
-			document.body.style.overflow = "unset";
-		};
-	}, []);
+	useModal({
+		isOpen: Boolean(booking),
+		onClose,
+		id: "booking-details-sheet",
+		lockScroll: true,
+	});
 
 	const handleCopyId = useCallback((id) => {
 		if (!id) return;

@@ -20,6 +20,7 @@ import {
 import { FadeLoader } from "react-spinners";
 import api from "../api/axiosInstance";
 import { useAuth } from "../contexts/AuthContext";
+import useModal from "../hooks/useModal";
 import VerifiedBadge from "./VerifiedBadge";
 
 const DOC_TYPES = [
@@ -74,42 +75,40 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 	const [declaration, setDeclaration] = useState(false);
 	const [uploadingSide, setUploadingSide] = useState({ front: false, back: false });
 
-	const [kycData, setKycData] = useState(null);
+	const [kycData, setKycData] = useState(() =>
+		user
+			? {
+					kyc_status: user.kyc_status,
+					is_verified: user.is_verified,
+					verification_badge: user.verification_badge,
+					kyc_doc_type: user.kyc_doc_type,
+					kyc_doc_number: user.kyc_doc_number,
+					kyc_doc_front: user.kyc_doc_front,
+					kyc_doc_back: user.kyc_doc_back,
+					rejection_reason: user.rejection_reason,
+					verified_at: user.verified_at,
+					kyc_submitted_at: user.kyc_submitted_at,
+				}
+			: null
+	);
 
 	const frontInputRef = useRef(null);
 	const backInputRef = useRef(null);
 	const submitButtonRef = useRef(null);
 
-	// Lock body scroll while modal is active
-	useEffect(() => {
-		if (isOpen) {
-			const prevOverflow = document.body.style.overflow;
-			document.body.style.overflow = "hidden";
-			return () => {
-				document.body.style.overflow = prevOverflow;
-			};
-		}
-	}, [isOpen]);
-
-	// Keyboard Shortcuts: Esc to close, Ctrl+Enter to submit
-	useEffect(() => {
-		if (!isOpen) return;
-
-		const handleKeyDown = (e) => {
-			if (e.key === "Escape") {
-				e.preventDefault();
-				onClose();
-			} else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-				if (submitButtonRef.current) {
-					e.preventDefault();
-					submitButtonRef.current.click();
-				}
+	// Centralized modal stack & Escape handling
+	useModal({
+		isOpen,
+		onClose,
+		id: "kyc-verification-modal",
+		lockScroll: true,
+		submitOnCtrlEnter: true,
+		onSubmit: () => {
+			if (submitButtonRef.current) {
+				submitButtonRef.current.click();
 			}
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [isOpen, onClose]);
+		},
+	});
 
 	// Fetch current provider KYC status whenever modal opens
 	useEffect(() => {
@@ -269,7 +268,7 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 					animate={{ opacity: 1 }}
 					exit={{ opacity: 0 }}
 					onClick={onClose}
-					className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+					className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
 				/>
 
 				{/* Modal Dialog Card */}

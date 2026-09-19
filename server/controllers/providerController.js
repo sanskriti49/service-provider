@@ -959,6 +959,42 @@ async function getProviderAvailability(req, res, next) {
 			serviceQuery += ` LIMIT 1`;
 		}
 
+		const fetchBookings = async () => {
+			try {
+				return await db.query(
+					`SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date_str, 
+                            TO_CHAR(start_time, 'HH24:MI') AS start_time, 
+                            TO_CHAR(end_time, 'HH24:MI') AS end_time,
+                            latitude, longitude, status
+                     FROM bookings
+                     WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
+                     AND (
+                         status IN ('booked', 'confirmed', 'in_progress')
+                         OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
+                     )`,
+					[providerIdValue, fromStr, endDateStr],
+				);
+			} catch (bErr) {
+				if (bErr.code === "42703") {
+					// Fallback if latitude/longitude columns are missing on legacy tables
+					return await db.query(
+						`SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date_str, 
+                                TO_CHAR(start_time, 'HH24:MI') AS start_time, 
+                                TO_CHAR(end_time, 'HH24:MI') AS end_time,
+                                status
+                         FROM bookings
+                         WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
+                         AND (
+                             status IN ('booked', 'confirmed', 'in_progress')
+                             OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
+                         )`,
+						[providerIdValue, fromStr, endDateStr],
+					);
+				}
+				throw bErr;
+			}
+		};
+
 		const [masterRes, providerServiceRes, exceptionsRes, bookingsRes] =
 			await Promise.all([
 				db.query(
@@ -976,19 +1012,7 @@ async function getProviderAvailability(req, res, next) {
                      WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date`,
 					[providerIdValue, fromStr, endDateStr],
 				),
-				db.query(
-					`SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date_str, 
-                            TO_CHAR(start_time, 'HH24:MI') AS start_time, 
-                            TO_CHAR(end_time, 'HH24:MI') AS end_time,
-                            latitude, longitude, status
-                     FROM bookings
-                     WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
-                     AND (
-                         status IN ('booked', 'confirmed', 'in_progress')
-                         OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
-                     )`,
-					[providerIdValue, fromStr, endDateStr],
-				),
+				fetchBookings(),
 			]);
 
 		let masterRows = masterRes.rows;
@@ -1013,8 +1037,9 @@ async function getProviderAvailability(req, res, next) {
 					end_time: (a.end || a.end_time || "18:00").slice(0, 5),
 				}));
 			} else {
-				// Standard operational business hours for mock / newly registered providers
+				// Standard operational business hours for mock / newly registered providers (7 days)
 				masterRows = [
+					{ day_of_week: 0, start_time: "10:00", end_time: "16:00" },
 					{ day_of_week: 1, start_time: "09:00", end_time: "18:00" },
 					{ day_of_week: 2, start_time: "09:00", end_time: "18:00" },
 					{ day_of_week: 3, start_time: "09:00", end_time: "18:00" },

@@ -2,14 +2,14 @@
    Tailwind CSS Engine & Theme Definition
    ========================================================================== */
 /* @import url('https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,100..900;1,100..900&display=swap'); */
+@import url("https://fonts.googleapis.com/css2?family=Valley+Sans:ital,wght@0,100..900;1,100..900&display=swap");
 @import "tailwindcss";
 
 @theme {
 	--color-white-100: #efefef;
 
 	/* Font Stacks */
-	--font-sans:
-		"Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
+	--font-sans: "Valley Sans", system-ui, -apple-system, sans-serif;
 	--font-newsreader:
 		"Newsreader", "Iowan Old Style", Georgia, "Times New Roman", serif;
 	--font-editorial:
@@ -59,6 +59,7 @@
 
 	html {
 		scroll-behavior: smooth;
+		scrollbar-gutter: stable;
 	}
 
 	body {

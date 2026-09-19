@@ -246,7 +246,6 @@ export default function ProviderServices() {
 					</p>
 				</div>
 
-				{/* Active vs Discoverable Tabs */}
 				<div className="flex items-center gap-1.5 p-1 bg-white/[0.03] border border-white/[0.07] rounded-2xl">
 					<button
 						onClick={() => setActiveTab("active")}
@@ -320,7 +319,7 @@ export default function ProviderServices() {
 											</div>
 											<div className="space-y-1 min-w-0">
 												<div className="flex items-center gap-2.5 flex-wrap">
-													<h3 className="text-sm font-bold text-white truncate">
+													<h3 className="text-[16px] font-bold text-white truncate">
 														{service.name}
 													</h3>
 													<span
@@ -333,7 +332,7 @@ export default function ProviderServices() {
 														{service.is_visible ? "Live on App" : "Paused"}
 													</span>
 												</div>
-												<p className="text-xs text-slate-400 truncate pr-4">
+												<p className="text-sm text-slate-400 truncate pr-4">
 													{service.description}
 												</p>
 											</div>
@@ -341,12 +340,12 @@ export default function ProviderServices() {
 
 										<div className="flex items-center gap-6 shrink-0 md:w-1/4">
 											<div>
-												<span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-													Your Rate
+												<span className="text-[10.5px] font-bold text-slate-400/80 uppercase tracking-wider block">
+													You Get
 												</span>
-												<span className="text-sm font-black text-emerald-400 mt-0.5 block font-mono">
+												<span className="text-[15px] font-black text-emerald-400 mt-0.5 block font-mono">
 													₹{service.price}
-													<span className="text-xs text-slate-400 font-normal font-sans ml-1">
+													<span className="text-sm text-slate-400 font-normal font-sans ml-1">
 														/
 														{UNIT_LABELS[service.price_unit] ||
 															service.price_unit}
@@ -371,14 +370,14 @@ export default function ProviderServices() {
 														<FadeLoader color="#a78bfa" />
 													</span>
 												) : service.is_visible ? (
-													<Eye size={15} />
+													<Eye size={18} />
 												) : (
-													<EyeOff size={15} />
+													<EyeOff size={18} />
 												)}
 											</button>
 											<button
 												onClick={() => openEditDrawer(service)}
-												className="cursor-pointer px-3 py-2 bg-violet-600/15 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/30 hover:border-violet-500 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all"
+												className="cursor-pointer px-3 py-2 bg-violet-600/15 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/30 hover:border-violet-500 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all"
 											>
 												<SlidersHorizontal size={12} />
 												Configure

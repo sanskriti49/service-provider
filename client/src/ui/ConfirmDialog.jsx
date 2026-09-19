@@ -1,7 +1,7 @@
-import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Trash2, LogOut, Info, X } from "lucide-react";
+import useModal from "../hooks/useModal";
 
 export default function ConfirmDialog({
 	isOpen,
@@ -15,27 +15,13 @@ export default function ConfirmDialog({
 	icon: CustomIcon,
 	loading = false,
 }) {
-	// Close on Escape key
-	useEffect(() => {
-		const handleKeyDown = (e) => {
-			if (e.key === "Escape" && isOpen && !loading) {
-				onClose?.();
-			}
-		};
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [isOpen, loading, onClose]);
-
-	// Prevent background scrolling when open
-	useEffect(() => {
-		if (isOpen) {
-			const originalOverflow = document.body.style.overflow;
-			document.body.style.overflow = "hidden";
-			return () => {
-				document.body.style.overflow = originalOverflow;
-			};
-		}
-	}, [isOpen]);
+	// Centralized modal stack & Escape handling
+	useModal({
+		isOpen,
+		onClose: !loading ? onClose : null,
+		id: "confirm-dialog",
+		lockScroll: true,
+	});
 
 	if (typeof document === "undefined") return null;
 

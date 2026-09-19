@@ -23,6 +23,7 @@ import ReviewModal from "../ui/ReviewModal";
 import { apiCache } from "../utils/apiCache";
 import VerifiedBadge from "../ui/VerifiedBadge";
 import TaskGenieLoader from "../ui/TaskGenieLoader";
+import useModal from "../hooks/useModal";
 
 import { API_URL } from "../config";
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
@@ -565,18 +566,12 @@ const ProviderCard = ({
 		setSelectedTime(null);
 	}, [selectedDateStr]);
 
-	useEffect(() => {
-		if (!isExpanded) return;
-
-		const handleEsc = (e) => {
-			if (e.key === "Escape") {
-				onToggleExpand();
-			}
-		};
-		window.addEventListener("keydown", handleEsc);
-
-		return () => window.removeEventListener("keydown", handleEsc);
-	}, [isExpanded, onToggleExpand]);
+	useModal({
+		isOpen: isExpanded,
+		onClose: onToggleExpand,
+		id: "service-details-slot-picker",
+		lockScroll: false,
+	});
 
 	return (
 		<div

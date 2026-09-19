@@ -181,15 +181,32 @@ async function createBooking(req, res, next) {
 			}
 		}
 
-		const existingBookings = await client.query(
-			`SELECT start_time, end_time, latitude, longitude FROM bookings 
-             WHERE provider_id = $1 AND date = $2::date 
-             AND (
-                 status IN ('booked', 'confirmed', 'in_progress')
-                 OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
-             )`,
-			[resolvedProviderId, cleanDate],
-		);
+		let existingBookings;
+		try {
+			existingBookings = await client.query(
+				`SELECT start_time, end_time, latitude, longitude FROM bookings 
+                 WHERE provider_id = $1 AND date = $2::date 
+                 AND (
+                     status IN ('booked', 'confirmed', 'in_progress')
+                     OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
+                 )`,
+				[resolvedProviderId, cleanDate],
+			);
+		} catch (bErr) {
+			if (bErr.code === "42703") {
+				existingBookings = await client.query(
+					`SELECT start_time, end_time FROM bookings 
+                     WHERE provider_id = $1 AND date = $2::date 
+                     AND (
+                         status IN ('booked', 'confirmed', 'in_progress')
+                         OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
+                     )`,
+					[resolvedProviderId, cleanDate],
+				);
+			} else {
+				throw bErr;
+			}
+		}
 
 		for (const slot of existingBookings.rows) {
 			const existStart = toMins(String(slot.start_time).slice(0, 5));

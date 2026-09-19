@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import ReviewModal from "../../ui/ReviewModal";
 import api from "../../api/axiosInstance";
+import useModal from "../../hooks/useModal";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -78,12 +79,12 @@ export default function BookingDetailsSheet({
 		setTimeout(() => setOtpCopied(false), 2000);
 	};
 
-	useEffect(() => {
-		document.body.style.overflow = "hidden";
-		return () => {
-			document.body.style.overflow = "unset";
-		};
-	}, []);
+	useModal({
+		isOpen: Boolean(booking),
+		onClose,
+		id: "customer-booking-details-sheet",
+		lockScroll: true,
+	});
 
 	const handleCopyId = useCallback((id) => {
 		if (!id) return;

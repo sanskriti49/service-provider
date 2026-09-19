@@ -1,8 +1,10 @@
-﻿const express = require("express");
+const express = require("express");
 const router = express.Router();
 const reviewController = require("../controllers/reviewController");
 const authMiddleware = require("../middleware/authMiddleware");
 
+router.get("/", reviewController.getAllReviews);
+router.get("/my-reviews", authMiddleware, reviewController.getMyProviderReviews);
 router.get("/provider/:provider_id", reviewController.getProviderReviews);
 
 router.get("/booking/:booking_id", authMiddleware, reviewController.getBookingReview);

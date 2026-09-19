@@ -477,7 +477,7 @@ export default function ProviderBookings() {
 										? "No upcoming bookings"
 										: "No bookings match criteria"}
 								</p>
-								<p className="text-sm text-slate-500 mt-1">
+								<p className="text-sm text-slate-400/90 mt-1">
 									{activeTab === "upcoming"
 										? "When customers book your services, they will appear here."
 										: "Completed jobs and cancelled bookings will appear here."}

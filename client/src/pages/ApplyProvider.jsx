@@ -1,28 +1,33 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
-	User,
-	Mail,
-	Phone,
-	Lock,
-	MapPin,
-	FileText,
-	Briefcase,
-	Clock,
-	CheckCircle2,
-	ChevronRight,
-	ChevronLeft,
-	Sparkles,
-	ShieldCheck,
 	Award,
-	DollarSign,
+	Check,
+	CheckCircle2,
+	ChevronLeft,
+	ChevronRight,
 	CircleAlert,
-	UploadCloud,
+	CreditCard,
+	Eye,
+	EyeOff,
 	FileCheck,
+	FileText,
+	Fingerprint,
+	Loader2,
+	ShieldCheck,
+	UploadCloud,
 } from "lucide-react";
-import { FadeLoader } from "react-spinners";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import api from "../api/axiosInstance";
 import VerifiedBadge from "../ui/VerifiedBadge";
+
+/*
+ * Design tokens (Tailwind arbitrary values, no config changes needed)
+ *  ink     #1E1240  headings, dark sidebar
+ *  brand   #5B2EE0  primary actions, selected states
+ *  lilac   #CDBBFF  progress and completed steps on dark
+ *  mist    #EFEAFB  selected-option background
+ *  page    #F6F4FB  page background
+ */
 
 const DEFAULT_SERVICES = [
 	{
@@ -70,14 +75,257 @@ const DEFAULT_SERVICES = [
 ];
 
 const DAYS = [
-	{ id: 1, name: "Mon" },
-	{ id: 2, name: "Tue" },
-	{ id: 3, name: "Wed" },
-	{ id: 4, name: "Thu" },
-	{ id: 5, name: "Fri" },
-	{ id: 6, name: "Sat" },
-	{ id: 0, name: "Sun" },
+	{ id: 1, name: "Mon", full: "Monday" },
+	{ id: 2, name: "Tue", full: "Tuesday" },
+	{ id: 3, name: "Wed", full: "Wednesday" },
+	{ id: 4, name: "Thu", full: "Thursday" },
+	{ id: 5, name: "Fri", full: "Friday" },
+	{ id: 6, name: "Sat", full: "Saturday" },
+	{ id: 0, name: "Sun", full: "Sunday" },
 ];
+
+const STEPS = [
+	{
+		label: "Your details",
+		title: "Tell us about yourself",
+		description: "We'll use these details to create your provider account.",
+	},
+	{
+		label: "Your service",
+		title: "What service do you offer?",
+		description: "Pick your main service and set your starting rate.",
+	},
+	{
+		label: "Your schedule",
+		title: "When are you available?",
+		description: "Choose the days and hours you're open for bookings.",
+	},
+	{
+		label: "Verification",
+		title: "Verify your identity",
+		description:
+			"Add a government-approved ID to earn your Verified Pro badge.",
+	},
+];
+
+const KYC_DOCS = [
+	{
+		id: "aadhaar",
+		label: "Aadhaar card",
+		sub: "12-digit UIDAI ID",
+		icon: Fingerprint,
+		numberLabel: "Aadhaar number (12 digits)",
+		placeholder: "5482 1920 4412",
+	},
+	{
+		id: "driving_license",
+		label: "Driving license",
+		sub: "State transport dept.",
+		icon: CreditCard,
+		numberLabel: "Driving license number",
+		placeholder: "MH-02-2018-0091242",
+	},
+	{
+		id: "certificate",
+		label: "Trade certificate",
+		sub: "Certified professional",
+		icon: Award,
+		numberLabel: "Certificate or registration ID",
+		placeholder: "CERT-PLUMB-90211",
+	},
+];
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const DEFAULT_HOURS = { start: "09:00", end: "18:00" };
+
+/* ---------- shared styles ---------- */
+
+const inputBase =
+	"w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-[#1E1240] placeholder:text-slate-400 transition-colors focus:border-[#5B2EE0] focus:outline-none focus:ring-2 focus:ring-[#5B2EE0]/20";
+
+const focusRing =
+	"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B2EE0] focus-visible:ring-offset-2";
+
+const primaryBtn = `inline-flex items-center justify-center gap-2 rounded-full bg-[#5B2EE0] px-7 py-3 text-base font-semibold text-white transition-colors hover:bg-[#4A22C4] disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`;
+
+/* ---------- small building blocks ---------- */
+
+function Field({ id, label, optional, hint, children }) {
+	return (
+		<div>
+			<label
+				htmlFor={id}
+				className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-[#1E1240]"
+			>
+				<span>{label}</span>
+				{optional && (
+					<span className="text-xs font-normal text-slate-500">Optional</span>
+				)}
+			</label>
+			{children}
+			{hint && (
+				<p id={`${id}-hint`} className="mt-1.5 text-xs text-slate-500">
+					{hint}
+				</p>
+			)}
+		</div>
+	);
+}
+
+function PasswordInput({ id, value, onChange, describedBy }) {
+	const [show, setShow] = useState(false);
+	return (
+		<div className="relative">
+			<input
+				id={id}
+				type={show ? "text" : "password"}
+				required
+				autoComplete="new-password"
+				placeholder="At least 6 characters"
+				aria-describedby={describedBy}
+				value={value}
+				onChange={onChange}
+				className={`${inputBase} pr-12`}
+			/>
+			<button
+				type="button"
+				onClick={() => setShow((s) => !s)}
+				aria-label={show ? "Hide password" : "Show password"}
+				aria-pressed={show}
+				className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 transition-colors hover:text-[#1E1240] ${focusRing}`}
+			>
+				{show ? <EyeOff size={18} /> : <Eye size={18} />}
+			</button>
+		</div>
+	);
+}
+
+function UploadSlot({
+	id,
+	label,
+	optional,
+	url,
+	uploading,
+	onSelect,
+	onRemove,
+}) {
+	const isPdf = /\.pdf(\?|#|$)/i.test(url || "");
+
+	return (
+		<div>
+			<div className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-[#1E1240]">
+				<span>{label}</span>
+				{optional && (
+					<span className="text-xs font-normal text-slate-500">Optional</span>
+				)}
+			</div>
+
+			{url ? (
+				<div className="overflow-hidden rounded-2xl border border-slate-300">
+					<div className="flex aspect-[16/10] items-center justify-center bg-slate-100">
+						{isPdf ? (
+							<div className="flex flex-col items-center gap-2 text-slate-600">
+								<FileText size={32} strokeWidth={1.5} />
+								<span className="text-sm">PDF uploaded</span>
+							</div>
+						) : (
+							<img
+								src={url}
+								alt={`${label} preview`}
+								className="h-full w-full object-cover"
+							/>
+						)}
+					</div>
+					<div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-white px-3 py-2">
+						<span className="flex items-center gap-1.5 text-sm font-medium text-emerald-700">
+							<FileCheck size={16} aria-hidden="true" /> Uploaded
+						</span>
+						<button
+							type="button"
+							onClick={onRemove}
+							className={`rounded-md px-2.5 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-red-50 hover:text-red-700 ${focusRing}`}
+						>
+							Remove
+						</button>
+					</div>
+				</div>
+			) : (
+				<label
+					htmlFor={id}
+					className={`flex aspect-[16/10] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 text-center transition-colors focus-within:ring-2 focus-within:ring-[#5B2EE0]/30 ${
+						uploading
+							? "border-[#5B2EE0] bg-[#EFEAFB]"
+							: "border-slate-300 hover:border-[#5B2EE0] hover:bg-[#F6F4FB]"
+					}`}
+				>
+					<input
+						id={id}
+						type="file"
+						accept="image/*,.pdf"
+						className="sr-only"
+						disabled={uploading}
+						onChange={(e) => {
+							onSelect(e.target.files?.[0]);
+							e.target.value = "";
+						}}
+					/>
+					{uploading ? (
+						<>
+							<Loader2
+								size={24}
+								className="animate-spin text-[#5B2EE0]"
+								aria-hidden="true"
+							/>
+							<span className="text-sm font-medium text-[#1E1240]">
+								Uploading…
+							</span>
+						</>
+					) : (
+						<>
+							<UploadCloud
+								size={26}
+								strokeWidth={1.5}
+								className="text-[#5B2EE0]"
+								aria-hidden="true"
+							/>
+							<span className="text-sm font-medium text-[#1E1240]">
+								Choose a file to upload
+							</span>
+							<span className="text-xs text-slate-500">
+								PNG, JPG or PDF, up to 10 MB
+							</span>
+						</>
+					)}
+				</label>
+			)}
+		</div>
+	);
+}
+
+function OptionCard({ selected, onClick, children }) {
+	return (
+		<button
+			type="button"
+			role="radio"
+			aria-checked={selected}
+			onClick={onClick}
+			className={`relative rounded-2xl border p-4 text-left transition-colors ${focusRing} ${
+				selected
+					? "border-[#5B2EE0] bg-[#EFEAFB] ring-1 ring-[#5B2EE0]"
+					: "border-slate-300 bg-white hover:border-[#5B2EE0]/60"
+			}`}
+		>
+			{selected && (
+				<span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[#5B2EE0] text-white">
+					<Check size={12} strokeWidth={3} aria-hidden="true" />
+				</span>
+			)}
+			{children}
+		</button>
+	);
+}
+
+/* ---------- page ---------- */
 
 export default function ApplyProvider() {
 	const [step, setStep] = useState(1);
@@ -88,7 +336,6 @@ export default function ApplyProvider() {
 	});
 	const [successData, setSuccessData] = useState(null);
 	const [errorMsg, setErrorMsg] = useState("");
-
 	const [servicesList, setServicesList] = useState(DEFAULT_SERVICES);
 
 	const [formData, setFormData] = useState({
@@ -101,20 +348,21 @@ export default function ApplyProvider() {
 		service: "electrical-repair",
 		price: 499,
 		price_unit: "fixed",
-		availability: [
-			{ day: 1, start: "09:00", end: "18:00" },
-			{ day: 2, start: "09:00", end: "18:00" },
-			{ day: 3, start: "09:00", end: "18:00" },
-			{ day: 4, start: "09:00", end: "18:00" },
-			{ day: 5, start: "09:00", end: "18:00" },
-			{ day: 6, start: "09:00", end: "18:00" },
-		],
+		availability: [1, 2, 3, 4, 5, 6].map((day) => ({
+			day,
+			...DEFAULT_HOURS,
+		})),
 		kyc_doc_type: "aadhaar",
 		kyc_doc_number: "",
 		kyc_doc_front: "",
 		kyc_doc_back: "",
-		kyc_declaration: true,
+		kyc_declaration: false,
 	});
+
+	const reduceMotion = useReducedMotion();
+	const headingRef = useRef(null);
+	const errorRef = useRef(null);
+	const mounted = useRef(false);
 
 	useEffect(() => {
 		async function fetchServices() {
@@ -131,6 +379,25 @@ export default function ApplyProvider() {
 		fetchServices();
 	}, []);
 
+	// Move focus to the new step heading (keyboard and screen-reader friendly)
+	useEffect(() => {
+		if (!mounted.current) {
+			mounted.current = true;
+			return;
+		}
+		headingRef.current?.focus();
+	}, [step, successData]);
+
+	// Bring new errors into view
+	useEffect(() => {
+		if (errorMsg) {
+			errorRef.current?.scrollIntoView({
+				block: "nearest",
+				behavior: "smooth",
+			});
+		}
+	}, [errorMsg]);
+
 	const handleInputChange = (field, value) => {
 		setErrorMsg("");
 		setFormData((prev) => ({ ...prev, [field]: value }));
@@ -138,6 +405,12 @@ export default function ApplyProvider() {
 
 	const handleFileUpload = async (side, file) => {
 		if (!file) return;
+		if (file.size > MAX_UPLOAD_BYTES) {
+			setErrorMsg(
+				"That file is larger than 10 MB. Please choose a smaller one.",
+			);
+			return;
+		}
 		setUploadingDoc((prev) => ({ ...prev, [side]: true }));
 		setErrorMsg("");
 		try {
@@ -166,24 +439,31 @@ export default function ApplyProvider() {
 	const toggleDayAvailability = (dayId) => {
 		setFormData((prev) => {
 			const exists = prev.availability.find((a) => a.day === dayId);
-			if (exists) {
-				return {
-					...prev,
-					availability: prev.availability.filter((a) => a.day !== dayId),
-				};
-			} else {
-				return {
-					...prev,
-					availability: [
-						...prev.availability,
-						{ day: dayId, start: "09:00", end: "18:00" },
-					],
-				};
-			}
+			return {
+				...prev,
+				availability: exists
+					? prev.availability.filter((a) => a.day !== dayId)
+					: [...prev.availability, { day: dayId, ...DEFAULT_HOURS }],
+			};
 		});
 	};
 
+	const applyDayPreset = (dayIds) => {
+		setErrorMsg("");
+		setFormData((prev) => ({
+			...prev,
+			availability: dayIds.map(
+				(day) =>
+					prev.availability.find((a) => a.day === day) || {
+						day,
+						...DEFAULT_HOURS,
+					},
+			),
+		}));
+	};
+
 	const handleTimeChange = (dayId, type, val) => {
+		setErrorMsg("");
 		setFormData((prev) => ({
 			...prev,
 			availability: prev.availability.map((a) =>
@@ -226,13 +506,33 @@ export default function ApplyProvider() {
 				setErrorMsg("Please select at least one working day in your schedule");
 				return;
 			}
+			const badDay = formData.availability.find((a) => a.start >= a.end);
+			if (badDay) {
+				const day = DAYS.find((d) => d.id === badDay.day);
+				setErrorMsg(
+					`On ${day?.full}, the end time must be later than the start time`,
+				);
+				return;
+			}
 		}
 		setErrorMsg("");
 		setStep((s) => Math.min(s + 1, 4));
 	};
 
+	const goToStep = (target) => {
+		setErrorMsg("");
+		setStep(target);
+	};
+
 	const handleSubmit = async (e) => {
 		e.preventDefault();
+
+		// Pressing Enter on steps 1-3 should move forward, not submit
+		if (step < 4) {
+			handleNextStep();
+			return;
+		}
+
 		setErrorMsg("");
 
 		if (!formData.kyc_doc_type) {
@@ -286,764 +586,692 @@ export default function ApplyProvider() {
 		}
 	};
 
-	return (
-		<div className="min-h-screen bg-slate-50 text-slate-800 bricolage-grotesque relative overflow-hidden py-12 px-4 sm:px-6">
-			<div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[750px] h-[380px] bg-gradient-to-r from-violet-200/50 via-purple-200/40 to-pink-200/50 blur-3xl pointer-events-none rounded-full" />
+	const meta = STEPS[step - 1];
+	const current = successData ? STEPS.length + 1 : step;
+	const selectedDoc = KYC_DOCS.find((d) => d.id === formData.kyc_doc_type);
+	const isUploading = uploadingDoc.front || uploadingDoc.back;
+	const priceNumber = Number(formData.price);
 
-			<div className="max-w-3xl mx-auto relative z-10 space-y-8">
-				<div className="text-center space-y-3">
-					<div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-violet-100/90 border border-violet-200 text-violet-700 text-xs font-bold uppercase tracking-wider">
-						<Sparkles size={13} className="text-pink-600" /> Join TaskGenie
-						Partner Network
+	return (
+		<div className="mt-18 bricolage-grotesque min-h-screen bg-[#F6F4FB] px-4 py-8 text-[#1E1240] sm:px-6 sm:py-12">
+			<div className="mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-[#E4DEF5] bg-white lg:grid lg:grid-cols-[340px_1fr]">
+				{/* ---------- Sidebar ---------- */}
+				<aside className="bg-[#1E1240] px-6 py-8 text-white sm:px-10 sm:py-10 lg:py-12">
+					<h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+						Apply as a verified service expert
+					</h1>
+					<p className="mt-4 max-w-xs text-[15px] leading-relaxed text-white/70">
+						Set your own rates and hours, and connect with clients near you.
+					</p>
+
+					{/* Mobile progress */}
+					<div className="mt-6 lg:hidden">
+						<div className="flex items-center justify-between text-sm">
+							<span className="font-medium">
+								{successData ? "All done" : `Step ${step} of ${STEPS.length}`}
+							</span>
+							{!successData && (
+								<span className="text-white/70">{STEPS[step - 1].label}</span>
+							)}
+						</div>
+						<div
+							role="progressbar"
+							aria-valuemin={0}
+							aria-valuemax={STEPS.length}
+							aria-valuenow={Math.min(current - 1, STEPS.length)}
+							aria-label="Application progress"
+							className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15"
+						>
+							<div
+								className="h-full rounded-full bg-[#CDBBFF] transition-[width] duration-300"
+								style={{
+									width: `${(Math.min(current - 1, STEPS.length) / STEPS.length) * 100}%`,
+								}}
+							/>
+						</div>
 					</div>
 
-					<h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#281950] tracking-tight">
-						Apply as a{" "}
-						<span className="bg-gradient-to-r from-violet-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">
-							Verified Service Expert
-						</span>
-					</h1>
-					<p className="font-geist text-sm sm:text-base text-slate-600 max-w-lg mx-auto leading-relaxed">
-						Set your own rates, choose your working hours, and connect with
-						thousands of local clients.
-					</p>
-				</div>
+					{/* Desktop stepper */}
+					<ol className="mt-12 hidden lg:block">
+						{STEPS.map((s, idx) => {
+							const num = idx + 1;
+							const done = current > num;
+							const active = current === num;
+							const canGo = done && !successData;
 
-				{!successData && (
-					<div className="bg-white/90 backdrop-blur-md rounded-2xl border border-violet-100 p-4 shadow-sm flex items-center justify-between">
-						{[
-							{ num: 1, label: "Personal" },
-							{ num: 2, label: "Services" },
-							{ num: 3, label: "Schedule" },
-							{ num: 4, label: "Identity & KYC" },
-						].map((s, idx) => (
-							<React.Fragment key={s.num}>
-								<div className="flex items-center gap-2">
-									<div
-										className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-											step >= s.num
-												? "bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/20"
-												: "bg-slate-100 text-slate-400 border border-slate-200"
-										}`}
-									>
-										{step > s.num ? <CheckCircle2 size={16} /> : s.num}
-									</div>
+							const circle = (
+								<span
+									className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+										done
+											? "bg-[#CDBBFF] text-[#1E1240]"
+											: active
+												? "bg-white text-[#1E1240]"
+												: "border border-white/30 text-white/60"
+									}`}
+								>
+									{done ? <Check size={16} strokeWidth={3} /> : num}
+								</span>
+							);
+
+							const text = (
+								<span className="block pt-1 text-left">
 									<span
-										className={`text-xs font-bold hidden sm:inline ${
-											step >= s.num ? "text-[#281950]" : "text-slate-400"
+										className={`block text-base font-semibold ${
+											active || done ? "text-white" : "text-white/60"
 										}`}
 									>
 										{s.label}
 									</span>
-								</div>
-								{idx < 3 && (
-									<div
-										className={`h-0.5 flex-1 mx-2 sm:mx-3 rounded-full transition-all ${
-											step > s.num
-												? "bg-gradient-to-r from-violet-500 to-pink-500"
-												: "bg-slate-200"
-										}`}
-									/>
-								)}
-							</React.Fragment>
-						))}
-					</div>
-				)}
+								</span>
+							);
 
-				<div className="bg-white/95 backdrop-blur-xl border border-violet-200/70 rounded-3xl p-6 sm:p-10 shadow-xl shadow-purple-900/5 relative">
-					{errorMsg && (
-						<div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2.5">
-							<CircleAlert size={16} className="text-red-500 shrink-0" />
-							<span>{errorMsg}</span>
-						</div>
-					)}
+							return (
+								<li
+									key={s.label}
+									aria-current={active ? "step" : undefined}
+									className="relative pb-9 last:pb-0"
+								>
+									{idx < STEPS.length - 1 && (
+										<span
+											aria-hidden="true"
+											className={`absolute left-4 top-9 bottom-1 w-px -translate-x-1/2 ${
+												done ? "bg-[#CDBBFF]" : "bg-white/20"
+											}`}
+										/>
+									)}
+									{canGo ? (
+										<button
+											type="button"
+											onClick={() => goToStep(num)}
+											className="flex w-full items-start gap-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CDBBFF] focus-visible:ring-offset-4 focus-visible:ring-offset-[#1E1240]"
+										>
+											{circle}
+											{text}
+										</button>
+									) : (
+										<div className="flex items-start gap-4">
+											{circle}
+											{text}
+										</div>
+									)}
+								</li>
+							);
+						})}
+					</ol>
 
+					<p className="mt-12 hidden text-sm text-white/60 lg:block">
+						Free to apply. No upfront fees.
+					</p>
+				</aside>
+
+				{/* ---------- Main panel ---------- */}
+				<main className="px-6 py-8 sm:px-10 sm:py-10 lg:px-12 lg:py-12">
 					{successData ? (
 						<motion.div
-							initial={{ opacity: 0, scale: 0.95 }}
-							animate={{ opacity: 1, scale: 1 }}
-							className="text-center py-8 space-y-5"
+							initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+							animate={{ opacity: 1, y: 0 }}
+							transition={{ duration: 0.25 }}
+							className="py-4 sm:py-8"
 						>
-							<div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-200">
-								<CheckCircle2 size={36} />
+							<div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+								<CheckCircle2 size={30} aria-hidden="true" />
 							</div>
 
-							<div className="space-y-2">
-								<h2 className="text-2xl font-bold text-[#281950]">
-									Application Submitted Successfully!
-								</h2>
-								<p className="text-sm text-slate-600 max-w-md mx-auto">
-									Welcome to the TaskGenie family! Your provider ID is{" "}
-									<strong className="text-violet-700 font-mono text-base">
-										{successData.custom_id}
-									</strong>
-									.
-								</p>
-							</div>
+							<h2
+								ref={headingRef}
+								tabIndex={-1}
+								className="mt-6 text-2xl font-semibold tracking-tight focus:outline-none sm:text-3xl"
+							>
+								Application submitted
+							</h2>
+							<p className="mt-2 max-w-md text-base leading-relaxed text-slate-600">
+								Welcome to TaskGenie. Keep your provider ID handy:
+							</p>
+							<p className="mt-3 inline-block rounded-lg bg-[#EFEAFB] px-4 py-2 font-mono text-lg font-semibold text-[#1E1240]">
+								{successData.custom_id}
+							</p>
 
-							<div className="p-5 rounded-2xl bg-violet-50 border border-violet-100 max-w-sm mx-auto text-left space-y-2 text-xs text-slate-700">
-								<div className="font-bold text-violet-900 flex items-center gap-1.5">
-									<ShieldCheck size={16} className="text-violet-600" /> Next
-									Steps:
-								</div>
-								<div>1. Log into your Provider Dashboard</div>
-								<div>2. Complete phone and location verification</div>
-								<div>3. Start receiving instant customer booking requests</div>
+							<div className="mt-10">
+								<h3 className="text-base font-semibold">What happens next</h3>
+								<ol className="mt-4 space-y-4">
+									{[
+										"Log in to your provider dashboard",
+										"Complete phone and location verification",
+										"Start receiving booking requests",
+									].map((text, i) => (
+										<li key={text} className="flex items-center gap-4">
+											<span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#EFEAFB] text-sm font-semibold text-[#5B2EE0]">
+												{i + 1}
+											</span>
+											<span className="text-base text-slate-700">{text}</span>
+										</li>
+									))}
+								</ol>
 							</div>
 
 							<button
+								type="button"
 								onClick={() => (window.location.href = "/provider/dashboard")}
-								className="cursor-pointer px-8 py-3 rounded-full text-sm font-bold text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 shadow-lg shadow-purple-500/25 transition-all"
+								className={`${primaryBtn} mt-10`}
 							>
-								Go to Dashboard
+								Go to dashboard
 							</button>
 						</motion.div>
 					) : (
-						<form onSubmit={handleSubmit} className="space-y-6">
-							{step === 1 && (
-								<motion.div
-									initial={{ opacity: 0, x: -10 }}
-									animate={{ opacity: 1, x: 0 }}
-									className="space-y-5"
-								>
-									<div className="border-b border-slate-100 pb-3">
-										<h3 className="text-lg font-bold text-[#281950]">
-											Step 1: Personal & Contact Details
-										</h3>
-										<p className="text-xs text-slate-500">
-											Provide basic details to create your provider account.
-										</p>
-									</div>
+						<form onSubmit={handleSubmit} noValidate>
+							<header className="mb-8">
+								<p className="text-sm text-slate-500">
+									Step {step} of {STEPS.length}
+								</p>
+								<div className="mt-1 flex items-start justify-between gap-4">
+									<h2
+										ref={headingRef}
+										tabIndex={-1}
+										className="text-2xl font-semibold tracking-tight focus:outline-none sm:text-3xl"
+									>
+										{meta.title}
+									</h2>
+									{step === 4 && <VerifiedBadge size="md" />}
+								</div>
+								<p className="mt-2 max-w-lg text-base leading-relaxed text-slate-600">
+									{meta.description}
+								</p>
+							</header>
 
-									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-										<div>
-											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-												Full Name *
-											</label>
-											<div className="relative">
-												<User
-													size={16}
-													className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-												/>
+							{errorMsg && (
+								<div
+									ref={errorRef}
+									role="alert"
+									className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+								>
+									<CircleAlert
+										size={18}
+										className="mt-0.5 shrink-0 text-red-600"
+										aria-hidden="true"
+									/>
+									<span>{errorMsg}</span>
+								</div>
+							)}
+
+							<motion.div
+								key={step}
+								initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+								animate={{ opacity: 1, y: 0 }}
+								transition={{ duration: 0.25 }}
+								className="space-y-6"
+							>
+								{/* ---- Step 1 ---- */}
+								{step === 1 && (
+									<>
+										<div className="grid gap-5 sm:grid-cols-2">
+											<Field id="name" label="Full name">
 												<input
+													id="name"
 													type="text"
 													required
-													placeholder="e.g. Rahul Sharma"
+													autoComplete="name"
+													placeholder="Rahul Sharma"
 													value={formData.name}
 													onChange={(e) =>
 														handleInputChange("name", e.target.value)
 													}
-													className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+													className={inputBase}
 												/>
-											</div>
-										</div>
-
-										<div>
-											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-												Email Address *
-											</label>
-											<div className="relative">
-												<Mail
-													size={16}
-													className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-												/>
+											</Field>
+											<Field id="email" label="Email address">
 												<input
+													id="email"
 													type="email"
 													required
+													autoComplete="email"
 													placeholder="rahul@example.com"
 													value={formData.email}
 													onChange={(e) =>
 														handleInputChange("email", e.target.value)
 													}
-													className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+													className={inputBase}
 												/>
-											</div>
+											</Field>
 										</div>
-									</div>
 
-									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-										<div>
-											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-												Indian Mobile Phone *
-											</label>
-											<div className="relative">
-												<Phone
-													size={16}
-													className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-												/>
+										<div className="grid gap-5 sm:grid-cols-2">
+											<Field
+												id="phone"
+												label="Mobile number"
+												hint="Start with +91, then your 10-digit number"
+											>
 												<input
+													id="phone"
 													type="tel"
+													inputMode="tel"
 													required
+													autoComplete="tel"
 													placeholder="+91 9876543210"
+													aria-describedby="phone-hint"
 													value={formData.phone}
 													onChange={(e) =>
 														handleInputChange("phone", e.target.value)
 													}
-													className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+													className={inputBase}
 												/>
-											</div>
-											<span className="text-[10px] text-slate-500 mt-1 block">
-												+91 followed by 10 digits
-											</span>
-										</div>
-
-										<div>
-											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-												Account Password *
-											</label>
-											<div className="relative">
-												<Lock
-													size={16}
-													className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-												/>
-												<input
-													type="password"
-													required
-													placeholder="At least 6 characters"
+											</Field>
+											<Field
+												id="password"
+												label="Password"
+												hint="Use at least 6 characters"
+											>
+												<PasswordInput
+													id="password"
+													describedBy="password-hint"
 													value={formData.password}
 													onChange={(e) =>
 														handleInputChange("password", e.target.value)
 													}
-													className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
 												/>
-											</div>
+											</Field>
 										</div>
-									</div>
 
-									<div>
-										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-											Service City / Region
-										</label>
-										<div className="relative">
-											<MapPin
-												size={16}
-												className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-											/>
+										<Field id="location" label="City or region" optional>
 											<input
+												id="location"
 												type="text"
-												placeholder="e.g. Mumbai, Maharashtra"
+												autoComplete="address-level2"
+												placeholder="Mumbai, Maharashtra"
 												value={formData.location}
 												onChange={(e) =>
 													handleInputChange("location", e.target.value)
 												}
-												className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+												className={inputBase}
+											/>
+										</Field>
+
+										<Field
+											id="bio"
+											label="About you and your experience"
+											optional
+										>
+											<textarea
+												id="bio"
+												rows={4}
+												maxLength={500}
+												placeholder="Licensed electrician with 6+ years of residential repair experience…"
+												value={formData.bio}
+												onChange={(e) =>
+													handleInputChange("bio", e.target.value)
+												}
+												className={`${inputBase} resize-none`}
+											/>
+											<p className="mt-1.5 text-right text-xs text-slate-500">
+												{formData.bio.length}/500
+											</p>
+										</Field>
+									</>
+								)}
+
+								{/* ---- Step 2 ---- */}
+								{step === 2 && (
+									<>
+										<div>
+											<p
+												id="service-label"
+												className="mb-2 text-sm font-medium"
+											>
+												Primary service
+											</p>
+											<div
+												role="radiogroup"
+												aria-labelledby="service-label"
+												className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+											>
+												{servicesList.map((s) => (
+													<OptionCard
+														key={s.slug}
+														selected={formData.service === s.slug}
+														onClick={() => handleInputChange("service", s.slug)}
+													>
+														<span className="block text-2xl" aria-hidden="true">
+															{s.icon || "🛠️"}
+														</span>
+														<span className="mt-3 block text-sm font-semibold leading-snug">
+															{s.name}
+														</span>
+														<span className="mt-0.5 block text-xs text-slate-500">
+															{s.category}
+														</span>
+													</OptionCard>
+												))}
+											</div>
+										</div>
+
+										<div className="grid gap-5 sm:grid-cols-2">
+											<Field
+												id="price"
+												label="Starting rate"
+												hint={
+													priceNumber > 0
+														? `Clients will see ₹${priceNumber.toLocaleString("en-IN")} ${formData.price_unit === "hourly" ? "per hour" : "per task"}`
+														: undefined
+												}
+											>
+												<div className="relative">
+													<span
+														aria-hidden="true"
+														className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
+													>
+														₹
+													</span>
+													<input
+														id="price"
+														type="number"
+														inputMode="numeric"
+														min="0"
+														required
+														aria-describedby="price-hint"
+														value={formData.price}
+														onChange={(e) =>
+															handleInputChange("price", e.target.value)
+														}
+														className={`${inputBase} pl-9`}
+													/>
+												</div>
+											</Field>
+
+											<div>
+												<p
+													id="unit-label"
+													className="mb-1.5 text-sm font-medium"
+												>
+													Charge
+												</p>
+												<div
+													role="radiogroup"
+													aria-labelledby="unit-label"
+													className="grid grid-cols-2 rounded-xl bg-slate-100 p-1"
+												>
+													{[
+														{ id: "fixed", label: "Per task" },
+														{ id: "hourly", label: "Per hour" },
+													].map((u) => {
+														const selected = formData.price_unit === u.id;
+														return (
+															<button
+																key={u.id}
+																type="button"
+																role="radio"
+																aria-checked={selected}
+																onClick={() =>
+																	handleInputChange("price_unit", u.id)
+																}
+																className={`rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${focusRing} ${
+																	selected
+																		? "bg-white text-[#1E1240] shadow-sm"
+																		: "text-slate-600 hover:text-[#1E1240]"
+																}`}
+															>
+																{u.label}
+															</button>
+														);
+													})}
+												</div>
+											</div>
+										</div>
+									</>
+								)}
+
+								{/* ---- Step 3 ---- */}
+								{step === 3 && (
+									<>
+										<div className="flex flex-wrap items-center gap-2">
+											<span className="mr-1 text-sm text-slate-600">
+												Quick set:
+											</span>
+											{[
+												{ label: "Mon to Fri", days: [1, 2, 3, 4, 5] },
+												{ label: "Mon to Sat", days: [1, 2, 3, 4, 5, 6] },
+												{ label: "Every day", days: [1, 2, 3, 4, 5, 6, 0] },
+											].map((p) => (
+												<button
+													key={p.label}
+													type="button"
+													onClick={() => applyDayPreset(p.days)}
+													className={`rounded-full border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:border-[#5B2EE0] hover:text-[#5B2EE0] ${focusRing}`}
+												>
+													{p.label}
+												</button>
+											))}
+										</div>
+
+										<ul className="divide-y divide-slate-200 rounded-2xl border border-slate-300">
+											{DAYS.map((d) => {
+												const rule = formData.availability.find(
+													(a) => a.day === d.id,
+												);
+												const isOn = Boolean(rule);
+												return (
+													<li
+														key={d.id}
+														className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3.5"
+													>
+														<label className="flex cursor-pointer items-center gap-3">
+															<span className="relative inline-flex">
+																<input
+																	type="checkbox"
+																	role="switch"
+																	checked={isOn}
+																	onChange={() => toggleDayAvailability(d.id)}
+																	className="peer sr-only"
+																/>
+																<span className="h-6 w-11 rounded-full bg-slate-300 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-[#5B2EE0] peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-[#5B2EE0] peer-focus-visible:ring-offset-2" />
+															</span>
+															<span
+																className={`text-base font-medium ${isOn ? "" : "text-slate-500"}`}
+															>
+																{d.full}
+															</span>
+														</label>
+
+														{isOn ? (
+															<div className="flex items-center gap-2">
+																<input
+																	type="time"
+																	aria-label={`${d.full} start time`}
+																	value={rule.start}
+																	onChange={(e) =>
+																		handleTimeChange(
+																			d.id,
+																			"start",
+																			e.target.value,
+																		)
+																	}
+																	className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-base focus:border-[#5B2EE0] focus:outline-none focus:ring-2 focus:ring-[#5B2EE0]/20"
+																/>
+																<span className="text-sm text-slate-500">
+																	to
+																</span>
+																<input
+																	type="time"
+																	aria-label={`${d.full} end time`}
+																	value={rule.end}
+																	onChange={(e) =>
+																		handleTimeChange(
+																			d.id,
+																			"end",
+																			e.target.value,
+																		)
+																	}
+																	className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-base focus:border-[#5B2EE0] focus:outline-none focus:ring-2 focus:ring-[#5B2EE0]/20"
+																/>
+															</div>
+														) : (
+															<span className="text-sm text-slate-500">
+																Day off
+															</span>
+														)}
+													</li>
+												);
+											})}
+										</ul>
+									</>
+								)}
+
+								{/* ---- Step 4 ---- */}
+								{step === 4 && (
+									<>
+										<div className="flex items-start gap-3 rounded-2xl bg-[#F6F4FB] p-4">
+											<ShieldCheck
+												size={22}
+												strokeWidth={1.75}
+												className="mt-0.5 shrink-0 text-[#5B2EE0]"
+												aria-hidden="true"
+											/>
+											<p className="text-sm leading-relaxed text-slate-700">
+												Our security team checks every provider to keep
+												homeowners safe. Verified pros enjoy{" "}
+												<strong className="font-semibold">
+													3.8x higher booking conversion
+												</strong>{" "}
+												and priority dispatch.
+											</p>
+										</div>
+
+										<div>
+											<p id="doc-label" className="mb-2 text-sm font-medium">
+												Identification document
+											</p>
+											<div
+												role="radiogroup"
+												aria-labelledby="doc-label"
+												className="grid gap-3 sm:grid-cols-3"
+											>
+												{KYC_DOCS.map((doc) => {
+													const Icon = doc.icon;
+													return (
+														<OptionCard
+															key={doc.id}
+															selected={formData.kyc_doc_type === doc.id}
+															onClick={() =>
+																handleInputChange("kyc_doc_type", doc.id)
+															}
+														>
+															<Icon
+																size={24}
+																strokeWidth={1.5}
+																className="text-[#5B2EE0]"
+																aria-hidden="true"
+															/>
+															<span className="mt-3 block text-sm font-semibold">
+																{doc.label}
+															</span>
+															<span className="mt-0.5 block text-xs text-slate-500">
+																{doc.sub}
+															</span>
+														</OptionCard>
+													);
+												})}
+											</div>
+										</div>
+
+										<Field id="kyc_doc_number" label={selectedDoc.numberLabel}>
+											<input
+												id="kyc_doc_number"
+												type="text"
+												autoComplete="off"
+												value={formData.kyc_doc_number}
+												onChange={(e) =>
+													handleInputChange("kyc_doc_number", e.target.value)
+												}
+												placeholder={selectedDoc.placeholder}
+												className={`${inputBase} font-mono tracking-wide`}
+											/>
+										</Field>
+
+										<div className="grid gap-5 sm:grid-cols-2">
+											<UploadSlot
+												id="kyc-front"
+												label="Front of document"
+												url={formData.kyc_doc_front}
+												uploading={uploadingDoc.front}
+												onSelect={(file) => handleFileUpload("front", file)}
+												onRemove={() => handleInputChange("kyc_doc_front", "")}
+											/>
+											<UploadSlot
+												id="kyc-back"
+												label="Back of document"
+												optional
+												url={formData.kyc_doc_back}
+												uploading={uploadingDoc.back}
+												onSelect={(file) => handleFileUpload("back", file)}
+												onRemove={() => handleInputChange("kyc_doc_back", "")}
 											/>
 										</div>
-									</div>
 
-									<div>
-										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-											Short Bio & Experience
-										</label>
-										<textarea
-											rows={3}
-											maxLength={500}
-											placeholder="Licensed electrician with 6+ years of residential repair experience..."
-											value={formData.bio}
-											onChange={(e) => handleInputChange("bio", e.target.value)}
-											className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 resize-none"
-										/>
-									</div>
-								</motion.div>
-							)}
-
-							{step === 2 && (
-								<motion.div
-									initial={{ opacity: 0, x: -10 }}
-									animate={{ opacity: 1, x: 0 }}
-									className="space-y-5"
-								>
-									<div className="border-b border-slate-100 pb-3">
-										<h3 className="text-lg font-bold text-[#281950]">
-											Step 2: Primary Service & Base Rate
-										</h3>
-										<p className="text-xs text-slate-500">
-											Select your main field of expertise and set your starting
-											rate.
-										</p>
-									</div>
-
-									<div>
-										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
-											Select Primary Service *
-										</label>
-										<div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-											{servicesList.map((s) => (
-												<button
-													key={s.slug}
-													type="button"
-													onClick={() => handleInputChange("service", s.slug)}
-													className={`p-3.5 rounded-2xl border text-left flex flex-col gap-1.5 transition-all cursor-pointer ${
-														formData.service === s.slug
-															? "bg-violet-50 border-violet-500 text-violet-950 font-bold shadow-sm ring-1 ring-violet-500"
-															: "bg-white border-slate-200 text-slate-700 hover:border-violet-300"
-													}`}
-												>
-													<span className="text-2xl">{s.icon || "🛠️"}</span>
-													<span className="text-xs font-bold">{s.name}</span>
-													<span className="text-[10px] text-slate-500">
-														{s.category}
-													</span>
-												</button>
-											))}
-										</div>
-									</div>
-
-									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-										<div>
-											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-												Base Service Price (₹) *
-											</label>
-											<div className="relative">
-												<DollarSign
-													size={16}
-													className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-												/>
-												<input
-													type="number"
-													min="0"
-													required
-													value={formData.price}
-													onChange={(e) =>
-														handleInputChange("price", e.target.value)
-													}
-													className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500"
-												/>
-											</div>
-										</div>
-
-										<div>
-											<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-												Pricing Unit
-											</label>
-											<select
-												value={formData.price_unit}
+										<div className="flex items-start gap-3 rounded-2xl border border-slate-300 p-4">
+											<input
+												type="checkbox"
+												id="kyc_declaration"
+												checked={formData.kyc_declaration}
 												onChange={(e) =>
-													handleInputChange("price_unit", e.target.value)
+													handleInputChange("kyc_declaration", e.target.checked)
 												}
-												className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500"
+												className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded accent-[#5B2EE0]"
+											/>
+											<label
+												htmlFor="kyc_declaration"
+												className="cursor-pointer text-sm leading-relaxed text-slate-700"
 											>
-												<option value="fixed">Fixed Price per Task</option>
-												<option value="hourly">Hourly Rate (₹ / hr)</option>
-											</select>
+												I confirm that these details and documents are mine and
+												authentic. I consent to TaskGenie verifying them with
+												authorized databases to issue my{" "}
+												<strong className="font-semibold">Verified Pro</strong>{" "}
+												badge.
+											</label>
 										</div>
-									</div>
-								</motion.div>
-							)}
+									</>
+								)}
+							</motion.div>
 
-							{step === 3 && (
-								<motion.div
-									initial={{ opacity: 0, x: -10 }}
-									animate={{ opacity: 1, x: 0 }}
-									className="space-y-5"
-								>
-									<div className="border-b border-slate-100 pb-3">
-										<h3 className="text-lg font-bold text-[#281950]">
-											Step 3: Weekly Availability Schedule
-										</h3>
-										<p className="text-xs text-slate-500">
-											Configure your standard working days and active time
-											slots.
-										</p>
-									</div>
-
-									<div className="space-y-3">
-										{DAYS.map((d) => {
-											const activeRule = formData.availability.find(
-												(a) => a.day === d.id,
-											);
-											const isSelected = Boolean(activeRule);
-
-											return (
-												<div
-													key={d.id}
-													className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
-														isSelected
-															? "bg-violet-50/70 border-violet-200"
-															: "bg-slate-50 border-slate-200 opacity-60"
-													}`}
-												>
-													<div className="flex items-center gap-3">
-														<input
-															type="checkbox"
-															checked={isSelected}
-															onChange={() => toggleDayAvailability(d.id)}
-															className="w-4 h-4 accent-violet-600 rounded cursor-pointer"
-														/>
-														<span className="text-sm font-bold text-[#281950] w-12">
-															{d.name}
-														</span>
-													</div>
-
-													{isSelected ? (
-														<div className="flex items-center gap-2 text-xs">
-															<input
-																type="time"
-																value={activeRule.start}
-																onChange={(e) =>
-																	handleTimeChange(
-																		d.id,
-																		"start",
-																		e.target.value,
-																	)
-																}
-																className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-none focus:border-violet-500"
-															/>
-															<span className="text-slate-400">to</span>
-															<input
-																type="time"
-																value={activeRule.end}
-																onChange={(e) =>
-																	handleTimeChange(d.id, "end", e.target.value)
-																}
-																className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-none focus:border-violet-500"
-															/>
-														</div>
-													) : (
-														<span className="text-xs text-slate-400 italic">
-															Off Day
-														</span>
-													)}
-												</div>
-											);
-										})}
-									</div>
-								</motion.div>
-							)}
-
-							{step === 4 && (
-								<motion.div
-									initial={{ opacity: 0, x: -10 }}
-									animate={{ opacity: 1, x: 0 }}
-									className="space-y-6"
-								>
-									<div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-										<div>
-											<h3 className="text-lg font-bold text-[#281950] flex items-center gap-2">
-												<span>
-													Step 4: Identity &amp; Background Verification
-												</span>
-											</h3>
-											<p className="text-xs text-slate-500 mt-0.5">
-												Upload government-approved documentation to earn your
-												gold Verified Pro trust badge.
-											</p>
-										</div>
-										<VerifiedBadge size="md" />
-									</div>
-
-									{/* Trust & Safety Banner */}
-									<div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-yellow-500/10 border border-amber-400/30 flex items-start gap-3.5 text-slate-700">
-										<div className="p-2.5 bg-amber-500/15 rounded-xl text-amber-600 dark:text-amber-400 shrink-0">
-											<ShieldCheck size={22} className="stroke-[2.2]" />
-										</div>
-										<div className="space-y-1">
-											<div className="text-xs font-bold text-[#281950] flex items-center gap-2">
-												<span>TaskGenie Trust &amp; Safety Standard</span>
-												<span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-200/80 text-amber-950 font-bold">
-													Fraud Prevention
-												</span>
-											</div>
-											<p className="text-xs text-slate-600 leading-relaxed">
-												To protect homeowners from unauthorized personnel, every
-												provider is checked by our administrative security team.
-												Verified pros enjoy{" "}
-												<strong>3.8x higher booking conversion</strong> and
-												priority dispatch.
-											</p>
-										</div>
-									</div>
-
-									{/* Document Type Selector */}
-									<div className="space-y-2">
-										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-											Select Identification Document *
-										</label>
-										<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-											{[
-												{
-													id: "aadhaar",
-													label: "Aadhaar Card",
-													sub: "UIDAI 12-Digit ID",
-													icon: "🇮🇳",
-												},
-												{
-													id: "driving_license",
-													label: "Driving License",
-													sub: "State Transport Dept",
-													icon: "🪪",
-												},
-												{
-													id: "certificate",
-													label: "Trade Certificate",
-													sub: "Certified Professional",
-													icon: "📜",
-												},
-											].map((doc) => (
-												<button
-													key={doc.id}
-													type="button"
-													onClick={() =>
-														handleInputChange("kyc_doc_type", doc.id)
-													}
-													className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-														formData.kyc_doc_type === doc.id
-															? "bg-violet-50/80 border-violet-500 shadow-sm ring-1 ring-violet-400/50"
-															: "bg-slate-50/50 border-slate-200 hover:bg-slate-100/70"
-													}`}
-												>
-													<div className="text-xl mb-1.5">{doc.icon}</div>
-													<div className="text-xs font-bold text-[#281950]">
-														{doc.label}
-													</div>
-													<div className="text-[10px] text-slate-500">
-														{doc.sub}
-													</div>
-												</button>
-											))}
-										</div>
-									</div>
-
-									{/* Document Number Input */}
-									<div>
-										<label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-											{formData.kyc_doc_type === "aadhaar"
-												? "Aadhaar Number (12 Digits) *"
-												: formData.kyc_doc_type === "driving_license"
-													? "Driving License Number *"
-													: "Trade Certificate / Registration ID *"}
-										</label>
-										<input
-											type="text"
-											value={formData.kyc_doc_number}
-											onChange={(e) =>
-												handleInputChange("kyc_doc_number", e.target.value)
-											}
-											placeholder={
-												formData.kyc_doc_type === "aadhaar"
-													? "e.g. 5482 1920 4412"
-													: formData.kyc_doc_type === "driving_license"
-														? "e.g. MH-02-2018-0091242"
-														: "e.g. CERT-PLUMB-90211"
-											}
-											className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-500 font-mono tracking-wide"
-										/>
-									</div>
-
-									{/* Document Image Uploads: Front & Back */}
-									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-										{/* Front Document */}
-										<div className="space-y-2">
-											<div className="flex items-center justify-between">
-												<label className="text-xs font-bold text-slate-700">
-													Document Front Photo *
-												</label>
-												{formData.kyc_doc_front && (
-													<span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
-														<FileCheck size={13} /> Attached
-													</span>
-												)}
-											</div>
-											{formData.kyc_doc_front ? (
-												<div className="relative rounded-2xl border border-violet-200 overflow-hidden bg-slate-100 group aspect-[4/3] flex items-center justify-center shadow-inner">
-													<img
-														src={formData.kyc_doc_front}
-														alt="Document Front Preview"
-														className="w-full h-full object-cover"
-													/>
-													<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-														<button
-															type="button"
-															onClick={() =>
-																handleInputChange("kyc_doc_front", "")
-															}
-															className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition cursor-pointer shadow-md"
-														>
-															Remove Photo
-														</button>
-													</div>
-												</div>
-											) : (
-												<label
-													className={`border-2 border-dashed rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition aspect-[4/3] ${
-														uploadingDoc.front
-															? "border-violet-400 bg-violet-50/50"
-															: "border-slate-200 hover:border-violet-400 hover:bg-slate-50"
-													}`}
-												>
-													<input
-														type="file"
-														accept="image/*,.pdf"
-														className="hidden"
-														disabled={uploadingDoc.front}
-														onChange={(e) =>
-															handleFileUpload("front", e.target.files[0])
-														}
-													/>
-													{uploadingDoc.front ? (
-														<div className="flex flex-col items-center gap-3 text-violet-600">
-															<FadeLoader color="#8b5cf6" height={8} width={2.5} radius={1} margin={-2} />
-															<span className="text-xs font-semibold mt-1">
-																Uploading Document...
-															</span>
-														</div>
-													) : (
-														<div className="flex flex-col items-center gap-2 text-slate-500">
-															<div className="w-10 h-10 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center">
-																<UploadCloud size={20} />
-															</div>
-															<div className="text-xs font-bold text-slate-700">
-																Upload Front Side
-															</div>
-															<div className="text-[10px] text-slate-400">
-																PNG, JPG, or PDF (Max 10MB)
-															</div>
-														</div>
-													)}
-												</label>
-											)}
-										</div>
-
-										{/* Back Document */}
-										<div className="space-y-2">
-											<div className="flex items-center justify-between">
-												<label className="text-xs font-bold text-slate-700">
-													Document Back Photo (Optional)
-												</label>
-												{formData.kyc_doc_back && (
-													<span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
-														<FileCheck size={13} /> Attached
-													</span>
-												)}
-											</div>
-											{formData.kyc_doc_back ? (
-												<div className="relative rounded-2xl border border-violet-200 overflow-hidden bg-slate-100 group aspect-[4/3] flex items-center justify-center shadow-inner">
-													<img
-														src={formData.kyc_doc_back}
-														alt="Document Back Preview"
-														className="w-full h-full object-cover"
-													/>
-													<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-														<button
-															type="button"
-															onClick={() =>
-																handleInputChange("kyc_doc_back", "")
-															}
-															className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition cursor-pointer shadow-md"
-														>
-															Remove Photo
-														</button>
-													</div>
-												</div>
-											) : (
-												<label
-													className={`border-2 border-dashed rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition aspect-[4/3] ${
-														uploadingDoc.back
-															? "border-violet-400 bg-violet-50/50"
-															: "border-slate-200 hover:border-violet-400 hover:bg-slate-50"
-													}`}
-												>
-													<input
-														type="file"
-														accept="image/*,.pdf"
-														className="hidden"
-														disabled={uploadingDoc.back}
-														onChange={(e) =>
-															handleFileUpload("back", e.target.files[0])
-														}
-													/>
-													{uploadingDoc.back ? (
-														<div className="flex flex-col items-center gap-3 text-violet-600">
-															<FadeLoader color="#8b5cf6" height={8} width={2.5} radius={1} margin={-2} />
-															<span className="text-xs font-semibold mt-1">
-																Uploading Document...
-															</span>
-														</div>
-													) : (
-														<div className="flex flex-col items-center gap-2 text-slate-500">
-															<div className="w-10 h-10 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center">
-																<UploadCloud size={20} />
-															</div>
-															<div className="text-xs font-bold text-slate-700">
-																Upload Back Side
-															</div>
-															<div className="text-[10px] text-slate-400">
-																PNG, JPG, or PDF (Max 10MB)
-															</div>
-														</div>
-													)}
-												</label>
-											)}
-										</div>
-									</div>
-
-									{/* Consent Checkbox */}
-									<div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3">
-										<input
-											type="checkbox"
-											id="kyc_declaration"
-											checked={formData.kyc_declaration}
-											onChange={(e) =>
-												handleInputChange("kyc_declaration", e.target.checked)
-											}
-											className="w-4 h-4 accent-violet-600 rounded cursor-pointer mt-0.5"
-										/>
-										<label
-											htmlFor="kyc_declaration"
-											className="text-xs text-slate-600 cursor-pointer select-none leading-relaxed"
-										>
-											I declare that the identification details and documents
-											provided belong to me and are authentic. I give consent to
-											TaskGenie to verify these documents with authorized
-											databases to issue my <strong>Verified Pro</strong> badge.
-										</label>
-									</div>
-								</motion.div>
-							)}
-
-							<div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+							{/* ---- Navigation ---- */}
+							<div className="mt-10 flex items-center justify-between gap-4 border-t border-slate-200 pt-6">
 								{step > 1 ? (
 									<button
 										type="button"
-										onClick={() => setStep((s) => s - 1)}
-										className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+										onClick={() => goToStep(step - 1)}
+										className={`inline-flex items-center gap-1 rounded-full px-4 py-3 text-base font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#1E1240] ${focusRing}`}
 									>
-										<ChevronLeft size={16} /> Previous
+										<ChevronLeft size={18} aria-hidden="true" /> Back
 									</button>
 								) : (
-									<div />
+									<span />
 								)}
 
-								{step < 4 ? (
+								{step < STEPS.length ? (
 									<button
 										type="button"
 										onClick={handleNextStep}
-										className="flex items-center gap-1.5 px-7 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 shadow-md shadow-purple-500/20 transition-all cursor-pointer"
+										className={primaryBtn}
 									>
-										Next Step <ChevronRight size={16} />
+										Continue <ChevronRight size={18} aria-hidden="true" />
 									</button>
 								) : (
 									<button
 										type="submit"
-										disabled={
-											loading || uploadingDoc.front || uploadingDoc.back
-										}
-										className="flex items-center gap-2 px-8 py-3 rounded-full font-bold text-sm text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 shadow-lg shadow-purple-500/25 disabled:opacity-50 transition-all cursor-pointer"
+										disabled={loading || isUploading}
+										className={primaryBtn}
 									>
-										{loading ? (
-											<span className="inline-flex items-center justify-center w-5 h-5 scale-[0.4] origin-center -mx-1">
-												<FadeLoader color="#ffffff" />
-											</span>
-										) : (
-											<Sparkles size={16} />
+										{loading && (
+											<Loader2
+												size={18}
+												className="animate-spin"
+												aria-hidden="true"
+											/>
 										)}
-										<span>Submit Application &amp; KYC</span>
+										{loading ? "Submitting…" : "Submit application"}
 									</button>
 								)}
 							</div>
 						</form>
 					)}
-				</div>
+				</main>
 			</div>
 		</div>
 	);

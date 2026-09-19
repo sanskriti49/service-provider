@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, KeyRound, AlertCircle, X, CheckCircle2 } from "lucide-react";
 import { FadeLoader } from "react-spinners";
+import useModal from "../../hooks/useModal";
 
 export default function CompletionOtpModal({
 	isOpen,
@@ -14,6 +15,13 @@ export default function CompletionOtpModal({
 	const [otpDigits, setOtpDigits] = useState(["", "", "", ""]);
 	const [error, setError] = useState("");
 	const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+
+	useModal({
+		isOpen: Boolean(isOpen && booking),
+		onClose: loading ? null : onClose,
+		id: "completion-otp-modal",
+		lockScroll: true,
+	});
 
 	useEffect(() => {
 		if (isOpen) {

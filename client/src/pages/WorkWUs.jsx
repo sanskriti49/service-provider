@@ -1,197 +1,183 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
 	CalendarSync,
 	CheckCircle,
 	HandCoins,
 	Users,
-	ArrowRight,
-	Sparkles,
-	ShieldCheck,
 	TrendingUp,
 } from "lucide-react";
+
+/*
+ * Design tokens (Tailwind arbitrary values, so no config changes needed)
+ *  ink     #1E1240  deep aubergine: headings, dark panel
+ *  brand   #5B2EE0  primary actions
+ *  lilac   #CDBBFF  icons on dark
+ *  mist    #EFEAFB  image stage
+ *  body    text-slate-600 on light, text-white/70 on dark
+ */
 
 const BENEFITS = [
 	{
 		icon: CalendarSync,
-		title: "Flexible Work",
-		subtitle: "Choose your own schedule",
+		title: "Work when you want",
 		description:
-			"Work full-time or pick up extra gigs whenever you choose. Total control over your hours.",
-		badge: "100% Flexible",
-		iconBg: "bg-violet-100 text-violet-600 border-violet-200/80",
-		badgeBg: "bg-violet-100/80 text-violet-700 border-violet-200",
+			"Go full-time or pick up extra jobs around your day. You choose your hours and which jobs to accept.",
 	},
 	{
 		icon: TrendingUp,
-		title: "Grow Your Skills",
-		subtitle: "Access new clients daily",
+		title: "Grow your reputation",
 		description:
-			"Expand your client base, receive verified reviews, and scale your personal reputation.",
-		badge: "Career Growth",
-		iconBg: "bg-pink-100 text-pink-600 border-pink-200/80",
-		badgeBg: "bg-pink-100/80 text-pink-700 border-pink-200",
+			"Meet new clients every day, collect verified reviews, and build a profile that brings repeat work.",
 	},
 	{
 		icon: HandCoins,
-		title: "Reliable Payments",
-		subtitle: "Secure & on-time payouts",
+		title: "Get paid on time",
 		description:
-			"Enjoy total price transparency with automated, direct payments right after job completion.",
-		badge: "Guaranteed Payouts",
-		iconBg: "bg-emerald-100 text-emerald-600 border-emerald-200/80",
-		badgeBg: "bg-emerald-100/80 text-emerald-700 border-emerald-200",
+			"Prices are clear up front, and your payout is sent directly once the job is complete.",
 	},
 	{
 		icon: Users,
-		title: "Trusted Network",
-		subtitle: "Join verified professionals",
+		title: "Join a trusted network",
 		description:
-			"Be part of a premium network backed by dedicated 24/7 support and safety protocols.",
-		badge: "Verified Community",
-		iconBg: "bg-indigo-100 text-indigo-600 border-indigo-200/80",
-		badgeBg: "bg-indigo-100/80 text-indigo-700 border-indigo-200",
+			"Work alongside verified professionals, with 24/7 support and safety protocols behind you.",
 	},
 ];
 
-const WorkWUs = () => {
-	return (
-		<section className="bricolage-grotesque max-w-6xl mx-auto px-4 py-10 relative overflow-hidden text-slate-800">
-			<div className="flex flex-col lg:flex-row items-center justify-between gap-10 py-6 text-center lg:text-left">
-				<div className="flex-1 space-y-4">
-					<div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-violet-100/80 border border-violet-200 text-violet-700 text-xs font-bold uppercase tracking-wider">
-						<Sparkles size={13} className="text-pink-600" /> Grow Your Career
-						With Us
-					</div>
+const focusRing =
+	"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
-					<h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#281950] tracking-tight leading-[1.15]">
-						Join our family of service experts and{" "}
-						<span className="bg-gradient-to-r from-violet-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">
-							turn your talent into income.
-						</span>
+const WorkWUs = () => {
+	const [imgFailed, setImgFailed] = useState(false);
+
+	return (
+		<section
+			aria-labelledby="work-with-us-heading"
+			className="bricolage-grotesque mx-auto max-w-6xl px-4 py-12 text-[#1E1240] sm:px-6 sm:py-16 lg:py-20"
+		>
+			{/* Hero */}
+			<div className="grid items-center gap-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
+				<div>
+					<h2
+						id="work-with-us-heading"
+						className="text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.5rem]"
+					>
+						Join TaskGenie's service experts and turn your talent into income.
 					</h2>
 
-					<p className="text-base sm:text-lg text-slate-700 leading-relaxed max-w-2xl">
-						At{" "}
-						<strong className="text-violet-600 font-semibold">TaskGenie</strong>
-						, we believe great talent deserves great opportunities. Whether
-						you’re just starting out or looking to expand your career, our
-						platform connects you with clients who value your skills. Work on
-						your own terms, build your reputation, and enjoy the security of
-						reliable payments — all in one place.
+					<p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-600">
+						Whether you're just starting out or growing an established business,
+						we connect you with clients who value your skills. Set your own
+						hours, build your reputation, and get paid on time.
 					</p>
+
+					<div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-4">
+						<Link
+							to="/apply-now"
+							className={`inline-flex items-center justify-center rounded-full bg-[#5B2EE0] px-7 py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#4A22C4] focus-visible:ring-[#5B2EE0] focus-visible:ring-offset-white ${focusRing}`}
+						>
+							Apply now
+						</Link>
+						<a
+							href="#why-work-with-us"
+							className={`rounded-sm text-base font-semibold underline decoration-[#5B2EE0]/40 underline-offset-4 transition-colors hover:decoration-[#5B2EE0] focus-visible:ring-[#5B2EE0] ${focusRing}`}
+						>
+							See why experts join
+						</a>
+					</div>
+
+					<ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
+						{["Fast registration", "Zero upfront fees"].map((text) => (
+							<li key={text} className="flex items-center gap-2">
+								<CheckCircle
+									size={16}
+									strokeWidth={2}
+									className="text-[#5B2EE0]"
+									aria-hidden="true"
+								/>
+								{text}
+							</li>
+						))}
+					</ul>
 				</div>
 
-				<div className="relative group shrink-0">
-					<div className="absolute inset-0 bg-gradient-to-tr from-violet-400/20 to-pink-400/20 rounded-3xl blur-2xl opacity-60 group-hover:opacity-90 transition-opacity duration-500" />
-
-					<div className="relative p-4 sm:p-6 rounded-3xl bg-white/80 border border-violet-100/80 backdrop-blur-xl shadow-xl shadow-violet-900/5 flex flex-col items-center">
-						<img
-							src="/images/globe.webp"
-							loading="lazy"
-							decoding="async"
-							alt="Work with us illustration"
-							className="w-56 sm:w-64 lg:w-72 h-auto object-contain transition-transform duration-500 group-hover:scale-105"
-							onError={(e) => {
-								e.target.style.display = "none";
-								e.target.nextSibling.style.display = "flex";
-							}}
-						/>
-						<div className="hidden w-60 h-60 rounded-2xl bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50 border border-violet-200 flex-col items-center justify-center text-center p-6 space-y-3">
-							<div className="w-14 h-14 rounded-2xl bg-violet-100 border border-violet-200 flex items-center justify-center">
-								<Users size={28} className="text-violet-600" />
+				{/* Image stage */}
+				<div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-[2rem] bg-[#EFEAFB] lg:max-w-none">
+					{imgFailed ? (
+						<div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+							<div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#5B2EE0]">
+								<Users size={26} aria-hidden="true" />
 							</div>
-							<span className="text-sm font-bold text-[#281950]">
-								10,000+ Active Experts
-							</span>
-							<span className="text-xs text-slate-600">
-								Connecting top local pros with clients daily
-							</span>
+							<p className="text-lg font-semibold">10,000+ active experts</p>
+							<p className="max-w-[16rem] text-sm text-slate-600">
+								Connecting local professionals with clients every day
+							</p>
 						</div>
-					</div>
-				</div>
-			</div>
-
-			<div className="my-10 flex items-center justify-center gap-3">
-				<div className="h-[1px] w-24 bg-gradient-to-r from-transparent to-violet-300" />
-				<div className="h-1.5 w-14 rounded-full bg-gradient-to-r from-violet-500 via-purple-400 to-pink-500 shadow-sm shadow-purple-500/20" />
-				<div className="h-[1px] w-24 bg-gradient-to-l from-transparent to-pink-300" />
-			</div>
-
-			<div className="relative rounded-3xl p-6 sm:p-10 border border-violet-200/60 bg-gradient-to-br from-pink-100/80 via-violet-100/70 to-indigo-100/80 backdrop-blur-md shadow-xl shadow-purple-900/5">
-				<div className="text-center max-w-xl mx-auto mb-10 space-y-2">
-					<h3 className="text-2xl sm:text-3xl font-extrabold text-[#281950] tracking-tight">
-						Why Work With{" "}
-						<span className="bg-gradient-to-r from-violet-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">
-							TaskGenie
-						</span>
-					</h3>
-					<p className="text-xs sm:text-sm text-slate-700 font-medium">
-						Everything you need to build a lucrative, independent service
-						business.
-					</p>
-				</div>
-
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-					{BENEFITS.map((item, index) => {
-						const IconComp = item.icon;
-						return (
+					) : (
+						<>
 							<div
-								key={index}
-								className="group relative p-6 rounded-2xl bg-white/90 border border-violet-100/80 hover:border-violet-300 transition-all duration-300 hover:shadow-xl hover:shadow-purple-900/10 flex items-start gap-4"
-							>
-								<div
-									className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 ${item.iconBg} transition-transform duration-300 group-hover:scale-110 shadow-sm`}
-								>
-									<IconComp size={22} />
-								</div>
-
-								<div className="space-y-1 flex-1 min-w-0">
-									<div className="flex items-center justify-between gap-2">
-										<h4 className="text-base font-bold text-slate-900 group-hover:text-violet-700 transition-colors">
-											{item.title}
-										</h4>
-										<span
-											className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${item.badgeBg}`}
-										>
-											{item.badge}
-										</span>
-									</div>
-									<div className="text-xs font-semibold text-violet-700">
-										{item.subtitle}
-									</div>
-									<p className="text-xs sm:text-sm text-slate-600 leading-relaxed pt-1">
-										{item.description}
-									</p>
-								</div>
+								className="absolute left-1/2 top-1/2 h-[78%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+								aria-hidden="true"
+							/>
+							<img
+								src="/images/globe.webp"
+								alt="Illustration of a globe connecting service professionals"
+								loading="lazy"
+								decoding="async"
+								onError={() => setImgFailed(true)}
+								className="absolute left-1/2 top-1/2 h-auto w-[62%] -translate-x-1/2 -translate-y-1/2 object-contain"
+							/>
+							<div className="absolute bottom-5 left-5 flex items-center gap-2 rounded-full bg-white py-2 pl-3 pr-4 text-sm font-semibold shadow-sm">
+								<Users
+									size={16}
+									className="text-[#5B2EE0]"
+									aria-hidden="true"
+								/>
+								10,000+ active experts
 							</div>
-						);
-					})}
+						</>
+					)}
 				</div>
+			</div>
 
-				<div className="mt-10 pt-8 border-t border-violet-200/80 flex flex-col sm:flex-row items-center justify-between gap-6">
-					<div className="flex flex-wrap items-center justify-center gap-4 text-xs text-slate-700">
-						<span className="flex items-center gap-1.5 text-emerald-700 font-bold">
-							<CheckCircle size={15} className="text-emerald-600" /> Fast
-							Registration
-						</span>
-						<span>•</span>
-						<span className="flex items-center gap-1.5 text-violet-700 font-bold">
-							<ShieldCheck size={15} className="text-violet-600" /> Zero Upfront
-							Fees
-						</span>
+			{/* Benefits */}
+			<div
+				id="why-work-with-us"
+				className="mt-16 scroll-mt-8 rounded-[2rem] bg-[#1E1240] px-6 py-12 text-white sm:px-12 lg:mt-24 lg:px-16 lg:py-16"
+			>
+				<div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
+					<div className="lg:col-span-5">
+						<h3 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+							Everything you need to run your own service business
+						</h3>
+						<p className="mt-4 max-w-sm text-base leading-relaxed text-white/70">
+							We handle clients, payments, and support, so you can focus on
+							doing great work.
+						</p>
+						<Link
+							to="/apply-now"
+							className={`mt-8 inline-flex items-center justify-center rounded-full bg-white px-7 py-3.5 text-base font-semibold text-[#1E1240] transition-colors hover:bg-[#EDE6FF] focus-visible:ring-white focus-visible:ring-offset-[#1E1240] ${focusRing}`}
+						>
+							Apply now
+						</Link>
 					</div>
 
-					<Link
-						to="/apply-now"
-						className="group relative cursor-pointer px-9 py-3.5 rounded-full text-sm font-bold text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 transition-all shadow-lg shadow-purple-500/25 hover:shadow-pink-500/35 hover:scale-105 active:scale-95 flex items-center gap-2"
-					>
-						<span>Apply Now</span>
-						<ArrowRight
-							size={16}
-							className="transition-transform group-hover:translate-x-1"
-						/>
-					</Link>
+					<ul className="grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:col-span-7">
+						{BENEFITS.map(({ icon: Icon, title, description }) => (
+							<li key={title} className="border-t border-white/15 pt-6">
+								<Icon
+									size={26}
+									strokeWidth={1.5}
+									className="text-[#CDBBFF]"
+									aria-hidden="true"
+								/>
+								<h4 className="mt-4 text-lg font-semibold">{title}</h4>
+								<p className="mt-2 text-[15px] leading-relaxed text-white/70">
+									{description}
+								</p>
+							</li>
+						))}
+					</ul>
 				</div>
 			</div>
 		</section>

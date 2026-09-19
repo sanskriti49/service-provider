@@ -34,6 +34,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import ConfirmDialog from "../../ui/ConfirmDialog";
 import Logo from "../../ui/Logo";
 import VerifiedBadge from "../../ui/VerifiedBadge";
+import ScrollToTop from "../../ui/ScrollToTop";
 
 const formatCurrency = (val) =>
 	new Intl.NumberFormat("en-IN", {
@@ -318,6 +319,7 @@ export default function AdminDashboard() {
 
 	return (
 		<div className="min-h-screen bg-[#090514] text-slate-100 antialiased">
+			<ScrollToTop />
 			{/* Top Navbar */}
 			<header className="sticky top-0 z-40 bg-[#0e0822] border-b border-white/[0.08]">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

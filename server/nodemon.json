@@ -1,6 +1,6 @@
 {
-	"watch": ["server", "routes", "controllers", "models", "utils"],
+	"watch": [".", "routes", "controllers", "middleware", "config", "utils"],
 	"ext": "js,json",
-	"ignore": ["client/*", "node_modules/*"],
-	"exec": "node index.js"
+	"ignore": ["node_modules/*", "test/*", "seeds/*"],
+	"legacyWatch": true
 }
