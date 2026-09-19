@@ -42,15 +42,46 @@ const eventQueueJobsTotal = new client.Counter({
 	registers: [register],
 });
 
+// Database Connection Pool Telemetry Gauges
+const dbPoolTotal = new client.Gauge({
+	name: "taskgenie_db_pool_total",
+	help: "Total connections currently open in the PostgreSQL pool",
+	registers: [register],
+});
+
+const dbPoolIdle = new client.Gauge({
+	name: "taskgenie_db_pool_idle",
+	help: "Idle connections available in the PostgreSQL pool",
+	registers: [register],
+});
+
+const dbPoolWaiting = new client.Gauge({
+	name: "taskgenie_db_pool_waiting",
+	help: "Number of clients waiting for a connection in the PostgreSQL pool queue",
+	registers: [register],
+});
+
+// Circuit Breaker State Gauge (0: Closed, 1: Half-Open, 2: Open)
+const circuitBreakerStateGauge = new client.Gauge({
+	name: "taskgenie_circuit_breaker_state",
+	help: "Circuit breaker status (0: Closed/Healthy, 1: Half-Open, 2: Open/Degraded)",
+	labelNames: ["service"],
+	registers: [register],
+});
+
+function updatePoolMetrics(stats = {}) {
+	if (stats.totalCount != null) dbPoolTotal.set(stats.totalCount);
+	if (stats.idleCount != null) dbPoolIdle.set(stats.idleCount);
+	if (stats.waitingCount != null) dbPoolWaiting.set(stats.waitingCount);
+}
+
 // Express Middleware to observe HTTP latency and throughput
 function metricsMiddleware(req, res, next) {
-	// Exclude /metrics and /health probes from bloating application metrics
 	if (req.path === "/metrics" || req.path.startsWith("/health")) {
 		return next();
 	}
 
 	const endTimer = httpRequestDurationSeconds.startTimer();
-	const startTime = process.hrtime();
 
 	res.on("finish", () => {
 		const route = req.route ? req.baseUrl + req.route.path : req.baseUrl || req.path || "unknown";
@@ -78,5 +109,10 @@ module.exports = {
 	httpRequestsTotal,
 	bookingsTotal,
 	eventQueueJobsTotal,
+	dbPoolTotal,
+	dbPoolIdle,
+	dbPoolWaiting,
+	circuitBreakerStateGauge,
+	updatePoolMetrics,
 	metricsMiddleware,
 };

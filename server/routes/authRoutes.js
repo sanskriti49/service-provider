@@ -10,6 +10,7 @@ const sendEmail = require("../utils/sendEmail");
 
 const verifyToken = require("../middleware/verifyToken");
 const verifyTurnstile = require("../middleware/verifyRecaptcha");
+const { authLimiter } = require("../middleware/rateLimiter");
 
 const { formatName } = require("../utils/formatName");
 const { normalizeEmail } = require("../utils/normalizeEmail");
@@ -52,7 +53,62 @@ const getSafeUser = (user) => {
 	};
 };
 
-router.post("/request-email-change", verifyToken, async (req, res) => {
+router.get("/me", verifyToken, async (req, res) => {
+	try {
+		const userId = req.user.id;
+		const userResult = await db.query(
+			`SELECT u.id, u.name, u.email, u.role, u.photo, u.custom_id, u.phone,
+			        u.location, u.lat, u.lng, u.bio, u.created_at,
+			        p.status AS provider_status,
+			        COALESCE(p.is_verified, FALSE) AS is_verified,
+			        p.verification_badge,
+			        COALESCE(p.kyc_status, 'pending') AS kyc_status,
+			        p.kyc_doc_type,
+			        p.kyc_doc_number,
+			        p.kyc_doc_front,
+			        p.kyc_doc_back,
+			        p.rejection_reason,
+			        p.verified_at,
+			        p.kyc_submitted_at
+			 FROM users u
+			 LEFT JOIN providers p ON p.user_id = u.id
+			 WHERE u.id = $1`,
+			[userId],
+		);
+
+		if (userResult.rows.length === 0) {
+			return res.status(404).json({ error: "User not found" });
+		}
+
+		const user = userResult.rows[0];
+		res.json({
+			success: true,
+			user: {
+				...getSafeUser(user),
+				location: user.location,
+				lat: user.lat,
+				lng: user.lng,
+				bio: user.bio,
+				provider_status: user.provider_status,
+				is_verified: user.is_verified,
+				verification_badge: user.verification_badge,
+				kyc_status: user.kyc_status,
+				kyc_doc_type: user.kyc_doc_type,
+				kyc_doc_number: user.kyc_doc_number,
+				kyc_doc_front: user.kyc_doc_front,
+				kyc_doc_back: user.kyc_doc_back,
+				rejection_reason: user.rejection_reason,
+				verified_at: user.verified_at,
+				kyc_submitted_at: user.kyc_submitted_at,
+			},
+		});
+	} catch (err) {
+		console.error("GET /me error:", err);
+		res.status(500).json({ error: "Failed to fetch session profile" });
+	}
+});
+
+router.post("/request-email-change", authLimiter, verifyToken, async (req, res) => {
 	try {
 		const { newEmail } = req.body;
 		const userId = req.user.id;
@@ -93,7 +149,7 @@ router.post("/request-email-change", verifyToken, async (req, res) => {
 	}
 });
 
-router.post("/verify-email-change", verifyToken, async (req, res) => {
+router.post("/verify-email-change", authLimiter, verifyToken, async (req, res) => {
 	try {
 		const { otp } = req.body;
 		const userId = req.user.id;
@@ -210,7 +266,7 @@ router.post("/google", async (req, res) => {
 	}
 });
 
-router.post("/register", verifyTurnstile, async (req, res) => {
+router.post("/register", authLimiter, verifyTurnstile, async (req, res) => {
 	try {
 		const { name, email, password, role, phone } = req.body;
 
@@ -256,7 +312,7 @@ router.post("/register", verifyTurnstile, async (req, res) => {
 	}
 });
 
-router.post("/login", verifyTurnstile, async (req, res) => {
+router.post("/login", authLimiter, verifyTurnstile, async (req, res) => {
 	try {
 		const { email, password } = req.body;
 		const cleanEmail = normalizeEmail(email);
@@ -291,7 +347,7 @@ router.post("/login", verifyTurnstile, async (req, res) => {
 	}
 });
 
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", authLimiter, async (req, res) => {
 	const { email } = req.body;
 
 	try {
@@ -346,7 +402,7 @@ router.post("/forgot-password", async (req, res) => {
 	}
 });
 
-router.put("/reset-password/:resetToken", async (req, res) => {
+router.put("/reset-password/:resetToken", authLimiter, async (req, res) => {
 	const { resetToken } = req.params;
 	const { password } = req.body;
 
@@ -447,7 +503,7 @@ router.get("/me", verifyToken, async (req, res) => {
 	}
 });
 
-router.post("/update-password", verifyToken, async (req, res) => {
+router.post("/update-password", authLimiter, verifyToken, async (req, res) => {
 	try {
 		const { currentPassword, newPassword } = req.body;
 		const userId = req.user.id;

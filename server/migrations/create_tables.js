@@ -240,14 +240,53 @@ const queries = [
      ('commission_rate', '{"percentage": 15, "min_fee": 50}'::jsonb),
      ('cancellation_fee', '{"customer_fee": 100, "provider_penalty": 150}'::jsonb)
    ON CONFLICT (key) DO NOTHING`,
+
+	// PostGIS Spatial Extension & Geography Indexing
+	`CREATE EXTENSION IF NOT EXISTS postgis;`,
+	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS geom geography(Point, 4326);`,
+	`CREATE INDEX IF NOT EXISTS idx_users_geom_gist ON public.users USING GIST (geom);`,
+	`DO $$
+	BEGIN
+	  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
+	    UPDATE public.users 
+	    SET geom = ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography 
+	    WHERE lat IS NOT NULL AND lng IS NOT NULL AND geom IS NULL;
+	  END IF;
+	END $$;`,
+	`ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS geom geography(Point, 4326);`,
+	`CREATE INDEX IF NOT EXISTS idx_bookings_geom_gist ON public.bookings USING GIST (geom);`,
+	`CREATE OR REPLACE FUNCTION sync_user_geom() 
+	RETURNS trigger AS $$
+	BEGIN
+	  IF NEW.lat IS NOT NULL AND NEW.lng IS NOT NULL THEN
+	    NEW.geom = ST_SetSRID(ST_MakePoint(NEW.lng, NEW.lat), 4326)::geography;
+	  ELSE
+	    NEW.geom = NULL;
+	  END IF;
+	  RETURN NEW;
+	END;
+	$$ LANGUAGE plpgsql;`,
+	`DROP TRIGGER IF EXISTS trg_users_geom_sync ON public.users;`,
+	`CREATE TRIGGER trg_users_geom_sync
+	BEFORE INSERT OR UPDATE OF lat, lng ON public.users
+	FOR EACH ROW EXECUTE FUNCTION sync_user_geom();`,
 ];
 
 const runMigration = async () => {
 	try {
 		console.log("⏳ Starting migration...");
 		for (const [index, query] of queries.entries()) {
-			console.log(`... Running Step ${index + 1}/${queries.length}`);
-			await db.query(query);
+			try {
+				console.log(`... Running Step ${index + 1}/${queries.length}`);
+				await db.query(query);
+			} catch (stepErr) {
+				// If postgis extension is not supported on this specific PG server, log and continue
+				if (query.includes("postgis") || query.includes("geography") || query.includes("geom")) {
+					console.warn(`⚠️ PostGIS step skipped (standard PostgreSQL without spatial module): ${stepErr.message}`);
+				} else {
+					throw stepErr;
+				}
+			}
 		}
 		console.log("✅ All tables created successfully!");
 	} catch (err) {

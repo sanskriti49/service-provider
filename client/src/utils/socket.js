@@ -1,4 +1,4 @@
-﻿import { io } from "socket.io-client";
+import { io } from "socket.io-client";
 import { toast } from "sonner";
 
 import { API_URL } from "../config";
@@ -15,7 +15,7 @@ export function getSocket() {
 	}
 
 	if (!socketInstance) {
-		socketInstance = io(API_URL, {
+		socketInstance = io(API_URL || undefined, {
 			auth: { token },
 			transports: ["websocket", "polling"],
 			reconnection: true,

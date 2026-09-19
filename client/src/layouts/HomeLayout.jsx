@@ -3,7 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import Footer from "../pages/Footer";
 import { AnimatePresence, motion } from "framer-motion";
 import { Suspense } from "react";
-import Loader2 from "lucide-react";
+import TaskGenieLoader from "../ui/TaskGenieLoader";
 
 export default function HomeLayout() {
 	const location = useLocation();
@@ -25,22 +25,7 @@ export default function HomeLayout() {
 						transition={{ duration: 0.3 }}
 						className="flex-1 w-full flex flex-col"
 					>
-						<Suspense
-							fallback={
-								<div className="flex flex-col flex-grow items-center justify-center min-h-[60vh] w-full gap-3 text-slate-400">
-									<div className="relative flex items-center justify-center">
-										<div className="absolute w-12 h-12 rounded-full bg-violet-500/20 animate-ping duration-1000" />
-										<Loader2
-											size={36}
-											className="animate-spin text-violet-500 relative z-10"
-										/>
-									</div>
-									<p className="text-xs font-medium tracking-wide animate-pulse mt-2 bricolage-grotesque">
-										Loading TaskGenie...
-									</p>
-								</div>
-							}
-						>
+						<Suspense fallback={<TaskGenieLoader fullScreen />}>
 							<Outlet />
 						</Suspense>
 					</motion.div>

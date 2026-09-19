@@ -10,7 +10,6 @@ import {
 	Info,
 	Eye,
 	EyeOff,
-	Loader2,
 	SlidersHorizontal,
 	Layers,
 	X,
@@ -19,6 +18,7 @@ import {
 	ShieldCheck,
 	ArrowUpRight,
 } from "lucide-react";
+import { FadeLoader } from "react-spinners";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../hooks/useAuth";
 import { UNIT_LABELS, getAllowedUnits } from "../../utils/pricingHelper";
@@ -58,7 +58,10 @@ export default function ProviderServices() {
 	const [pendingPauseService, setPendingPauseService] = useState(null);
 
 	useEffect(() => {
-		if (!user?.id) return;
+		if (!user?.id) {
+			setLoading(false);
+			return;
+		}
 		const load = async () => {
 			setLoading(true);
 			try {
@@ -179,7 +182,11 @@ export default function ProviderServices() {
 					s.id === serviceItem.id ? { ...s, is_visible: nextVis } : s,
 				),
 			);
-			toast.success(nextVis ? "Service is live on marketplace" : "Service visibility paused");
+			toast.success(
+				nextVis
+					? "Service is live on marketplace"
+					: "Service visibility paused",
+			);
 		} catch (err) {
 			toast.error("Failed to update visibility");
 		} finally {
@@ -211,9 +218,15 @@ export default function ProviderServices() {
 
 	if (loading) {
 		return (
-			<div className="flex flex-col items-center justify-center min-h-[350px] gap-3 text-slate-400">
-				<Loader2 size={24} className="animate-spin text-violet-500" />
-				<span className="text-xs font-bold">Loading merchant catalog...</span>
+			<div className="flex flex-col items-center justify-center min-h-[350px] gap-4 text-slate-400">
+				<FadeLoader
+					color="#8b5cf6"
+					height={10}
+					width={3}
+					radius={2}
+					margin={2}
+				/>
+				<span className="text-xs font-bold mt-2">Loading your services...</span>
 			</div>
 		);
 	}
@@ -225,7 +238,7 @@ export default function ProviderServices() {
 				<div>
 					<div className="flex items-center gap-2.5">
 						<h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-							Service Catalog & Rates
+							My Services & Pricing
 						</h1>
 					</div>
 					<p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
@@ -237,25 +250,25 @@ export default function ProviderServices() {
 				<div className="flex items-center gap-1.5 p-1 bg-white/[0.03] border border-white/[0.07] rounded-2xl">
 					<button
 						onClick={() => setActiveTab("active")}
-						className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						className={`cursor-pointer px-4 py-1.5 text-[13.5px] font-bold rounded-xl transition-all flex items-center gap-2 ${
 							activeTab === "active"
 								? "bg-violet-600 text-white shadow-md shadow-violet-950"
 								: "text-slate-400 hover:text-white"
 						}`}
 					>
 						<Layers size={13} />
-						Active Offerings ({myServices.length})
+						Active Services ({myServices.length})
 					</button>
 					<button
 						onClick={() => setActiveTab("explore")}
-						className={`cursor-pointer px-4 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+						className={`cursor-pointer px-4 py-1.5 text-[13.5px] font-bold rounded-xl transition-all flex items-center gap-2 ${
 							activeTab === "explore"
 								? "bg-violet-600 text-white shadow-md shadow-violet-950"
 								: "text-slate-400 hover:text-white"
 						}`}
 					>
 						<Plus size={13} />
-						Marketplace Library ({discoverableServices.length})
+						Available Services ({discoverableServices.length})
 					</button>
 				</div>
 			</div>
@@ -272,13 +285,16 @@ export default function ProviderServices() {
 						{myServices.length === 0 ? (
 							<div className="flex flex-col items-center justify-center text-center p-14 border border-dashed border-white/[0.08] bg-white/[0.01] rounded-3xl space-y-3">
 								<Briefcase size={36} className="text-slate-600" />
-								<p className="text-white font-bold text-base">No active offerings in your catalog</p>
-								<p className="text-slate-400 text-xs max-w-sm leading-relaxed">
-									Customers cannot find or book you until you enable at least one trade service.
+								<p className="text-white font-bold text-[17.5px]">
+									No active services added yet
+								</p>
+								<p className="text-slate-400 text-sm max-w-sm leading-relaxed">
+									Customers cannot find or book you until you enable at least
+									one service.
 								</p>
 								<button
 									onClick={() => setActiveTab("explore")}
-									className="mt-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl shadow-md shadow-violet-950 cursor-pointer transition-all"
+									className="mt-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold rounded-xl shadow-md shadow-violet-950 cursor-pointer transition-all"
 								>
 									Browse Marketplace Services
 								</button>
@@ -295,7 +311,9 @@ export default function ProviderServices() {
 										<div className="flex gap-4 items-center min-w-0 md:w-1/2">
 											<div className="w-13 h-13 rounded-2xl overflow-hidden bg-black/40 shrink-0 border border-white/[0.08]">
 												<img
-													src={service.image_url || "/images/default-service.jpg"}
+													src={
+														service.image_url || "/images/default-service.jpg"
+													}
 													alt={service.name}
 													className="w-full h-full object-cover"
 												/>
@@ -329,7 +347,9 @@ export default function ProviderServices() {
 												<span className="text-sm font-black text-emerald-400 mt-0.5 block font-mono">
 													₹{service.price}
 													<span className="text-xs text-slate-400 font-normal font-sans ml-1">
-														/{UNIT_LABELS[service.price_unit] || service.price_unit}
+														/
+														{UNIT_LABELS[service.price_unit] ||
+															service.price_unit}
 													</span>
 												</span>
 											</div>
@@ -339,11 +359,17 @@ export default function ProviderServices() {
 											<button
 												onClick={() => handleToggleClick(service)}
 												disabled={updatingId === service.id}
-												className="p-2.5 cursor-pointer bg-white/[0.03] hover:bg-white/[0.07] text-slate-400 hover:text-white border border-white/[0.06] rounded-xl transition-colors"
-												title={service.is_visible ? "Pause Service" : "Activate Service"}
+												className="p-2.5 cursor-pointer bg-white/[0.03] hover:bg-white/[0.07] text-slate-400 hover:text-white border border-white/[0.06] rounded-xl transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+												title={
+													service.is_visible
+														? "Pause Service"
+														: "Activate Service"
+												}
 											>
 												{updatingId === service.id ? (
-													<Loader2 size={15} className="animate-spin text-violet-400" />
+													<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center">
+														<FadeLoader color="#a78bfa" />
+													</span>
 												) : service.is_visible ? (
 													<Eye size={15} />
 												) : (
@@ -374,13 +400,14 @@ export default function ProviderServices() {
 						<div className="p-4 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-start gap-3">
 							<Sparkles className="text-violet-400 shrink-0 mt-0.5" size={16} />
 							<p className="text-xs text-violet-200/90 leading-relaxed font-medium">
-								Add more services to your profile. Select a category, set your rates, and start taking bookings.
+								Add more services to your profile. Select a category, set your
+								rates, and start taking bookings.
 							</p>
 						</div>
 
 						<div className="bg-[#120a22] border border-white/[0.07] rounded-3xl divide-y divide-white/[0.04] overflow-hidden shadow-xl">
 							{discoverableServices.length === 0 ? (
-								<div className="p-12 text-center text-slate-400 text-xs font-semibold">
+								<div className="p-12 text-center text-slate-400 text-sm font-semibold">
 									You have unlocked all currently supported platform services!
 								</div>
 							) : (
@@ -392,7 +419,9 @@ export default function ProviderServices() {
 										<div className="flex gap-4 items-center min-w-0 md:w-3/4">
 											<div className="w-13 h-13 rounded-2xl overflow-hidden bg-black/40 shrink-0 border border-white/[0.08]">
 												<img
-													src={service.image_url || "/images/default-service.jpg"}
+													src={
+														service.image_url || "/images/default-service.jpg"
+													}
 													alt={service.name}
 													className="w-full h-full object-cover"
 												/>
@@ -401,7 +430,7 @@ export default function ProviderServices() {
 												<h3 className="text-sm font-bold text-white truncate group-hover:text-violet-300 transition-colors">
 													{service.name}
 												</h3>
-												<p className="text-xs text-slate-400 line-clamp-1 pr-6 leading-relaxed">
+												<p className="text-sm text-slate-400 line-clamp-1 pr-6 leading-relaxed">
 													{service.description}
 												</p>
 											</div>
@@ -446,10 +475,10 @@ export default function ProviderServices() {
 								<div className="flex items-start justify-between border-b border-white/[0.06] pb-4">
 									<div>
 										<h2 className="text-lg font-black text-white tracking-tight">
-											Catalog Service Parameters
+											Service Setup
 										</h2>
 										<p className="text-xs text-slate-400 mt-0.5 font-medium">
-											Calibrate billing unit, rates, and working schedules.
+											Set your rates, billing type, and working hours.
 										</p>
 									</div>
 									<button
@@ -464,18 +493,21 @@ export default function ProviderServices() {
 								<div className="p-3.5 bg-white/[0.02] border border-white/[0.06] rounded-2xl flex gap-3.5 items-center">
 									<div className="w-12 h-12 rounded-xl bg-black/40 overflow-hidden shrink-0 border border-white/[0.08]">
 										<img
-											src={selectedService.image_url || "/images/default-service.jpg"}
+											src={
+												selectedService.image_url ||
+												"/images/default-service.jpg"
+											}
 											alt={selectedService.name}
 											className="w-full h-full object-cover"
 										/>
 									</div>
 									<div className="min-w-0">
-										<h4 className="text-sm font-bold text-white truncate">
+										<h4 className="text-[17px] font-bold text-white truncate">
 											{selectedService.name}
 										</h4>
 										<span className="text-[10px] text-violet-300 font-bold uppercase tracking-wider block mt-0.5">
 											{myServices.some((s) => s.id === selectedService.id)
-												? "Active In Catalog"
+												? "Active in Your Services"
 												: "New Service Setup"}
 										</span>
 									</div>
@@ -484,8 +516,8 @@ export default function ProviderServices() {
 								<form onSubmit={handleSavePrice} className="space-y-5 text-xs">
 									<div className="space-y-3.5">
 										<div className="space-y-1.5">
-											<label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-												Pricing Unit Format
+											<label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest block">
+												Charge By
 											</label>
 											<select
 												value={priceUnit}
@@ -493,7 +525,11 @@ export default function ProviderServices() {
 												className="w-full px-3 py-2.5 bg-black/40 border border-white/[0.08] rounded-xl text-xs font-semibold text-white capitalize focus:outline-none focus:border-violet-500"
 											>
 												{currentAllowedUnits.map((unit) => (
-													<option key={unit} value={unit} className="bg-[#120a22]">
+													<option
+														key={unit}
+														value={unit}
+														className="bg-[#120a22]"
+													>
 														{UNIT_LABELS[unit] || unit}
 													</option>
 												))}
@@ -501,8 +537,8 @@ export default function ProviderServices() {
 										</div>
 
 										<div className="space-y-1.5">
-											<label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-												Base Client Fee (INR)
+											<label className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest block">
+												Service Rate (INR)
 											</label>
 											<div className="relative">
 												<span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xs">
@@ -514,7 +550,7 @@ export default function ProviderServices() {
 													min="1"
 													value={customPrice}
 													onChange={(e) => setCustomPrice(e.target.value)}
-													className="w-full pl-8 pr-4 py-2.5 bg-black/40 border border-white/[0.08] rounded-xl text-xs font-extrabold text-white font-mono focus:outline-none focus:border-violet-500"
+													className="w-full pl-8 pr-4 py-2.5 bg-black/40 border border-white/[0.08] rounded-xl text-sm font-extrabold text-white font-mono focus:outline-none focus:border-violet-500"
 												/>
 											</div>
 										</div>
@@ -522,8 +558,8 @@ export default function ProviderServices() {
 
 									{/* Operating Days */}
 									<div className="space-y-2.5 pt-2 border-t border-white/[0.06]">
-										<label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">
-											Weekly Operating Windows
+										<label className="text-[10.5px] font-bold uppercase tracking-widest text-slate-400 block">
+											Available Days
 										</label>
 
 										<div className="flex gap-1.5 overflow-x-auto pb-1">
@@ -548,7 +584,7 @@ export default function ProviderServices() {
 
 										<div className="grid grid-cols-2 gap-3 bg-white/[0.02] p-3 rounded-2xl border border-white/[0.06]">
 											<div>
-												<span className="text-[10px] text-slate-500 font-bold block mb-1">
+												<span className="text-[10.5px] text-slate-300/80 font-bold block mb-1">
 													START TIME
 												</span>
 												<input
@@ -559,7 +595,7 @@ export default function ProviderServices() {
 												/>
 											</div>
 											<div>
-												<span className="text-[10px] text-slate-500 font-bold block mb-1">
+												<span className="text-[10.5px] text-slate-300/80 font-bold block mb-1">
 													END TIME
 												</span>
 												<input
@@ -573,15 +609,15 @@ export default function ProviderServices() {
 									</div>
 
 									{/* Take Home Preview */}
-									<div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-1.5 text-xs">
-										<div className="flex justify-between text-slate-400">
-											<span>Estimated 15% Platform Take</span>
+									<div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-1.5 text-sm">
+										<div className="flex justify-between text-slate-300/80">
+											<span>Platform Fee (15%)</span>
 											<span className="font-mono text-slate-300">
 												-₹{Math.round((Number(customPrice) || 0) * 0.15)}
 											</span>
 										</div>
 										<div className="flex justify-between items-center pt-2 border-t border-white/[0.06]">
-											<span className="font-bold text-white">Estimated Net Payout</span>
+											<span className="font-bold text-white">You Earn</span>
 											<span className="font-mono font-extrabold text-emerald-400 text-sm">
 												₹{Math.round((Number(customPrice) || 0) * 0.85)}
 											</span>
@@ -590,15 +626,21 @@ export default function ProviderServices() {
 
 									<button
 										type="submit"
-										disabled={updatingId === (selectedService.slug ?? selectedService.id)}
-										className="w-full py-2.5 cursor-pointer bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-violet-950 flex items-center justify-center gap-2"
+										disabled={
+											updatingId ===
+											(selectedService.slug ?? selectedService.id)
+										}
+										className="w-full py-2.5 cursor-pointer bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold text-[15.5px] rounded-xl transition-all shadow-md shadow-violet-950 flex items-center justify-center gap-2"
 									>
-										{updatingId === (selectedService.slug ?? selectedService.id) && (
-											<Loader2 size={13} className="animate-spin" />
+										{updatingId ===
+											(selectedService.slug ?? selectedService.id) && (
+											<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
+												<FadeLoader color="#ffffff" />
+											</span>
 										)}
 										{myServices.some((s) => s.id === selectedService.id)
-											? "Update Service Parameters"
-											: "Confirm & Launch Service"}
+											? "Save Changes"
+											: "Add Service to Profile"}
 									</button>
 								</form>
 							</div>

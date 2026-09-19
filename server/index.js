@@ -8,23 +8,54 @@ const httpServer = http.createServer(app);
 const db = require("./config/db");
 const { initSocket } = require("./utils/socket");
 
+// Global process safeguards against unhandled background rejections
+process.on("unhandledRejection", (reason) => {
+	console.warn("⚠️ [Server Process] Handled rejection:", reason?.message || reason);
+});
+
+process.on("uncaughtException", (err) => {
+	console.error("⚠️ [Server Process] Handled exception:", err?.message || err);
+});
+
 const corsOptions = {
 	origin: (origin, callback) => {
-		if (
-			!origin ||
-			/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+		// Allow requests with no origin (curl, mobile apps, Postman)
+		if (!origin) return callback(null, true);
+
+		// Allow all localhost / 127.0.0.1 / [::1] on any port
+		const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
+		const isPrivateIp = /^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin);
+		const isAllowedDomain =
 			origin === process.env.CLIENT_URL ||
+			origin === process.env.FRONTEND_URL ||
+			origin.endsWith(".vercel.app") ||
 			origin === "https://taskgenieee.vercel.app" ||
-			origin === "https://service-provider-git-main-sanskriti49s-projects.vercel.app"
-		) {
-			callback(null, true);
-		} else {
-			callback(new Error("Not allowed by CORS"));
+			origin === "https://service-provider-git-main-sanskriti49s-projects.vercel.app";
+
+		if (isLocalhost || isPrivateIp || isAllowedDomain) {
+			return callback(null, true);
 		}
+
+		// In non-production environments, allow everything to prevent local dev friction
+		if (process.env.NODE_ENV !== "production") {
+			return callback(null, true);
+		}
+
+		return callback(null, false);
 	},
 	credentials: true,
-	methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-	allowedHeaders: ["Content-Type", "Authorization"],
+	methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+	allowedHeaders: [
+		"Content-Type",
+		"Authorization",
+		"X-Requested-With",
+		"Accept",
+		"Origin",
+		"Cache-Control",
+		"Pragma",
+		"x-test-bypass-ratelimit",
+	],
+	optionsSuccessStatus: 200,
 };
 
 initSocket(httpServer, corsOptions);
@@ -33,9 +64,12 @@ app.use(compression());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "5mb" }));
 
-const { register, metricsMiddleware } = require("./utils/metrics");
+const { register, metricsMiddleware, updatePoolMetrics } = require("./utils/metrics");
+const { globalLimiter } = require("./middleware/rateLimiter");
+const { getCircuitBreakerStatus } = require("./utils/circuitBreaker");
 const eventQueue = require("./utils/eventQueue");
 app.use(metricsMiddleware);
+app.use("/api", globalLimiter);
 
 const providerRoutes = require("./routes/providerRoutes");
 const serviceRoutes = require("./routes/servicesRoutes");
@@ -48,6 +82,7 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const supportRoutes = require("./routes/supportRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 app.use("/api/providers", providerRoutes);
@@ -61,6 +96,7 @@ app.use("/api/availability", availabilityRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/support", supportRoutes);
 
 app.get("/", (req, res) => {
 	res.send("Backend running..");
@@ -93,13 +129,20 @@ app.get("/health/ready", async (req, res) => {
 		await db.query("SELECT 1");
 		const dbLatency = Date.now() - dbStart;
 
+		const poolStats = db.getPoolStats ? db.getPoolStats() : null;
+		if (poolStats) {
+			updatePoolMetrics(poolStats);
+		}
+
 		const queueStats = eventQueue.getStats();
+		const circuitBreakerStats = getCircuitBreakerStatus();
 
 		res.status(200).json({
 			status: "ready",
 			checks: {
-				database: { status: "connected", latencyMs: dbLatency },
+				database: { status: "connected", latencyMs: dbLatency, pool: poolStats },
 				eventQueue: { status: "healthy", ...queueStats },
+				circuitBreakers: circuitBreakerStats,
 			},
 			timestamp: new Date().toISOString(),
 		});

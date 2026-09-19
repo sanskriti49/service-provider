@@ -7,12 +7,9 @@ const { sendNotification } = require("./notificationService");
  * Decouples slow I/O (transactional email, push notifications, external webhooks)
  * from synchronous HTTP request/response lifecycles.
  *
- * Supports:
- * - Asynchronous background execution
- * - Concurrency control
- * - Automatic retry with exponential backoff
- * - Dead-letter failure tracking
- * - Extensible to Redis/BullMQ / AWS SQS
+ * Enterprise Dual-Engine:
+ * 1. Redis-backed BullMQ Queue & Worker: distributed, persistent, horizontal scaling.
+ * 2. In-Memory Resilient Fallback: zero-downtime execution if Redis is unavailable/offline.
  */
 class EventQueue extends EventEmitter {
 	constructor(options = {}) {
@@ -28,7 +25,118 @@ class EventQueue extends EventEmitter {
 			failed: 0,
 		};
 
+		this.bullQueue = null;
+		this.bullWorker = null;
+		this.isBullMqActive = false;
+
 		this.registerDefaultHandlers();
+		this._initBullMq();
+	}
+
+	_initBullMq() {
+		const isTest =
+			process.env.NODE_ENV === "test" ||
+			process.argv.includes("--test") ||
+			process.argv.some((a) => typeof a === "string" && a.includes("test"));
+
+		// In unit test runs, keep pure in-memory queue to prevent open network handles
+		if (isTest && !process.env.TEST_BULLMQ) {
+			return;
+		}
+
+		try {
+			const { getRedisClient, isRedisReady } = require("../config/redisClient");
+			const redis = getRedisClient();
+
+			redis.on("ready", () => {
+				if (!this.bullQueue) {
+					this._setupBullMq();
+				}
+			});
+
+			if (isRedisReady() && !this.bullQueue) {
+				this._setupBullMq();
+			}
+		} catch (_) {}
+	}
+
+	_setupBullMq() {
+		try {
+			const { Queue, Worker } = require("bullmq");
+			const { getRedisClient, createRedisClient } = require("../config/redisClient");
+
+			const queueClient = getRedisClient();
+			const workerClient = createRedisClient();
+
+			this.bullQueue = new Queue("taskgenie-events", {
+				connection: queueClient,
+				defaultJobOptions: {
+					attempts: this.maxRetries,
+					backoff: {
+						type: "exponential",
+						delay: 200,
+					},
+					removeOnComplete: { age: 3600, count: 500 },
+					removeOnFail: { age: 86400, count: 1000 },
+				},
+			});
+
+			this.bullQueue.on("error", (err) => {
+				if (process.env.NODE_ENV !== "test") {
+					console.warn("[BullMQ Queue Notice]:", err.message);
+				}
+			});
+
+			this.bullWorker = new Worker(
+				"taskgenie-events",
+				async (job) => {
+					const handler = this.handlers.get(job.name);
+					if (!handler) {
+						console.warn(`[BullMQ Worker] No registered handler for: ${job.name}`);
+						return;
+					}
+					await handler(job.data, job);
+				},
+				{
+					connection: workerClient,
+					concurrency: this.concurrency,
+				},
+			);
+
+			this.bullWorker.on("completed", (job) => {
+				this.stats.processed++;
+				try {
+					const { eventQueueJobsTotal } = require("./metrics");
+					eventQueueJobsTotal.inc({ event_type: job.name, status: "success" });
+				} catch (_) {}
+				this.emit("job:completed", { id: job.id, eventType: job.name, data: job.data });
+			});
+
+			this.bullWorker.on("failed", (job, err) => {
+				if (job && job.attemptsMade >= job.opts.attempts) {
+					this.stats.failed++;
+					try {
+						const { eventQueueJobsTotal } = require("./metrics");
+						eventQueueJobsTotal.inc({ event_type: job.name, status: "failed" });
+					} catch (_) {}
+					this.emit("job:dead_letter", { job, error: err.message });
+					console.error(`[BullMQ Worker] Job ${job.id} permanently failed and moved to DLQ.`);
+				}
+			});
+
+			this.bullWorker.on("error", (err) => {
+				if (process.env.NODE_ENV !== "test") {
+					console.warn("[BullMQ Worker Notice]:", err.message);
+				}
+			});
+
+			this.isBullMqActive = true;
+			if (process.env.NODE_ENV !== "test") {
+				console.log("🚀 [EventQueue] BullMQ persistent distributed worker initialized.");
+			}
+		} catch (err) {
+			this.isBullMqActive = false;
+		}
 	}
 
 	registerHandler(eventType, handler) {
@@ -36,8 +144,9 @@ class EventQueue extends EventEmitter {
 	}
 
 	publish(eventType, data = {}, options = {}) {
+		const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 		const job = {
-			id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+			id: jobId,
 			eventType,
 			data,
 			attempts: 0,
@@ -45,17 +154,40 @@ class EventQueue extends EventEmitter {
 			createdAt: new Date(),
 		};
 
-		this.queue.push(job);
 		this.stats.queued++;
 		this.emit("job:enqueued", job);
 
-		// Trigger worker process tick asynchronously
-		setImmediate(() => this._processNext());
+		let dispatchedViaBullMq = false;
+		if (this.isBullMqActive && this.bullQueue) {
+			try {
+				const { isRedisReady } = require("../config/redisClient");
+				if (isRedisReady()) {
+					dispatchedViaBullMq = true;
+					this.bullQueue
+						.add(eventType, data, {
+							jobId: job.id,
+							attempts: job.maxRetries,
+							backoff: { type: "exponential", delay: 200 },
+						})
+						.catch((err) => {
+							console.warn(`[BullMQ Publish Fallback] routing to in-memory: ${err.message}`);
+							this.queue.push(job);
+							setImmediate(() => this._processNext());
+						});
+				}
+			} catch (_) {}
+		}
+
+		if (!dispatchedViaBullMq) {
+			this.queue.push(job);
+			setImmediate(() => this._processNext());
+		}
 
 		return {
 			jobId: job.id,
 			status: "queued",
 			enqueuedAt: job.createdAt,
+			engine: dispatchedViaBullMq ? "bullmq" : "in-memory",
 		};
 	}
 
@@ -85,10 +217,11 @@ class EventQueue extends EventEmitter {
 			} catch (_) {}
 			this.emit("job:completed", job);
 		} catch (err) {
-			console.error(`[EventQueue] Error executing job ${job.id} (Attempt ${job.attempts}):`, err.message);
+			if (process.env.NODE_ENV !== "test") {
+				console.error(`[EventQueue] Error executing job ${job.id} (Attempt ${job.attempts}):`, err.message);
+			}
 
 			if (job.attempts < job.maxRetries) {
-				// Exponential backoff: 200ms, 400ms, 800ms...
 				const delayMs = Math.pow(2, job.attempts) * 100;
 				setTimeout(() => {
 					this.queue.unshift(job);
@@ -101,7 +234,9 @@ class EventQueue extends EventEmitter {
 					eventQueueJobsTotal.inc({ event_type: job.eventType, status: "failed" });
 				} catch (_) {}
 				this.emit("job:dead_letter", { job, error: err.message });
-				console.error(`[EventQueue] Job ${job.id} permanently failed and moved to Dead Letter Queue.`);
+				if (process.env.NODE_ENV !== "test") {
+					console.error(`[EventQueue] Job ${job.id} permanently failed and moved to Dead Letter Queue.`);
+				}
 			}
 		} finally {
 			this.processingCount--;
@@ -112,21 +247,18 @@ class EventQueue extends EventEmitter {
 	}
 
 	registerDefaultHandlers() {
-		// Handler for sending individual emails
 		this.registerHandler("SEND_EMAIL", async (data) => {
 			const { email, subject, message } = data;
 			if (!email) return;
 			await sendEmail({ email, subject, message });
 		});
 
-		// Handler for in-app push/socket notifications
 		this.registerHandler("SEND_NOTIFICATION", async (data) => {
 			const { userId, title, message, notifData } = data;
 			if (!userId) return;
 			await sendNotification(userId, title, message, notifData);
 		});
 
-		// Handler for composite booking status notifications
 		this.registerHandler("BOOKING_STATUS_CHANGED", async (data) => {
 			const { status, userRole, currentBooking, refundPercentage } = data;
 			if (!currentBooking) return;
@@ -209,11 +341,29 @@ class EventQueue extends EventEmitter {
 	}
 
 	getStats() {
+		let engine = "in-memory";
+		try {
+			const { isRedisReady } = require("../config/redisClient");
+			if (this.isBullMqActive && isRedisReady()) {
+				engine = "bullmq";
+			}
+		} catch (_) {}
+
 		return {
 			...this.stats,
 			pending: this.queue.length,
 			active: this.processingCount,
+			engine,
 		};
+	}
+
+	async close() {
+		if (this.bullWorker) {
+			await this.bullWorker.close();
+		}
+		if (this.bullQueue) {
+			await this.bullQueue.close();
+		}
 	}
 }
 

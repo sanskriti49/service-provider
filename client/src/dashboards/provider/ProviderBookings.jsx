@@ -15,12 +15,12 @@ import {
 	ShieldCheck,
 	Users,
 	History as HistoryIcon,
-	Loader2,
 	ArrowUpRight,
 	CalendarCheck,
 	SlidersHorizontal,
 	Check,
 } from "lucide-react";
+import { FadeLoader } from "react-spinners";
 import api from "../../api/axiosInstance";
 import ConfirmModal from "../../ui/ConfirmModal";
 import BookingDetailsSheet from "../provider/BookingDetailsSheet";
@@ -286,7 +286,8 @@ export default function ProviderBookings() {
 						</h1>
 					</div>
 					<p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
-						Manage your service appointments, customer requests, and job schedules.
+						Manage your service appointments, customer requests, and job
+						schedules.
 					</p>
 				</div>
 
@@ -302,14 +303,14 @@ export default function ProviderBookings() {
 							placeholder="Search by service or client..."
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
-							className="w-full pl-9 pr-4 py-2 bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.12] focus:border-violet-500/50 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all"
+							className="w-full pl-9 pr-4 py-2 bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.12] focus:border-violet-500/50 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all"
 						/>
 					</div>
 
 					<div className="relative">
 						<button
 							onClick={() => setShowFilters(!showFilters)}
-							className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-all cursor-pointer ${
+							className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-sm font-bold transition-all cursor-pointer ${
 								showFilters || isFilterActive
 									? "bg-violet-600/20 text-violet-300 border-violet-500/40 shadow-xs"
 									: "bg-white/[0.03] text-slate-400 border-white/[0.08] hover:text-slate-200 hover:bg-white/[0.06]"
@@ -426,8 +427,8 @@ export default function ProviderBookings() {
 			{/* Status Tabs Switcher */}
 			<div className="flex items-center gap-2 border-b border-white/[0.06] pb-3">
 				{[
-					{ key: "upcoming", label: "Active & Upcoming Queue", icon: Clock },
-					{ key: "history", label: "Completed & Archived", icon: HistoryIcon },
+					{ key: "upcoming", label: "Upcoming Bookings", icon: Clock },
+					{ key: "history", label: "Completed Bookings", icon: HistoryIcon },
 				].map(({ key, label, icon: Icon }) => (
 					<button
 						key={key}
@@ -438,7 +439,12 @@ export default function ProviderBookings() {
 								: "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
 						}`}
 					>
-						<Icon size={14} className={activeTab === key ? "text-violet-400" : "text-slate-500"} />
+						<Icon
+							size={14}
+							className={
+								activeTab === key ? "text-violet-400" : "text-slate-500"
+							}
+						/>
 						<span>{label}</span>
 					</button>
 				))}
@@ -448,9 +454,17 @@ export default function ProviderBookings() {
 			<div className="bg-[#120a22] border border-white/[0.07] rounded-3xl shadow-xl overflow-hidden min-h-[350px]">
 				<div className="overflow-x-auto">
 					{loading ? (
-						<div className="flex flex-col items-center justify-center h-72 gap-3 text-slate-500">
-							<Loader2 size={24} className="animate-spin text-violet-500" />
-							<span className="text-xs font-bold">Loading bookings...</span>
+						<div className="flex flex-col items-center justify-center h-72 gap-4 text-slate-500">
+							<FadeLoader
+								color="#8b5cf6"
+								height={10}
+								width={3}
+								radius={2}
+								margin={2}
+							/>
+							<span className="text-sm font-bold mt-2">
+								Loading bookings...
+							</span>
 						</div>
 					) : bookings.length === 0 ? (
 						<div className="flex flex-col items-center justify-center h-72 text-center p-8 space-y-3">
@@ -463,7 +477,7 @@ export default function ProviderBookings() {
 										? "No upcoming bookings"
 										: "No bookings match criteria"}
 								</p>
-								<p className="text-xs text-slate-500 mt-1">
+								<p className="text-sm text-slate-500 mt-1">
 									{activeTab === "upcoming"
 										? "When customers book your services, they will appear here."
 										: "Completed jobs and cancelled bookings will appear here."}
@@ -481,7 +495,7 @@ export default function ProviderBookings() {
 									<th className="py-4 px-6 text-right">Actions</th>
 								</tr>
 							</thead>
-							<tbody className="divide-y divide-white/[0.04] text-xs">
+							<tbody className="divide-y divide-white/[0.04] text-sm">
 								{bookings.map((item) => {
 									const rawDate = new Date(item.date);
 									const y = rawDate.getFullYear();

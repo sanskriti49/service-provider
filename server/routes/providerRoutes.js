@@ -14,6 +14,9 @@ router.get("/v1/:id/availability", c.getProviderAvailability);
 router.get("/v1/:custom_id", c.getProviderById);
 
 router.put("/v1/:id", authenticate, c.updateProvider);
+router.get("/v1/:id/kyc", authenticate, c.getKycStatus);
+router.put("/v1/:id/kyc", authenticate, c.submitKyc);
+router.post("/v1/:id/kyc", authenticate, c.submitKyc);
 router.delete("/v1/:id", authenticate, c.deleteProvider);
 
 router.get("/v1/:id/services", authenticate, c.getProviderServices);

@@ -14,12 +14,12 @@ import {
 	Sparkles,
 	ShieldCheck,
 	Award,
-	Loader2,
 	DollarSign,
 	CircleAlert,
 	UploadCloud,
 	FileCheck,
 } from "lucide-react";
+import { FadeLoader } from "react-spinners";
 import { motion } from "framer-motion";
 import api from "../api/axiosInstance";
 import VerifiedBadge from "../ui/VerifiedBadge";
@@ -881,9 +881,9 @@ export default function ApplyProvider() {
 														}
 													/>
 													{uploadingDoc.front ? (
-														<div className="flex flex-col items-center gap-2 text-violet-600">
-															<Loader2 size={24} className="animate-spin" />
-															<span className="text-xs font-semibold">
+														<div className="flex flex-col items-center gap-3 text-violet-600">
+															<FadeLoader color="#8b5cf6" height={8} width={2.5} radius={1} margin={-2} />
+															<span className="text-xs font-semibold mt-1">
 																Uploading Document...
 															</span>
 														</div>
@@ -953,9 +953,9 @@ export default function ApplyProvider() {
 														}
 													/>
 													{uploadingDoc.back ? (
-														<div className="flex flex-col items-center gap-2 text-violet-600">
-															<Loader2 size={24} className="animate-spin" />
-															<span className="text-xs font-semibold">
+														<div className="flex flex-col items-center gap-3 text-violet-600">
+															<FadeLoader color="#8b5cf6" height={8} width={2.5} radius={1} margin={-2} />
+															<span className="text-xs font-semibold mt-1">
 																Uploading Document...
 															</span>
 														</div>
@@ -1031,7 +1031,9 @@ export default function ApplyProvider() {
 										className="flex items-center gap-2 px-8 py-3 rounded-full font-bold text-sm text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 shadow-lg shadow-purple-500/25 disabled:opacity-50 transition-all cursor-pointer"
 									>
 										{loading ? (
-											<Loader2 size={16} className="animate-spin" />
+											<span className="inline-flex items-center justify-center w-5 h-5 scale-[0.4] origin-center -mx-1">
+												<FadeLoader color="#ffffff" />
+											</span>
 										) : (
 											<Sparkles size={16} />
 										)}

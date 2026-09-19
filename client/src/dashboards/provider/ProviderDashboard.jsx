@@ -35,13 +35,18 @@ import {
 	MapPin,
 	SlidersHorizontal,
 	CircleDot,
+	AlertTriangle,
+	LifeBuoy,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
+import { jwtDecode } from "jwt-decode";
 import { toast } from "sonner";
 import ConfirmDialog from "../../ui/ConfirmDialog";
 import Logo from "../../ui/Logo";
 import VerifiedBadge from "../../ui/VerifiedBadge";
+import KycVerificationModal from "../../ui/KycVerificationModal";
+import SupportTicketModal from "../../ui/SupportTicketModal";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -111,7 +116,7 @@ function NavItem({ to, icon: Icon, label, end = false, onClick, badge }) {
 						<span>{label}</span>
 					</div>
 					{badge !== undefined && badge > 0 && (
-						<span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
+						<span className="px-1.5 py-0.5 rounded-md text-[14px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
 							{badge}
 						</span>
 					)}
@@ -174,7 +179,9 @@ function SidebarProfile({ user, notifications, onLogout, onLinkClick }) {
 									<VerifiedBadge size="xs" />
 								) : (
 									<>
-										<span className="text-emerald-400 font-semibold">Online</span>
+										<span className="text-emerald-400 font-semibold">
+											Online
+										</span>
 										<span>•</span>
 										<span className="truncate">
 											{user?.location || "Provider"}
@@ -212,7 +219,7 @@ function SidebarProfile({ user, notifications, onLogout, onLinkClick }) {
 
 				{/* Primary Navigation */}
 				<nav className="space-y-1">
-					<div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+					<div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
 						Operations
 					</div>
 					<NavItem
@@ -241,7 +248,7 @@ function SidebarProfile({ user, notifications, onLogout, onLinkClick }) {
 						onClick={onLinkClick}
 					/>
 
-					<div className="pt-4 px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+					<div className="pt-4 px-3 pb-2 text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
 						Preferences
 					</div>
 					<NavItem
@@ -305,10 +312,20 @@ export default function ProviderDashboard() {
 		total_customers: 0,
 	});
 	const [recentBookings, setRecentBookings] = useState([]);
+	const [showKycModal, setShowKycModal] = useState(false);
+	const [showTicketModal, setShowTicketModal] = useState(false);
 
 	const isOverviewPage =
 		location.pathname === "/provider/dashboard" ||
 		location.pathname === "/provider/dashboard/";
+
+	// Detect ?openKyc=true in URL
+	useEffect(() => {
+		const searchParams = new URLSearchParams(location.search);
+		if (searchParams.get("openKyc") === "true") {
+			setShowKycModal(true);
+		}
+	}, [location.search]);
 
 	useEffect(() => {
 		if (sidebarOpen) {
@@ -322,27 +339,77 @@ export default function ProviderDashboard() {
 	}, [sidebarOpen]);
 
 	useEffect(() => {
-		if (!user?.id) return;
+		// Resolve user ID from state or fallback directly to stored JWT token
+		let resolvedUserId = user?.id;
+		if (!resolvedUserId) {
+			const token = localStorage.getItem("token");
+			if (token) {
+				try {
+					const decoded = jwtDecode(token);
+					if (decoded.exp * 1000 >= Date.now()) {
+						resolvedUserId = decoded.id;
+					}
+				} catch (err) {
+					console.warn("Invalid token stored:", err);
+				}
+			}
+		}
+
+		// If no user could be verified, release loading skeleton immediately
+		if (!resolvedUserId) {
+			setIsLoading(false);
+			return;
+		}
+
+		let isMounted = true;
+		const safetyTimer = setTimeout(() => {
+			if (isMounted) setIsLoading(false);
+		}, 4000);
+
 		const load = async () => {
 			try {
 				const [statsRes, bookingsRes] = await Promise.allSettled([
 					api.get(`/api/dashboard/provider`),
 					api.get(`/api/bookings/provider/history/recent`),
 				]);
+
+				if (!isMounted) return;
+
 				if (statsRes.status === "fulfilled") {
 					setStats(statsRes.value.data?.stats || {});
 					setNotifications(statsRes.value.data?.pending_notifications || 0);
+				} else {
+					console.warn(
+						"Provider dashboard stats notice:",
+						statsRes.reason?.message,
+					);
 				}
+
 				if (bookingsRes.status === "fulfilled") {
 					setRecentBookings(bookingsRes.value.data || []);
+				} else {
+					console.warn(
+						"Provider recent bookings notice:",
+						bookingsRes.reason?.message,
+					);
 				}
 			} catch (err) {
+				console.error("Failed to sync provider metrics:", err);
 				toast.error("Failed to sync provider metrics");
 			} finally {
-				setIsLoading(false);
+				clearTimeout(safetyTimer);
+				if (isMounted) {
+					setIsLoading(false);
+				}
 			}
 		};
+
 		load();
+
+		return () => {
+			isMounted = false;
+			clearTimeout(safetyTimer);
+		};
 	}, [user?.id]);
 
 	const handleLogout = useCallback(() => {
@@ -445,9 +512,19 @@ export default function ProviderDashboard() {
 								user={user}
 								stats={stats}
 								recentBookings={recentBookings}
+								onOpenKyc={() => setShowKycModal(true)}
+								onOpenTicket={() => setShowTicketModal(true)}
 							/>
 						) : (
-							<Outlet context={{ user, stats, recentBookings }} />
+							<Outlet
+								context={{
+									user,
+									stats,
+									recentBookings,
+									onOpenKyc: () => setShowKycModal(true),
+									onOpenTicket: () => setShowTicketModal(true),
+								}}
+							/>
 						)}
 					</main>
 				</div>
@@ -464,11 +541,29 @@ export default function ProviderDashboard() {
 				variant="danger"
 				icon={LogOut}
 			/>
+
+			<KycVerificationModal
+				isOpen={showKycModal}
+				onClose={() => setShowKycModal(false)}
+			/>
+
+			<SupportTicketModal
+				isOpen={showTicketModal}
+				onClose={() => setShowTicketModal(false)}
+				defaultRole="provider"
+				defaultCategory="kyc"
+			/>
 		</div>
 	);
 }
 
-function ProviderOverview({ user, stats, recentBookings }) {
+function ProviderOverview({
+	user,
+	stats,
+	recentBookings,
+	onOpenKyc,
+	onOpenTicket,
+}) {
 	const navigate = useNavigate();
 
 	// Calculate net payout estimation (assuming 15% platform take)
@@ -490,11 +585,42 @@ function ProviderOverview({ user, stats, recentBookings }) {
 							Dashboard
 						</h1>
 						{user?.is_verified ? (
-							<VerifiedBadge size="md" />
+							<button
+								type="button"
+								onClick={onOpenKyc}
+								className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 transition-all cursor-pointer"
+								title="Click to view KYC Verification Details"
+							>
+								<VerifiedBadge size="md" />
+								<span className="text-xs font-bold">Verified Pro</span>
+							</button>
+						) : user?.kyc_status === "pending" ? (
+							<button
+								type="button"
+								onClick={onOpenKyc}
+								className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-all cursor-pointer"
+								title="Click to check verification status"
+							>
+								<Clock size={13} /> KYC In Verification
+							</button>
+						) : user?.kyc_status === "rejected" ? (
+							<button
+								type="button"
+								onClick={onOpenKyc}
+								className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 transition-all cursor-pointer"
+								title="Click to resolve KYC rejection"
+							>
+								<AlertTriangle size={13} /> Action Needed: Resubmit KYC
+							</button>
 						) : (
-							<span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 flex items-center gap-1.5">
-								<ShieldCheck size={13} /> KYC In Verification
-							</span>
+							<button
+								type="button"
+								onClick={onOpenKyc}
+								className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25 transition-all cursor-pointer"
+								title="Click to submit verification documents"
+							>
+								<ShieldCheck size={13} /> Complete KYC for Verified Badge
+							</button>
 						)}
 					</div>
 					<p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
@@ -520,6 +646,85 @@ function ProviderOverview({ user, stats, recentBookings }) {
 				</div>
 			</div>
 
+			{/* Trust & Safety KYC Action Strip */}
+			{!user?.is_verified && (
+				<div
+					className={`p-4 sm:p-5 rounded-3xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs transition-all ${
+						user?.kyc_status === "rejected"
+							? "bg-rose-500/10 border-rose-500/30 text-rose-200"
+							: user?.kyc_status === "pending"
+								? "bg-amber-500/10 border-amber-500/30 text-amber-200"
+								: "bg-gradient-to-r from-violet-500/15 via-purple-500/10 to-amber-500/15 border-violet-500/30 text-slate-200"
+					}`}
+				>
+					<div className="flex items-start sm:items-center gap-3.5">
+						<div
+							className={`p-2.5 rounded-2xl shrink-0 ${
+								user?.kyc_status === "rejected"
+									? "bg-rose-500/20 text-rose-300"
+									: user?.kyc_status === "pending"
+										? "bg-amber-500/20 text-amber-300"
+										: "bg-violet-500/20 text-violet-300"
+							}`}
+						>
+							{user?.kyc_status === "rejected" ? (
+								<AlertTriangle size={20} />
+							) : user?.kyc_status === "pending" ? (
+								<Clock size={20} />
+							) : (
+								<ShieldCheck size={20} />
+							)}
+						</div>
+						<div>
+							<div className="flex items-center gap-2 flex-wrap">
+								<span className="font-bold text-white text-[14.5px] sm:text-base">
+									{user?.kyc_status === "rejected"
+										? "Identity Verification Needs Attention"
+										: user?.kyc_status === "pending"
+											? "KYC Documents In Review (24–48h)"
+											: "Unlock Gold Verified Pro Trust Badge"}
+								</span>
+								<span
+									className={`text-[11.5px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+										user?.kyc_status === "rejected"
+											? "bg-rose-500/20 text-rose-300"
+											: user?.kyc_status === "pending"
+												? "bg-amber-500/20 text-amber-300"
+												: "bg-violet-500/20 text-violet-300"
+									}`}
+								>
+									{user?.kyc_status === "rejected"
+										? "Action Required"
+										: user?.kyc_status === "pending"
+											? "Processing"
+											: "Verified"}
+								</span>
+							</div>
+							<p className="text-slate-400/95 mt-1 max-w-2xl text-[13.5px] leading-relaxed">
+								{user?.kyc_status === "rejected"
+									? user?.rejection_reason ||
+										"The verification team could not verify the submitted document. Please upload a clear photo."
+									: user?.kyc_status === "pending"
+										? "Your credentials are being reviewed by our verification team. You will receive an update as soon as they are approved."
+										: "Submit government identification (Aadhaar, Driving License, or Trade Certificate) to enjoy higher booking priority and instant customer trust."}
+							</p>
+						</div>
+					</div>
+
+					<button
+						type="button"
+						onClick={onOpenKyc}
+						className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm shrink-0 transition-all shadow-md active:scale-95 cursor-pointer self-stretch sm:self-auto text-center"
+					>
+						{user?.kyc_status === "rejected"
+							? "Resubmit KYC"
+							: user?.kyc_status === "pending"
+								? "View Status"
+								: "Verify Identity"}
+					</button>
+				</div>
+			)}
+
 			{/* Asymmetric Financial & Workload Core */}
 			<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 				{/* Primary Revenue Anchor (7 Cols) */}
@@ -528,9 +733,9 @@ function ProviderOverview({ user, stats, recentBookings }) {
 
 					<div className="flex items-center justify-between">
 						<div className="space-y-1">
-							<span className="text-[10px] font-extrabold uppercase tracking-wider text-violet-300 flex items-center gap-1.5">
+							<span className="text-[11.5px] font-extrabold uppercase tracking-wider text-violet-300 flex items-center gap-1.5">
 								<Activity size={12} className="text-violet-400" />
-								Cumulative Platform Earnings
+								Total Earnings
 							</span>
 							<div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
 								{formatCurrency(grossTotal)}
@@ -540,7 +745,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 						<Link
 							to="/provider/dashboard/earnings"
 							className="p-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-violet-300 hover:text-white transition-colors"
-							title="View Payout Breakdown"
+							title="View Earnings & Payouts"
 						>
 							<ArrowUpRight size={16} />
 						</Link>
@@ -549,20 +754,20 @@ function ProviderOverview({ user, stats, recentBookings }) {
 					{/* Breakdown telemetry pills */}
 					<div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-white/[0.06]">
 						<div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
-							<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400 block">
 								Estimated Net
 							</span>
 							<span className="text-base font-extrabold text-emerald-400 mt-0.5 block">
 								{formatCurrency(estimatedNet)}
 							</span>
-							<span className="text-[11px] text-slate-500 font-medium">
-								Post 15% platform cut
+							<span className="text-[11.5px] text-slate-500/95 font-medium">
+								After 15% platform fee
 							</span>
 						</div>
 
 						<div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
-							<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-								Avg Job Ticket
+							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400 block">
+								Average Per Booking
 							</span>
 							<span className="text-base font-extrabold text-white mt-0.5 block">
 								{formatCurrency(
@@ -571,20 +776,20 @@ function ProviderOverview({ user, stats, recentBookings }) {
 										: 499,
 								)}
 							</span>
-							<span className="text-[11px] text-slate-500 font-medium">
-								Per completed visit
+							<span className="text-[11.5px] text-slate-500/95 font-medium">
+								Per completed booking
 							</span>
 						</div>
 
 						<div className="col-span-2 sm:col-span-1 p-3 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
-							<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-								Settlement Status
+							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400 block">
+								Payout Status
 							</span>
 							<span className="text-base font-extrabold text-violet-300 mt-0.5 flex items-center gap-1.5">
 								<span className="h-2 w-2 rounded-full bg-emerald-400" />
-								Automated
+								Automated Weekly
 							</span>
-							<span className="text-[11px] text-slate-500 font-medium">
+							<span className="text-[11.5px] text-slate-500/95 font-medium">
 								Direct bank transfer
 							</span>
 						</div>
@@ -596,7 +801,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 					{/* Card 1: Active Jobs */}
 					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
 						<div className="flex items-center justify-between">
-							<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">
 								Active Bookings
 							</span>
 							<span className="p-2 rounded-xl bg-blue-500/10 text-blue-300 border border-blue-500/20">
@@ -616,7 +821,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 					{/* Card 2: Completed Jobs */}
 					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
 						<div className="flex items-center justify-between">
-							<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">
 								Completed
 							</span>
 							<span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
@@ -636,8 +841,8 @@ function ProviderOverview({ user, stats, recentBookings }) {
 					{/* Card 3: Quality Rating */}
 					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
 						<div className="flex items-center justify-between">
-							<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-								Quality Score
+							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">
+								Customer Rating
 							</span>
 							<span className="p-2 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20">
 								<Star size={15} />
@@ -651,7 +856,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 								</span>
 							</div>
 							<p className="text-[11px] text-amber-300/90 mt-1 flex items-center gap-1">
-								<span>Verified feedback</span>
+								<span>Verified customer reviews</span>
 							</p>
 						</div>
 					</div>
@@ -659,8 +864,8 @@ function ProviderOverview({ user, stats, recentBookings }) {
 					{/* Card 4: Clients Served */}
 					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
 						<div className="flex items-center justify-between">
-							<span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-								Clients
+							<span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">
+								Total Customers
 							</span>
 							<span className="p-2 rounded-xl bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20">
 								<Users size={15} />
@@ -671,7 +876,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 								{stats.total_customers ?? 0}
 							</div>
 							<p className="text-[11.5px] text-slate-400 mt-1">
-								Direct patron base
+								Clients served
 							</p>
 						</div>
 					</div>
@@ -692,7 +897,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 									Upcoming Bookings
 								</h3>
 								<p className="text-xs text-slate-400">
-									Chronological list of customer scheduled jobs
+									Your scheduled customer appointments
 								</p>
 							</div>
 						</div>
@@ -709,10 +914,10 @@ function ProviderOverview({ user, stats, recentBookings }) {
 						{recentBookings.length === 0 ? (
 							<div className="py-12 text-center text-slate-500 space-y-2">
 								<CalendarCheck size={32} className="mx-auto text-slate-600" />
-								<p className="text-sm font-bold text-slate-300">
+								<p className="text-md font-bold text-slate-300">
 									No active bookings right now
 								</p>
-								<p className="text-xs text-slate-500">
+								<p className="text-sm text-slate-500/95">
 									When customers schedule service in your area, they will
 									populate here instantly.
 								</p>
@@ -755,7 +960,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 
 											<div className="flex items-center gap-3 shrink-0">
 												<span
-													className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1.5 ${status.badge}`}
+													className={`px-2 py-0.5 rounded-full text-[11.5px] font-bold border flex items-center gap-1.5 ${status.badge}`}
 												>
 													<span
 														className={`h-1.5 w-1.5 rounded-full ${status.dot}`}
@@ -784,7 +989,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 						<div className="flex items-center gap-2 border-b border-white/[0.06] pb-3">
 							<SlidersHorizontal size={16} className="text-violet-400" />
 							<h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-200">
-								Merchant Workflows
+								Quick Actions
 							</h3>
 						</div>
 
@@ -799,10 +1004,10 @@ function ProviderOverview({ user, stats, recentBookings }) {
 									</div>
 									<div>
 										<p className="text-xs font-bold text-white">
-											Service Catalog & Rates
+											Services & Pricing
 										</p>
 										<p className="text-[11px] text-slate-400">
-											Update pricing per visiting hour or task
+											Update pricing per hour or service package
 										</p>
 									</div>
 								</div>
@@ -864,7 +1069,7 @@ function ProviderOverview({ user, stats, recentBookings }) {
 					<div className="p-5 rounded-3xl bg-gradient-to-tr from-violet-950/40 via-[#140b28] to-[#1a0f35] border border-violet-500/20 text-xs space-y-2">
 						<div className="flex items-center gap-2 text-violet-300 font-extrabold">
 							<ShieldCheck size={16} />
-							<span>Merchant Protection Guarantee</span>
+							<span>Provider Protection Guarantee</span>
 						</div>
 						<p className="text-slate-300 text-[13px] leading-relaxed">
 							Customer cancellations within 2 hours of arrival automatically

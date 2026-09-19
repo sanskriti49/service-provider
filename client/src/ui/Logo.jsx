@@ -5,15 +5,15 @@ import { Link } from "react-router-dom";
  * Standardized TaskGenie Logo Component
  *
  * Consistent across Landing, Admin Dashboard, Provider Dashboard, Auth, and Footer:
- * - Official Magic Lamp SVG (/images/taskgenie-logo.svg)
- * - Authentic brand Lobster Two cursive typography
- * - Dynamic size & theme variants (dark/light/primary)
+ * - Handcrafted Artisanal Magic Lamp SVG (/images/taskgenie-logo.svg)
+ * - Authentic Lobster Two brand typography with anti-clipping padding
+ * - Harmonious theme variants (dark/light/primary)
  * - Optional link wrapping
  */
 export default function Logo({
 	size = "md", // "xs" | "sm" | "md" | "lg" | "xl" | number
 	variant = "full", // "full" | "icon" | "wordmark"
-	theme = "dark", // "dark" (violet-400->fuchsia-400) | "light" (violet-700->fuchsia-700) | "primary" (violet-600->fuchsia-600)
+	theme = "dark", // "dark" | "light" | "primary"
 	to = null, // if provided, wraps in React Router <Link>
 	className = "",
 	onClick,
@@ -24,7 +24,7 @@ export default function Logo({
 		sm: { icon: "h-7 w-7", text: "text-xl", imgSize: 28 },
 		md: { icon: "h-8 w-8", text: "text-2xl", imgSize: 32 },
 		lg: { icon: "h-10 w-10", text: "text-3xl", imgSize: 40 },
-		xl: { icon: "h-11 w-11", text: "text-3xl sm:text-4xl", imgSize: 44 },
+		xl: { icon: "h-12 w-12 sm:h-14 sm:w-14", text: "text-3xl sm:text-4xl", imgSize: 44 },
 	};
 
 	const resolvedSize =
@@ -37,18 +37,30 @@ export default function Logo({
 					customTextStyle: { fontSize: `${Math.round(size * 0.75)}px` },
 				};
 
-	// Typography gradient by theme
-	const themeGradients = {
-		dark: "bg-gradient-to-r from-violet-400 via-fuchsia-400 to-indigo-300",
-		light: "bg-gradient-to-r from-violet-700 via-fuchsia-700 to-fuchsia-700",
-		primary: "bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600",
+	// Theme color treatments
+	const themeStyles = {
+		dark: {
+			prefix: "text-white",
+			suffix:
+				"bg-gradient-to-r from-violet-300 via-indigo-200 to-amber-300 bg-clip-text text-transparent",
+		},
+		light: {
+			prefix: "text-slate-900",
+			suffix:
+				"bg-gradient-to-r from-violet-600 via-indigo-600 to-amber-600 bg-clip-text text-transparent",
+		},
+		primary: {
+			prefix: "text-[#1E1B4B]",
+			suffix:
+				"bg-gradient-to-r from-violet-600 via-indigo-600 to-amber-500 bg-clip-text text-transparent",
+		},
 	};
 
-	const textGradient = themeGradients[theme] || themeGradients.dark;
+	const currentTheme = themeStyles[theme] || themeStyles.dark;
 
 	const Icon = (
 		<div
-			className={`shrink-0 overflow-hidden drop-shadow-md transition-transform duration-300 group-hover:scale-105 ${
+			className={`shrink-0 overflow-hidden drop-shadow-sm transition-transform duration-300 group-hover:scale-105 ${
 				resolvedSize.icon || ""
 			}`}
 			style={resolvedSize.customIconStyle}
@@ -64,12 +76,21 @@ export default function Logo({
 
 	const Wordmark = (
 		<span
-			className={`lobster font-bold bg-clip-text text-transparent pb-0.5 tracking-tight ${textGradient} ${
+			className={`font-lobster font-bold select-none leading-normal inline-flex items-baseline ${
 				resolvedSize.text || ""
 			}`}
 			style={resolvedSize.customTextStyle}
 		>
-			TaskGenie
+			<span className={currentTheme.prefix}>Task</span>
+			{/*
+			  We use inline-block with pl-2 -ml-2 and pr-1 so the calligraphic left swash/loop
+			  of capital 'G' in Lobster Two is never clipped by the CSS background-clip: text box!
+			*/}
+			<span
+				className={`inline-block pl-2 -ml-2 pr-1.5 py-0.5 ${currentTheme.suffix}`}
+			>
+				Genie
+			</span>
 		</span>
 	);
 

@@ -1,29 +1,53 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
 	Bell,
-	Calendar,
+	CalendarCheck,
 	Star,
 	CheckCheck,
 	Trash2,
-	Filter,
 	ArrowLeft,
 	Sparkles,
 	Clock,
-	CheckCircle2,
-	CircleAlert,
 	ChevronRight,
+	Check,
+	Inbox,
+	Compass,
+	ShieldCheck,
+	CircleCheck,
 } from "lucide-react";
 import { FadeLoader } from "react-spinners";
 import { toast } from "sonner";
 import { getSocket } from "../utils/socket";
 import ConfirmDialog from "../ui/ConfirmDialog";
-
+import Logo from "../ui/Logo";
+import { useAuth } from "../contexts/AuthContext";
 import { API_URL } from "../config";
-function formatDate(dateString) {
+
+function formatRelativeTime(dateString) {
 	if (!dateString) return "";
 	const date = new Date(dateString);
-	return date.toLocaleString("en-US", {
+	const now = new Date();
+	const diffSec = Math.floor((now - date) / 1000);
+
+	if (diffSec < 60) return "Just now";
+	const diffMin = Math.floor(diffSec / 60);
+	if (diffMin < 60) return `${diffMin}m ago`;
+	const diffHours = Math.floor(diffMin / 60);
+	if (diffHours < 24) return `${diffHours}h ago`;
+
+	const isYesterday =
+		new Date(now.setDate(now.getDate() - 1)).toDateString() ===
+		date.toDateString();
+	if (isYesterday) {
+		return `Yesterday at ${date.toLocaleTimeString("en-US", {
+			hour: "numeric",
+			minute: "2-digit",
+			hour12: true,
+		})}`;
+	}
+
+	return date.toLocaleDateString("en-US", {
 		month: "short",
 		day: "numeric",
 		hour: "numeric",
@@ -32,18 +56,71 @@ function formatDate(dateString) {
 	});
 }
 
+function getDateGroup(dateString) {
+	if (!dateString) return "Earlier";
+	const date = new Date(dateString);
+	const today = new Date();
+	const isToday = today.toDateString() === date.toDateString();
+	if (isToday) return "Today";
+
+	const yesterday = new Date();
+	yesterday.setDate(yesterday.getDate() - 1);
+	if (yesterday.toDateString() === date.toDateString()) return "Yesterday";
+
+	const oneWeekAgo = new Date();
+	oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+	if (date > oneWeekAgo) return "This Week";
+
+	return "Earlier";
+}
+
+function getNotificationStyle(type) {
+	if (type?.includes("booking")) {
+		return {
+			icon: <CalendarCheck className="w-5 h-5 text-violet-600" />,
+			badgeBg: "bg-violet-100/70 border-violet-200/80 text-violet-700",
+			cardBorder: "hover:border-violet-300",
+			accentColor: "from-violet-600 to-indigo-600",
+			label: "Booking Update",
+		};
+	}
+	if (type?.includes("review")) {
+		return {
+			icon: <Star className="w-5 h-5 text-amber-500" />,
+			badgeBg: "bg-amber-100/70 border-amber-200/80 text-amber-700",
+			cardBorder: "hover:border-amber-300",
+			accentColor: "from-amber-500 to-amber-600",
+			label: "Review & Rating",
+		};
+	}
+	return {
+		icon: <Sparkles className="w-5 h-5 text-indigo-600" />,
+		badgeBg: "bg-indigo-100/70 border-indigo-200/80 text-indigo-700",
+		cardBorder: "hover:border-indigo-300",
+		accentColor: "from-indigo-600 to-violet-600",
+		label: "TaskGenie Notice",
+	};
+}
+
 export default function NotificationsPage() {
 	const [notifications, setNotifications] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [activeFilter, setActiveFilter] = useState("all");
 	const [unreadCount, setUnreadCount] = useState(0);
 	const [showClearConfirm, setShowClearConfirm] = useState(false);
+	const { user } = useAuth();
 	const navigate = useNavigate();
+
+	const backUrl = useMemo(() => {
+		if (user?.role === "provider") return "/provider/dashboard";
+		if (user?.role === "admin") return "/admin";
+		return "/dashboard";
+	}, [user?.role]);
 
 	const fetchNotifications = async () => {
 		const token = localStorage.getItem("token");
 		if (!token) {
-			navigate("/sign-in");
+			navigate("/login");
 			return;
 		}
 
@@ -61,7 +138,7 @@ export default function NotificationsPage() {
 			}
 		} catch (err) {
 			console.error("Failed to load notifications:", err);
-			toast.error("Failed to load notifications");
+			toast.error("Failed to load notifications. Please ensure backend is running.");
 		} finally {
 			setLoading(false);
 		}
@@ -69,7 +146,6 @@ export default function NotificationsPage() {
 
 	useEffect(() => {
 		fetchNotifications();
-
 		getSocket();
 
 		const handleRealtime = (e) => {
@@ -153,215 +229,327 @@ export default function NotificationsPage() {
 		}
 	};
 
-	const filteredNotifications = notifications.filter((notif) => {
-		if (activeFilter === "unread") return !notif.is_read;
-		if (activeFilter === "bookings") return notif.type?.includes("booking");
-		if (activeFilter === "reviews") return notif.type?.includes("review");
-		if (activeFilter === "system") return notif.type === "system";
-		return true;
-	});
+	const filteredNotifications = useMemo(() => {
+		return notifications.filter((notif) => {
+			if (activeFilter === "unread") return !notif.is_read;
+			if (activeFilter === "bookings") return notif.type?.includes("booking");
+			if (activeFilter === "reviews") return notif.type?.includes("review");
+			return true;
+		});
+	}, [notifications, activeFilter]);
 
-	const getIcon = (type) => {
-		if (type?.includes("booking"))
-			return <Calendar className="w-5 h-5 text-violet-400" />;
-		if (type?.includes("review"))
-			return <Star className="w-5 h-5 text-yellow-400" />;
-		return <Sparkles className="w-5 h-5 text-cyan-400" />;
-	};
+	// Group notifications into Today, Yesterday, This Week, Earlier
+	const groupedNotifications = useMemo(() => {
+		const groups = {};
+		for (const notif of filteredNotifications) {
+			const group = getDateGroup(notif.created_at);
+			if (!groups[group]) groups[group] = [];
+			groups[group].push(notif);
+		}
+		return groups;
+	}, [filteredNotifications]);
 
 	return (
-		<div className="min-h-screen bg-[#191034] text-white selection:bg-violet-500/30 pb-20">
-			<div className="fixed inset-0 pointer-events-none overflow-hidden">
-				<div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-900/20 rounded-full blur-[120px]" />
-				<div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-900/20 rounded-full blur-[100px]" />
+		<div className="min-h-screen bg-[#faf8ff] text-slate-900 selection:bg-violet-500/20 pb-24 bricolage-grotesque">
+			{/* Ambient Warm Atmosphere Halos */}
+			<div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+				<div className="absolute top-0 right-1/4 w-[600px] h-[350px] bg-violet-400/10 blur-[130px] rounded-full" />
+				<div className="absolute top-1/3 left-10 w-[500px] h-[350px] bg-amber-300/10 blur-[140px] rounded-full" />
+				<div className="absolute bottom-10 right-1/3 w-[500px] h-[300px] bg-indigo-400/10 blur-[130px] rounded-full" />
 			</div>
 
-			<div className="sticky top-0 z-40 bg-[#191034]/90 backdrop-blur-xl border-b border-white/5">
-				<div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
-					<div className="flex items-center gap-3">
-						<button
-							onClick={() => navigate(-1)}
-							className="p-2 rounded-full hover:bg-white/10 text-gray-300 hover:text-white transition-colors cursor-pointer"
+			{/* Top Brand Navigation Header */}
+			<header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-xs">
+				<div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
+					{/* Brand Logo & Back Breadcrumb */}
+					<div className="flex items-center gap-4">
+						<Logo to="/" size="md" theme="primary" />
+
+						<div className="h-5 w-px bg-slate-200 hidden sm:block" />
+
+						<Link
+							to={backUrl}
+							className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/80 hover:bg-slate-200/80 text-slate-700 hover:text-slate-900 text-xs font-bold transition-all"
 						>
-							<ArrowLeft size={20} />
-						</button>
-						<div>
-							<h1 className="text-xl font-bold bricolage-grotesque">
-								Notifications Center
-							</h1>
-							<p className="text-xs text-gray-400">
-								Live real-time alerts & booking updates
-							</p>
-						</div>
+							<ArrowLeft size={14} />
+							<span>Dashboard</span>
+						</Link>
 					</div>
 
-					{unreadCount > 0 && (
-						<button
-							onClick={handleMarkAllAsRead}
-							className="px-3 py-1.5 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 text-violet-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-						>
-							<CheckCheck size={14} />
-							<span>Mark all as read</span>
-						</button>
-					)}
-				</div>
-			</div>
+					{/* Header Actions */}
+					<div className="flex items-center gap-2.5">
+						{unreadCount > 0 && (
+							<button
+								onClick={handleMarkAllAsRead}
+								className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+							>
+								<CheckCheck size={14} />
+								<span className="hidden sm:inline">Mark all as read</span>
+								<span className="sm:hidden">Mark all</span>
+							</button>
+						)}
 
-			<div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#22194A] p-2 sm:p-2.5 rounded-2xl border border-white/5">
+						{notifications.some((n) => n.is_read) && (
+							<button
+								onClick={() => setShowClearConfirm(true)}
+								className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 text-xs font-bold transition-all border border-slate-200/80 cursor-pointer"
+								title="Clear read notifications"
+							>
+								<Trash2 size={13} />
+								<span className="hidden sm:inline">Clear read</span>
+							</button>
+						)}
+					</div>
+				</div>
+			</header>
+
+			{/* Main Content Area */}
+			<main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
+				{/* Hero Title & Live Status */}
+				<div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2">
+					<div>
+						<div className="flex items-center gap-3 flex-wrap">
+							<h1 className="text-3xl sm:text-4xl font-extrabold text-[#1E1B4B] tracking-tight">
+								Notification Inbox
+							</h1>
+
+							{unreadCount > 0 ? (
+								<span className="px-3 py-1 text-xs font-extrabold bg-violet-600 text-white rounded-full shadow-sm shadow-violet-500/30">
+									{unreadCount} unread
+								</span>
+							) : (
+								<span className="px-3 py-1 text-xs font-bold bg-emerald-100/80 text-emerald-800 rounded-full border border-emerald-200 flex items-center gap-1.5">
+									<CircleCheck size={13} className="text-emerald-600" />
+									All caught up
+								</span>
+							)}
+						</div>
+
+						<p className="text-sm text-slate-500 mt-1.5 font-medium leading-relaxed max-w-xl">
+							Stay up to speed with your live appointments, provider confirmations, and customer reviews.
+						</p>
+					</div>
+
+					{/* Live Connection Tag */}
+					<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200/90 text-xs font-medium text-slate-600 shadow-xs self-start sm:self-auto">
+						<span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
+						<span>Live socket sync active</span>
+					</div>
+				</div>
+
+				{/* Filter Segmented Control Tabs */}
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2 rounded-2xl border border-slate-200/90 shadow-xs">
 					<div className="flex gap-1.5 overflow-x-auto custom-scrollbar-x pb-1 sm:pb-0">
 						{[
-							{ id: "all", label: "All", count: notifications.length },
-							{ id: "unread", label: "Unread", count: unreadCount },
+							{
+								id: "all",
+								label: "All Updates",
+								count: notifications.length,
+								icon: Bell,
+							},
+							{
+								id: "unread",
+								label: "Unread",
+								count: unreadCount,
+								icon: Inbox,
+							},
 							{
 								id: "bookings",
 								label: "Bookings",
-								count: notifications.filter((n) => n.type?.includes("booking"))
-									.length,
+								count: notifications.filter((n) => n.type?.includes("booking")).length,
+								icon: CalendarCheck,
 							},
 							{
 								id: "reviews",
 								label: "Reviews",
-								count: notifications.filter((n) => n.type?.includes("review"))
-									.length,
+								count: notifications.filter((n) => n.type?.includes("review")).length,
+								icon: Star,
 							},
-						].map((tab) => (
-							<button
-								key={tab.id}
-								onClick={() => setActiveFilter(tab.id)}
-								className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-									activeFilter === tab.id
-										? "bg-violet-600 text-white shadow-md shadow-violet-900/40"
-										: "text-gray-400 hover:text-white hover:bg-white/5"
-								}`}
-							>
-								<span>{tab.label}</span>
-								{tab.count > 0 && (
-									<span
-										className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-											activeFilter === tab.id
-												? "bg-white/20 text-white"
-												: "bg-white/10 text-gray-400"
-										}`}
-									>
-										{tab.count}
-									</span>
-								)}
-							</button>
-						))}
+						].map((tab) => {
+							const Icon = tab.icon;
+							const isActive = activeFilter === tab.id;
+							return (
+								<button
+									key={tab.id}
+									onClick={() => setActiveFilter(tab.id)}
+									className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
+										isActive
+											? "bg-[#1E1B4B] text-white shadow-md shadow-indigo-950/20"
+											: "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+									}`}
+								>
+									<Icon size={14} className={isActive ? "text-violet-300" : "text-slate-400"} />
+									<span>{tab.label}</span>
+									{tab.count > 0 && (
+										<span
+											className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+												isActive
+													? "bg-white/20 text-white"
+													: "bg-slate-100 text-slate-600"
+											}`}
+										>
+											{tab.count}
+										</span>
+									)}
+								</button>
+							);
+						})}
 					</div>
-
-					{notifications.some((n) => n.is_read) && (
-						<button
-							onClick={() => setShowClearConfirm(true)}
-							className="text-xs text-gray-400 hover:text-red-400 flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
-						>
-							<Trash2 size={13} />
-							<span>Clear read</span>
-						</button>
-					)}
 				</div>
 
+				{/* Content Feed */}
 				{loading ? (
-					<div className="py-20 flex flex-col items-center justify-center gap-4">
-						<FadeLoader color="#8b5cf6" />
-						<p className="text-sm text-violet-300/70">
-							Loading notifications...
+					<div className="py-24 flex flex-col items-center justify-center gap-3 bg-white rounded-3xl border border-slate-200/80 shadow-xs">
+						<FadeLoader color="#6366F1" />
+						<p className="text-sm font-semibold text-slate-500 mt-3">
+							Syncing your notifications...
 						</p>
 					</div>
 				) : filteredNotifications.length === 0 ? (
-					<div className="p-12 text-center bg-[#22194A] rounded-3xl border border-dashed border-white/10 space-y-3">
-						<div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto text-violet-400">
-							<Bell size={28} />
+					<div className="py-20 px-6 text-center bg-white rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+						<div className="w-16 h-16 bg-gradient-to-br from-violet-100 to-indigo-50 border border-violet-200/80 rounded-3xl flex items-center justify-center mx-auto text-violet-600 shadow-sm">
+							<Bell size={28} className="text-violet-600" />
 						</div>
-						<h3 className="text-lg font-bold text-white">No notifications</h3>
-						<p className="text-xs text-gray-400 max-w-sm mx-auto">
-							You're all caught up! New updates regarding bookings, reviews, and
-							appointments will appear here automatically.
-						</p>
+						<div className="space-y-1.5 max-w-sm mx-auto">
+							<h3 className="text-lg font-bold text-slate-900">
+								No notifications right now
+							</h3>
+							<p className="text-xs sm:text-sm text-slate-500 leading-relaxed font-normal">
+								{activeFilter === "unread"
+									? "You've read all your notifications. Check back later for new booking updates!"
+									: "You're all caught up! New updates regarding bookings, reviews, and specialists will appear here live."}
+							</p>
+						</div>
+
+						<div className="pt-2 flex items-center justify-center gap-3">
+							<Link
+								to="/services"
+								className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/25 transition-all cursor-pointer"
+							>
+								<Compass size={14} />
+								<span>Explore Services</span>
+							</Link>
+							<Link
+								to={backUrl}
+								className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+							>
+								<span>Go to Dashboard</span>
+							</Link>
+						</div>
 					</div>
 				) : (
-					<div className="space-y-3">
-						{filteredNotifications.map((notif) => (
-							<div
-								key={notif.id}
-								onClick={() => handleMarkAsRead(notif.id)}
-								className={`p-4 sm:p-5 rounded-2xl border transition-all relative overflow-hidden group cursor-pointer ${
-									!notif.is_read
-										? "bg-[#271d54] border-violet-500/40 shadow-lg shadow-violet-900/20"
-										: "bg-[#22194A] border-white/5 hover:border-white/10"
-								}`}
-							>
-								{!notif.is_read && (
-									<div className="absolute top-0 left-0 bottom-0 w-1 bg-gradient-to-b from-violet-500 to-fuchsia-500" />
-								)}
+					<div className="space-y-8">
+						{Object.entries(groupedNotifications).map(([groupTitle, items]) => (
+							<div key={groupTitle} className="space-y-3">
+								{/* Group Date Header */}
+								<div className="flex items-center gap-3 px-1">
+									<span className="text-xs font-black uppercase tracking-wider text-slate-400">
+										{groupTitle}
+									</span>
+									<div className="flex-1 h-px bg-slate-200/80" />
+								</div>
 
-								<div className="flex items-start gap-4">
-									<div className="p-3 bg-white/5 border border-white/10 rounded-2xl shrink-0 mt-0.5">
-										{getIcon(notif.type)}
-									</div>
-
-									<div className="flex-1 min-w-0">
-										<div className="flex items-center justify-between gap-2 mb-1.5">
-											<div className="flex items-center gap-2">
-												<h4
-													className={`text-sm ${
-														!notif.is_read
-															? "font-bold text-white"
-															: "font-semibold text-gray-200"
-													}`}
-												>
-													{notif.title}
-												</h4>
+								{/* Notification Cards */}
+								<div className="space-y-3">
+									{items.map((notif) => {
+										const style = getNotificationStyle(notif.type);
+										return (
+											<div
+												key={notif.id}
+												onClick={() => handleMarkAsRead(notif.id)}
+												className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
+													!notif.is_read
+														? "bg-white border-violet-300 shadow-sm ring-1 ring-violet-500/10 hover:border-violet-400"
+														: "bg-white/80 hover:bg-white border-slate-200/80 hover:border-slate-300 shadow-xs"
+												}`}
+											>
+												{/* Left Accent Strip for Unread */}
 												{!notif.is_read && (
-													<span className="w-2 h-2 rounded-full bg-violet-400" />
+													<div
+														className={`absolute top-0 left-0 bottom-0 w-1.5 bg-gradient-to-b ${style.accentColor}`}
+													/>
 												)}
+
+												<div className="flex items-start gap-4">
+													{/* Type Icon Badge */}
+													<div
+														className={`p-3 rounded-2xl border shrink-0 mt-0.5 shadow-xs transition-transform group-hover:scale-105 ${style.badgeBg}`}
+													>
+														{style.icon}
+													</div>
+
+													{/* Details */}
+													<div className="flex-1 min-w-0">
+														<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 mb-1.5">
+															<div className="flex items-center gap-2">
+																<h4
+																	className={`text-sm sm:text-base leading-snug ${
+																		!notif.is_read
+																			? "font-bold text-slate-900"
+																			: "font-semibold text-slate-700"
+																	}`}
+																>
+																	{notif.title}
+																</h4>
+
+																{!notif.is_read && (
+																	<span className="w-2 h-2 rounded-full bg-violet-600 inline-block shrink-0" />
+																)}
+															</div>
+
+															<div className="flex items-center gap-1 text-xs font-medium text-slate-400 shrink-0">
+																<Clock size={12} />
+																<span>{formatRelativeTime(notif.created_at)}</span>
+															</div>
+														</div>
+
+														<p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+															{notif.message}
+														</p>
+
+														{/* Interactive Booking Action CTA */}
+														{notif.data?.booking_id && (
+															<div className="mt-3.5 flex items-center gap-3">
+																<button
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		const role = user?.role || localStorage.getItem("role");
+																		if (role === "provider") {
+																			navigate("/provider/dashboard/bookings");
+																		} else {
+																			navigate("/dashboard/bookings");
+																		}
+																	}}
+																	className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 hover:text-violet-900 bg-violet-50 hover:bg-violet-100 px-3.5 py-1.5 rounded-xl border border-violet-200 transition-all cursor-pointer shadow-xs"
+																>
+																	<span>View Booking Details</span>
+																	<ChevronRight size={13} />
+																</button>
+															</div>
+														)}
+													</div>
+
+													{/* Delete Trigger */}
+													<button
+														onClick={(e) => handleDelete(notif.id, e)}
+														className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer shrink-0"
+														title="Delete notification"
+														aria-label="Delete notification"
+													>
+														<Trash2 size={16} />
+													</button>
+												</div>
 											</div>
-
-											<span className="text-[11px] text-gray-500 shrink-0">
-												{formatDate(notif.created_at)}
-											</span>
-										</div>
-
-										<p className="text-xs text-gray-300 leading-relaxed">
-											{notif.message}
-										</p>
-
-										{notif.data?.booking_id && (
-											<div className="mt-3 flex items-center gap-3">
-												<button
-													onClick={(e) => {
-														e.stopPropagation();
-														const role = localStorage.getItem("role");
-														if (role === "provider") {
-															navigate("/provider/dashboard");
-														} else {
-															navigate("/customer/bookings");
-														}
-													}}
-													className="inline-flex items-center gap-1 text-xs font-semibold text-violet-300 hover:text-white bg-violet-500/15 hover:bg-violet-500/25 px-3 py-1 rounded-lg border border-violet-500/30 transition-all cursor-pointer"
-												>
-													<span>View Booking</span>
-													<ChevronRight size={12} />
-												</button>
-											</div>
-										)}
-									</div>
-
-									<button
-										onClick={(e) => handleDelete(notif.id, e)}
-										className="opacity-0 group-hover:opacity-100 p-2 text-gray-500 hover:text-red-400 hover:bg-white/5 rounded-xl transition-all cursor-pointer shrink-0"
-										title="Delete notification"
-									>
-										<Trash2 size={15} />
-									</button>
+										);
+									})}
 								</div>
 							</div>
 						))}
 					</div>
 				)}
-			</div>
+			</main>
 
+			{/* Confirm Clear Read Dialog */}
 			<ConfirmDialog
 				isOpen={showClearConfirm}
 				onClose={() => setShowClearConfirm(false)}
@@ -370,7 +558,7 @@ export default function NotificationsPage() {
 					await handleClearRead();
 				}}
 				title="Clear read notifications?"
-				description="This will permanently delete all read notifications from your history."
+				description="This will permanently remove all read notifications from your history."
 				confirmText="Clear read"
 				cancelText="Cancel"
 				variant="danger"

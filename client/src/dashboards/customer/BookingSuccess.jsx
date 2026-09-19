@@ -7,10 +7,10 @@ import {
 	Clock,
 	Navigation,
 	X,
-	Loader2,
 	CircleAlert,
 	Mail,
 } from "lucide-react";
+import { FadeLoader } from "react-spinners";
 import api from "../../api/axiosInstance";
 
 export default function BookingSuccess() {
@@ -218,7 +218,9 @@ export default function BookingSuccess() {
 												className="flex cursor-pointer disabled:cursor-not-allowed items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition disabled:opacity-50"
 											>
 												{isSaving ? (
-													<Loader2 size={14} className="animate-spin" />
+													<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
+														<FadeLoader color="#ffffff" />
+													</span>
 												) : (
 													<Check size={14} />
 												)}

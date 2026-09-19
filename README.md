@@ -8,19 +8,7 @@
 [![Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?style=flat&logo=terraform)](https://terraform.io)
 [![Prometheus](https://img.shields.io/badge/Metrics-Prometheus-E6522C?style=flat&logo=prometheus)](https://prometheus.io)
 
-TaskGenie is a cloud-native, high-concurrency hyper-local on-demand service marketplace connecting consumers with vetted professionals in real-time. Built on a decoupled **PERN stack** (PostgreSQL, Express.js, React, Node.js), TaskGenie combines **geospatial proximity indexing**, **pessimistic row-level concurrency locking** to eliminate double-booking race conditions, **asynchronous Event-Driven Architecture (EDA)** for non-blocking worker execution, and **Prometheus cloud observability**.
-
----
-
-## 🎯 Engineering Rationale: "Why Build TaskGenie When Marketplaces Already Exist?"
-
-> **Interview Pitch & Architecture Context:**  
-> TaskGenie was built not as a feature clone, but as a **distributed systems and cloud architecture testbed** to reverse-engineer and solve the four hardest backend bottlenecks that hyper-local platforms (like Urban Company or TaskRabbit) face at scale:
->
-> 1. **High-Concurrency Race Conditions:** Flash-crowd demand on top-rated professionals causes double-booking bugs. TaskGenie guarantees atomic scheduling using PostgreSQL row locks (`SELECT ... FOR UPDATE`) within isolated database transactions.
-> 2. **Sub-10ms Geospatial Proximity Matching:** Computing proximity without full-table scans via spatial indexes (`idx_providers_location`) and spherical **Haversine Distance algorithms** with transit buffer calculations.
-> 3. **Event-Driven Decoupling (EDA):** Slow third-party I/O (cryptographic payment verification, transactional email receipts, SMS OTPs) is offloaded to an asynchronous background worker queue with exponential backoff retries, ensuring the core booking API responds in **$<40\text{ms}$**.
-> 4. **Cloud-Native Observability & Zero-Cost Cloud Emulation:** Kubernetes/ECS readiness probes (`/health/ready`, `/health/live`), Prometheus `/metrics` scraping, and LocalStack/Terraform IaC allow complete enterprise cloud validation on a **$0 budget**.
+TaskGenie is a cloud-native, high-concurrency hyper-local on-demand service marketplace connecting consumers with vetted professionals in real-time. Built on a decoupled **PERN stack** (PostgreSQL, Express.js, React, Node.js), TaskGenie combines **PostGIS spatial indexing**, **Redis distributed locks (Redlock)** and PostgreSQL row locks for multi-tiered concurrency, **durable BullMQ + Redis event-driven background workers**, **PgBouncer-compatible connection pooling safeguards**, **API rate limiting & Opossum circuit breakers**, and **Prometheus cloud observability**.
 
 ---
 
@@ -80,26 +68,39 @@ flowchart TD
 
 ## ⚡ Engineering & Architectural Highlights
 
-### 1. ⚡ Event-Driven Decoupling (EDA) & Background Workers
-- Core booking endpoints delegate transactional email delivery and in-app notifications to an asynchronous worker queue (`eventQueue.js`).
-- Employs **exponential backoff retries** (up to 3 attempts with 200ms, 400ms, 800ms delays) and routes persistent errors to a **Dead-Letter Queue (DLQ)**.
-- Keeps HTTP request-response latency strictly under $40\text{ms}$ by preventing external SMTP / network delays from blocking users.
+### 1. ⚡ BullMQ + Redis Distributed Background Workers (EDA)
 
-### 2. 📍 Geospatial Proximity Search (<5ms Lookup Latency)
-- Utilizes indexed spatial queries (`idx_providers_location`) and spherical **Haversine Distance algorithms** to compute nearest service providers within a dynamic radius (1km – 50km).
-- Incorporates real-time transit buffer calculations (`estimateTravelTimeMinutes`) between adjacent booking slots to prevent impossible provider schedules.
+- Migrated asynchronous workload processing from an in-memory queue to **BullMQ on Redis** with persistent job storage, worker concurrency limits, and distributed locking.
+- Employs **exponential backoff retries** (up to 3 attempts) and routes permanently failed jobs to a **Dead-Letter Queue (DLQ)**.
+- Features **resilient dual-mode fallback**: automatically degrades to an in-memory worker queue if Redis is temporarily unreachable, guaranteeing zero downtime.
+- Offloads slow transactional email (Nodemailer) and push notifications, keeping HTTP request-response latency strictly under **$<40\text{ms}$**.
 
-### 3. 🔒 Concurrency Control & Double-Booking Prevention
-- Employs PostgreSQL row-level locks (`SELECT ... FOR UPDATE`) inside atomic database transactions (`BEGIN ... COMMIT`) during the booking window.
-- Guarantees zero race conditions when multiple customers attempt to reserve the same professional's overlapping time slot simultaneously.
+### 2. 📍 Sub-10ms PostGIS Geospatial Proximity Matching
 
-### 4. 📊 Cloud Observability & SRE Readiness
-- **Prometheus Metrics (`/metrics`)**: Exposes custom duration histograms (`taskgenie_http_request_duration_seconds`), booking throughput counters (`taskgenie_bookings_total`), and queue metrics.
-- **Container Probes**: Provides Kubernetes/ECS-ready `/health/live` (process health & memory) and `/health/ready` (active PostgreSQL pool & queue health checks).
+- Replaced table-scanning trigonometry with native PostgreSQL **PostGIS (`GEOGRAPHY(Point, 4326)`)** and **R-Tree GIST spatial indexing (`idx_users_geom_gist`)**.
+- Uses `ST_DWithin()` for bounded radius filtering and `ST_Distance()` for database-engine distance calculation.
+- Backed by an automatic database trigger (`trg_users_geom_sync`) to keep coordinates synchronized, and falls back to spherical **Haversine Distance algorithms** if running on standard non-spatial PostgreSQL.
 
-### 5. 🏗️ Infrastructure as Code (IaC) & Docker
+### 3. 🔒 Two-Tiered Concurrency Control & Double-Booking Elimination
+
+- **Tier 1 (Redis Edge Lock):** Employs the **Redlock pattern** (`SET lock:slot <token> PX 15000 NX`) with atomic Lua script releasing. Under concurrent booking spikes, conflicting requests fail fast with HTTP 409 before opening or stalling database connections.
+- **Tier 2 (PostgreSQL ACID Isolation):** Uses row-level locks (`SELECT ... FOR UPDATE`) inside atomic database transactions (`BEGIN ... COMMIT`) during the final slot allocation and transit buffer verification.
+
+### 4. 🛡️ API Rate Limiting & Circuit Breakers (Chaos Resilience)
+
+- **Tiered Rate Limiting (`express-rate-limit` + `rate-limit-redis`):** Global limiter (300 req / 15 min), sensitive authentication limiter (15 req / 15 min on login, registration, password reset, and OTP verification), and booking limiter (25 req / 5 min).
+- **Opossum Circuit Breakers:** Wraps external third-party I/O (Razorpay payment order creation, Nodemailer SMTP delivery) with circuit breakers. When downstream services fail or time out, the circuit trips to `OPEN`, immediately failing fast without exhausting thread pools or hanging customer requests.
+
+### 5. 📊 Database Connection Pooling Safeguards & SRE Observability
+
+- **PgBouncer-Compatible Pool Tuning:** Configured connection recycling (`maxUses: 7500`), fast client timeouts (`connectionTimeoutMillis: 5000`), and idle connection pruning (`idleTimeoutMillis: 30000`) to prevent pool starvation.
+- **Prometheus Metrics (`/metrics`)**: Exposes custom duration histograms (`taskgenie_http_request_duration_seconds`), booking counters (`taskgenie_bookings_total`), database pool saturation gauges (`taskgenie_db_pool_total`, `taskgenie_db_pool_idle`, `taskgenie_db_pool_waiting`), and circuit breaker state gauges.
+- **Container Probes**: Kubernetes/ECS-ready `/health/live` (process health & memory) and `/health/ready` (active PostgreSQL pool & queue health checks).
+
+### 6. 🏗️ Infrastructure as Code (IaC) & Docker
+
 - Complete **Terraform (`terraform/main.tf`)** specification provisioning S3 asset buckets with CORS, SQS FIFO queues with DLQ, and IAM least-privilege execution roles.
-- **Docker Compose** orchestration running the Node API, PostgreSQL, Redis, Prometheus, and LocalStack (offline AWS S3 & SQS emulation) for \$0 local cloud development.
+- **Docker Compose** orchestration running the Node API, PostGIS (`postgis/postgis:15-3.4-alpine`), Redis, Prometheus, and LocalStack (offline AWS S3 & SQS emulation) for \$0 local cloud development.
 
 ---
 
@@ -112,7 +113,10 @@ service-provider/
 │   └── variables.tf          # Configurable Deployment Variables
 ├── client/                   # React + Vite Frontend Application
 │   ├── src/
-│   │   ├── components/       # Reusable UI Elements
+│   │   ├── components/       # Reusable UI Components
+│   │   ├── contexts/         # React Contexts for Global State
+│   │   ├── hooks/            # Custom React Hooks
+│   │   ├── layouts/          # Different Layouts for Pages
 │   │   ├── pages/            # Marketplace, Dashboard, Booking Views
 │   │   └── App.jsx           # Routing Engine
 │   └── package.json
@@ -140,23 +144,27 @@ service-provider/
 ## 🚀 Local Setup & Installation
 
 ### Prerequisites
-- **Node.js**: v18+ 
+
+- **Node.js**: v18+
 - **PostgreSQL**: v14+ (Local instance or Cloud: NeonDB / Supabase)
 - **Razorpay Account**: Test API Keys
 
 ### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/sanskriti49/service-provider.git
 cd service-provider
 ```
 
 ### 2. Backend Setup
+
 ```bash
 cd server
 npm install
 ```
 
 Create `.env` inside `/server`:
+
 ```env
 PORT=5000
 DATABASE_URL=postgresql://postgres:password@localhost:5432/taskgenie
@@ -166,22 +174,27 @@ JWT_SECRET=your_secure_jwt_secret
 ```
 
 Run test suite:
+
 ```bash
 npm test
 ```
 
 Run server:
+
 ```bash
 npm run dev
 ```
 
 ### 3. Docker Compose (Full Cloud Stack Emulation)
+
 To spin up the entire cloud architecture locally (API + Postgres + Redis + LocalStack + Prometheus):
+
 ```bash
 docker-compose up --build
 ```
 
 Access:
+
 - **API**: `http://localhost:5000`
 - **Prometheus Metrics**: `http://localhost:5000/metrics`
 - **Liveness Probe**: `http://localhost:5000/health/live`
@@ -191,6 +204,7 @@ Access:
 ---
 
 ## 🛡️ Security Best Practices
+
 - **Parameterized SQL Queries**: Complete protection against SQL injection.
 - **Stateless Authentication**: Signed JWT tokens with strict expiration.
 - **Cryptographic Verification**: HMAC-SHA256 signature verification for payment webhooks.
@@ -199,4 +213,5 @@ Access:
 ---
 
 ## 📜 License
+
 Distributed under the MIT License.

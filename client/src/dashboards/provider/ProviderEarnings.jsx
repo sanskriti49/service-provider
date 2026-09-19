@@ -19,6 +19,7 @@ import {
 	ChevronLeft,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
+import { FadeLoader } from "react-spinners";
 
 import {
 	Chart as ChartJS,
@@ -199,15 +200,14 @@ export default function ProviderEarnings() {
 				<div>
 					<div className="flex items-center gap-2.5">
 						<h1 className="font-mackinac text-2xl sm:text-3xl font-black text-white tracking-tight">
-							Payouts & Finance Engine
+							Earnings & Payouts
 						</h1>
 						<span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-violet-500/15 text-violet-300 border border-violet-500/25">
 							Direct Bank Deposit
 						</span>
 					</div>
 					<p className="text-xs sm:text-sm text-slate-400 mt-1 font-medium">
-						Audited transaction reconciliation, fee deductions, and scheduled
-						payouts.
+						Track your completed earnings, fee deductions, and weekly payouts.
 					</p>
 				</div>
 
@@ -222,14 +222,14 @@ export default function ProviderEarnings() {
 				</div>
 			</div>
 
-			{/* Financial Telemetry Architecture */}
+			{/* Earnings Overview Cards */}
 			<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 				{/* Main Payout Card (7 Cols) */}
 				<div className="lg:col-span-7 p-6 sm:p-7 rounded-3xl bg-gradient-to-br from-[#160d31] to-[#0e0820] border border-violet-500/20 shadow-xl shadow-black/50 relative overflow-hidden flex flex-col justify-between space-y-6">
 					<div className="flex items-center justify-between">
 						<span className="text-[11px] font-extrabold uppercase tracking-wider text-violet-300 flex items-center gap-1.5">
 							<ShieldCheck size={14} className="text-emerald-400" />
-							Net Realized Income
+							Net Earnings (Take-Home)
 						</span>
 						<span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
 							Automatic Weekly Payout
@@ -240,12 +240,12 @@ export default function ProviderEarnings() {
 						<div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
 							{formatCurrency(estimatedNetRetention)}
 						</div>
-						<p className="text-xs text-slate-400">
-							Gross Platform Revenue:{" "}
+						<p className="text-sm text-slate-400">
+							Total Booking Value:{" "}
 							<span className="font-bold text-slate-200">
 								{formatCurrency(summary.total_earnings)}
 							</span>{" "}
-							(less standard 15% marketplace commission)
+							(minus standard 15% platform fee)
 						</p>
 					</div>
 
@@ -269,7 +269,7 @@ export default function ProviderEarnings() {
 						</div>
 						<div>
 							<span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-								MoM Shift
+								Monthly Change
 							</span>
 							<span
 								className={`text-sm sm:text-base font-extrabold mt-0.5 flex items-center gap-1 ${
@@ -287,25 +287,25 @@ export default function ProviderEarnings() {
 					</div>
 				</div>
 
-				{/* Volume & Telemetry (5 Cols) */}
+				{/* Volume & Details (5 Cols) */}
 				<div className="lg:col-span-5 grid grid-cols-2 gap-4">
 					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
 						<span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-							Completed Jobs
+							Completed Bookings
 						</span>
 						<div className="mt-3">
 							<span className="text-2xl sm:text-3xl font-black text-white">
 								{summary.completed_jobs ?? 0}
 							</span>
 							<p className="text-[12.5px] text-slate-500 mt-1">
-								Paid customer visits
+								Completed jobs
 							</p>
 						</div>
 					</div>
 
 					<div className="p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex flex-col justify-between">
 						<span className="text-[12.5px] font-bold uppercase tracking-wider text-slate-400">
-							Avg Ticket Value
+							Avg Booking Amount
 						</span>
 						<div className="mt-3">
 							<span className="text-2xl sm:text-3xl font-black text-white">
@@ -318,7 +318,7 @@ export default function ProviderEarnings() {
 								)}
 							</span>
 							<p className="text-[12.5px] text-slate-500 mt-1">
-								Gross job value
+								Per completed booking
 							</p>
 						</div>
 					</div>
@@ -326,10 +326,10 @@ export default function ProviderEarnings() {
 					<div className="col-span-2 p-5 rounded-3xl bg-[#120a22] border border-white/[0.07] shadow-lg flex items-center justify-between">
 						<div className="space-y-0.5">
 							<span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-								Next Estimated Disbursement
+								Next Weekly Payout
 							</span>
 							<span className="text-sm font-bold text-white">
-								Scheduled Every Monday • Direct NEFT/IMPS
+								Every Monday • Direct Bank Transfer
 							</span>
 						</div>
 						<div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-300 border border-violet-500/20">
@@ -346,10 +346,10 @@ export default function ProviderEarnings() {
 					<div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
 						<div>
 							<h3 className="text-base font-extrabold text-white">
-								Revenue Progression
+								Earnings History
 							</h3>
 							<p className="text-sm text-slate-400">
-								Monthly billing volume over past quarters
+								Your monthly earnings over the past quarters
 							</p>
 						</div>
 						<span className="text-xs text-slate-400 font-mono">FY 2026</span>
@@ -358,7 +358,7 @@ export default function ProviderEarnings() {
 					<div className="h-64 pt-2">
 						{monthlyData.length === 0 ? (
 							<div className="h-full flex items-center justify-center text-xs text-slate-500">
-								No historical monthly volume available
+								No past earnings data available yet
 							</div>
 						) : (
 							<Bar data={chartData} options={chartOptions} />
@@ -371,7 +371,7 @@ export default function ProviderEarnings() {
 					<div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
 						<h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-200 flex items-center gap-2">
 							<Activity size={15} className="text-violet-400" />
-							Recent Transactions
+							Recent Payments & Bookings
 						</h3>
 						<span className="text-[11px] text-slate-500 font-mono">
 							Page {txPage} of {txMeta.total_pages || 1}
@@ -380,8 +380,17 @@ export default function ProviderEarnings() {
 
 					<div className="flex-1">
 						{txLoading ? (
-							<div className="py-16 text-center text-xs text-slate-500">
-								Loading records...
+							<div className="py-16 flex flex-col items-center justify-center gap-3 text-xs text-slate-500">
+								<FadeLoader
+									color="#8b5cf6"
+									height={8}
+									width={2.5}
+									radius={1}
+									margin={-2}
+								/>
+								<span className="mt-2 font-medium">
+									Loading transactions...
+								</span>
 							</div>
 						) : transactions.length === 0 ? (
 							<div className="py-16 text-center text-slate-500 space-y-2">

@@ -1,4 +1,4 @@
-﻿const axios = require("axios");
+const axios = require("axios");
 
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 	if (
@@ -130,9 +130,15 @@ async function getBatchedTravelDurations(origin, destinations) {
 	}
 }
 
+function formatPostGisPoint(lng, lat) {
+	if (lng == null || lat == null || isNaN(lng) || isNaN(lat)) return null;
+	return `SRID=4326;POINT(${parseFloat(lng)} ${parseFloat(lat)})`;
+}
+
 module.exports = {
 	calculateHaversineDistance,
 	estimateTravelTimeMinutes,
 	calculateMatchScore,
 	getBatchedTravelDurations,
+	formatPostGisPoint,
 };

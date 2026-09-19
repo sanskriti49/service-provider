@@ -11,11 +11,23 @@ const {
 	getBatchedTravelDurations,
 } = require("../utils/geoUtils");
 const { sendNotification } = require("../utils/notificationService");
+const { acquireLock, releaseLock } = require("../utils/distributedLock");
+const { createProtectedBreaker } = require("../utils/circuitBreaker");
 
 const razorpay = new Razorpay({
 	key_id: process.env.RAZORPAY_KEY_ID || "rzp_test_placeholder",
 	key_secret: process.env.RAZORPAY_KEY_SECRET || "placeholder_secret",
 });
+
+const razorpayOrderBreaker = createProtectedBreaker(
+	(opts) => razorpay.orders.create(opts),
+	{
+		name: "razorpay-orders",
+		timeout: 5000,
+		errorThresholdPercentage: 50,
+		resetTimeout: 20000,
+	},
+);
 
 BigInt.prototype.toJSON = function () {
 	return this.toString();
@@ -77,8 +89,22 @@ async function createBooking(req, res, next) {
 			.json({ message: "Missing required fields: provider_id, date, start_time" });
 	}
 
-	const client = await db.connect();
+	start_time = String(start_time).slice(0, 5);
+	const cleanDate = date.toString().substring(0, 10);
+
+	// Edge-level Distributed Lock (fail fast before touching database pool)
+	const lockKey = `booking:provider:${provider_id}:${cleanDate}:${start_time}`;
+	const lock = await acquireLock(lockKey, 15000);
+	if (!lock.acquired) {
+		return res.status(409).json({
+			message:
+				"This provider slot is currently being reserved by another customer. Please try again in a few moments.",
+		});
+	}
+
+	let client;
 	try {
+		client = await db.connect();
 		await client.query("BEGIN");
 
 		const resolvedProviderId = await resolveProviderId(client, provider_id);
@@ -86,8 +112,6 @@ async function createBooking(req, res, next) {
 			await client.query("ROLLBACK");
 			return res.status(404).json({ message: "Provider not found" });
 		}
-
-		start_time = String(start_time).slice(0, 5);
 
 		let resolvedServiceId = service_id;
 		let serviceName = "default";
@@ -145,14 +169,14 @@ async function createBooking(req, res, next) {
 
 		if (payment_method === "online") {
 			try {
-				const order = await razorpay.orders.create({
+				const order = await razorpayOrderBreaker.fire({
 					amount: Math.round(finalPrice * 100),
 					currency: "INR",
 					receipt: `rcpt_${Date.now()}`,
 				});
 				razorpay_order_id = order.id;
 			} catch (rzpErr) {
-				console.warn("Razorpay order generation warning:", rzpErr.message);
+				console.warn("Razorpay order generation warning (circuit breaker protected):", rzpErr.message);
 				razorpay_order_id = `test_order_${Date.now()}`;
 			}
 		}
@@ -277,11 +301,18 @@ async function createBooking(req, res, next) {
 			razorpay_order: razorpay_order_id,
 		});
 	} catch (err) {
-		await client.query("ROLLBACK");
+		if (client) {
+			try {
+				await client.query("ROLLBACK");
+			} catch (_) {}
+		}
 		console.error("Create booking error:", err);
 		res.status(500).json({ message: "Server error", error: err.message });
 	} finally {
-		client.release();
+		if (client) {
+			client.release();
+		}
+		await releaseLock(lock.key, lock.token);
 	}
 }
 

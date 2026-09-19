@@ -1,7 +1,8 @@
-﻿import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShieldCheck, KeyRound, AlertCircle, Loader2, X, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, KeyRound, AlertCircle, X, CheckCircle2 } from "lucide-react";
+import { FadeLoader } from "react-spinners";
 
 export default function CompletionOtpModal({
 	isOpen,
@@ -182,7 +183,9 @@ export default function CompletionOtpModal({
 							>
 								{loading ? (
 									<>
-										<Loader2 size={14} className="animate-spin" />
+										<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
+											<FadeLoader color="#ffffff" />
+										</span>
 										<span>Verifying...</span>
 									</>
 								) : (

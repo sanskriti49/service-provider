@@ -15,13 +15,13 @@ import {
 	Save,
 	Eye,
 	EyeOff,
-	Loader2,
 	CheckCircle2,
 	AlertTriangle,
 	ChevronRight,
 	ShieldCheck,
 	Clock,
 } from "lucide-react";
+import { FadeLoader } from "react-spinners";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -166,7 +166,9 @@ function SubmitBtn({ loading, saved, children }) {
 			className="cursor-pointer flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-violet-600 hover:bg-violet-500 disabled:bg-violet-900 disabled:text-violet-700 transition-all shadow-lg shadow-violet-900/20 disabled:cursor-not-allowed"
 		>
 			{loading ? (
-				<Loader2 size={13} className="animate-spin" />
+				<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
+					<FadeLoader color="#ffffff" />
+				</span>
 			) : saved ? (
 				<CheckCircle2 size={13} className="text-emerald-300" />
 			) : (
@@ -959,7 +961,9 @@ export default function ProviderSettings() {
 									className="cursor-pointer flex-1 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-500 disabled:bg-red-950 disabled:text-red-800 border border-red-500/30 rounded-xl transition-all flex items-center justify-center gap-2"
 								>
 									{deleteLoading ? (
-										<Loader2 size={13} className="animate-spin" />
+										<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
+											<FadeLoader color="#ffffff" />
+										</span>
 									) : (
 										<Trash2 size={13} />
 									)}{" "}

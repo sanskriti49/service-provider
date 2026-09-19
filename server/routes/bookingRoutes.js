@@ -12,6 +12,7 @@ const {
 	regenerateCompletionOtp,
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
+const { bookingLimiter } = require("../middleware/rateLimiter");
 const db = require("../config/db");
 
 function allowRoles(...roles) {
@@ -22,7 +23,7 @@ function allowRoles(...roles) {
 		next();
 	};
 }
-router.post("/", authMiddleware, allowRoles("customer"), createBooking);
+router.post("/", bookingLimiter, authMiddleware, allowRoles("customer"), createBooking);
 router.post("/verify-payment", authMiddleware, verifyPayment);
 
 router.get(

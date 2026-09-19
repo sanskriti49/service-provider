@@ -7,9 +7,11 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import api from "../api/axiosInstance";
 import Logo from "../ui/Logo";
 import { loadGoogleIdentity } from "../utils/googleIdentity";
+import { useAuth } from "../contexts/AuthContext";
 
 const SignUp = () => {
 	const navigate = useNavigate();
+	const { login } = useAuth();
 	const turnstileRef = useRef();
 	const [token, setToken] = useState("");
 	const [loading, setLoading] = useState(false);
@@ -139,8 +141,8 @@ const SignUp = () => {
 				lat,
 				lng,
 			});
-			const { token, user } = res.data;
-			localStorage.setItem("token", token);
+			const { token: authToken, user } = res.data;
+			login(authToken, user);
 
 			if (!user.role) {
 				navigate("/choose-role");
@@ -173,7 +175,7 @@ const SignUp = () => {
 				captchaToken: token,
 			});
 			const { token: authToken, user } = res.data;
-			localStorage.setItem("token", authToken);
+			login(authToken, user);
 
 			alert("Account created!");
 			if (form.role === "provider") {

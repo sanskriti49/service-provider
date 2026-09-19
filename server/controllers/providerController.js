@@ -48,6 +48,20 @@ async function resolveProviderId(clientOrPool, idOrCustomId) {
 	return result.rows[0]?.id ?? null;
 }
 
+let postGisSupported = null;
+async function checkPostGisSupport(clientOrPool) {
+	if (postGisSupported !== null) return postGisSupported;
+	try {
+		const res = await clientOrPool.query(
+			"SELECT 1 FROM pg_extension WHERE extname = 'postgis' LIMIT 1"
+		);
+		postGisSupported = res.rows.length > 0;
+	} catch (_) {
+		postGisSupported = false;
+	}
+	return postGisSupported;
+}
+
 const providerSchema = Joi.object({
 	name: Joi.string().min(3).max(100).required(),
 	email: Joi.string().email().lowercase().required(),
@@ -345,6 +359,15 @@ async function getProviders(req, res, next) {
 		const userLng = parseFloat(lng);
 		const hasUserCoords = !isNaN(userLat) && !isNaN(userLng);
 		const searchRadiusKm = parseFloat(radius) || 50;
+		const hasPostGis = hasUserCoords ? await checkPostGisSupport(db) : false;
+
+		const params = [];
+		let postGisSelect = "";
+
+		if (hasPostGis) {
+			params.push(userLng, userLat);
+			postGisSelect = `, ROUND((ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000.0)::numeric, 1) AS postgis_distance_km`;
+		}
 
 		let query = `
             SELECT DISTINCT ON (u.id)
@@ -356,13 +379,20 @@ async function getProviders(req, res, next) {
                    COALESCE(p.is_verified, FALSE) AS is_verified,
                    p.verification_badge,
                    COALESCE(p.kyc_status, 'pending') AS kyc_status
+                   ${postGisSelect}
             FROM providers p
             JOIN users u ON p.user_id = u.id
             JOIN provider_services ps ON ps.provider_id = p.user_id AND ps.is_visible = TRUE
             JOIN services s ON s.id = ps.service_id
         `;
-		const params = [];
 		const whereClauses = ["COALESCE(p.status, 'approved') = 'approved'"];
+
+		if (hasPostGis && radius) {
+			params.push(searchRadiusKm * 1000);
+			whereClauses.push(
+				`ST_DWithin(u.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $${params.length})`,
+			);
+		}
 
 		if (service) {
 			const cleanService = String(service).trim();
@@ -434,7 +464,10 @@ async function getProviders(req, res, next) {
 			let distanceKm = null;
 			let travelTimeMins = null;
 
-			if (hasUserCoords && hasProviderCoords) {
+			if (p.postgis_distance_km != null) {
+				distanceKm = parseFloat(p.postgis_distance_km);
+				travelTimeMins = estimateTravelTimeMinutes(distanceKm);
+			} else if (hasUserCoords && hasProviderCoords) {
 				distanceKm = calculateHaversineDistance(userLat, userLng, pLat, pLng);
 				travelTimeMins = estimateTravelTimeMinutes(distanceKm);
 			}
@@ -519,7 +552,13 @@ async function getProviderById(req, res, next) {
                     COALESCE(p.is_verified, FALSE) AS is_verified,
                     p.verification_badge,
                     COALESCE(p.kyc_status, 'pending') AS kyc_status,
-                    p.kyc_doc_type
+                    p.kyc_doc_type,
+                    p.kyc_doc_number,
+                    p.kyc_doc_front,
+                    p.kyc_doc_back,
+                    p.rejection_reason,
+                    p.verified_at,
+                    p.kyc_submitted_at
              FROM providers p
              JOIN users u ON u.id = p.user_id
              LEFT JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
@@ -1200,6 +1239,134 @@ async function deleteProvider(req, res, next) {
 	}
 }
 
+const kycSubmitSchema = Joi.object({
+	kyc_doc_type: Joi.string()
+		.valid("aadhaar", "driving_license", "certificate", "pan", "voter_id")
+		.required()
+		.messages({
+			"any.only": "Document type must be Aadhaar, Driving License, Trade Certificate, PAN, or Voter ID",
+			"any.required": "Document type is required",
+		}),
+	kyc_doc_number: Joi.string().min(4).max(100).required().messages({
+		"string.min": "Document number must have at least 4 characters",
+		"any.required": "Document identification number is required",
+	}),
+	kyc_doc_front: Joi.string().required().messages({
+		"any.required": "Front photo of your document is required",
+	}),
+	kyc_doc_back: Joi.string().allow("", null).optional(),
+	kyc_declaration: Joi.boolean().valid(true).required().messages({
+		"any.only": "You must accept the truthfulness and verification declaration",
+		"any.required": "Verification declaration is required",
+	}),
+});
+
+async function getKycStatus(req, res, next) {
+	try {
+		const targetParam = req.params.id;
+		const providerId = await resolveProviderId(db, targetParam);
+		if (!providerId) {
+			return res.status(404).json({ error: "Provider not found" });
+		}
+
+		if (req.user && req.user.role !== "admin" && req.user.id !== providerId) {
+			return res.status(403).json({ error: "Access denied. Cannot view other provider's KYC documents." });
+		}
+
+		const result = await db.query(
+			`SELECT u.id, u.name, u.email, u.phone,
+			        COALESCE(p.kyc_status, 'pending') AS kyc_status,
+			        COALESCE(p.is_verified, FALSE) AS is_verified,
+			        p.verification_badge,
+			        p.kyc_doc_type,
+			        p.kyc_doc_number,
+			        p.kyc_doc_front,
+			        p.kyc_doc_back,
+			        p.rejection_reason,
+			        p.verified_at,
+			        p.kyc_submitted_at
+			 FROM users u
+			 LEFT JOIN providers p ON p.user_id = u.id
+			 WHERE u.id = $1`,
+			[providerId],
+		);
+
+		if (!result.rows.length) {
+			return res.status(404).json({ error: "Provider not found" });
+		}
+
+		res.json({
+			success: true,
+			kyc: result.rows[0],
+		});
+	} catch (err) {
+		next(err);
+	}
+}
+
+async function submitKyc(req, res, next) {
+	try {
+		const targetParam = req.params.id;
+		const providerId = await resolveProviderId(db, targetParam);
+		if (!providerId) {
+			return res.status(404).json({ error: "Provider not found" });
+		}
+
+		if (req.user && req.user.role !== "admin" && req.user.id !== providerId) {
+			return res.status(403).json({ error: "Access denied. Cannot update another provider's KYC documents." });
+		}
+
+		const { error, value } = kycSubmitSchema.validate(req.body);
+		if (error) {
+			return res.status(400).json({ error: error.details[0].message });
+		}
+
+		const { kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back } = value;
+		const sanitizedDocNumber = kyc_doc_number.trim().toUpperCase();
+
+		const updateRes = await db.query(
+			`INSERT INTO providers (user_id, kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back, kyc_status, kyc_submitted_at, rejection_reason, status)
+			 VALUES ($1, $2, $3, $4, $5, 'pending', now(), NULL, 'pending')
+			 ON CONFLICT (user_id) DO UPDATE SET
+			    kyc_doc_type = EXCLUDED.kyc_doc_type,
+			    kyc_doc_number = EXCLUDED.kyc_doc_number,
+			    kyc_doc_front = EXCLUDED.kyc_doc_front,
+			    kyc_doc_back = EXCLUDED.kyc_doc_back,
+			    kyc_status = 'pending',
+			    kyc_submitted_at = now(),
+			    rejection_reason = NULL
+			 RETURNING user_id, kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back, kyc_status, kyc_submitted_at, is_verified, verification_badge`,
+			[providerId, kyc_doc_type, sanitizedDocNumber, kyc_doc_front, kyc_doc_back || null],
+		);
+
+		try {
+			await db.query(
+				`INSERT INTO notifications (user_id, title, message, type, data)
+				 VALUES ($1, $2, $3, 'system', $4)`,
+				[
+					providerId,
+					"📋 KYC Documents Received",
+					"Your identity verification documents have been submitted. Our security team verifies submissions within 24–48 hours.",
+					JSON.stringify({ kyc_status: "pending", submitted_at: new Date().toISOString() }),
+				],
+			);
+		} catch (notifErr) {
+			console.warn("Could not dispatch KYC submission notification:", notifErr.message);
+		}
+
+		cache.delPattern("provider");
+
+		res.json({
+			success: true,
+			message: "KYC documents submitted successfully. Verification takes 24–48 business hours.",
+			kyc: updateRes.rows[0],
+		});
+	} catch (err) {
+		console.error("submitKyc error:", err);
+		next(err);
+	}
+}
+
 module.exports = {
 	createProvider,
 	uploadKycDocument,
@@ -1213,4 +1380,6 @@ module.exports = {
 	toggleServiceVisibility,
 	deleteProvider,
 	getProviderAvailability,
+	getKycStatus,
+	submitKyc,
 };

@@ -1,5 +1,6 @@
-﻿import React, { useState } from "react";
-import { Star, X, Sparkles, Check, Loader2 } from "lucide-react";
+import React, { useState } from "react";
+import { Star, X, Sparkles, Check } from "lucide-react";
+import { FadeLoader } from "react-spinners";
 import { toast } from "sonner";
 
 import { API_URL } from "../config";
@@ -191,7 +192,9 @@ export default function ReviewModal({
 							className="px-7 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-900/40 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
 						>
 							{isSubmitting ? (
-								<Loader2 size={14} className="animate-spin" />
+								<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
+									<FadeLoader color="#ffffff" />
+								</span>
 							) : (
 								<Sparkles size={14} className="text-yellow-300" />
 							)}

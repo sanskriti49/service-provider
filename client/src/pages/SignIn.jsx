@@ -8,9 +8,11 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance";
 import Logo from "../ui/Logo";
 import { loadGoogleIdentity } from "../utils/googleIdentity";
+import { useAuth } from "../contexts/AuthContext";
 
 const SignIn = () => {
 	const navigate = useNavigate();
+	const { login } = useAuth();
 	const turnstileRef = useRef();
 	const [token, setToken] = useState("");
 
@@ -116,15 +118,14 @@ const SignIn = () => {
 
 	const handleGoogleResponse = async (response) => {
 		try {
-
 			const res = await api.post("/api/auth/google", {
 				googleToken: response.credential,
 			});
 
-			const { token } = res.data;
-			localStorage.setItem("token", token);
+			const { token: authToken, user } = res.data;
+			login(authToken, user);
 
-			const decoded = jwtDecode(token);
+			const decoded = jwtDecode(authToken);
 			if (!decoded.role) {
 				navigate("/choose-role");
 			} else if (decoded.role === "provider") {
@@ -155,8 +156,8 @@ const SignIn = () => {
 				captchaToken: token,
 			});
 
-			const { token: authToken } = res.data;
-			localStorage.setItem("token", authToken);
+			const { token: authToken, user } = res.data;
+			login(authToken, user);
 
 			const decoded = jwtDecode(authToken);
 			if (decoded.role === "admin") {

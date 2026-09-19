@@ -1,88 +1,102 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
   <defs>
-    <!-- Background glow -->
-    <filter id="magic-glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="3" result="blur" />
+    <!-- Rich Indigo to Royal Violet Lamp Body -->
+    <linearGradient id="tg-body" x1="20%" y1="10%" x2="80%" y2="90%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="45%" stop-color="#6366F1" />
+      <stop offset="100%" stop-color="#312E81" />
+    </linearGradient>
+
+    <!-- Warm Golden Flame / Magic Star Gradient -->
+    <linearGradient id="tg-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7" />
+      <stop offset="30%" stop-color="#FDE047" />
+      <stop offset="70%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+
+    <!-- Warm Ambient Light -->
+    <radialGradient id="tg-glow" cx="68%" cy="28%" r="45%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.35" />
+      <stop offset="50%" stop-color="#8B5CF6" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Subtle Lamp Surface Highlight -->
+    <linearGradient id="tg-highlight" x1="30%" y1="20%" x2="70%" y2="80%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Soft Filter for Magical Warmth -->
+    <filter id="tg-soft-glow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
-
-    <!-- Main Lamp Vibrant Gradient -->
-    <linearGradient id="lamp-body-grad" x1="15%" y1="15%" x2="85%" y2="85%">
-      <stop offset="0%" stop-color="#a855f7" />
-      <stop offset="50%" stop-color="#7c3aed" />
-      <stop offset="100%" stop-color="#4f46e5" />
-    </linearGradient>
-
-    <!-- Magic Energy / Flame Gradient -->
-    <linearGradient id="magic-spark-grad" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#f43f5e" />
-      <stop offset="35%" stop-color="#ec4899" />
-      <stop offset="70%" stop-color="#8b5cf6" />
-      <stop offset="100%" stop-color="#38bdf8" />
-    </linearGradient>
-
-    <!-- Golden Highlight Gradient -->
-    <linearGradient id="gold-accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fef08a" />
-      <stop offset="50%" stop-color="#fbbf24" />
-      <stop offset="100%" stop-color="#f59e0b" />
-    </linearGradient>
-
-    <!-- Task Checkmark Glow -->
-    <linearGradient id="check-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" />
-      <stop offset="100%" stop-color="#e0e7ff" />
-    </linearGradient>
   </defs>
 
-  <!-- Ambient Magic Aura -->
-  <circle cx="75" cy="42" r="28" fill="#8b5cf6" opacity="0.15" filter="url(#magic-glow)" />
+  <!-- Ambient Glow Behind Star & Spout -->
+  <circle cx="86" cy="30" r="26" fill="url(#tg-glow)" />
 
-  <!-- Ethereal Magic Dust / Stars -->
-  <circle cx="98" cy="22" r="2" fill="#fbbf24" opacity="0.9" />
-  <circle cx="62" cy="18" r="1.5" fill="#f43f5e" opacity="0.8" />
-  <circle cx="106" cy="46" r="1.8" fill="#38bdf8" opacity="0.85" />
+  <!-- The Artisanal Genie Lamp -->
+  <g id="lamp">
+    <!-- Pedestal Base -->
+    <ellipse cx="56" cy="94" rx="18" ry="4" fill="url(#tg-gold)" />
+    <path d="M 48 91 L 51 83 L 61 83 L 64 91 Z" fill="url(#tg-body)" />
 
-  <!-- 4-point Diamond Sparkle -->
-  <path d="M96 28 Q96 35 89 35 Q96 35 96 42 Q96 35 103 35 Q96 35 96 28 Z" fill="url(#gold-accent-grad)" />
+    <!-- Lamp Body & Spout (Smooth Hand-Crafted Contour) -->
+    <path d="M 44 65
+             C 33 66, 28 73, 31 80
+             C 34 85, 44 85, 56 84
+             C 70 83, 82 76, 91 66
+             C 95 61, 99 56, 103 50
+             C 100 53, 94 57, 88 59
+             C 78 63, 71 64, 65 65
+             Z"
+          fill="url(#tg-body)" />
 
-  <!-- Rising Magic Vapor Swirl -->
-  <path d="M68 64 C68 54 78 50 78 40 C78 32 72 26 78 20 C81 24 84 28 84 34 C84 44 74 48 74 58 Z"
-        fill="url(#magic-spark-grad)" opacity="0.5" />
+    <!-- Inner Body Shading / Volume -->
+    <path d="M 36 76 C 34 71, 41 67, 51 66 C 60 65, 68 67, 72 70 C 64 74, 52 77, 41 77 C 38 77, 37 76.5, 36 76 Z"
+          fill="url(#tg-highlight)" />
 
-  <!-- Main Genie Lamp Body -->
-  <!-- Lamp Base / Stand -->
-  <ellipse cx="50" cy="98" rx="22" ry="6" fill="url(#lamp-body-grad)" />
-  <ellipse cx="50" cy="97" rx="18" ry="4" fill="url(#gold-accent-grad)" opacity="0.4" />
-  <path d="M42 94 L45 86 L55 86 L58 94 Z" fill="url(#lamp-body-grad)" />
+    <!-- Ergonomic Loop Handle -->
+    <path d="M 33 69
+             C 19 65, 13 77, 16 85
+             C 18 90, 24 90, 26 86
+             C 19 82, 20 74, 30 73
+             Z"
+          fill="url(#tg-gold)" />
 
-  <!-- Main Vessel / Belly -->
-  <path d="M28 80 C26 70 34 62 48 62 C62 62 76 68 84 70 C88 71 94 67 98 62 C100 60 102 61 101 64 C97 73 88 78 78 81 C64 85 36 86 28 80 Z"
-        fill="url(#lamp-body-grad)" />
-
-  <!-- Lamp Belly Highlight (Depth & Volume) -->
-  <path d="M34 78 C32 72 38 66 48 66 C58 66 70 70 76 72 C70 78 50 82 34 78 Z"
-        fill="#ffffff" opacity="0.16" />
-
-  <!-- Lamp Neck & Spout Rim -->
-  <path d="M92 63 C96 62 101 60 103 59 C104 61 102 64 99 66 Z" fill="url(#gold-accent-grad)" />
-
-  <!-- Sleek Ergonomic Handle -->
-  <path d="M30 66 C18 64 12 74 14 84 C15 89 20 92 25 89 C20 86 19 80 22 75 C24 71 27 69 31 68 Z"
-        fill="url(#gold-accent-grad)" />
-
-  <!-- Lamp Lid & Finial -->
-  <ellipse cx="48" cy="62" rx="11" ry="3.5" fill="url(#gold-accent-grad)" />
-  <circle cx="48" cy="57" r="3.5" fill="url(#gold-accent-grad)" />
-
-  <!-- The "Task Done" Genie Star Sparkle (App functionality symbol: Wishes & Tasks Granted) -->
-  <g transform="translate(80, 22) scale(0.95)" filter="url(#magic-glow)">
-    <!-- Central Brilliant 8-point Magic Sparkle -->
-    <path d="M12 0 C12 6.5 17.5 12 24 12 C17.5 12 12 17.5 12 24 C12 17.5 6.5 12 0 12 C6.5 12 12 6.5 12 0 Z"
-          fill="url(#gold-accent-grad)" />
-    <path d="M12 4 C12 8.5 15.5 12 20 12 C15.5 12 12 15.5 12 20 C12 15.5 8.5 12 4 12 C8.5 12 12 8.5 12 4 Z"
-          fill="#ffffff" />
+    <!-- Lamp Lid & Finial -->
+    <ellipse cx="55" cy="65" rx="11" ry="3" fill="url(#tg-gold)" />
+    <circle cx="55" cy="58" r="3.5" fill="url(#tg-gold)" />
+    <circle cx="55" cy="57" r="1.2" fill="#FEF3C7" />
   </g>
 
+  <!-- Luminous Rising Magic Spark / Star -->
+  <g id="magic-spark" filter="url(#tg-soft-glow)">
+    <!-- Main 4-Point Golden Star -->
+    <path d="M 88 16
+             Q 88 27 99 27
+             Q 88 27 88 38
+             Q 88 27 77 27
+             Q 88 27 88 16 Z"
+          fill="url(#tg-gold)" />
 
+    <!-- Radiant White Star Core -->
+    <circle cx="88" cy="27" r="2.5" fill="#FFFFFF" />
+
+    <!-- Secondary Delicate Sparkle -->
+    <path d="M 72 38
+             Q 72 43 77 43
+             Q 72 43 72 48
+             Q 72 43 67 43
+             Q 72 43 72 38 Z"
+          fill="url(#tg-gold)" opacity="0.9" />
+
+    <!-- Rising Golden Embers -->
+    <circle cx="98" cy="42" r="1.6" fill="#FDE047" />
+    <circle cx="82" cy="48" r="1.3" fill="#F59E0B" />
+    <circle cx="92" cy="11" r="1.1" fill="#FEF3C7" />
+  </g>
 </svg>

@@ -12,12 +12,12 @@ import {
 	ShieldCheck,
 	AlertTriangle,
 	Users,
-	Loader2,
 	Copy,
 	Check,
 	Wrench,
 	ArrowUpRight,
 } from "lucide-react";
+import { FadeLoader } from "react-spinners";
 import CompletionOtpModal from "./CompletionOtpModal";
 
 const formatCurrency = (n) =>
@@ -239,7 +239,9 @@ export default function BookingDetailsSheet({
 								className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-950 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
 							>
 								{actionLoading === booking.booking_id ? (
-									<Loader2 size={14} className="animate-spin" />
+									<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
+										<FadeLoader color="#ffffff" />
+									</span>
 								) : (
 									<CheckCircle2 size={14} />
 								)}
@@ -256,11 +258,13 @@ export default function BookingDetailsSheet({
 								className="w-full py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-md shadow-violet-950"
 							>
 								{actionLoading === booking.booking_id ? (
-									<Loader2 size={14} className="animate-spin" />
+									<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
+										<FadeLoader color="#ffffff" />
+									</span>
 								) : (
 									<CheckCircle2 size={14} />
 								)}
-								Accept & Lock Slot
+								Accept Booking
 							</button>
 							<button
 								onClick={() => onUpdateStatus(booking.booking_id, "cancelled")}
@@ -276,12 +280,12 @@ export default function BookingDetailsSheet({
 					<div className="bg-white/[0.02] rounded-2xl p-5 border border-white/[0.06] space-y-3">
 						<div className="flex items-center gap-2 text-slate-300 text-xs font-bold">
 							<CreditCard size={14} className="text-violet-400" />
-							<span>{isRefunded ? "Refund Accounting" : "Settlement Breakdown"}</span>
+							<span>{isRefunded ? "Refund Details" : "Payment Breakdown"}</span>
 						</div>
 
 						<div className="space-y-2 text-xs">
 							<div className="flex justify-between">
-								<span className="text-slate-400">Gross Service Bill</span>
+								<span className="text-slate-400">Service Total</span>
 								<span className={isRefunded ? "text-slate-500 line-through" : "text-white font-bold"}>
 									{formatCurrency(booking.price)}
 								</span>
@@ -295,13 +299,13 @@ export default function BookingDetailsSheet({
 							) : (
 								<>
 									<div className="flex justify-between text-slate-400">
-										<span>Estimated Platform Take (15%)</span>
+										<span>Platform Fee (15%)</span>
 										<span className="font-medium text-slate-300">
 											-{formatCurrency(Math.round((booking.price || 0) * 0.15))}
 										</span>
 									</div>
 									<div className="flex justify-between text-emerald-400 font-extrabold text-sm border-t border-white/[0.06] pt-2">
-										<span>Net Merchant Payout</span>
+										<span>Your Payout</span>
 										<span>{formatCurrency(Math.round((booking.price || 0) * 0.85))}</span>
 									</div>
 								</>
@@ -314,9 +318,9 @@ export default function BookingDetailsSheet({
 				<div className="p-4 bg-black/30 border-t border-white/[0.06] flex items-center justify-between text-[11px] text-slate-500">
 					<span className="flex items-center gap-1.5">
 						<ShieldCheck size={13} className="text-emerald-400" />
-						TaskGenie Protected Settlement
+						TaskGenie Protected Payment
 					</span>
-					<span className="font-mono">Encrypted</span>
+					<span className="font-mono">Secure</span>
 				</div>
 			</motion.div>
 
