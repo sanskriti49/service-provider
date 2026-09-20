@@ -124,9 +124,6 @@ export default function AccountMenu({ user }) {
 							<MenuLink to="/dashboard/bookings" icon={History}>
 								My Bookings
 							</MenuLink>
-							<MenuLink to="/saved" icon={Heart}>
-								Saved Services
-							</MenuLink>
 						</div>
 					)}
 

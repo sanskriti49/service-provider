@@ -74,22 +74,6 @@ const router = createBrowserRouter([
 			{ path: "/help", element: <HelpCenter /> },
 			{ path: "/unauthorized", element: <Unauthorized /> },
 
-			{
-				path: "/account/profile",
-				element: (
-					<ProtectedRoute allowed={["customer"]}>
-						<CustomerProfile />
-					</ProtectedRoute>
-				),
-			},
-			{
-				path: "/account/settings",
-				element: (
-					<ProtectedRoute allowed={["customer"]}>
-						<CustomerSettings />
-					</ProtectedRoute>
-				),
-			},
 			{ path: "/services/:slug", element: <ServiceDetails /> },
 			{ path: "/apply-now", element: <ApplyProvider /> },
 			{ path: "*", element: <Navigate to="/" replace /> },
@@ -105,7 +89,7 @@ const router = createBrowserRouter([
 			</ProtectedRoute>
 		),
 		children: [
-			{ index: true, element: null }, // Handled by CustomerOverview in CustomerDashboard
+			{ index: true, element: null },
 			{ path: "bookings", element: <AllBookings /> },
 		],
 	},
@@ -137,6 +121,14 @@ const router = createBrowserRouter([
 			{ path: "/forgot-password", element: <ForgotPassword /> },
 			{ path: "/reset-password/:resetToken", element: <ResetPassword /> },
 			{
+				path: "/account/profile",
+				element: (
+					<ProtectedRoute allowed={["customer"]}>
+						<CustomerProfile />
+					</ProtectedRoute>
+				),
+			},
+			{
 				path: "/book/:customId",
 				element: (
 					<ProtectedRoute allowed={["customer"]}>
@@ -153,6 +145,14 @@ const router = createBrowserRouter([
 				),
 			},
 			{ path: "/notifications", element: <NotificationsPage /> },
+			{
+				path: "/account/settings",
+				element: (
+					<ProtectedRoute allowed={["customer"]}>
+						<CustomerSettings />
+					</ProtectedRoute>
+				),
+			},
 			{ path: "/reviews", element: <Reviews /> },
 		],
 	},

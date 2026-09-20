@@ -19,6 +19,7 @@ const getCustomerDashboardStats = async (req, res) => {
                 JOIN services s ON s.id=b.service_id
                 JOIN users u ON u.id=b.provider_id
                 WHERE b.user_id=$1 AND b.date >= CURRENT_DATE AND b.status != 'cancelled'
+                  AND (b.payment_method = 'cod' OR b.payment_status = 'paid')
                 ORDER BY b.date ASC, b.start_time ASC
                 LIMIT 1`,
 				[userId],
@@ -26,7 +27,7 @@ const getCustomerDashboardStats = async (req, res) => {
 			db.query(
 				`SELECT COUNT(*) AS active_count
                 FROM bookings
-                WHERE user_id=$1 AND status IN ('booked', 'confirmed', 'in_progress')`,
+                WHERE user_id=$1 AND (status IN ('booked', 'confirmed', 'in_progress') OR (status = 'pending' AND (payment_method = 'cod' OR payment_status = 'paid')))`,
 				[userId],
 			),
 		]);

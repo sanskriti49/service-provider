@@ -188,7 +188,8 @@ async function createBooking(req, res, next) {
                  WHERE provider_id = $1 AND date = $2::date 
                  AND (
                      status IN ('booked', 'confirmed', 'in_progress')
-                     OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
+                     OR (status = 'pending' AND payment_method IN ('cod', 'cash'))
+                     OR (status = 'pending' AND payment_method = 'online' AND payment_status = 'pending' AND created_at > NOW() - INTERVAL '5 minutes')
                  )`,
 				[resolvedProviderId, cleanDate],
 			);
@@ -199,7 +200,8 @@ async function createBooking(req, res, next) {
                      WHERE provider_id = $1 AND date = $2::date 
                      AND (
                          status IN ('booked', 'confirmed', 'in_progress')
-                         OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
+                         OR (status = 'pending' AND payment_method IN ('cod', 'cash'))
+                         OR (status = 'pending' AND payment_method = 'online' AND payment_status = 'pending' AND created_at > NOW() - INTERVAL '5 minutes')
                      )`,
 					[resolvedProviderId, cleanDate],
 				);
@@ -273,7 +275,7 @@ async function createBooking(req, res, next) {
 			end_time,
 			address || "",
 			finalPrice,
-			payment_method || "cod",
+			payment_method === "cash" ? "cod" : (payment_method || "cod"),
 			payment_status,
 			razorpay_order_id,
 			otp,
@@ -285,24 +287,13 @@ async function createBooking(req, res, next) {
 
 		const createdBooking = r.rows[0];
 
-		sendNotification({
-			userId: resolvedProviderId,
-			title: "New Booking Request 📅",
-			message: `New booking request for ${serviceName} on ${cleanDate} at ${start_time}.`,
-			type: "booking_created",
-			data: {
-				booking_id: createdBooking.booking_id,
-				service_name: serviceName,
-				date: cleanDate,
-				start_time,
-			},
-		});
-
-		if (user_id) {
+		// Only send immediate booking notifications for non-online (e.g. COD) bookings.
+		// For online payments, notifications are triggered only after successful payment verification.
+		if (payment_method !== "online") {
 			sendNotification({
-				userId: user_id,
-				title: "Booking Placed Successfully ✨",
-				message: `Your booking for ${serviceName} on ${cleanDate} at ${start_time} has been placed.`,
+				userId: resolvedProviderId,
+				title: "New Booking Request 📅",
+				message: `New booking request for ${serviceName} on ${cleanDate} at ${start_time}.`,
 				type: "booking_created",
 				data: {
 					booking_id: createdBooking.booking_id,
@@ -311,6 +302,21 @@ async function createBooking(req, res, next) {
 					start_time,
 				},
 			});
+
+			if (user_id) {
+				sendNotification({
+					userId: user_id,
+					title: "Booking Placed Successfully ✨",
+					message: `Your booking for ${serviceName} on ${cleanDate} at ${start_time} has been placed.`,
+					type: "booking_created",
+					data: {
+						booking_id: createdBooking.booking_id,
+						service_name: serviceName,
+						date: cleanDate,
+						start_time,
+					},
+				});
+			}
 		}
 
 		res.status(201).json({
@@ -631,7 +637,7 @@ async function getProviderHistory(req, res) {
 
 		if (type === "upcoming") {
 			whereClause +=
-				" AND b.status IN ('pending', 'booked', 'confirmed', 'in_progress')";
+				" AND (b.status IN ('booked', 'confirmed', 'in_progress') OR (b.status = 'pending' AND (b.payment_method = 'cod' OR b.payment_status = 'paid')))";
 		} else {
 			whereClause +=
 				" AND b.status IN ('completed', 'cancelled', 'no_show', 'expired')";
@@ -724,6 +730,7 @@ async function getRecentProviderBookings(req, res) {
              JOIN users u ON b.user_id = u.id
              LEFT JOIN services s ON b.service_id = s.id
              WHERE b.provider_id = $1
+               AND (b.payment_method = 'cod' OR b.payment_status = 'paid')
              ORDER BY b.date DESC, b.start_time DESC
              LIMIT 5`,
 			[providerId],
@@ -744,6 +751,7 @@ async function getUpcomingBookings(req, res) {
             LEFT JOIN services s ON s.id = b.service_id
             LEFT JOIN users pu ON pu.id = b.provider_id
             WHERE b.user_id = $1 AND b.date >= CURRENT_DATE AND b.status != 'cancelled'
+              AND (b.payment_method = 'cod' OR b.payment_status = 'paid')
             ORDER BY b.date ASC, b.start_time ASC
         `;
 		const result = await db.query(q, [req.user.id]);
@@ -863,7 +871,56 @@ async function verifyPayment(req, res) {
 				`UPDATE bookings SET payment_status='paid', status='booked', razorpay_payment_id=$1 WHERE razorpay_order_id=$2 RETURNING *`,
 				[razorpay_payment_id, razorpay_order_id],
 			);
-			res.status(200).json({ success: true, booking: result.rows[0] });
+			const verifiedBooking = result.rows[0];
+
+			if (verifiedBooking) {
+				let serviceName = "Service";
+				try {
+					const sRes = await db.query(`SELECT name FROM services WHERE id = $1`, [
+						verifiedBooking.service_id,
+					]);
+					if (sRes.rows.length > 0) {
+						serviceName = sRes.rows[0].name;
+					}
+				} catch (_) {}
+
+				const cleanDate = verifiedBooking.date
+					? verifiedBooking.date.toString().substring(0, 10)
+					: "";
+				const startTime = verifiedBooking.start_time
+					? String(verifiedBooking.start_time).slice(0, 5)
+					: "";
+
+				sendNotification({
+					userId: verifiedBooking.provider_id,
+					title: "New Booking Request 📅",
+					message: `New booking request for ${serviceName} on ${cleanDate} at ${startTime}.`,
+					type: "booking_created",
+					data: {
+						booking_id: verifiedBooking.booking_id,
+						service_name: serviceName,
+						date: cleanDate,
+						start_time: startTime,
+					},
+				});
+
+				if (verifiedBooking.user_id) {
+					sendNotification({
+						userId: verifiedBooking.user_id,
+						title: "Booking Placed Successfully ✨",
+						message: `Your booking for ${serviceName} on ${cleanDate} at ${startTime} has been placed.`,
+						type: "booking_created",
+						data: {
+							booking_id: verifiedBooking.booking_id,
+							service_name: serviceName,
+							date: cleanDate,
+							start_time: startTime,
+						},
+					});
+				}
+			}
+
+			res.status(200).json({ success: true, booking: verifiedBooking });
 		} catch (err) {
 			res.status(500).json({ message: "Internal Server Error" });
 		}
@@ -943,7 +1000,8 @@ async function getUserHistory(req, res) {
 		paramCounter++;
 
 		if (type === "upcoming") {
-			whereClause += " AND b.status IN ('booked','confirmed','in_progress','pending')";
+			whereClause +=
+				" AND (b.status IN ('booked','confirmed','in_progress') OR (b.status = 'pending' AND (b.payment_method = 'cod' OR b.payment_status = 'paid')))";
 		} else {
 			whereClause +=
 				" AND b.status IN ('completed','cancelled','no_show','expired')";
@@ -1091,6 +1149,36 @@ async function regenerateCompletionOtp(req, res) {
 	}
 }
 
+async function cancelUnpaidBooking(req, res) {
+	const { booking_id } = req.params;
+	const userId = req.user.id;
+
+	try {
+		const result = await db.query(
+			`DELETE FROM bookings 
+			 WHERE booking_id = $1 AND user_id = $2 
+			   AND payment_method = 'online' AND payment_status = 'pending'
+			 RETURNING booking_id, provider_id, date, start_time`,
+			[booking_id, userId],
+		);
+
+		if (result.rowCount === 0) {
+			return res.status(404).json({
+				message: "Unpaid booking not found or already processed.",
+			});
+		}
+
+		res.json({
+			success: true,
+			message: "Unpaid booking cancelled and slot released successfully.",
+			booking: result.rows[0],
+		});
+	} catch (err) {
+		console.error("Cancel unpaid booking error:", err);
+		res.status(500).json({ message: "Server error cancelling unpaid booking" });
+	}
+}
+
 module.exports = {
 	createBooking,
 	updateBookingAddress,
@@ -1101,4 +1189,5 @@ module.exports = {
 	getUpcomingBookings,
 	getProviderHistory,
 	regenerateCompletionOtp,
+	cancelUnpaidBooking,
 };

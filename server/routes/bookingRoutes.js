@@ -10,6 +10,7 @@ const {
 	getUpcomingBookings,
 	getProviderHistory,
 	regenerateCompletionOtp,
+	cancelUnpaidBooking,
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { bookingLimiter } = require("../middleware/rateLimiter");
@@ -25,6 +26,7 @@ function allowRoles(...roles) {
 }
 router.post("/", bookingLimiter, authMiddleware, allowRoles("customer"), createBooking);
 router.post("/verify-payment", authMiddleware, verifyPayment);
+router.delete("/:booking_id/unpaid", authMiddleware, allowRoles("customer"), cancelUnpaidBooking);
 
 router.get(
 	"/user/history",
@@ -34,6 +36,12 @@ router.get(
 );
 router.get(
 	"/user/upcoming",
+	authMiddleware,
+	allowRoles("customer"),
+	getUpcomingBookings,
+);
+router.get(
+	"/my-bookings",
 	authMiddleware,
 	allowRoles("customer"),
 	getUpcomingBookings,
@@ -50,6 +58,7 @@ router.get(
             FROM bookings b
             LEFT JOIN users u ON u.id = b.user_id
             WHERE b.provider_id=$1
+              AND (b.payment_method = 'cod' OR b.payment_status = 'paid')
             ORDER BY b.date ASC
         `;
 			const result = await db.query(q, [req.user.id]);

@@ -1,497 +1,746 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { MotionConfig, motion } from "framer-motion";
 import {
-	Clock,
-	MapPin,
-	Wallet,
-	ChevronRight,
-	Share2,
-	Settings,
-	Shield,
+	ArrowLeft,
+	ArrowUpRight,
 	Bell,
-	LogOut,
-	HelpCircle,
-	Edit3,
-	Camera,
-	Sun,
-	Moon,
-	Zap,
-	MessageSquare,
-	Star,
+	CalendarCheck,
+	Check,
+	CheckCircle2,
+	ChevronRight,
+	Clock,
 	Copy,
-	Heart,
+	HelpCircle,
+	LogOut,
+	Mail,
+	MapPin,
+	MessageSquare,
+	Pencil,
+	Phone,
+	Plus,
+	Settings,
+	Share2,
+	Sparkles,
+	Users,
+	Wallet,
+	Zap,
 } from "lucide-react";
-import { useState, useEffect, useMemo, useCallback, forwardRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { toast } from "sonner";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
 import ConfirmDialog from "../../ui/ConfirmDialog";
-import { toast } from "sonner";
+import Logo from "../../ui/Logo";
 
-const SERIF_FONT = { fontFamily: "P22Mackinac, Cambria, sans-serif" };
-const TEXT_MAIN = "text-[#281950]";
-const TEXT_MUTED = "text-[#281950]/60";
+/* -------------------------------------------------------------------------- */
+/*  Helpers                                                                   */
+/* -------------------------------------------------------------------------- */
 
-const BentoCard = forwardRef(({ children, className, delay = 0 }, ref) => (
-	<motion.div
-		ref={ref}
-		initial={{ opacity: 0, y: 20, scale: 0.98 }}
-		animate={{ opacity: 1, y: 0, scale: 1 }}
-		transition={{ duration: 0.5, delay, type: "spring", stiffness: 80 }}
-		className={`bg-violet-100/60 backdrop-blur-xl border border-white/60 shadow-2xl shadow-indigo-300/30 rounded-[2.5rem] overflow-hidden relative group ${className}`}
-	>
-		<div className="absolute inset-0 bg-gradient-to-br from-violet-100/50 via-transparent to-violet-100/20 pointer-events-none" />
-		{children}
-	</motion.div>
-));
-BentoCard.displayName = "BentoCard";
+const formatINR = (n) =>
+	new Intl.NumberFormat("en-IN", {
+		style: "currency",
+		currency: "INR",
+		maximumFractionDigits: 0,
+	}).format(n || 0);
 
-const colorMap = {
-	blue: "bg-blue-100/50 text-blue-700 border-blue-200/50",
-	emerald: "bg-emerald-100/50 text-emerald-700 border-emerald-200/50",
-	amber: "bg-amber-100/50 text-amber-700 border-amber-200/50",
-	rose: "bg-fuchsia-100/50 text-fuchsia-700 border-fuchsia-200/50",
+const ACTIVE_STATUSES = ["pending", "booked", "confirmed", "in_progress"];
+
+const STATUS = {
+	pending: { label: "Pending", dot: "bg-amber-300", text: "text-amber-200" },
+	booked: { label: "Confirmed", dot: "bg-violet-300", text: "text-violet-200" },
+	confirmed: {
+		label: "Confirmed",
+		dot: "bg-violet-300",
+		text: "text-violet-200",
+	},
+	in_progress: {
+		label: "In progress",
+		dot: "bg-sky-300",
+		text: "text-sky-200",
+	},
 };
 
-const StatPill = ({ icon: Icon, label, value, color, delay }) => (
-	<motion.div
-		initial={{ opacity: 0, x: -10 }}
-		animate={{ opacity: 1, x: 0 }}
-		transition={{ delay }}
-		className="bg-violet-200/30 flex items-center gap-3 p-3 pr-5 backdrop-blur-md border border-violet-400/20 rounded-2xl cursor-default transition-all duration-300 hover:scale-[1.03] hover:bg-violet-400/20 hover:shadow-lg hover:shadow-violet-100/50"
-	>
-		<div
-			className={`p-3 rounded-xl border ${colorMap[color] || colorMap.blue} transition-colors duration-300`}
-		>
-			<Icon size={18} strokeWidth={2.5} />
-		</div>
-		<div className="flex flex-col">
-			<p
-				className={`text-[10px] ${TEXT_MUTED} font-black uppercase tracking-widest`}
-			>
-				{label}
-			</p>
-			<p className={`text-base font-bold ${TEXT_MAIN} tracking-tight`}>
-				{value}
-			</p>
-		</div>
-	</motion.div>
-);
+const bookingTime = (b) => {
+	const d = b?.date ? new Date(b.date) : null;
+	return d && !isNaN(d) ? d.getTime() : Infinity;
+};
 
-const CustomMenuItem = forwardRef(
-	(
-		{
-			icon: Icon,
-			title,
-			desc,
-			onClick,
-			iconColorClass,
-			isDanger = false,
-			delay,
-		},
-		ref,
-	) => (
-		<motion.button
-			ref={ref}
-			initial={{ opacity: 0, x: -10 }}
-			animate={{ opacity: 1, x: 0 }}
-			transition={{ delay }}
-			onClick={onClick}
-			className={`cursor-pointer w-full group/item flex items-center justify-between p-3 rounded-2xl transition-all duration-300 border border-transparent ${
-				isDanger
-					? "hover:bg-red-50 hover:border-red-100"
-					: "hover:bg-violet-400/20 hover:border-violet-500/30"
-			}`}
-		>
-			<div className="flex items-center gap-4">
-				<div
-					className={`p-3 rounded-2xl transition-transform duration-300 ${isDanger ? "bg-red-50 text-red-500" : iconColorClass}`}
-				>
-					<Icon size={20} strokeWidth={2.5} />
-				</div>
-				<div className="text-left">
-					<h4
-						className={`font-bold text-[15px] ${isDanger ? "text-red-600" : TEXT_MAIN}`}
-					>
-						{title}
-					</h4>
-					<p
-						className={`text-xs font-medium ${isDanger ? "text-red-400" : "text-gray-500"}`}
-					>
-						{desc}
-					</p>
+const sortSoonest = (a, b) =>
+	bookingTime(a) - bookingTime(b) ||
+	String(a.start_time || "").localeCompare(String(b.start_time || ""));
+
+const startOfDay = (d) => {
+	const x = new Date(d);
+	x.setHours(0, 0, 0, 0);
+	return x.getTime();
+};
+
+function relativeDay(dateStr) {
+	const d = dateStr ? new Date(dateStr) : null;
+	if (!d || isNaN(d)) return "Scheduled";
+	const diff = Math.round((startOfDay(d) - startOfDay(new Date())) / 86400000);
+	if (diff === 0) return "Today";
+	if (diff === 1) return "Tomorrow";
+	if (diff > 1 && diff < 7) return `In ${diff} days`;
+	return d.toLocaleDateString("en-IN", {
+		weekday: "short",
+		day: "numeric",
+		month: "short",
+	});
+}
+
+const primaryBtn =
+	"bg-gradient-to-r from-violet-400 to-fuchsia-400 text-[#0d0b12] font-semibold hover:brightness-110 shadow-[0_6px_24px_-8px_rgba(167,139,250,0.7)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300";
+
+const containerVariants = {
+	hidden: {},
+	show: { transition: { staggerChildren: 0.07, delayChildren: 0.02 } },
+};
+const itemVariants = {
+	hidden: { opacity: 0, y: 12 },
+	show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+};
+
+/* One meaning-colour per icon chip, same tones as the dashboard */
+const TONES = {
+	sky: "bg-sky-300/12 text-sky-300",
+	emerald: "bg-emerald-300/12 text-emerald-300",
+	amber: "bg-amber-300/12 text-amber-300",
+	violet: "bg-violet-300/12 text-violet-300",
+	fuchsia: "bg-fuchsia-300/12 text-fuchsia-300",
+};
+
+/* -------------------------------------------------------------------------- */
+/*  Building blocks                                                           */
+/* -------------------------------------------------------------------------- */
+
+function Avatar({ user }) {
+	const [broken, setBroken] = useState(false);
+	return (
+		<div className="relative shrink-0">
+			<div className="p-[3px] rounded-full bg-gradient-to-br from-violet-400 via-fuchsia-400 to-amber-300">
+				<div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#1a1428] overflow-hidden flex items-center justify-center text-3xl font-semibold text-white">
+					{user?.photo && !broken ? (
+						<img
+							src={user.photo}
+							alt=""
+							onError={() => setBroken(true)}
+							className="w-full h-full object-cover"
+						/>
+					) : (
+						<span>{user?.name?.[0]?.toUpperCase() || "C"}</span>
+					)}
 				</div>
 			</div>
-			<ChevronRight
-				size={18}
-				className={`transition-all duration-300 transform opacity-0 group-hover/item:opacity-100 group-hover/item:translate-x-1 ${
-					isDanger
-						? "text-red-400 group-hover/item:text-red-600"
-						: "text-violet-300 group-hover/item:text-violet-600"
-				}`}
+			<span
+				aria-hidden
+				className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 ring-[3px] ring-[#0d0b12]"
 			/>
-		</motion.button>
-	),
-);
-CustomMenuItem.displayName = "CustomMenuItem";
+		</div>
+	);
+}
+
+function Fact({ label, children }) {
+	return (
+		<div className="min-w-0">
+			<dt className="text-xs text-stone-500">{label}</dt>
+			<dd className="mt-1.5 text-sm text-white">{children}</dd>
+		</div>
+	);
+}
+
+/** Customer identity as a ticket, echoing the booking page's summary ticket. */
+function IdentityTicket({ user }) {
+	const [copied, setCopied] = useState(false);
+
+	const handleCopy = useCallback(async () => {
+		if (!user?.custom_id) return;
+		try {
+			await navigator.clipboard.writeText(user.custom_id);
+			setCopied(true);
+			toast.success("Customer ID copied");
+			setTimeout(() => setCopied(false), 2000);
+		} catch {
+			toast.error("Couldn't copy. Select the ID and copy it by hand.");
+		}
+	}, [user?.custom_id]);
+
+	const joined = user?.created_at ? new Date(user.created_at) : null;
+	const joinedLabel =
+		joined && !isNaN(joined)
+			? joined.toLocaleDateString("en-IN", { month: "long", year: "numeric" })
+			: "–";
+
+	return (
+		<div className="relative rounded-2xl border border-white/[0.09] bg-gradient-to-b from-white/[0.06] to-white/[0.02] h-full">
+			<div className="p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center gap-5">
+				<Avatar user={user} />
+
+				<div className="min-w-0 flex-1">
+					<h2 className="font-mackinac text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
+						{user?.name || "Customer"}
+					</h2>
+					<div className="mt-2 flex flex-col gap-1 text-sm text-stone-400">
+						{user?.email && (
+							<p className="flex items-center gap-2 min-w-0">
+								<Mail size={14} className="shrink-0 text-stone-500" />
+								<span className="truncate">{user.email}</span>
+							</p>
+						)}
+						{user?.phone && (
+							<p className="flex items-center gap-2">
+								<Phone size={14} className="shrink-0 text-stone-500" />
+								{user.phone}
+							</p>
+						)}
+					</div>
+				</div>
+
+				<Link
+					to="/account/settings"
+					className="self-start sm:self-center h-9 px-3.5 inline-flex items-center gap-2 rounded-lg border border-white/[0.12] text-sm text-stone-200 hover:bg-white/[0.06] hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300"
+				>
+					<Pencil size={14} />
+					Edit profile
+				</Link>
+			</div>
+
+			{/* Perforation */}
+			<div className="relative">
+				<div className="mx-6 border-t border-dashed border-white/[0.14]" />
+				<span
+					aria-hidden
+					className="absolute -left-[9px] -top-[9px] w-[18px] h-[18px] rounded-full bg-[#0d0b12] border-r border-white/[0.09]"
+				/>
+				<span
+					aria-hidden
+					className="absolute -right-[9px] -top-[9px] w-[18px] h-[18px] rounded-full bg-[#0d0b12] border-l border-white/[0.09]"
+				/>
+			</div>
+
+			<dl className="p-6 sm:p-7 grid grid-cols-1 sm:grid-cols-3 gap-5">
+				<Fact label="Customer ID">
+					{user?.custom_id ? (
+						<button
+							type="button"
+							onClick={handleCopy}
+							aria-label="Copy customer ID"
+							className="group inline-flex items-center gap-2 max-w-full text-stone-200 hover:text-violet-200 transition-colors"
+						>
+							<span className="font-mono truncate">{user.custom_id}</span>
+							{copied ? (
+								<Check size={13} className="shrink-0 text-emerald-400" />
+							) : (
+								<Copy
+									size={13}
+									className="shrink-0 text-stone-500 group-hover:text-violet-300 transition-colors"
+								/>
+							)}
+						</button>
+					) : (
+						<span className="text-stone-500">Not assigned</span>
+					)}
+				</Fact>
+				<Fact label="Member since">{joinedLabel}</Fact>
+				<Fact label="Location">
+					{user?.location ? (
+						<span className="inline-flex items-center gap-1.5">
+							<MapPin size={13} className="text-violet-300 shrink-0" />
+							{user.location}
+						</span>
+					) : (
+						<span className="text-stone-500">Not set</span>
+					)}
+				</Fact>
+			</dl>
+		</div>
+	);
+}
+
+/** The one booking that matters right now, or a nudge to make one. */
+function UpNextCard({ booking, loading }) {
+	if (loading) {
+		return (
+			<div className="h-full min-h-[220px] rounded-2xl border border-white/[0.06] bg-white/[0.03] animate-pulse" />
+		);
+	}
+
+	if (!booking) {
+		return (
+			<div className="h-full flex flex-col justify-between gap-6 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-6">
+				<div>
+					<span className="w-10 h-10 rounded-xl bg-violet-400/10 text-violet-300 flex items-center justify-center">
+						<Sparkles size={18} />
+					</span>
+					<p className="mt-4 text-sm font-medium text-white">
+						Nothing scheduled
+					</p>
+					<p className="mt-1 text-sm text-stone-500">
+						Verified professionals, priced upfront, at your door.
+					</p>
+				</div>
+				<Link
+					to="/services"
+					className={`h-10 px-4 inline-flex items-center justify-center gap-2 rounded-lg text-sm ${primaryBtn}`}
+				>
+					<Plus size={15} />
+					Book a service
+				</Link>
+			</div>
+		);
+	}
+
+	const st = STATUS[booking.status] || STATUS.pending;
+	const provider = booking.provider?.name || booking.provider_name;
+
+	return (
+		<div className="relative overflow-hidden h-full flex flex-col justify-between gap-6 rounded-2xl border border-violet-400/20 bg-gradient-to-br from-violet-400/[0.12] via-white/[0.02] to-amber-300/[0.07] p-6">
+			<div
+				aria-hidden
+				className="absolute -right-12 -top-12 w-44 h-44 rounded-full bg-amber-300/[0.07] blur-3xl pointer-events-none"
+			/>
+			<div className="relative">
+				<div className="flex items-center justify-between gap-3">
+					<p className="inline-flex items-center gap-2 text-sm font-medium text-violet-300">
+						<Clock size={14} />
+						Up next
+					</p>
+					<span className="text-sm font-medium text-amber-200">
+						{relativeDay(booking.date)}
+					</span>
+				</div>
+				<h3 className="mt-4 font-mackinac text-xl font-bold text-white leading-snug">
+					{booking.service_name || "Home service"}
+				</h3>
+				<p className="mt-1 text-sm text-stone-400 truncate">
+					{booking.start_time ? `${booking.start_time} · ` : ""}
+					{provider || "Finding your provider"}
+				</p>
+				<span
+					className={`mt-3 inline-flex items-center gap-1.5 text-xs ${st.text}`}
+				>
+					<span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+					{st.label}
+				</span>
+			</div>
+			<Link
+				to="/dashboard/bookings"
+				className="relative h-10 px-4 inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.14] text-sm font-medium text-stone-100 hover:bg-white/[0.07] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300"
+			>
+				View booking
+				<ChevronRight size={15} />
+			</Link>
+		</div>
+	);
+}
+
+function Stat({ label, value, hint, icon: Icon, tone, to, loading }) {
+	const inner = (
+		<div className="h-full p-4 rounded-xl border border-white/[0.07] bg-white/[0.025] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:bg-white/[0.045]">
+			<div className="flex items-center justify-between">
+				<span
+					className={`w-8 h-8 rounded-lg flex items-center justify-center ${TONES[tone]}`}
+				>
+					<Icon size={15} />
+				</span>
+				{to && (
+					<ArrowUpRight
+						size={14}
+						className="text-stone-600 group-hover:text-stone-300 transition-colors"
+					/>
+				)}
+			</div>
+			{loading ? (
+				<div className="mt-4 h-8 w-16 rounded bg-white/[0.06] animate-pulse" />
+			) : (
+				<p className="mt-4 font-mackinac text-3xl font-bold tabular-nums text-white truncate">
+					{value}
+				</p>
+			)}
+			<p className="mt-1 text-sm text-stone-300">{label}</p>
+			<p className="mt-0.5 text-xs text-stone-500">{hint}</p>
+		</div>
+	);
+	return to ? (
+		<Link
+			to={to}
+			className="group block h-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300 rounded-xl"
+		>
+			{inner}
+		</Link>
+	) : (
+		<div className="group h-full">{inner}</div>
+	);
+}
+
+/** A shortcut row. Real links navigate; unbuilt ones show as "Soon" instead of doing nothing. */
+function MenuRow({ icon: Icon, title, desc, tone, to, onClick, soon, danger }) {
+	const body = (
+		<>
+			<span
+				className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center ${
+					danger ? "bg-rose-400/10 text-rose-300" : TONES[tone]
+				}`}
+			>
+				<Icon size={16} />
+			</span>
+			<span className="min-w-0 flex-1 text-left">
+				<span
+					className={`block text-sm font-medium ${danger ? "text-rose-300" : "text-white"}`}
+				>
+					{title}
+				</span>
+				<span className="block text-xs text-stone-500 truncate">{desc}</span>
+			</span>
+			{soon ? (
+				<span className="shrink-0 h-5 px-2 rounded-full bg-white/[0.06] text-[11px] text-stone-400 flex items-center">
+					Soon
+				</span>
+			) : (
+				<ChevronRight
+					size={15}
+					className={`shrink-0 transition-all group-hover:translate-x-0.5 ${
+						danger
+							? "text-rose-400/50 group-hover:text-rose-300"
+							: "text-stone-600 group-hover:text-violet-300"
+					}`}
+				/>
+			)}
+		</>
+	);
+
+	const base =
+		"group w-full flex items-center gap-3.5 px-4 py-3.5 transition-colors";
+	const focus =
+		"focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-violet-300";
+
+	if (soon) {
+		return (
+			<div aria-disabled="true" className={`${base} opacity-60 cursor-default`}>
+				{body}
+			</div>
+		);
+	}
+	if (to) {
+		return (
+			<Link to={to} className={`${base} hover:bg-white/[0.04] ${focus}`}>
+				{body}
+			</Link>
+		);
+	}
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className={`${base} ${focus} ${danger ? "hover:bg-rose-400/[0.07]" : "hover:bg-white/[0.04]"}`}
+		>
+			{body}
+		</button>
+	);
+}
+
+function MenuGroup({ title, children }) {
+	return (
+		<section>
+			<h2 className="mb-4 font-mackinac text-xl font-bold text-white">
+				{title}
+			</h2>
+			<div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] divide-y divide-white/[0.06] overflow-hidden">
+				{children}
+			</div>
+		</section>
+	);
+}
+
+function ProfileSkeleton() {
+	return (
+		<div className="space-y-8 animate-pulse" aria-busy="true">
+			<div className="h-10 w-48 rounded-xl bg-white/[0.05]" />
+			<div className="grid lg:grid-cols-12 gap-6">
+				<div className="lg:col-span-8 h-[300px] rounded-2xl bg-white/[0.04] border border-white/[0.05]" />
+				<div className="lg:col-span-4 h-[300px] rounded-2xl bg-white/[0.03] border border-white/[0.05]" />
+			</div>
+			<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+				{[...Array(4)].map((_, i) => (
+					<div
+						key={i}
+						className="h-[136px] rounded-xl bg-white/[0.03] border border-white/[0.05]"
+					/>
+				))}
+			</div>
+			<div className="grid md:grid-cols-2 gap-6">
+				<div className="h-56 rounded-2xl bg-white/[0.03]" />
+				<div className="h-56 rounded-2xl bg-white/[0.03]" />
+			</div>
+		</div>
+	);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Page                                                                      */
+/* -------------------------------------------------------------------------- */
 
 export default function CustomerProfile() {
 	const navigate = useNavigate();
+	const { user: authUser, logout } = useAuth();
 
-	const [user, setUser] = useState(null);
-	const [stats, setStats] = useState({
-		bookings: 0,
-		spent: 0,
-		rating: 0,
-		recents: 0,
-	});
-	const [isLoading, setIsLoading] = useState(true);
-	const [imageError, setImageError] = useState(false);
-
-	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				const [userRes, statsRes] = await Promise.allSettled([
-					api.get("/api/auth/me"),
-					api.get("/api/dashboard/customer"),
-				]);
-
-				if (userRes.status === "fulfilled" && userRes.value.data?.user) {
-					setUser(userRes.value.data.user);
-				}
-				if (statsRes.status === "fulfilled") {
-					setStats(statsRes.value.data.stats || statsRes.value.data);
-				}
-				console.log(statsRes.value);
-			} catch (err) {
-				console.error("Profile fetch error:", err);
-			} finally {
-				setIsLoading(false);
-			}
-		};
-
-		fetchData();
-	}, []);
-
-	const hour = new Date().getHours();
-
-	const greeting = useMemo(() => {
-		if (hour >= 5 && hour < 12) return "Good Morning";
-		if (hour >= 12 && hour < 17) return "Good Afternoon";
-		if (hour >= 17 && hour < 23) return "Good Evening";
-		return "Good Night";
-	}, [hour]);
-
-	const { logout } = useAuth();
+	// Start from the signed-in user so the page paints immediately, then refresh.
+	const [user, setUser] = useState(authUser || null);
+	const [bookings, setBookings] = useState([]);
+	const [loading, setLoading] = useState(true);
 	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-	const handleLogout = useCallback(() => {
-		setShowLogoutConfirm(true);
+	useEffect(() => {
+		let alive = true;
+		(async () => {
+			const [meRes, bookingsRes] = await Promise.allSettled([
+				api.get("/api/auth/me"),
+				api.get("/api/bookings/my-bookings"),
+			]);
+			if (!alive) return;
+
+			if (meRes.status === "fulfilled" && meRes.value.data?.user) {
+				setUser(meRes.value.data.user);
+			}
+			if (bookingsRes.status === "fulfilled") {
+				const data = bookingsRes.value.data?.bookings ?? bookingsRes.value.data;
+				setBookings(Array.isArray(data) ? data : []);
+			} else {
+				toast.error("Couldn't load your booking stats");
+			}
+			setLoading(false);
+		})();
+		return () => {
+			alive = false;
+		};
 	}, []);
 
+	const stats = useMemo(() => {
+		const completed = bookings.filter((b) => b.status === "completed");
+		const providers = new Set(
+			bookings
+				.map(
+					(b) =>
+						b.provider?.id ||
+						b.provider_id ||
+						b.provider?.name ||
+						b.provider_name,
+				)
+				.filter(Boolean),
+		);
+		return {
+			total: bookings.length,
+			completed: completed.length,
+			spent: completed.reduce((s, b) => s + (Number(b.price) || 0), 0),
+			providers: providers.size,
+		};
+	}, [bookings]);
+
+	const nextBooking = useMemo(
+		() =>
+			bookings
+				.filter((b) => ACTIVE_STATUSES.includes(b.status))
+				.sort(sortSoonest)[0] || null,
+		[bookings],
+	);
+
+	const handleLogout = useCallback(() => setShowLogoutConfirm(true), []);
 	const executeLogout = useCallback(() => {
 		setShowLogoutConfirm(false);
 		logout();
 		navigate("/login");
 	}, [logout, navigate]);
 
-	if (isLoading) return <ProfileSkeleton />;
-
 	return (
-		<div className="min-h-screen relative overflow-hidden bricolage-grotesque mt-20 pb-20">
-			<div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-				<div className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-300/30 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/4" />
-				<div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-fuchsia-300/20 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/4" />
-			</div>
+		<MotionConfig reducedMotion="user">
+			<div className="min-h-screen bg-[#0d0b12] text-stone-200 bricolage-grotesque antialiased selection:bg-violet-400/30">
+				<div
+					aria-hidden
+					className="fixed inset-x-0 top-0 h-[460px] pointer-events-none bg-[radial-gradient(60%_100%_at_20%_0%,rgba(139,92,246,0.14),transparent_70%),radial-gradient(45%_80%_at_85%_0%,rgba(251,191,36,0.08),transparent_70%)]"
+				/>
 
-			<div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12">
-				<header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
-					<motion.div
-						initial={{ opacity: 0, x: -20 }}
-						animate={{ opacity: 1, x: 0 }}
-					>
-						<div className="flex items-center gap-2 text-violet-600 font-bold text-xs tracking-widest uppercase mb-2">
-							{hour >= 5 && hour < 17 ? (
-								<Sun size={14} className="text-orange-400" />
-							) : hour >= 17 && hour < 22 ? (
-								<Moon size={14} className="text-indigo-400" />
-							) : (
-								<Zap size={14} className="text-yellow-400" />
-							)}
-							<span>{greeting}</span>
-						</div>
-						<h1
-							className={`text-5xl md:text-6xl font-medium ${TEXT_MAIN} tracking-tight`}
-							style={SERIF_FONT}
+				<header className="sticky top-0 z-40 bg-[#0d0b12]/90 backdrop-blur-md border-b border-white/[0.06]">
+					<div className="max-w-5xl mx-auto px-4 sm:px-8 lg:px-12 h-14 flex items-center gap-3">
+						<Link
+							to="/dashboard"
+							className="-ml-2 h-9 px-2 inline-flex items-center gap-2 rounded-md text-sm text-stone-300 hover:text-white hover:bg-white/[0.06] transition-colors"
 						>
-							{user?.name?.split(" ")[0] || "Friend"}
-							<span className="text-violet-500">.</span>
-						</h1>
-					</motion.div>
-
-					<button
-						onClick={() => navigate("/account/settings")}
-						className="cursor-pointer group h-12 px-6 rounded-2xl bg-violet-200/20 border border-violet-800/10 hover:bg-white/20 hover:shadow-xl hover:shadow-violet-200/50 transition-all flex items-center gap-2 font-bold text-[#281950]"
-					>
-						<Settings
-							size={18}
-							className="group-hover:rotate-90 transition-transform duration-500"
-						/>
-						Settings
-					</button>
+							<ArrowLeft size={17} />
+							Dashboard
+						</Link>
+						<span className="flex-1" />
+						<Logo to="/" size="md" theme="dark" />
+					</div>
 				</header>
 
-				<div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-					<div className="md:col-span-8 flex flex-col gap-8">
-						<BentoCard className="p-8 md:p-10 flex flex-col md:flex-row items-center md:items-start gap-10">
-							<div className="relative shrink-0">
-								<div className="absolute -inset-6 bg-gradient-to-tr from-violet-400 to-fuchsia-400 opacity-20 blur-2xl rounded-full" />
-								<div className="w-22 h-22 md:w-30 md:h-30 rounded-full border-[5px] border-violet-500 shadow-2xl overflow-hidden relative z-10 bg-white">
-									{user?.photo && !imageError ? (
-										<img
-											src={user.photo}
-											className="w-full h-full object-cover"
-											onError={() => setImageError(true)}
-											alt="Profile"
-										/>
-									) : (
-										<div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white text-5xl font-bold">
-											{user?.name?.[0] || "U"}
-										</div>
-									)}
-								</div>
-								<button className="cursor-pointer absolute bottom-2 right-2 z-20 bg-[#281950] text-white p-2.5 rounded-full border-3 border-violet-200 shadow-xl hover:scale-110 transition-transform">
-									<Camera size={16} />
-								</button>
-							</div>
-
-							<div className="flex-1 space-y-6 text-center md:text-left">
-								<div>
-									<div className="flex items-center justify-center md:justify-start gap-3 mb-2">
-										<div
-											className={`cursor-pointer text-black text-3xl font-bold ${TEXT_MAIN}`}
-										>
-											{user?.custom_id || "Genie_User"}
-										</div>
-										<button
-											type="button"
-											onClick={() => {
-												if (!user.custom_id) return;
-												navigator.clipboard.writeText(user.custom_id);
-												toast.success("Provider ID copied!");
-											}}
-											className="cursor-pointer rounded-xl  text-violet-600 hover:text-violet-800 transition-colors"
-										>
-											<Copy size={1} />
-										</button>
-										<Shield
-											size={20}
-											className="text-blue-500 fill-blue-500/20"
-										/>
-									</div>
-									<div className="flex items-center justify-center md:justify-start gap-3 text-gray-500 font-medium text-sm">
-										<MapPin size={16} className="text-violet-400" />
-										{user?.location || "India"}
-										<span className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
-										<span>
-											Joined{" "}
-											{user?.created_at
-												? new Date(user.created_at).getFullYear()
-												: new Date().getFullYear()}
-										</span>
-									</div>
-								</div>
-								<div className="flex flex-wrap justify-center md:justify-start gap-3">
-									<div className="px-4 py-2 rounded-full bg-amber-50 text-amber-700 text-[11px] font-black uppercase tracking-widest border border-amber-200/50 flex items-center gap-2">
-										<Star size={12} className="fill-amber-400 text-amber-400" />
-										Gold Member
-									</div>
-									<div className="px-4 py-2 rounded-full bg-violet-50 text-violet-700 text-[11px] font-black uppercase tracking-widest border border-violet-200/50">
-										Verified Pro
-									</div>
-								</div>
-							</div>
-						</BentoCard>
-
-						<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-							<StatPill
-								icon={Clock}
-								label="Bookings"
-								value={stats.active_tasks}
-								color="blue"
-								delay={0.1}
-							/>
-							<StatPill
-								icon={Wallet}
-								label="Spent"
-								value={`₹${stats.total_spent}`}
-								color="emerald"
-								delay={0.2}
-							/>
-							<StatPill
-								icon={Heart}
-								label="Saved"
-								value={stats.rating || "0"}
-								color="rose"
-							/>
-							<StatPill
-								icon={Zap}
-								label="Recents"
-								value={stats.total_completed}
-								color="rose"
-								delay={0.4}
-							/>
-						</div>
-					</div>
-
-					<div className="md:col-span-4 h-full">
+				<main className="relative max-w-5xl mx-auto px-4 sm:px-8 lg:px-12 py-8 lg:py-12 pb-20">
+					{!user && loading ? (
+						<ProfileSkeleton />
+					) : (
 						<motion.div
-							initial={{ opacity: 0, y: 20, scale: 0.98 }}
-							animate={{ opacity: 1, y: 0, scale: 1 }}
-							transition={{
-								duration: 0.5,
-								delay: 0.2,
-								type: "spring",
-								stiffness: 80,
-							}}
-							className="h-full bg-[#281950] rounded-[2.5rem] overflow-hidden relative"
+							variants={containerVariants}
+							initial="hidden"
+							animate="show"
+							className="space-y-10"
 						>
-							<div className="absolute top-0 right-0 w-64 h-64 bg-violet-600 rounded-full blur-[80px] opacity-40 translate-x-1/3 -translate-y-1/3" />
-							<div className="absolute bottom-0 left-0 w-48 h-48 bg-fuchsia-300 rounded-full blur-[60px] opacity-30 -translate-x-1/3 translate-y-1/3" />
-							<div className="p-8 relative z-10 flex flex-col h-full justify-center">
-								<div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10 mb-6">
-									<Zap className="text-yellow-300 fill-yellow-300" size={24} />
-								</div>
-								<h3
-									className="text-white text-2xl font-bold mb-2"
-									style={SERIF_FONT}
-								>
-									Upgrade to Genie+
-								</h3>
-								<p className="text-white/70 text-sm leading-relaxed mb-6">
-									Unlock priority support, 0% service fees, and exclusive
-									premium themes.
+							<motion.header variants={itemVariants}>
+								<h1 className="font-mackinac text-3xl sm:text-4xl font-bold text-white tracking-tight">
+									Profile
+								</h1>
+								<p className="mt-2 text-sm text-stone-400">
+									Your details, your activity, and shortcuts to everything else.
 								</p>
-								<button className="cursor-pointer w-full py-4 bg-white text-[#281950] rounded-2xl font-black hover:scale-[1.03] active:scale-95 transition-all shadow-2xl shadow-black/20">
-									Try Free Trial
-								</button>
-							</div>
-						</motion.div>
-					</div>
+							</motion.header>
 
-					<div className="md:col-span-12 grid md:grid-cols-3 gap-6 mt-2">
-						<BentoCard delay={0.3} className="p-5">
-							<h3 className="text-xs font-black uppercase tracking-widest mb-4 pl-2 text-slate-600">
-								Account
-							</h3>
-							<div className="space-y-1">
-								<CustomMenuItem
+							<motion.section
+								variants={itemVariants}
+								className="grid lg:grid-cols-12 gap-6"
+							>
+								<div className="lg:col-span-8">
+									<IdentityTicket user={user} />
+								</div>
+								<div className="lg:col-span-4">
+									<UpNextCard booking={nextBooking} loading={loading} />
+								</div>
+							</motion.section>
+
+							<motion.section
+								variants={itemVariants}
+								aria-label="Your activity"
+								className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+							>
+								<Stat
+									label="Bookings"
+									value={stats.total}
+									hint="All time"
+									icon={CalendarCheck}
+									tone="sky"
+									to="/dashboard/bookings"
+									loading={loading}
+								/>
+								<Stat
+									label="Completed"
+									value={stats.completed}
+									hint="Jobs done at home"
+									icon={CheckCircle2}
+									tone="emerald"
+									loading={loading}
+								/>
+								<Stat
+									label="Spent"
+									value={formatINR(stats.spent)}
+									hint="On completed work"
 									icon={Wallet}
-									title="Payments"
-									desc="Cards & Wallets"
-									iconColorClass="bg-emerald-100 text-emerald-700"
-									delay={0.35}
+									tone="amber"
+									loading={loading}
 								/>
-								<CustomMenuItem
-									icon={MapPin}
-									title="Locations"
-									desc="Manage addresses"
-									iconColorClass="bg-blue-100 text-blue-700"
-									delay={0.4}
+								<Stat
+									label="Providers"
+									value={stats.providers}
+									hint="Hired so far"
+									icon={Users}
+									tone="fuchsia"
+									loading={loading}
 								/>
-								<CustomMenuItem
-									icon={Bell}
-									title="Notifications"
-									desc="Preferences"
-									iconColorClass="bg-orange-100 text-orange-700"
-									delay={0.45}
-								/>
-							</div>
-						</BentoCard>
+							</motion.section>
 
-						<BentoCard delay={0.4} className="p-5">
-							<h3 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-4 pl-2">
-								Community
-							</h3>
-							<div className="space-y-1">
-								<CustomMenuItem
-									icon={Share2}
-									title="Refer Friends"
-									desc="Earn ₹100 rewards"
-									iconColorClass="bg-violet-100 text-violet-700"
-									delay={0.45}
-								/>
-								<CustomMenuItem
-									icon={HelpCircle}
-									title="Support"
-									desc="24/7 Live Chat"
-									iconColorClass="bg-indigo-100 text-indigo-700"
-									delay={0.5}
-								/>
-								<CustomMenuItem
-									icon={MessageSquare}
-									title="Feedback"
-									desc="Share your thoughts"
-									iconColorClass="bg-amber-100 text-amber-700"
-									delay={0.55}
-								/>
-							</div>
-						</BentoCard>
-
-						<BentoCard
-							delay={0.5}
-							className="p-5 flex flex-col justify-between"
-						>
-							<div>
-								<h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 pl-2">
-									Session
-								</h3>
-								<div className="space-y-1">
-									<CustomMenuItem
-										icon={LogOut}
-										title="Log Out"
-										desc="Securely end session"
-										isDanger
-										onClick={handleLogout}
-										delay={0.6}
+							<motion.div
+								variants={itemVariants}
+								className="grid md:grid-cols-2 gap-6 lg:gap-8"
+							>
+								<MenuGroup title="Account">
+									<MenuRow
+										icon={Settings}
+										title="Settings"
+										desc="Name, password and preferences"
+										tone="violet"
+										to="/account/settings"
 									/>
-								</div>
-							</div>
-							<div className="text-center pt-4">
-								<p className="text-[10px] text-gray-400 font-mono">
-									v1.0.0 • 2026
-								</p>
-							</div>
-						</BentoCard>
-					</div>
-				</div>
-			</div>
+									<MenuRow
+										icon={Bell}
+										title="Notifications"
+										desc="Updates from your providers"
+										tone="fuchsia"
+										to="/notifications"
+									/>
+									<MenuRow
+										icon={CalendarCheck}
+										title="My bookings"
+										desc="Upcoming and past services"
+										tone="sky"
+										to="/dashboard/bookings"
+									/>
+									<MenuRow
+										icon={Wallet}
+										title="Payments"
+										desc="Cards and wallets"
+										tone="emerald"
+										soon
+									/>
+									<MenuRow
+										icon={MapPin}
+										title="Saved addresses"
+										desc="Book faster from home or work"
+										tone="amber"
+										soon
+									/>
+								</MenuGroup>
 
-			<ConfirmDialog
-				isOpen={showLogoutConfirm}
-				onClose={() => setShowLogoutConfirm(false)}
-				onConfirm={executeLogout}
-				title="Log out?"
-				description="You'll need to sign in again to access your customer account."
-				confirmText="Log out"
-				cancelText="Cancel"
-				variant="danger"
-				icon={LogOut}
-			/>
-		</div>
+								<MenuGroup title="Help and community">
+									<MenuRow
+										icon={HelpCircle}
+										title="Help and support"
+										desc="Get answers or contact us"
+										tone="sky"
+										to="/help"
+									/>
+									<MenuRow
+										icon={Share2}
+										title="Refer friends"
+										desc="Share TaskGenie, earn rewards"
+										tone="violet"
+										soon
+									/>
+									<MenuRow
+										icon={MessageSquare}
+										title="Feedback"
+										desc="Tell us what to improve"
+										tone="amber"
+										soon
+									/>
+									<MenuRow
+										icon={LogOut}
+										title="Sign out"
+										desc="End this session on this device"
+										danger
+										onClick={handleLogout}
+									/>
+								</MenuGroup>
+							</motion.div>
+
+							<motion.p
+								variants={itemVariants}
+								className="flex items-center justify-center gap-1.5 text-xs text-stone-600"
+							>
+								<Zap size={11} />
+								TaskGenie v1.0.0
+							</motion.p>
+						</motion.div>
+					)}
+				</main>
+
+				<ConfirmDialog
+					isOpen={showLogoutConfirm}
+					onClose={() => setShowLogoutConfirm(false)}
+					onConfirm={executeLogout}
+					title="Sign out?"
+					description="You'll need to sign in again to access your customer account."
+					confirmText="Sign out"
+					cancelText="Cancel"
+					variant="danger"
+					icon={LogOut}
+				/>
+			</div>
+		</MotionConfig>
 	);
 }
-
-const ProfileSkeleton = () => (
-	<div className="animate-pulse max-w-6xl mx-auto px-4 pt-32 pb-20 space-y-8">
-		<div className="h-16 bg-gray-100 rounded-2xl w-1/3" />
-		<div className="grid grid-cols-12 gap-8">
-			<div className="col-span-8 h-64 bg-gray-100 rounded-[2.5rem]" />
-			<div className="col-span-4 h-64 bg-gray-100 rounded-[2.5rem]" />
-			<div className="col-span-12 grid grid-cols-3 gap-6">
-				{[...Array(3)].map((_, i) => (
-					<div key={i} className="h-48 bg-gray-100 rounded-[2.5rem]" />
-				))}
-			</div>
-		</div>
-	</div>
-);

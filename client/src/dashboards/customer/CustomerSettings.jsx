@@ -1,339 +1,423 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-	MapPin,
-	Phone,
-	User,
-	Mail,
-	Lock,
-	ShieldCheck,
-	CheckCircle2,
-	Eye,
-	EyeOff,
-	Save,
-} from "lucide-react";
-import api from "../../api/axiosInstance";
+import { Link, useNavigate } from "react-router-dom";
+import { MotionConfig, motion } from "framer-motion";
+import { ArrowLeft, Eye, EyeOff, LogOut, Navigation } from "lucide-react";
 import { toast } from "sonner";
+import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
 import ConfirmDialog from "../../ui/ConfirmDialog";
+import Logo from "../../ui/Logo";
 
-const SaveButton = ({ loading, disabled, onClick, label, loadingLabel }) => (
-	<button
-		onClick={onClick}
-		disabled={disabled || loading}
-		className={`w-full flex items-center justify-center gap-2 text-sm font-bold py-3 px-6 rounded-xl transition-all duration-200 ${
-			disabled || loading
-				? "bg-gray-100 text-gray-400 cursor-not-allowed"
-				: "bg-violet-700 text-white hover:bg-violet-800 shadow-lg shadow-violet-200 cursor-pointer hover:-translate-y-0.5"
-		}`}
-	>
-		{loading ? (
-			loadingLabel || "Saving..."
-		) : (
-			<>
-				<Save size={18} /> {label || "Save Changes"}
-			</>
-		)}
-	</button>
-);
+/* -------------------------------------------------------------------------- */
+/*  Helpers                                                                   */
+/* -------------------------------------------------------------------------- */
 
-const PasswordInput = ({
-	value,
-	onChange,
-	placeholder,
-	show,
-	toggleShow,
-	disabled = false,
-}) => (
-	<div className="relative group">
-		<input
-			type={show ? "text" : "password"}
-			placeholder={placeholder}
-			value={value}
-			onChange={onChange}
-			disabled={disabled}
-			className="w-full px-4 py-3.5 pr-12 rounded-xl border border-gray-200 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none text-sm bg-white transition-all font-medium disabled:bg-gray-50 disabled:text-gray-400 placeholder:text-gray-400"
-		/>
-		<button
-			type="button"
-			onClick={() => toggleShow(!show)}
-			className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all cursor-pointer"
-			tabIndex="-1"
-		>
-			{show ? <EyeOff size={18} /> : <Eye size={18} />}
-		</button>
-	</div>
-);
+const readStoredUser = () => {
+	try {
+		return JSON.parse(localStorage.getItem("user") || "{}") || {};
+	} catch {
+		return {};
+	}
+};
 
-const CustomerSettings = () => {
-	const navigate = useNavigate();
+const authHeaders = () => ({
+	headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+});
 
-	const [user, setUser] = useState(
-		JSON.parse(localStorage.getItem("user") || "{}"),
+const initials = (name) => {
+	const parts = String(name || "")
+		.trim()
+		.split(/\s+/);
+	return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase() || "C";
+};
+
+const inputCls =
+	"w-full h-11 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 text-sm text-white placeholder:text-stone-600 transition-colors hover:border-white/[0.16] focus:outline-none focus:border-violet-400/50 focus:ring-2 focus:ring-violet-400/20 disabled:opacity-50";
+
+const primaryBtn =
+	"bg-gradient-to-r from-violet-400 to-fuchsia-400 text-[#0d0b12] font-semibold hover:brightness-110 shadow-[0_6px_24px_-8px_rgba(167,139,250,0.7)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:brightness-100";
+
+const ghostBtn =
+	"text-stone-300 hover:text-white hover:bg-white/[0.06] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300 disabled:opacity-40 disabled:cursor-not-allowed";
+
+const containerVariants = {
+	hidden: {},
+	show: { transition: { staggerChildren: 0.06, delayChildren: 0.02 } },
+};
+const itemVariants = {
+	hidden: { opacity: 0, y: 10 },
+	show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
+};
+
+/* -------------------------------------------------------------------------- */
+/*  Building blocks                                                           */
+/* -------------------------------------------------------------------------- */
+
+function Spinner() {
+	return (
+		<span className="w-4 h-4 rounded-full border-2 border-[#0d0b12]/30 border-t-[#0d0b12] animate-spin" />
 	);
+}
 
+function Field({ id, label, hint, error, children }) {
+	return (
+		<div>
+			<label htmlFor={id} className="block text-sm text-stone-300 mb-1.5">
+				{label}
+			</label>
+			{children}
+			{error ? (
+				<p className="mt-1.5 text-xs text-rose-300">{error}</p>
+			) : (
+				hint && <p className="mt-1.5 text-xs text-stone-500">{hint}</p>
+			)}
+		</div>
+	);
+}
+
+function PasswordField({ id, label, value, onChange, autoComplete, error }) {
+	const [show, setShow] = useState(false);
+	return (
+		<Field id={id} label={label} error={error}>
+			<div className="relative">
+				<input
+					id={id}
+					type={show ? "text" : "password"}
+					value={value}
+					onChange={onChange}
+					autoComplete={autoComplete}
+					className={`${inputCls} pr-11`}
+				/>
+				<button
+					type="button"
+					onClick={() => setShow((s) => !s)}
+					aria-label={show ? "Hide password" : "Show password"}
+					className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center text-stone-500 hover:text-white transition-colors"
+				>
+					{show ? <EyeOff size={16} /> : <Eye size={16} />}
+				</button>
+			</div>
+		</Field>
+	);
+}
+
+/** Two-column row: what the section is on the left, its fields on the right. */
+function Section({ title, description, children }) {
+	return (
+		<motion.section
+			variants={itemVariants}
+			className="grid lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)] gap-x-16 gap-y-5 py-9 border-t border-white/[0.07]"
+		>
+			<div>
+				<h2 className="font-mackinac text-xl font-bold text-white">{title}</h2>
+				{description && (
+					<p className="mt-1.5 text-sm leading-relaxed text-stone-500 max-w-[16rem]">
+						{description}
+					</p>
+				)}
+			</div>
+			<div className="max-w-xl min-w-0">{children}</div>
+		</motion.section>
+	);
+}
+
+function Actions({
+	dirty,
+	busy,
+	onSave,
+	onDiscard,
+	saveLabel = "Save changes",
+	disabled,
+}) {
+	return (
+		<div className="mt-6 flex items-center gap-2">
+			<button
+				type="button"
+				onClick={onSave}
+				disabled={!dirty || busy || disabled}
+				className={`h-10 min-w-[7.5rem] px-5 inline-flex items-center justify-center rounded-lg text-sm ${primaryBtn}`}
+			>
+				{busy ? <Spinner /> : saveLabel}
+			</button>
+			{dirty && onDiscard && !busy && (
+				<button
+					type="button"
+					onClick={onDiscard}
+					className={`h-10 px-4 rounded-lg text-sm ${ghostBtn}`}
+				>
+					Discard
+				</button>
+			)}
+		</div>
+	);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Page                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export default function CustomerSettings() {
+	const navigate = useNavigate();
+	const { logout } = useAuth();
+
+	const [user, setUser] = useState(readStoredUser);
+	const [busy, setBusy] = useState(null); // "personal" | "email" | "location" | "password"
+	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+	// Personal
 	const [name, setName] = useState(user.name || "");
-	const [nameLoading, setNameLoading] = useState(false);
-
-	const [email, setEmail] = useState(user.email || "");
-	const [isEditingEmail, setIsEditingEmail] = useState(false);
-	const [otp, setOtp] = useState("");
-	const [otpSent, setOtpSent] = useState(false);
-	const [emailLoading, setEmailLoading] = useState(false);
-
-	const [locationText, setLocationText] = useState(user.location || "");
-	const [locationLoading, setLocationLoading] = useState(false);
-
-	const [address, setAddress] = useState(user.address || "");
-	const [addressLoading, setAddressLoading] = useState(false);
-
 	const [phone, setPhone] = useState(user.phone ? String(user.phone) : "");
-	const [phoneLoading, setPhoneLoading] = useState(false);
 
+	// Email change: view -> enter -> verify
+	const [emailStep, setEmailStep] = useState("view");
+	const [newEmail, setNewEmail] = useState("");
+	const [otp, setOtp] = useState("");
+
+	// Location
+	const [locationText, setLocationText] = useState(user.location || "");
+	const [address, setAddress] = useState(user.address || "");
+	const [coords, setCoords] = useState(null);
+	const [locating, setLocating] = useState(false);
+
+	// Password
 	const [currentPassword, setCurrentPassword] = useState("");
 	const [newPassword, setNewPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
-	const [passwordLoading, setPasswordLoading] = useState(false);
 
-	const [showCurrent, setShowCurrent] = useState(false);
-	const [showNew, setShowNew] = useState(false);
+	const [photoBroken, setPhotoBroken] = useState(false);
 
-	const getInitials = (name) => {
-		if (!name) return "U";
-		const parts = name.split(" ");
-		return `${parts[0][0] || ""}${parts[1]?.[0] || ""}`.toUpperCase();
+	const syncFields = (u) => {
+		setName(u.name || "");
+		setPhone(u.phone ? String(u.phone) : "");
+		setLocationText(u.location || "");
+		setAddress(u.address || "");
 	};
 
-	const handlePasswordUpdate = async () => {
-		if (newPassword.length < 6) {
-			return toast.error("Password must be at least 6 characters");
+	useEffect(() => {
+		let alive = true;
+		if (!localStorage.getItem("token")) {
+			navigate("/login");
+			return;
 		}
-		if (newPassword !== confirmPassword) {
-			return toast.error("Passwords do not match");
-		}
-		if (!user.isGoogleUser && !currentPassword) {
-			return toast.error("Please enter your current password");
-		}
-
-		try {
-			setPasswordLoading(true);
-			const token = localStorage.getItem("token");
-			await api.post(
-				"/api/auth/update-password",
-				{ currentPassword, newPassword },
-				{ headers: { Authorization: `Bearer ${token}` } },
-			);
-			toast.success("Password updated successfully!");
-			setCurrentPassword("");
-			setNewPassword("");
-			setConfirmPassword("");
-			setShowCurrent(false);
-			setShowNew(false);
-		} catch (err) {
-			console.log(err);
-			toast.error(err.response?.data?.error || "Failed to update password!");
-		} finally {
-			passwordLoading(false);
-			setPasswordLoading(false);
-		}
-	};
-
-	const updateProfile = async (dataToUpdate, specificLoadingSet) => {
-		try {
-			if (specificLoadingSet) specificLoadingSet(true);
-			const token = localStorage.getItem("token");
-
-			const cleanField = (incoming, current, fallback) => {
-				if (incoming !== undefined) return incoming;
-				return current && current.trim() !== ""
-					? current
-					: fallback || undefined;
-			};
-
-			const payload = {
-				...dataToUpdate,
-				name: cleanField(dataToUpdate.name, name, user.name),
-				location: cleanField(
-					dataToUpdate.location,
-					locationText,
-					user.location,
-				),
-				address: cleanField(dataToUpdate.address, address, user.address),
-				phone: cleanField(dataToUpdate.phone, phone, user.phone),
-			};
-
-			Object.keys(payload).forEach((key) => {
-				if (payload[key] === undefined) {
-					delete payload[key];
+		(async () => {
+			try {
+				const res = await api.get("/api/auth/me", authHeaders());
+				if (!alive || !res.data?.user) return;
+				setUser(res.data.user);
+				localStorage.setItem("user", JSON.stringify(res.data.user));
+				syncFields(res.data.user);
+			} catch (err) {
+				if (!alive) return;
+				if (err.response?.status === 401) {
+					logout();
+					navigate("/login");
+				} else {
+					toast.error("Couldn't refresh your account details");
 				}
-			});
-
-			const response = await api.put(`/api/users/${user.id}`, payload, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
-			const updatedUser = { ...user, ...response.data.user };
-
-			if (response.data.user.name) setName(response.data.user.name);
-			if (response.data.user.location)
-				setLocationText(response.data.user.location);
-			if (response.data.user.address) setAddress(response.data.user.address);
-			if (response.data.user.phone) setPhone(response.data.user.phone);
-
-			localStorage.setItem("user", JSON.stringify(updatedUser));
-			setUser(updatedUser);
-			toast.success("Profile updated successfully!");
-		} catch (err) {
-			toast.error(err.response?.data?.error || "Failed to update profile.");
-		} finally {
-			if (specificLoadingSet) specificLoadingSet(false);
-		}
-	};
-
-	const handleSendOtp = async () => {
-		if (!email.includes("@")) return toast.error("Invalid email");
-		try {
-			setEmailLoading(true);
-			const token = localStorage.getItem("token");
-			await api.post(
-				"/api/auth/request-email-change",
-				{ newEmail: email },
-				{ headers: { Authorization: `Bearer ${token}` } },
-			);
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-			setOtpSent(true);
-			toast.success(`OTP sent to ${email}`);
-		} catch (err) {
-			toast.error("Failed to send OTP");
-		} finally {
-			setEmailLoading(false);
-		}
-	};
-
-	const handleVerifyAndChangeEmail = async () => {
-		try {
-			setEmailLoading(true);
-			const token = localStorage.getItem("token");
-			await api.post(
-				"/api/auth/verify-email-change",
-				{ email, otp },
-				{ headers: { Authorization: `Bearer ${token}` } },
-			);
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-			const updatedUser = { ...user, email: email };
-			localStorage.setItem("user", JSON.stringify(updatedUser));
-			setUser(updatedUser);
-			setIsEditingEmail(false);
-			setOtpSent(false);
-			setOtp("");
-			toast.success("Email updated successfully!");
-		} catch (err) {
-			toast.error("Invalid OTP or failed to update");
-		} finally {
-			setEmailLoading(false);
-		}
-	};
-
-	const handleCurrentLocation = () => {
-		if (!navigator.geolocation)
-			return toast.error("Geolocation not supported.");
-
-		setLocationLoading(true);
-
-		const options = {
-			enableHighAccuracy: true,
-			timeout: 10000,
-			maximumAge: 0,
+			}
+		})();
+		return () => {
+			alive = false;
 		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
+	/* ---- saving ---- */
+
+	/** Sends the saved values plus only the changes from the section being saved. */
+	const saveProfile = async (key, changes) => {
+		setBusy(key);
+		try {
+			const payload = {};
+			["name", "phone", "location", "address"].forEach((k) => {
+				if (user[k] !== undefined && user[k] !== null && user[k] !== "")
+					payload[k] = user[k];
+			});
+			Object.assign(payload, changes);
+
+			const res = await api.put(
+				`/api/users/${user.id}`,
+				payload,
+				authHeaders(),
+			);
+			const updated = { ...user, ...res.data.user };
+			localStorage.setItem("user", JSON.stringify(updated));
+			setUser(updated);
+			return updated;
+		} catch (err) {
+			toast.error(err.response?.data?.error || "Couldn't save your changes");
+			return null;
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	const personalDirty =
+		name.trim() !== (user.name || "") ||
+		phone.trim() !== (user.phone ? String(user.phone) : "");
+
+	const savePersonal = async () => {
+		const n = name.trim();
+		if (!n) return toast.error("Enter your name");
+		const digits = phone.replace(/\D/g, "");
+		if (phone && (digits.length < 10 || digits.length > 15)) {
+			return toast.error("Enter a valid phone number");
+		}
+		const u = await saveProfile("personal", {
+			name: n,
+			...(phone.trim() ? { phone: phone.trim() } : {}),
+		});
+		if (u) {
+			setName(u.name || n);
+			setPhone(u.phone ? String(u.phone) : "");
+			toast.success("Personal details saved");
+		}
+	};
+
+	const locationDirty =
+		locationText.trim() !== (user.location || "") ||
+		address.trim() !== (user.address || "") ||
+		Boolean(coords);
+
+	const saveLocation = async () => {
+		const u = await saveProfile("location", {
+			...(locationText.trim() ? { location: locationText.trim() } : {}),
+			address: address.trim(),
+			...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
+		});
+		if (u) {
+			setLocationText(u.location || "");
+			setAddress(u.address || "");
+			setCoords(null);
+			toast.success("Location saved");
+		}
+	};
+
+	const detectLocation = () => {
+		if (!navigator.geolocation) {
+			return toast.error("Your browser can't share your location");
+		}
+		setLocating(true);
 		navigator.geolocation.getCurrentPosition(
-			async (position) => {
-				const { latitude, longitude } = position.coords;
-
+			async ({ coords: c }) => {
+				setCoords({ lat: c.latitude, lng: c.longitude });
 				try {
-					const response = await fetch(
-						`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+					const res = await fetch(
+						`https://nominatim.openstreetmap.org/reverse?format=json&lat=${c.latitude}&lon=${c.longitude}`,
 					);
-					const data = await response.json();
-
-					const cityOrTown =
+					const data = await res.json();
+					const place =
 						data.address?.city ||
 						data.address?.town ||
 						data.address?.village ||
 						data.address?.suburb ||
 						"";
-					const stateString = data.address?.state || "";
-					const formattedLoc =
-						cityOrTown && stateString
-							? `${cityOrTown}, ${stateString}`
-							: data.display_name;
-
-					updateProfile(
-						{
-							lat: latitude,
-							lng: longitude,
-							location: formattedLoc || `${latitude}, ${longitude}`,
-						},
-						setLocationLoading,
-					);
-				} catch (err) {
-					updateProfile(
-						{
-							lat: latitude,
-							lng: longitude,
-							location: `${latitude}, ${longitude}`,
-						},
-						setLocationLoading,
-					);
+					const state = data.address?.state || "";
+					const text =
+						place && state ? `${place}, ${state}` : data.display_name || "";
+					if (text) setLocationText(text);
+					else toast("Got your position. Type your city to finish.");
+				} catch {
+					toast.error("Couldn't name this place. Type your city instead.");
+				} finally {
+					setLocating(false);
 				}
 			},
 			(error) => {
-				setLocationLoading(false);
-				let msg = "Unable to retrieve location.";
-				if (error.code === 1) msg = "Location permission denied.";
-				if (error.code === 2) msg = "Position unavailable (check GPS).";
-				if (error.code === 3) msg = "Location request timed out.";
-				toast.error(msg);
+				setLocating(false);
+				toast.error(
+					error.code === 1
+						? "Location is blocked. Allow access or type your city."
+						: error.code === 3
+							? "Location request timed out. Try again."
+							: "Couldn't get your location. Check your GPS.",
+				);
 			},
-			options,
+			{ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
 		);
 	};
 
-	useEffect(() => {
-		const fetchUserData = async () => {
-			const token = localStorage.getItem("token");
-			if (!token) {
-				navigate("/login");
-				return;
-			}
-			try {
-				const response = await api.get("/api/auth/me", {
-					headers: { Authorization: `Bearer ${token}` },
-				});
-				setUser(response.data.user);
-				localStorage.setItem("user", JSON.stringify(response.data.user));
-			} catch (err) {
-				handleLogout();
-			}
-		};
-		fetchUserData();
-	}, [navigate]);
+	/* ---- email ---- */
 
-	useEffect(() => {
-		if (user && Object.keys(user).length > 0) {
-			setName(user.name || "");
-			setEmail(user.email || "");
-			setLocationText(user.location || "");
-			setAddress(user.address || "");
-			setPhone(user.phone ? String(user.phone) : "");
-		}
-	}, [user]);
-
-	const { logout } = useAuth();
-	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-	const handleLogout = () => {
-		setShowLogoutConfirm(true);
+	const cancelEmailChange = () => {
+		setEmailStep("view");
+		setNewEmail("");
+		setOtp("");
 	};
+
+	const sendCode = async () => {
+		const value = newEmail.trim();
+		if (!/^\S+@\S+\.\S+$/.test(value))
+			return toast.error("Enter a valid email");
+		if (value === user.email) return toast.error("That's already your email");
+		setBusy("email");
+		try {
+			await api.post(
+				"/api/auth/request-email-change",
+				{ newEmail: value },
+				authHeaders(),
+			);
+			setEmailStep("verify");
+			toast.success(`Code sent to ${value}`);
+		} catch (err) {
+			toast.error(err.response?.data?.error || "Couldn't send the code");
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	const verifyEmail = async () => {
+		const value = newEmail.trim();
+		setBusy("email");
+		try {
+			await api.post(
+				"/api/auth/verify-email-change",
+				{ email: value, otp: otp.trim() },
+				authHeaders(),
+			);
+			const updated = { ...user, email: value };
+			localStorage.setItem("user", JSON.stringify(updated));
+			setUser(updated);
+			cancelEmailChange();
+			toast.success("Email updated");
+		} catch (err) {
+			toast.error(err.response?.data?.error || "That code didn't work");
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	/* ---- password ---- */
+
+	const isGoogle = Boolean(user.isGoogleUser);
+	const tooShort = newPassword.length > 0 && newPassword.length < 6;
+	const mismatch =
+		confirmPassword.length > 0 && newPassword !== confirmPassword;
+	const passwordReady =
+		newPassword.length >= 6 &&
+		newPassword === confirmPassword &&
+		(isGoogle || currentPassword.length > 0);
+
+	const updatePassword = async () => {
+		setBusy("password");
+		try {
+			await api.post(
+				"/api/auth/update-password",
+				{ currentPassword, newPassword },
+				authHeaders(),
+			);
+			toast.success("Password updated");
+			setCurrentPassword("");
+			setNewPassword("");
+			setConfirmPassword("");
+		} catch (err) {
+			toast.error(err.response?.data?.error || "Couldn't update your password");
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	/* ---- sign out ---- */
 
 	const executeLogout = () => {
 		setShowLogoutConfirm(false);
@@ -341,349 +425,347 @@ const CustomerSettings = () => {
 		navigate("/login");
 	};
 
-	return (
-		<div className="bricolage-grotesque min-h-screen text-[#191034] p-6 md:p-12 font-sans pt-24 md:pt-32">
-			<div className="max-w-6xl mx-auto space-y-8">
-				<div className="flex flex-col md:flex-row md:items-end justify-between border-b border-[#e7e6f4] pb-6 gap-4">
-					<div>
-						<h1 className="text-4xl font-bold bg-gradient-to-r from-violet-700 via-fuchsia-600 to-violet-700 bg-clip-text text-transparent bg-300% animate-gradient">
-							Account Settings
-						</h1>
-						<p className="text-gray-500 mt-2 text-lg">
-							Manage your personal details and security.
-						</p>
-					</div>
-				</div>
+	const photo = user.photo?.replace("=s96-c", "=s256-c");
 
-				<div className="grid lg:grid-cols-12 gap-8 items-start">
-					<div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
-						<div className="bg-white border border-gray-100 p-8 rounded-3xl flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow duration-300">
-							<div className="relative w-32 h-32 mb-6 group">
-								<div className="w-full h-full rounded-full p-1 border-2 border-dashed border-violet-200 group-hover:border-violet-400 transition-colors">
-									{user.photo ? (
+	return (
+		<MotionConfig reducedMotion="user">
+			<div className="min-h-screen bg-[#0d0b12] text-stone-200 bricolage-grotesque antialiased selection:bg-violet-400/30">
+				<div
+					aria-hidden
+					className="fixed inset-x-0 top-0 h-[460px] pointer-events-none bg-[radial-gradient(60%_100%_at_20%_0%,rgba(139,92,246,0.14),transparent_70%),radial-gradient(45%_80%_at_85%_0%,rgba(251,191,36,0.08),transparent_70%)]"
+				/>
+
+				<header className="sticky top-0 z-40 bg-[#0d0b12]/90 backdrop-blur-md border-b border-white/[0.06]">
+					<div className="max-w-5xl mx-auto px-4 sm:px-8 lg:px-12 h-14 flex items-center gap-3">
+						<Link
+							to="/dashboard"
+							className="-ml-2 h-9 px-2 inline-flex items-center gap-2 rounded-md text-sm text-stone-300 hover:text-white hover:bg-white/[0.06] transition-colors"
+						>
+							<ArrowLeft size={17} />
+							Dashboard
+						</Link>
+						<span className="flex-1" />
+						<Logo to="/" size="md" theme="dark" />
+					</div>
+				</header>
+
+				<main className="relative max-w-5xl mx-auto px-4 sm:px-8 lg:px-12 py-8 lg:py-12 pb-24">
+					<motion.div
+						variants={containerVariants}
+						initial="hidden"
+						animate="show"
+					>
+						<motion.header variants={itemVariants}>
+							<h1 className="font-mackinac text-3xl sm:text-4xl font-bold text-white tracking-tight">
+								Settings
+							</h1>
+							<p className="mt-2 text-sm text-stone-400">
+								How you appear, where you're booked, and how you sign in.
+							</p>
+						</motion.header>
+
+						<motion.div
+							variants={itemVariants}
+							className="mt-8 mb-9 flex items-center gap-4"
+						>
+							<div className="p-[2px] rounded-full bg-gradient-to-br from-violet-400 via-fuchsia-400 to-amber-300 shrink-0">
+								<div className="w-14 h-14 rounded-full bg-[#1a1428] overflow-hidden flex items-center justify-center text-lg font-semibold text-white">
+									{photo && !photoBroken ? (
 										<img
-											src={user.photo.replace("=s96-c", "=s256-c")}
-											alt="Profile"
-											className="w-full h-full object-cover rounded-full"
+											src={photo}
+											alt=""
+											onError={() => setPhotoBroken(true)}
+											className="w-full h-full object-cover"
 										/>
 									) : (
-										<div
-											className="flex h-full w-full items-center justify-center rounded-full bg-violet-600 text-[2.5rem] font-bold text-white select-none"
-											aria-hidden="true"
-										>
-											{getInitials(user.name || user.email)}
-										</div>
+										initials(user.name || user.email)
 									)}
 								</div>
-								<div className="absolute bottom-2 right-1 w-7 h-7 bg-green-500 border-4 border-white rounded-full shadow-sm" />
 							</div>
+							<div className="min-w-0 flex-1">
+								<p className="text-base font-medium text-white truncate">
+									{user.name || "Customer"}
+								</p>
+								<p className="text-sm text-stone-500 truncate">{user.email}</p>
+							</div>
+							<Link
+								to="/account/profile"
+								className="shrink-0 text-sm text-violet-300 hover:text-white transition-colors"
+							>
+								View profile
+							</Link>
+						</motion.div>
 
-							<div className="w-full space-y-5">
-								<div className="text-left group">
-									<label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">
-										Display Name
-									</label>
-									<div className="relative mb-3">
-										<User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
-										<input
-											type="text"
-											value={name}
-											onChange={(e) => setName(e.target.value)}
-											className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all font-semibold text-gray-700 bg-gray-50/50 focus:bg-white"
-										/>
-									</div>
-									<SaveButton
-										loading={nameLoading}
-										disabled={name === user.name}
-										onClick={() => updateProfile({ name }, setNameLoading)}
-										label="Save Name"
+						{/* Personal details */}
+						<Section
+							title="Personal details"
+							description="Providers see your name and number once you book them."
+						>
+							<div className="space-y-4">
+								<Field id="st-name" label="Full name">
+									<input
+										id="st-name"
+										type="text"
+										value={name}
+										onChange={(e) => setName(e.target.value)}
+										autoComplete="name"
+										className={inputCls}
 									/>
+								</Field>
+								<Field id="st-phone" label="Phone number">
+									<input
+										id="st-phone"
+										type="tel"
+										inputMode="tel"
+										autoComplete="tel"
+										placeholder="+91 98765 43210"
+										value={phone}
+										onChange={(e) =>
+											setPhone(e.target.value.replace(/[^\d+ ]/g, ""))
+										}
+										className={inputCls}
+									/>
+								</Field>
+							</div>
+							<Actions
+								dirty={personalDirty}
+								busy={busy === "personal"}
+								onSave={savePersonal}
+								onDiscard={() => {
+									setName(user.name || "");
+									setPhone(user.phone ? String(user.phone) : "");
+								}}
+							/>
+						</Section>
+
+						{/* Email */}
+						<Section
+							title="Email"
+							description="We send booking updates and receipts here."
+						>
+							{emailStep === "view" ? (
+								<div className="flex items-center justify-between gap-4">
+									<p className="text-sm text-white truncate">
+										{user.email || "No email on file"}
+									</p>
+									<button
+										type="button"
+										onClick={() => setEmailStep("enter")}
+										className={`shrink-0 h-9 px-4 rounded-lg border border-white/[0.12] text-sm ${ghostBtn}`}
+									>
+										Change email
+									</button>
 								</div>
-
-								<div className="h-px bg-gray-100 w-full" />
-
-								<div className="text-left">
-									<label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mb-1.5 block">
-										Email Address
-									</label>
-									{!isEditingEmail ? (
-										<div className="flex items-center justify-between bg-gray-50 p-3.5 rounded-xl border border-gray-200 group hover:border-violet-200 transition-colors">
-											<div className="flex items-center gap-3 overflow-hidden">
-												<div className="bg-white p-1.5 rounded-lg shadow-sm text-gray-400">
-													<Mail className="w-4 h-4" />
-												</div>
-												<span className="text-sm font-medium text-gray-700 truncate">
-													{user.email}
-												</span>
-											</div>
-											<button
-												onClick={() => setIsEditingEmail(true)}
-												className="cursor-pointer text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors"
-											>
-												Edit
-											</button>
-										</div>
-									) : (
-										<div className="space-y-3 bg-violet-50/50 p-4 rounded-xl border border-violet-100 animate-in fade-in slide-in-from-top-2 duration-200">
+							) : (
+								<div>
+									<div className="space-y-4">
+										<Field id="st-new-email" label="New email address">
 											<input
+												id="st-new-email"
 												type="email"
-												value={email}
-												onChange={(e) => setEmail(e.target.value)}
-												placeholder="New Email Address"
-												className="w-full px-3 py-2.5 rounded-lg border border-violet-200 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200 text-sm bg-white"
+												autoFocus
+												value={newEmail}
+												onChange={(e) => setNewEmail(e.target.value)}
+												disabled={emailStep === "verify"}
+												autoComplete="email"
+												className={inputCls}
 											/>
-											{otpSent && (
+										</Field>
+										{emailStep === "verify" && (
+											<Field
+												id="st-otp"
+												label="Verification code"
+												hint={`Enter the code we sent to ${newEmail.trim()}.`}
+											>
 												<input
+													id="st-otp"
 													type="text"
+													inputMode="numeric"
+													autoComplete="one-time-code"
+													autoFocus
 													value={otp}
 													onChange={(e) => setOtp(e.target.value)}
-													placeholder="Enter Code"
-													className="w-full px-3 py-2.5 rounded-lg border border-violet-200 focus:outline-none focus:border-violet-500 text-sm text-center tracking-[0.25em] font-mono font-bold bg-white"
+													className={`${inputCls} font-mono tracking-[0.3em]`}
 												/>
-											)}
-											<div className="flex gap-2 pt-1">
-												<button
-													onClick={() => {
-														setIsEditingEmail(false);
-														setOtpSent(false);
-														setEmail(user.email);
-													}}
-													className="cursor-pointer flex-1 py-2 text-xs font-bold text-gray-600 hover:bg-gray-200/50 rounded-lg transition-colors"
-												>
-													Cancel
-												</button>
-												{!otpSent ? (
-													<button
-														onClick={handleSendOtp}
-														disabled={emailLoading || email === user.email}
-														className="cursor-pointer disabled:cursor-not-allowed flex-1 py-2 text-xs font-bold bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-all shadow-md"
-													>
-														{emailLoading ? "Sending..." : "Send OTP"}
-													</button>
-												) : (
-													<button
-														onClick={handleVerifyAndChangeEmail}
-														disabled={emailLoading || !otp}
-														className="cursor-pointer disabled:cursor-not-allowed flex-1 py-2 text-xs font-bold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-md"
-													>
-														{emailLoading ? "Verifying..." : "Verify"}
-													</button>
-												)}
-											</div>
-										</div>
-									)}
-								</div>
-							</div>
-						</div>
-					</div>
-
-					<div className="lg:col-span-8 space-y-6">
-						<div className="bg-white border border-gray-100 p-8 rounded-3xl shadow-sm">
-							<h3 className="text-xl font-bold text-[#191034] mb-8 flex items-center gap-3">
-								<div className="bg-blue-50 p-2.5 rounded-xl text-blue-600">
-									<MapPin size={22} />
-								</div>
-								Contact & Location Details
-							</h3>
-
-							<div className="grid md:grid-cols-2 gap-8">
-								<div className="space-y-2">
-									<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">
-										Phone Number
-									</label>
-									<div className="relative group mb-3">
-										<Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
-										<input
-											type="text"
-											inputMode="tel"
-											placeholder="+91 9876543210"
-											value={phone}
-											onChange={(e) =>
-												setPhone(e.target.value.replace(/[^\d+ ]/g, ""))
-											}
-											className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50/30 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all font-medium"
-										/>
+											</Field>
+										)}
 									</div>
-									<SaveButton
-										loading={phoneLoading}
-										disabled={phone === (user.phone || "")}
-										onClick={() => updateProfile({ phone }, setPhoneLoading)}
-										label="Save Phone"
+									<div className="mt-6 flex items-center gap-2">
+										{emailStep === "enter" ? (
+											<button
+												type="button"
+												onClick={sendCode}
+												disabled={busy === "email" || !newEmail.trim()}
+												className={`h-10 min-w-[7.5rem] px-5 inline-flex items-center justify-center rounded-lg text-sm ${primaryBtn}`}
+											>
+												{busy === "email" ? <Spinner /> : "Send code"}
+											</button>
+										) : (
+											<>
+												<button
+													type="button"
+													onClick={verifyEmail}
+													disabled={busy === "email" || !otp.trim()}
+													className={`h-10 min-w-[7.5rem] px-5 inline-flex items-center justify-center rounded-lg text-sm ${primaryBtn}`}
+												>
+													{busy === "email" ? <Spinner /> : "Update email"}
+												</button>
+												<button
+													type="button"
+													onClick={sendCode}
+													disabled={busy === "email"}
+													className={`h-10 px-4 rounded-lg text-sm ${ghostBtn}`}
+												>
+													Resend code
+												</button>
+											</>
+										)}
+										<button
+											type="button"
+											onClick={cancelEmailChange}
+											className={`h-10 px-4 rounded-lg text-sm ${ghostBtn}`}
+										>
+											Cancel
+										</button>
+									</div>
+								</div>
+							)}
+						</Section>
+
+						{/* Location */}
+						<Section
+							title="Location"
+							description="Used to find providers near you and to pre-fill your bookings."
+						>
+							<div className="space-y-4">
+								<div>
+									<div className="flex items-center justify-between gap-3 mb-1.5">
+										<label
+											htmlFor="st-region"
+											className="text-sm text-stone-300"
+										>
+											City and state
+										</label>
+										<button
+											type="button"
+											onClick={detectLocation}
+											disabled={locating}
+											className="inline-flex items-center gap-1.5 text-xs text-violet-300 hover:text-white transition-colors disabled:opacity-60"
+										>
+											<Navigation size={12} />
+											{locating ? "Locating…" : "Use my location"}
+										</button>
+									</div>
+									<input
+										id="st-region"
+										type="text"
+										placeholder="Kanpur, Uttar Pradesh"
+										value={locationText}
+										onChange={(e) => setLocationText(e.target.value)}
+										className={inputCls}
 									/>
 								</div>
 
-								<div className="space-y-2">
-									<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">
-										General Service Region (City, State)
-									</label>
-									<div className="relative group mb-3">
-										<MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-violet-500 transition-colors" />
-										<input
-											type="text"
-											placeholder="e.g., Kanpur, Uttar Pradesh"
-											value={locationText}
-											onChange={(e) => setLocationText(e.target.value)}
-											className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50/30 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all font-medium"
-										/>
-									</div>
-
-									<div className="flex gap-2">
-										<button
-											type="button"
-											onClick={handleCurrentLocation}
-											disabled={locationLoading}
-											className="cursor-pointer bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1 disabled:opacity-50"
-											title="Auto-detect using browser GPS"
-										>
-											<MapPin size={13} /> Auto-GPS
-										</button>
-										<div className="flex-1">
-											<SaveButton
-												loading={locationLoading}
-												disabled={locationText === (user.location || "")}
-												onClick={() =>
-													updateProfile(
-														{ location: locationText },
-														setLocationLoading,
-													)
-												}
-												label="Save Region"
-											/>
-										</div>
-									</div>
-								</div>
+								<Field
+									id="st-address"
+									label="Home address"
+									hint="Flat or house number, building, street and a landmark."
+								>
+									<textarea
+										id="st-address"
+										rows={3}
+										value={address}
+										onChange={(e) => setAddress(e.target.value)}
+										autoComplete="street-address"
+										className={`${inputCls} h-auto py-3 resize-none leading-relaxed`}
+									/>
+								</Field>
 							</div>
+							<Actions
+								dirty={locationDirty}
+								busy={busy === "location"}
+								onSave={saveLocation}
+								onDiscard={() => {
+									setLocationText(user.location || "");
+									setAddress(user.address || "");
+									setCoords(null);
+								}}
+							/>
+						</Section>
 
-							<div className="mt-8 pt-6 border-t border-gray-100">
-								<label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 mb-2 block">
-									Permanent Doorstep Address (For Deliveries / Bookings)
-								</label>
-								<textarea
-									value={address}
-									onChange={(e) => setAddress(e.target.value)}
-									placeholder="Enter your specific house/flat number, building name, street address, and landmark details..."
-									rows="3"
-									className="w-full px-5 py-4 rounded-2xl border border-gray-200 bg-gray-50/30 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all resize-none leading-relaxed mb-4 font-medium"
+						{/* Password */}
+						<Section
+							title="Password"
+							description={
+								isGoogle
+									? "You signed in with Google. Set a password to also sign in with your email."
+									: "Use at least 6 characters."
+							}
+						>
+							<div className="space-y-4">
+								{!isGoogle && (
+									<PasswordField
+										id="st-current"
+										label="Current password"
+										value={currentPassword}
+										onChange={(e) => setCurrentPassword(e.target.value)}
+										autoComplete="current-password"
+									/>
+								)}
+								<PasswordField
+									id="st-new"
+									label="New password"
+									value={newPassword}
+									onChange={(e) => setNewPassword(e.target.value)}
+									autoComplete="new-password"
+									error={tooShort ? "Use at least 6 characters." : null}
 								/>
-								<SaveButton
-									loading={addressLoading}
-									disabled={address === (user.address || "")}
-									onClick={() => updateProfile({ address }, setAddressLoading)}
-									label="Update Address"
+								<PasswordField
+									id="st-confirm"
+									label="Confirm new password"
+									value={confirmPassword}
+									onChange={(e) => setConfirmPassword(e.target.value)}
+									autoComplete="new-password"
+									error={mismatch ? "Passwords don't match." : null}
 								/>
 							</div>
-						</div>
+							<Actions
+								dirty={passwordReady}
+								busy={busy === "password"}
+								onSave={updatePassword}
+								saveLabel={isGoogle ? "Set password" : "Update password"}
+							/>
+						</Section>
 
-						<div className="bg-white border border-gray-100 p-8 rounded-3xl shadow-sm">
-							<h3 className="text-xl font-bold text-[#191034] mb-8 flex items-center gap-3">
-								<div className="bg-amber-50 p-2.5 rounded-xl text-amber-600">
-									<ShieldCheck size={22} />
-								</div>
-								Security & Password
-							</h3>
+						{/* Sign out */}
+						<Section
+							title="Sign out"
+							description="You'll need to sign in again on this device."
+						>
+							<button
+								type="button"
+								onClick={() => setShowLogoutConfirm(true)}
+								className="h-10 px-5 inline-flex items-center gap-2 rounded-lg border border-rose-400/25 text-sm font-medium text-rose-300 hover:bg-rose-400/10 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
+							>
+								<LogOut size={15} />
+								Sign out
+							</button>
+						</Section>
+					</motion.div>
+				</main>
 
-							<div className="grid md:grid-cols-2 gap-10">
-								<div className="order-2 md:order-1 bg-gray-50/50 rounded-2xl p-6 border border-gray-100">
-									<h4 className="font-bold text-gray-700 mb-5 flex items-center gap-2">
-										<CheckCircle2 size={18} className="text-emerald-500" />
-										Update Password
-									</h4>
-
-									<div className="space-y-4">
-										{!user.isGoogleUser && (
-											<PasswordInput
-												value={currentPassword}
-												onChange={(e) => setCurrentPassword(e.target.value)}
-												placeholder="Current Password"
-												show={showCurrent}
-												toggleShow={setShowCurrent}
-											/>
-										)}
-										<PasswordInput
-											value={newPassword}
-											onChange={(e) => setNewPassword(e.target.value)}
-											placeholder="New Password (min 6 chars)"
-											show={showNew}
-											toggleShow={setShowNew}
-										/>
-										<PasswordInput
-											value={confirmPassword}
-											onChange={(e) => setConfirmPassword(e.target.value)}
-											placeholder="Confirm New Password"
-											show={showNew}
-											toggleShow={setShowNew}
-										/>
-
-										<SaveButton
-											loading={passwordLoading}
-											disabled={!newPassword || passwordLoading}
-											onClick={handlePasswordUpdate}
-											label="Update Password"
-											loadingLabel="Updating..."
-										/>
-									</div>
-								</div>
-
-								<div className="order-1 md:order-2 flex flex-col justify-between h-full">
-									<div>
-										<label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">
-											Security Status
-										</label>
-										<div className="flex items-center gap-3 w-full px-5 py-4 rounded-2xl border border-gray-200 bg-white shadow-sm">
-											<div
-												className={`p-2 rounded-lg ${
-													user.isGoogleUser
-														? "bg-orange-50 text-orange-600"
-														: "bg-emerald-50 text-emerald-600"
-												}`}
-											>
-												<Lock size={20} />
-											</div>
-											<div className="flex-1">
-												<p className="font-bold text-gray-800 text-sm">
-													{user.isGoogleUser
-														? "Google Authenticated"
-														: "Password Protected"}
-												</p>
-												<p className="text-xs text-gray-500 mt-0.5">
-													Your account is secure.
-												</p>
-											</div>
-										</div>
-									</div>
-
-									<div className="mt-6 md:mt-0">
-										<button
-											onClick={handleLogout}
-											className="cursor-pointer w-full group border border-red-100 bg-red-50 text-red-600 px-6 py-4 rounded-2xl font-bold hover:bg-red-600 hover:text-white transition-all duration-300 flex items-center justify-center gap-2"
-										>
-											<span className="group-hover:hidden">
-												Log out from all devices
-											</span>
-											<span className="hidden group-hover:inline">
-												Confirm Logout
-											</span>
-										</button>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
+				<ConfirmDialog
+					isOpen={showLogoutConfirm}
+					onClose={() => setShowLogoutConfirm(false)}
+					onConfirm={executeLogout}
+					title="Sign out?"
+					description="You'll need to sign in again to access your account."
+					confirmText="Sign out"
+					cancelText="Cancel"
+					variant="danger"
+					icon={LogOut}
+				/>
 			</div>
-
-			<ConfirmDialog
-				isOpen={showLogoutConfirm}
-				onClose={() => setShowLogoutConfirm(false)}
-				onConfirm={executeLogout}
-				title="Log out from all devices?"
-				description="You'll need to sign in again to access your account."
-				confirmText="Log out"
-				cancelText="Cancel"
-				variant="danger"
-			/>
-		</div>
+		</MotionConfig>
 	);
-};
-
-export default CustomerSettings;
+}

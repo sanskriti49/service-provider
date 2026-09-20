@@ -970,7 +970,8 @@ async function getProviderAvailability(req, res, next) {
                      WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
                      AND (
                          status IN ('booked', 'confirmed', 'in_progress')
-                         OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
+                         OR (status = 'pending' AND payment_method IN ('cod', 'cash'))
+                         OR (status = 'pending' AND payment_method = 'online' AND payment_status = 'pending' AND created_at > NOW() - INTERVAL '5 minutes')
                      )`,
 					[providerIdValue, fromStr, endDateStr],
 				);
@@ -986,7 +987,8 @@ async function getProviderAvailability(req, res, next) {
                          WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
                          AND (
                              status IN ('booked', 'confirmed', 'in_progress')
-                             OR (status = 'pending' AND created_at > NOW() - INTERVAL '15 minutes')
+                             OR (status = 'pending' AND payment_method IN ('cod', 'cash'))
+                             OR (status = 'pending' AND payment_method = 'online' AND payment_status = 'pending' AND created_at > NOW() - INTERVAL '5 minutes')
                          )`,
 						[providerIdValue, fromStr, endDateStr],
 					);
