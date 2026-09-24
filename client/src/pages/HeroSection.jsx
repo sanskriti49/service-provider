@@ -12,42 +12,21 @@ export const HeroSection = () => {
 	useEffect(() => {
 		const ctx = gsap.context(() => {
 			const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-			tl.fromTo(
-				".hero-badge",
-				{ opacity: 0, y: -12, scale: 0.95 },
-				{ opacity: 1, y: 0, scale: 1, duration: 0.5 }
-			)
-				.fromTo(
-					".hero-title",
-					{ opacity: 0, y: 20 },
-					{ opacity: 1, y: 0, duration: 0.6 },
-					"-=0.3"
-				)
-				.fromTo(
-					".hero-sub",
-					{ opacity: 0, y: 15 },
-					{ opacity: 1, y: 0, duration: 0.5 },
-					"-=0.35"
-				)
-				.fromTo(
-					".hero-search",
-					{ opacity: 0, y: 15, scale: 0.98 },
-					{ opacity: 1, y: 0, scale: 1, duration: 0.5 },
-					"-=0.3"
-				)
-				.fromTo(
-					".hero-pill",
-					{ opacity: 0, y: 10, scale: 0.9 },
-					{ opacity: 1, y: 0, scale: 1, stagger: 0.04, duration: 0.35 },
-					"-=0.25"
-				);
+			tl.from(".hero-badge", { y: -8, duration: 0.35 })
+				.from(".hero-title", { y: 14, duration: 0.45 }, "-=0.2")
+				.from(".hero-sub", { y: 10, duration: 0.35 }, "-=0.2")
+				.from(".hero-search", { y: 10, duration: 0.35 }, "-=0.2")
+				.from(".hero-pill", { y: 6, stagger: 0.03, duration: 0.25 }, "-=0.15");
 		}, heroRef);
 
 		return () => ctx.revert();
 	}, []);
 
 	return (
-		<main ref={heroRef} className="relative w-full pt-32 pb-24 md:pt-40 md:pb-32 lg:pt-44 lg:pb-36 overflow-hidden">
+		<main
+			ref={heroRef}
+			className="relative w-full pt-32 pb-24 md:pt-40 md:pb-32 lg:pt-44 lg:pb-36 overflow-hidden"
+		>
 			<div className="absolute inset-0 w-full h-full pointer-events-none opacity-80 pt-28 md:pt-36 lg:pt-40">
 				<BackgroundPattern />
 			</div>
@@ -60,7 +39,7 @@ export const HeroSection = () => {
 					</p>
 
 					<h1
-						className="hero-title text-4xl sm:text-5xl md:text-6xl text-[#281950] font-bold leading-[1.1] tracking-tight mb-3"
+						className="hero-title text-4xl sm:text-5xl md:text-6xl text-[#281950] leading-[1.1] tracking-tight mb-3"
 						style={{ fontFamily: "P22Mackinac, Cambria, sans-serif" }}
 					>
 						From burst pipes to makeovers,

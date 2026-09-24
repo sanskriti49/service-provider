@@ -8,7 +8,6 @@ import Carousel from "react-multi-carousel";
 import "react-multi-carousel/lib/styles.css";
 import { motion } from "framer-motion";
 import { useFetch } from "../hooks/useFetch";
-import { useEffect, useState } from "react";
 import "./ServicesCarousel.css";
 import AuroraBackground from "../ui/AuroraBackground";
 import { Link } from "react-router-dom";

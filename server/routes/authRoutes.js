@@ -167,7 +167,20 @@ router.post("/verify-email-change", authLimiter, verifyToken, async (req, res) =
 
 		const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
 		if (hashedOtp !== user.temp_email_otp) {
-			return res.status(400).json({ error: "Invalid OTP" });
+			const attempts = (parseInt(user.temp_email_attempts, 10) || 0) + 1;
+			if (attempts >= 5) {
+				await db.query(
+					"UPDATE users SET temp_email = NULL, temp_email_otp = NULL, temp_email_expires = NULL WHERE id = $1",
+					[userId],
+				);
+				return res.status(400).json({
+					error:
+						"Too many failed attempts. This OTP has been invalidated for your security.",
+				});
+			}
+			return res.status(400).json({
+				error: `Invalid OTP. ${5 - attempts} attempts remaining.`,
+			});
 		}
 		await db.query(
 			`UPDATE users 
@@ -199,7 +212,7 @@ router.post("/google", async (req, res) => {
 		});
 
 		const payload = ticket.getPayload();
-		const email = payload.email;
+		const email = normalizeEmail(payload.email);
 		const name = formatName(payload.name);
 		const picture = payload.picture;
 
@@ -486,22 +499,7 @@ router.post("/set-role", verifyToken, async (req, res) => {
 	}
 });
 
-router.get("/me", verifyToken, async (req, res) => {
-	try {
-		const result = await db.query("SELECT * FROM users WHERE id=$1", [
-			req.user.id,
-		]);
-		if (result.rows.length === 0) {
-			return res.status(404).json({ error: "User not found" });
-		}
 
-		const user = result.rows[0];
-		res.json({ user: getSafeUser(user) });
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ error: "Server error" });
-	}
-});
 
 router.post("/update-password", authLimiter, verifyToken, async (req, res) => {
 	try {

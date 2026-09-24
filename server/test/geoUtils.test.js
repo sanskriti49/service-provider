@@ -22,6 +22,13 @@ test("geoUtils: calculateHaversineDistance handles invalid/null coordinates", ()
 	assert.strictEqual(calculateHaversineDistance(28.7041, NaN, 28.7041, 77.1025), null);
 });
 
+test("geoUtils: calculateHaversineDistance rejects out-of-bounds coordinates", () => {
+	assert.strictEqual(calculateHaversineDistance(95, 77.1, 28.7, 77.1), null);
+	assert.strictEqual(calculateHaversineDistance(-91, 77.1, 28.7, 77.1), null);
+	assert.strictEqual(calculateHaversineDistance(28.7, 185, 28.7, 77.1), null);
+	assert.strictEqual(calculateHaversineDistance(28.7, -185, 28.7, 77.1), null);
+});
+
 test("geoUtils: estimateTravelTimeMinutes computes realistic buffer times", () => {
 	assert.strictEqual(estimateTravelTimeMinutes(null), 20);
 	assert.strictEqual(estimateTravelTimeMinutes(0.4), 5);

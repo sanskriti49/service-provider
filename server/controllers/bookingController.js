@@ -92,8 +92,13 @@ async function createBooking(req, res, next) {
 	start_time = String(start_time).slice(0, 5);
 	const cleanDate = date.toString().substring(0, 10);
 
+	const resolvedInitialProviderId = await resolveProviderId(db, provider_id);
+	if (!resolvedInitialProviderId) {
+		return res.status(404).json({ message: "Provider not found" });
+	}
+
 	// Edge-level Distributed Lock (fail fast before touching database pool)
-	const lockKey = `booking:provider:${provider_id}:${cleanDate}:${start_time}`;
+	const lockKey = `booking:provider:${resolvedInitialProviderId}:${cleanDate}`;
 	const lock = await acquireLock(lockKey, 15000);
 	if (!lock.acquired) {
 		return res.status(409).json({
@@ -107,11 +112,15 @@ async function createBooking(req, res, next) {
 		client = await db.connect();
 		await client.query("BEGIN");
 
-		const resolvedProviderId = await resolveProviderId(client, provider_id);
-		if (!resolvedProviderId) {
-			await client.query("ROLLBACK");
-			return res.status(404).json({ message: "Provider not found" });
-		}
+		const resolvedProviderId = resolvedInitialProviderId;
+
+		// Acquire PostgreSQL transactional advisory lock strictly scoped to (provider_id, cleanDate).
+		// This guarantees that concurrent booking attempts for the same provider on the same date are
+		// serialized at the database engine level, preventing race conditions and double bookings.
+		await client.query(
+			"SELECT pg_advisory_xact_lock(hashtext('booking:' || $1::text || ':' || $2::text))",
+			[resolvedProviderId, cleanDate],
+		);
 
 		let resolvedServiceId = service_id;
 		let serviceName = "default";
@@ -396,6 +405,16 @@ async function updateBookingStatus(req, res) {
 				}
 				refundPercentage = 100;
 			} else if (status === "cancelled") {
+				if (
+					["completed", "in_progress", "cancelled"].includes(
+						currentBooking.status,
+					)
+				) {
+					await client.query("ROLLBACK");
+					return res.status(400).json({
+						message: `Cannot cancel a booking that is already ${currentBooking.status}.`,
+					});
+				}
 				if (currentBooking.status === "pending") {
 					refundPercentage = 100;
 				} else {
@@ -857,44 +876,100 @@ async function sendEmailNotifications(
 async function verifyPayment(req, res) {
 	const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
 		req.body;
+
+	if (!razorpay_order_id || !razorpay_payment_id) {
+		return res
+			.status(400)
+			.json({ success: false, message: "Missing order or payment ID" });
+	}
+
 	const hmac = crypto.createHmac(
 		"sha256",
 		process.env.RAZORPAY_KEY_SECRET || "placeholder_secret",
 	);
 	hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
-	if (
-		hmac.digest("hex") === razorpay_signature ||
-		razorpay_payment_id.startsWith("pay_test_")
-	) {
-		try {
-			const result = await db.query(
-				`UPDATE bookings SET payment_status='paid', status='booked', razorpay_payment_id=$1 WHERE razorpay_order_id=$2 RETURNING *`,
-				[razorpay_payment_id, razorpay_order_id],
-			);
-			const verifiedBooking = result.rows[0];
+	const expectedSig = hmac.digest("hex");
 
-			if (verifiedBooking) {
-				let serviceName = "Service";
-				try {
-					const sRes = await db.query(`SELECT name FROM services WHERE id = $1`, [
-						verifiedBooking.service_id,
-					]);
-					if (sRes.rows.length > 0) {
-						serviceName = sRes.rows[0].name;
-					}
-				} catch (_) {}
+	const isTestEnv =
+		process.env.NODE_ENV === "test" ||
+		!process.env.RAZORPAY_KEY_SECRET ||
+		process.env.RAZORPAY_KEY_SECRET === "placeholder_secret";
 
-				const cleanDate = verifiedBooking.date
-					? verifiedBooking.date.toString().substring(0, 10)
-					: "";
-				const startTime = verifiedBooking.start_time
-					? String(verifiedBooking.start_time).slice(0, 5)
-					: "";
+	const isValidSignature =
+		expectedSig === razorpay_signature ||
+		(isTestEnv &&
+			typeof razorpay_payment_id === "string" &&
+			razorpay_payment_id.startsWith("pay_test_"));
 
+	if (!isValidSignature) {
+		return res
+			.status(400)
+			.json({ success: false, message: "Invalid signature" });
+	}
+
+	try {
+		// Idempotency check: see if already verified
+		const existingCheck = await db.query(
+			"SELECT * FROM bookings WHERE razorpay_order_id = $1",
+			[razorpay_order_id],
+		);
+		if (existingCheck.rows.length === 0) {
+			return res
+				.status(404)
+				.json({ success: false, message: "Booking order not found" });
+		}
+
+		const existingBooking = existingCheck.rows[0];
+		if (existingBooking.payment_status === "paid") {
+			return res.status(200).json({
+				success: true,
+				booking: existingBooking,
+				already_paid: true,
+			});
+		}
+
+		const result = await db.query(
+			`UPDATE bookings SET payment_status='paid', status='booked', razorpay_payment_id=$1, updated_at=NOW() WHERE razorpay_order_id=$2 RETURNING *`,
+			[razorpay_payment_id, razorpay_order_id],
+		);
+		const verifiedBooking = result.rows[0];
+
+		if (verifiedBooking) {
+			let serviceName = "Service";
+			try {
+				const sRes = await db.query(`SELECT name FROM services WHERE id = $1`, [
+					verifiedBooking.service_id,
+				]);
+				if (sRes.rows.length > 0) {
+					serviceName = sRes.rows[0].name;
+				}
+			} catch (_) {}
+
+			const cleanDate = verifiedBooking.date
+				? verifiedBooking.date.toString().substring(0, 10)
+				: "";
+			const startTime = verifiedBooking.start_time
+				? String(verifiedBooking.start_time).slice(0, 5)
+				: "";
+
+			sendNotification({
+				userId: verifiedBooking.provider_id,
+				title: "New Booking Request 📅",
+				message: `New booking request for ${serviceName} on ${cleanDate} at ${startTime}.`,
+				type: "booking_created",
+				data: {
+					booking_id: verifiedBooking.booking_id,
+					service_name: serviceName,
+					date: cleanDate,
+					start_time: startTime,
+				},
+			});
+
+			if (verifiedBooking.user_id) {
 				sendNotification({
-					userId: verifiedBooking.provider_id,
-					title: "New Booking Request 📅",
-					message: `New booking request for ${serviceName} on ${cleanDate} at ${startTime}.`,
+					userId: verifiedBooking.user_id,
+					title: "Booking Placed Successfully ✨",
+					message: `Your booking for ${serviceName} on ${cleanDate} at ${startTime} has been placed.`,
 					type: "booking_created",
 					data: {
 						booking_id: verifiedBooking.booking_id,
@@ -903,29 +978,180 @@ async function verifyPayment(req, res) {
 						start_time: startTime,
 					},
 				});
+			}
+		}
 
-				if (verifiedBooking.user_id) {
+		res.status(200).json({ success: true, booking: verifiedBooking });
+	} catch (err) {
+		console.error("Payment verification runtime error:", err);
+		res.status(500).json({ message: "Internal Server Error" });
+	}
+}
+
+/**
+ * POST /api/bookings/webhook
+ * Cryptographically verified, idempotent webhook receiver for Razorpay lifecycle events
+ */
+async function handleRazorpayWebhook(req, res) {
+	const signature = req.headers["x-razorpay-signature"];
+	const webhookSecret =
+		process.env.RAZORPAY_WEBHOOK_SECRET ||
+		process.env.RAZORPAY_KEY_SECRET ||
+		"placeholder_secret";
+
+	const rawBody = req.rawBody
+		? req.rawBody.toString("utf8")
+		: JSON.stringify(req.body);
+	const expectedSignature = crypto
+		.createHmac("sha256", webhookSecret)
+		.update(rawBody)
+		.digest("hex");
+
+	const isTestEnv =
+		process.env.NODE_ENV === "test" ||
+		!process.env.RAZORPAY_KEY_SECRET ||
+		process.env.RAZORPAY_KEY_SECRET === "placeholder_secret";
+
+	if (signature !== expectedSignature && !isTestEnv) {
+		console.warn("⚠️ Invalid Razorpay webhook signature rejected");
+		return res
+			.status(400)
+			.json({ status: "error", message: "Invalid webhook signature" });
+	}
+
+	const event = req.body?.event;
+	const payload = req.body?.payload || {};
+
+	try {
+		if (event === "order.paid" || event === "payment.captured") {
+			const orderId =
+				payload.order?.entity?.id || payload.payment?.entity?.order_id;
+			const paymentId = payload.payment?.entity?.id;
+
+			if (!orderId) {
+				return res
+					.status(200)
+					.json({ status: "ignored", reason: "missing_order_id" });
+			}
+
+			const client = await db.connect();
+			try {
+				await client.query("BEGIN");
+
+				const bRes = await client.query(
+					"SELECT * FROM bookings WHERE razorpay_order_id = $1 FOR UPDATE",
+					[orderId],
+				);
+
+				if (bRes.rows.length === 0) {
+					await client.query("ROLLBACK");
+					return res
+						.status(200)
+						.json({ status: "ignored", reason: "booking_not_found" });
+				}
+
+				const booking = bRes.rows[0];
+
+				// IDEMPOTENCY GUARD: If already marked paid, acknowledge 200 without duplicate side-effects
+				if (booking.payment_status === "paid") {
+					await client.query("ROLLBACK");
+					return res
+						.status(200)
+						.json({ status: "ok", message: "already_processed" });
+				}
+
+				const updateRes = await client.query(
+					`UPDATE bookings 
+					 SET payment_status = 'paid', 
+					     status = 'booked', 
+					     razorpay_payment_id = COALESCE($1, razorpay_payment_id), 
+					     updated_at = NOW() 
+					 WHERE booking_id = $2 
+					 RETURNING *`,
+					[paymentId, booking.booking_id],
+				);
+
+				await client.query("COMMIT");
+
+				const updatedBooking = updateRes.rows[0];
+
+				// Dispatch notifications once
+				try {
+					let serviceName = "Service";
+					const sRes = await db.query(
+						"SELECT name FROM services WHERE id = $1",
+						[updatedBooking.service_id],
+					);
+					if (sRes.rows.length > 0) {
+						serviceName = sRes.rows[0].name;
+					}
+					const cleanDate = updatedBooking.date
+						? String(updatedBooking.date).substring(0, 10)
+						: "";
+					const startTime = updatedBooking.start_time
+						? String(updatedBooking.start_time).slice(0, 5)
+						: "";
+
 					sendNotification({
-						userId: verifiedBooking.user_id,
-						title: "Booking Placed Successfully ✨",
-						message: `Your booking for ${serviceName} on ${cleanDate} at ${startTime} has been placed.`,
+						userId: updatedBooking.provider_id,
+						title: "New Booking Request 📅",
+						message: `New booking request for ${serviceName} on ${cleanDate} at ${startTime}.`,
 						type: "booking_created",
 						data: {
-							booking_id: verifiedBooking.booking_id,
+							booking_id: updatedBooking.booking_id,
 							service_name: serviceName,
 							date: cleanDate,
 							start_time: startTime,
 						},
 					});
-				}
-			}
 
-			res.status(200).json({ success: true, booking: verifiedBooking });
-		} catch (err) {
-			res.status(500).json({ message: "Internal Server Error" });
+					if (updatedBooking.user_id) {
+						sendNotification({
+							userId: updatedBooking.user_id,
+							title: "Booking Placed Successfully ✨",
+							message: `Your booking for ${serviceName} on ${cleanDate} at ${startTime} has been placed.`,
+							type: "booking_created",
+							data: {
+								booking_id: updatedBooking.booking_id,
+								service_name: serviceName,
+								date: cleanDate,
+								start_time: startTime,
+							},
+						});
+					}
+				} catch (notifErr) {
+					console.warn("Webhook notification warning:", notifErr.message);
+				}
+
+				return res
+					.status(200)
+					.json({ status: "ok", message: "payment_processed" });
+			} catch (txErr) {
+				await client.query("ROLLBACK");
+				throw txErr;
+			} finally {
+				client.release();
+			}
+		} else if (event === "payment.failed") {
+			const orderId =
+				payload.order?.entity?.id || payload.payment?.entity?.order_id;
+			if (orderId) {
+				await db.query(
+					"UPDATE bookings SET payment_status = 'failed', updated_at = NOW() WHERE razorpay_order_id = $1 AND payment_status != 'paid'",
+					[orderId],
+				);
+			}
+			return res
+				.status(200)
+				.json({ status: "ok", message: "payment_failure_recorded" });
 		}
-	} else {
-		res.status(400).json({ success: false, message: "Invalid signature" });
+
+		res.status(200).json({ status: "ignored", event });
+	} catch (err) {
+		console.error("Razorpay webhook execution error:", err);
+		res
+			.status(500)
+			.json({ status: "error", message: "Webhook execution error" });
 	}
 }
 
@@ -1185,6 +1411,7 @@ module.exports = {
 	getUserHistory,
 	updateBookingStatus,
 	verifyPayment,
+	handleRazorpayWebhook,
 	getRecentProviderBookings,
 	getUpcomingBookings,
 	getProviderHistory,

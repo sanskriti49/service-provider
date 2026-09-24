@@ -544,21 +544,14 @@ async function getProviderById(req, res, next) {
 			return res.status(404).json({ error: "Provider not found" });
 
 		const providerRes = await db.query(
-			`SELECT u.id, u.name, u.email, u.phone, u.role, u.custom_id,
+			`SELECT u.id, u.name, u.role, u.custom_id,
                     u.location, u.lat, u.lng, u.photo, u.bio,
                     COALESCE(p.rating, 5.0) AS rating, p.availability,
                     ps.price, ps.price_unit, 
                     s.name AS service, s.slug AS service_slug, s.id AS service_id,
                     COALESCE(p.is_verified, FALSE) AS is_verified,
                     p.verification_badge,
-                    COALESCE(p.kyc_status, 'pending') AS kyc_status,
-                    p.kyc_doc_type,
-                    p.kyc_doc_number,
-                    p.kyc_doc_front,
-                    p.kyc_doc_back,
-                    p.rejection_reason,
-                    p.verified_at,
-                    p.kyc_submitted_at
+                    COALESCE(p.kyc_status, 'pending') AS kyc_status
              FROM providers p
              JOIN users u ON u.id = p.user_id
              LEFT JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
@@ -706,6 +699,12 @@ async function updateProvider(req, res, next) {
 	const providerId = await resolveProviderId(db, id);
 	if (!providerId) return res.status(404).json({ error: "Provider not found" });
 
+	if (req.user && req.user.role !== "admin" && req.user.id !== providerId) {
+		return res.status(403).json({
+			error: "Access denied. Cannot modify another provider's account.",
+		});
+	}
+
 	const client = await db.connect();
 	try {
 		await client.query("BEGIN");
@@ -809,6 +808,13 @@ async function addProviderService(req, res, next) {
 		if (!providerId)
 			return res.status(404).json({ error: "Provider not found" });
 
+		if (req.user && req.user.role !== "admin" && req.user.id !== providerId) {
+			await client.query("ROLLBACK");
+			return res.status(403).json({
+				error: "Access denied. Cannot modify another provider's services.",
+			});
+		}
+
 		await client.query(
 			`INSERT INTO providers (user_id, rating, availability)
              VALUES ($1, NULL, '[]')
@@ -873,6 +879,12 @@ async function removeProviderService(req, res, next) {
 		if (!providerId)
 			return res.status(404).json({ error: "Provider not found" });
 
+		if (req.user && req.user.role !== "admin" && req.user.id !== providerId) {
+			return res.status(403).json({
+				error: "Access denied. Cannot delete another provider's service.",
+			});
+		}
+
 		const result = await db.query(
 			`DELETE FROM provider_services WHERE provider_id=$1 AND service_id=$2::uuid`,
 			[providerId, req.params.service_id],
@@ -897,6 +909,12 @@ async function toggleServiceVisibility(req, res, next) {
 		const providerId = await resolveProviderId(db, req.params.id);
 		if (!providerId)
 			return res.status(404).json({ error: "Provider not found" });
+
+		if (req.user && req.user.role !== "admin" && req.user.id !== providerId) {
+			return res.status(403).json({
+				error: "Access denied. Cannot update another provider's service visibility.",
+			});
+		}
 
 		const result = await db.query(
 			`UPDATE provider_services SET is_visible=$1
@@ -1253,6 +1271,12 @@ async function deleteProvider(req, res, next) {
 		const providerId = await resolveProviderId(db, req.params.id);
 		if (!providerId)
 			return res.status(404).json({ error: "Provider not found" });
+
+		if (req.user && req.user.role !== "admin" && req.user.id !== providerId) {
+			return res.status(403).json({
+				error: "Access denied. Cannot delete another provider's account.",
+			});
+		}
 
 		const r = await db.query("DELETE FROM providers WHERE user_id=$1", [
 			providerId,

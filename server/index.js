@@ -62,7 +62,14 @@ initSocket(httpServer, corsOptions);
 
 app.use(compression());
 app.use(cors(corsOptions));
-app.use(express.json({ limit: "5mb" }));
+app.use(
+	express.json({
+		limit: "5mb",
+		verify: (req, res, buf) => {
+			req.rawBody = buf;
+		},
+	}),
+);
 
 const { register, metricsMiddleware, updatePoolMetrics } = require("./utils/metrics");
 const { globalLimiter } = require("./middleware/rateLimiter");

@@ -20,24 +20,27 @@ export default function AppLayout() {
 	const { pathname } = useLocation();
 	const mainRef = useRef(null);
 
+	const isFirstMount = useRef(true);
+
 	useEffect(() => {
 		nprogress.start();
 		const timer = setTimeout(() => nprogress.done(), 200);
 
-		// GSAP smooth, natural page entrance
-		if (mainRef.current) {
+		// GSAP smooth page transition on route change (without blocking initial LCP render with opacity: 0)
+		if (mainRef.current && !isFirstMount.current) {
 			gsap.fromTo(
 				mainRef.current,
-				{ opacity: 0, y: 10 },
+				{ opacity: 0.85, y: 6 },
 				{
 					opacity: 1,
 					y: 0,
-					duration: 0.35,
+					duration: 0.25,
 					ease: "power2.out",
 					clearProps: "transform,opacity",
-				}
+				},
 			);
 		}
+		isFirstMount.current = false;
 
 		return () => {
 			clearTimeout(timer);

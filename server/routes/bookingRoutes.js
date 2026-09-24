@@ -6,6 +6,7 @@ const {
 	getUserHistory,
 	updateBookingStatus,
 	verifyPayment,
+	handleRazorpayWebhook,
 	getRecentProviderBookings,
 	getUpcomingBookings,
 	getProviderHistory,
@@ -26,6 +27,7 @@ function allowRoles(...roles) {
 }
 router.post("/", bookingLimiter, authMiddleware, allowRoles("customer"), createBooking);
 router.post("/verify-payment", authMiddleware, verifyPayment);
+router.post("/webhook", handleRazorpayWebhook);
 router.delete("/:booking_id/unpaid", authMiddleware, allowRoles("customer"), cancelUnpaidBooking);
 
 router.get(

@@ -127,6 +127,8 @@ const queries = [
 	`CREATE INDEX IF NOT EXISTS ix_bookings_provider_date ON public.bookings USING btree (provider_id, date)`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_user_id ON public.bookings(user_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_status ON public.bookings(status)`,
+	`CREATE INDEX IF NOT EXISTS ix_bookings_razorpay_order_id ON public.bookings(razorpay_order_id)`,
+	`CREATE INDEX IF NOT EXISTS ix_bookings_provider_active_slots ON public.bookings(provider_id, date, start_time) WHERE status NOT IN ('cancelled', 'expired')`,
 
 	`CREATE TABLE IF NOT EXISTS public.provider_master_availability (
     id serial4 NOT NULL,

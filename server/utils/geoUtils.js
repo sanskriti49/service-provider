@@ -9,7 +9,15 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 		isNaN(lat1) ||
 		isNaN(lon1) ||
 		isNaN(lat2) ||
-		isNaN(lon2)
+		isNaN(lon2) ||
+		lat1 < -90 ||
+		lat1 > 90 ||
+		lat2 < -90 ||
+		lat2 > 90 ||
+		lon1 < -180 ||
+		lon1 > 180 ||
+		lon2 < -180 ||
+		lon2 > 180
 	) {
 		return null;
 	}

@@ -10,6 +10,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import GuestRoute from "./auth/GuestRoute";
 import { Toaster } from "sonner";
 import PageLoader from "./ui/PageLoader";
+import Home from "./pages/Home";
 
 const ProviderBookings = lazy(
 	() => import("./dashboards/provider/ProviderBookings"),
@@ -29,7 +30,6 @@ const ProviderSettings = lazy(
 const ApplyProvider = lazy(() => import("./pages/ApplyProvider"));
 const AdminDashboard = lazy(() => import("./dashboards/admin/AdminDashboard"));
 
-const Home = lazy(() => import("./pages/Home"));
 const SignIn = lazy(() => import("./pages/SignIn"));
 const SignUp = lazy(() => import("./pages/SignUp"));
 const BookingPage = lazy(() => import("./dashboards/customer/BookingPage"));

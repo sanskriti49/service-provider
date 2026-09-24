@@ -68,9 +68,19 @@ async function createReview(req, res, next) {
 			);
 			if (bCheck.rows.length > 0) {
 				const b = bCheck.rows[0];
-				if (b.user_id === customerId) {
-					validBookingId = b.booking_id;
+				if (b.user_id !== customerId) {
+					await client.query("ROLLBACK");
+					return res.status(403).json({
+						error: "Cannot review a booking that does not belong to you",
+					});
 				}
+				if (b.status !== "completed") {
+					await client.query("ROLLBACK");
+					return res.status(400).json({
+						error: `Reviews can only be submitted for completed services (current status: ${b.status})`,
+					});
+				}
+				validBookingId = b.booking_id;
 			}
 		}
 

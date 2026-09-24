@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MessageCircle, Mail, Copy, Check, CheckCircle2 } from "lucide-react";
 
-const WHATSAPP_DIGITS = "916306642481";
-const WHATSAPP_DISPLAY = "+91 63066 42481";
+const WHATSAPP_DIGITS = "919876543201";
+const WHATSAPP_DISPLAY = "+91 98765 43201";
 
 // Only uses ticket categories your page already passes around ("booking", "kyc", "general").
 // Add more here if SupportTicketModal supports them (e.g. "payment", "payout").
