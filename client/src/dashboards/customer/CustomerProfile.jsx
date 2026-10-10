@@ -31,6 +31,9 @@ import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
 import ConfirmDialog from "../../ui/ConfirmDialog";
 import Logo from "../../ui/Logo";
+import SavedAddressesModal from "./SavedAddressesModal";
+import SavedPaymentsModal from "./SavedPaymentsModal";
+import FeedbackModal from "./FeedbackModal";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -490,12 +493,36 @@ export default function CustomerProfile() {
 	const [loading, setLoading] = useState(true);
 	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+	// Modals for Saved Addresses, Payment Accounts, and Feedback
+	const [showAddressModal, setShowAddressModal] = useState(false);
+	const [showPaymentModal, setShowPaymentModal] = useState(false);
+	const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+	const [addressCount, setAddressCount] = useState(0);
+	const [paymentCount, setPaymentCount] = useState(0);
+
+	useEffect(() => {
+		const searchParams = new URLSearchParams(window.location.search);
+		const openParam =
+			searchParams.get("open") ||
+			searchParams.get("tab") ||
+			window.location.hash.replace("#", "");
+		if (openParam === "addresses" || openParam === "address") {
+			setShowAddressModal(true);
+		} else if (openParam === "payments" || openParam === "payment") {
+			setShowPaymentModal(true);
+		} else if (openParam === "feedback") {
+			setShowFeedbackModal(true);
+		}
+	}, []);
+
 	useEffect(() => {
 		let alive = true;
 		(async () => {
-			const [meRes, bookingsRes] = await Promise.allSettled([
+			const [meRes, bookingsRes, addrRes, payRes] = await Promise.allSettled([
 				api.get("/api/auth/me"),
 				api.get("/api/bookings/my-bookings"),
+				api.get("/api/account/addresses"),
+				api.get("/api/account/payment-methods"),
 			]);
 			if (!alive) return;
 
@@ -507,6 +534,12 @@ export default function CustomerProfile() {
 				setBookings(Array.isArray(data) ? data : []);
 			} else {
 				toast.error("Couldn't load your booking stats");
+			}
+			if (addrRes.status === "fulfilled") {
+				setAddressCount(addrRes.value.data?.addresses?.length || 0);
+			}
+			if (payRes.status === "fulfilled") {
+				setPaymentCount(payRes.value.data?.payment_methods?.length || 0);
 			}
 			setLoading(false);
 		})();
@@ -673,16 +706,24 @@ export default function CustomerProfile() {
 									<MenuRow
 										icon={Wallet}
 										title="Payments"
-										desc="Cards and wallets"
+										desc={
+											paymentCount > 0
+												? `${paymentCount} saved account${paymentCount > 1 ? "s" : ""}`
+												: "Cards, UPI and wallets"
+										}
 										tone="emerald"
-										soon
+										onClick={() => setShowPaymentModal(true)}
 									/>
 									<MenuRow
 										icon={MapPin}
 										title="Saved addresses"
-										desc="Book faster from home or work"
+										desc={
+											addressCount > 0
+												? `${addressCount} saved address${addressCount > 1 ? "es" : ""}`
+												: "Book faster from home or work"
+										}
 										tone="amber"
-										soon
+										onClick={() => setShowAddressModal(true)}
 									/>
 								</MenuGroup>
 
@@ -706,7 +747,7 @@ export default function CustomerProfile() {
 										title="Feedback"
 										desc="Tell us what to improve"
 										tone="amber"
-										soon
+										onClick={() => setShowFeedbackModal(true)}
 									/>
 									<MenuRow
 										icon={LogOut}
@@ -739,6 +780,23 @@ export default function CustomerProfile() {
 					cancelText="Cancel"
 					variant="danger"
 					icon={LogOut}
+				/>
+
+				<SavedAddressesModal
+					isOpen={showAddressModal}
+					onClose={() => setShowAddressModal(false)}
+					onUpdate={(list) => setAddressCount(list.length)}
+				/>
+
+				<SavedPaymentsModal
+					isOpen={showPaymentModal}
+					onClose={() => setShowPaymentModal(false)}
+					onUpdate={(list) => setPaymentCount(list.length)}
+				/>
+
+				<FeedbackModal
+					isOpen={showFeedbackModal}
+					onClose={() => setShowFeedbackModal(false)}
 				/>
 			</div>
 		</MotionConfig>

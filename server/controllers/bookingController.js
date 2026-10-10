@@ -292,6 +292,13 @@ async function createBooking(req, res, next) {
 			longitude ? parseFloat(longitude) : null,
 		]);
 
+		await client.query(
+			`UPDATE availability_slots 
+			 SET is_booked = true 
+			 WHERE provider_id = $1 AND date = $2::date AND start_time = $3::time`,
+			[resolvedProviderId, cleanDate, start_time],
+		).catch(() => {});
+
 		await client.query("COMMIT");
 
 		const createdBooking = r.rows[0];
@@ -558,6 +565,15 @@ async function updateBookingStatus(req, res) {
 			userRole,
 			booking_id,
 		]);
+
+		if (status === "cancelled") {
+			await client.query(
+				`UPDATE availability_slots 
+				 SET is_booked = false 
+				 WHERE provider_id = $1 AND date = $2::date AND start_time = $3::time`,
+				[currentBooking.provider_id, currentBooking.date, currentBooking.start_time],
+			).catch(() => {});
+		}
 
 		await client.query("COMMIT");
 		try {
@@ -1392,6 +1408,16 @@ async function cancelUnpaidBooking(req, res) {
 			return res.status(404).json({
 				message: "Unpaid booking not found or already processed.",
 			});
+		}
+
+		const deletedBooking = result.rows[0];
+		if (deletedBooking) {
+			await db.query(
+				`UPDATE availability_slots 
+				 SET is_booked = false 
+				 WHERE provider_id = $1 AND date = $2::date AND start_time = $3::time`,
+				[deletedBooking.provider_id, deletedBooking.date, deletedBooking.start_time],
+			).catch(() => {});
 		}
 
 		res.json({

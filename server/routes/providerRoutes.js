@@ -53,9 +53,13 @@ async function requireProviderOwnerOrAdmin(req, res, next) {
 	}
 }
 
-// Authenticated upload with size limits & MIME checking
+// Authenticated upload with size limits & MIME checking (Multipart Ingestion)
 router.post("/v1/upload-kyc", authenticate, upload.single("document"), c.uploadKycDocument);
 router.post("/upload-kyc", authenticate, upload.single("document"), c.uploadKycDocument);
+
+// Direct-to-S3 Presigned Ingestion (Zero Server Egress)
+router.post("/v1/kyc-presign", authenticate, c.getKycPresignedUrl);
+router.post("/kyc-presign", authenticate, c.getKycPresignedUrl);
 
 // Public discovery endpoints
 router.post("/v1", c.createProvider);

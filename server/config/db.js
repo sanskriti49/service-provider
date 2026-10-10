@@ -1,3 +1,6 @@
+const path = require("path");
+// Prioritize server/.env regardless of process working directory
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
 require("dotenv").config();
 const { Pool } = require("pg");
 
@@ -32,11 +35,11 @@ const poolConfig = (hasDatabaseUrl || isProduction)
 			...baseConfig,
 		}
 	: {
-			user: process.env.DB_USER,
-			host: process.env.DB_HOST,
-			password: process.env.DB_PASSWORD,
+			user: process.env.DB_USER || process.env.POSTGRES_USER || "postgres",
+			host: process.env.DB_HOST || "localhost",
+			password: process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || "",
 			port: parseInt(process.env.DB_PORT || "5432", 10),
-			database: process.env.DB_NAME,
+			database: process.env.DB_NAME || process.env.POSTGRES_DB || "service_app",
 			ssl: false,
 			...baseConfig,
 		};

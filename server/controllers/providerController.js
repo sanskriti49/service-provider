@@ -1,4 +1,5 @@
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
+const crypto = require("crypto");
 const { customAlphabet } = require("nanoid");
 const Joi = require("joi");
 const db = require("../config/db");
@@ -6,8 +7,24 @@ const cache = require("../utils/cache");
 const { hashIfPresent } = require("../utils/hash");
 const { normalizeEmail } = require("../utils/normalizeEmail");
 const { getPriceDetails } = require("../utils/pricing");
+const {
+	s3Client,
+	generatePresignedUploadUrl,
+	generatePresignedDownloadUrl,
+	uploadBufferToS3,
+	isConfigured: isS3Configured,
+} = require("../config/s3");
 const cloudinary = require("cloudinary").v2;
 const streamifier = require("streamifier");
+
+function extractS3Key(docUrlOrKey) {
+	if (!docUrlOrKey || typeof docUrlOrKey !== "string") return null;
+	if (docUrlOrKey.startsWith("kyc-documents/")) return docUrlOrKey;
+	if (docUrlOrKey.includes(".amazonaws.com/")) {
+		return docUrlOrKey.split(".amazonaws.com/")[1];
+	}
+	return null;
+}
 
 cloudinary.config({
 	cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -304,7 +321,36 @@ async function uploadKycDocument(req, res, next) {
 		}
 
 		let documentUrl;
+		let storageEngine = "fallback";
+		const uniqueSuffix = crypto.randomBytes(6).toString("hex");
+		const sanitizedFileName = (req.file.originalname || "document").replace(
+			/[^a-zA-Z0-9._-]/g,
+			"_",
+		);
+		const userId = req.user?.id || "unassigned";
+		const fileKey = `kyc-documents/${userId}/${Date.now()}-${uniqueSuffix}-${sanitizedFileName}`;
+
+		// 1. Primary AWS S3 Encrypted Storage (SSE-S3)
+		if (isS3Configured) {
+			try {
+				const s3Res = await uploadBufferToS3({
+					buffer: req.file.buffer,
+					key: fileKey,
+					contentType: req.file.mimetype,
+				});
+				documentUrl = s3Res.fileUrl;
+				storageEngine = s3Res.isMock ? "s3-mock" : "s3";
+			} catch (s3Err) {
+				console.warn(
+					"AWS S3 upload failed, checking fallbacks:",
+					s3Err.message,
+				);
+			}
+		}
+
+		// 2. Secondary Cloudinary Fallback (if S3 is unconfigured or failed)
 		if (
+			!documentUrl &&
 			process.env.CLOUDINARY_CLOUD_NAME &&
 			process.env.CLOUDINARY_API_KEY &&
 			process.env.CLOUDINARY_API_SECRET
@@ -321,23 +367,66 @@ async function uploadKycDocument(req, res, next) {
 					streamifier.createReadStream(req.file.buffer).pipe(stream);
 				});
 				documentUrl = result.secure_url;
+				storageEngine = "cloudinary";
 			} catch (uploadErr) {
 				console.warn(
 					"Cloudinary upload failed, using data URI fallback:",
 					uploadErr.message,
 				);
-				documentUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
 			}
-		} else {
+		}
+
+		// 3. Final In-Memory Data URI Fallback (Zero Downtime / Local Dev)
+		if (!documentUrl) {
 			documentUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+			storageEngine = "data-uri";
 		}
 
 		res.json({
 			success: true,
 			url: documentUrl,
+			fileKey,
 			filename: req.file.originalname,
 			mimetype: req.file.mimetype,
 			size: req.file.size,
+			storage: storageEngine,
+		});
+	} catch (err) {
+		next(err);
+	}
+}
+
+/**
+ * Generate a presigned S3 upload URL for direct browser-to-S3 ingestion (Zero Server Egress)
+ */
+async function getKycPresignedUrl(req, res, next) {
+	try {
+		const { fileName, fileType, fileSize } = req.body;
+		if (!fileName) {
+			return res.status(400).json({ error: "fileName is required" });
+		}
+		if (fileSize && fileSize > 5 * 1024 * 1024) {
+			return res.status(400).json({ error: "Document photo must be under 5MB" });
+		}
+
+		const uniqueSuffix = crypto.randomBytes(6).toString("hex");
+		const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+		const userId = req.user?.id || "unassigned";
+		const fileKey = `kyc-documents/${userId}/${Date.now()}-${uniqueSuffix}-${sanitizedFileName}`;
+
+		const { uploadUrl, fileUrl, isMock } = await generatePresignedUploadUrl({
+			key: fileKey,
+			contentType: fileType || "application/octet-stream",
+			expiresIn: 300,
+		});
+
+		res.json({
+			success: true,
+			uploadUrl,
+			fileUrl,
+			fileKey,
+			fileName: sanitizedFileName,
+			isMock,
 		});
 	} catch (err) {
 		next(err);
@@ -421,11 +510,13 @@ async function getProviders(req, res, next) {
 		const result = await db.query(query, params);
 		let providers = result.rows;
 
-		// Fallback: If no providers found for the specific service, fetch category or top experts
+		// Fallback: If no providers found for the specific service within filters/radius, fetch providers for that service or top experts
 		if (providers.length === 0 && service) {
 			try {
-				const fallbackRes = await db.query(
-					`SELECT DISTINCT ON (u.id)
+				const cleanService = String(service).trim();
+				const svcFallbackParams = hasPostGis ? [userLng, userLat, cleanService] : [cleanService];
+				const svcFallbackQuery = `
+					SELECT DISTINCT ON (u.id)
 						   u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
 						   u.lat, u.lng,
 						   s.name AS service, s.slug AS service_slug, s.id AS service_id,
@@ -434,16 +525,44 @@ async function getProviders(req, res, next) {
 						   COALESCE(p.is_verified, TRUE) AS is_verified,
 						   p.verification_badge,
 						   COALESCE(p.kyc_status, 'approved') AS kyc_status
+						   ${hasPostGis ? `, ROUND((ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000.0)::numeric, 1) AS postgis_distance_km` : ""}
 					 FROM providers p
 					 JOIN users u ON p.user_id = u.id
 					 JOIN provider_services ps ON ps.provider_id = p.user_id AND ps.is_visible = TRUE
 					 JOIN services s ON s.id = ps.service_id
 					 WHERE COALESCE(p.status, 'approved') = 'approved'
-					 ORDER BY u.id, p.rating DESC
-					 LIMIT 6`
-				);
-				if (fallbackRes.rows.length > 0) {
-					providers = fallbackRes.rows.map(r => ({ ...r, is_recommended_fallback: true }));
+					   AND (LOWER(s.slug) = LOWER($${hasPostGis ? 3 : 1}) OR s.id::text = $${hasPostGis ? 3 : 1})
+					 ORDER BY u.id, ps.created_at ASC
+					 LIMIT 10
+				`;
+				const svcRes = await db.query(svcFallbackQuery, svcFallbackParams);
+				if (svcRes.rows.length > 0) {
+					providers = svcRes.rows.map(r => ({ ...r, is_expanded_radius: true }));
+				} else {
+					const generalParams = hasPostGis ? [userLng, userLat] : [];
+					const generalQuery = `
+						SELECT DISTINCT ON (u.id)
+							   u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
+							   u.lat, u.lng,
+							   s.name AS service, s.slug AS service_slug, s.id AS service_id,
+							   ps.price, ps.price_unit, 
+							   COALESCE(p.rating, 4.8) AS rating, p.user_id, p.availability,
+							   COALESCE(p.is_verified, TRUE) AS is_verified,
+							   p.verification_badge,
+							   COALESCE(p.kyc_status, 'approved') AS kyc_status
+							   ${hasPostGis ? `, ROUND((ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000.0)::numeric, 1) AS postgis_distance_km` : ""}
+						 FROM providers p
+						 JOIN users u ON p.user_id = u.id
+						 JOIN provider_services ps ON ps.provider_id = p.user_id AND ps.is_visible = TRUE
+						 JOIN services s ON s.id = ps.service_id
+						 WHERE COALESCE(p.status, 'approved') = 'approved'
+						 ORDER BY u.id, p.rating DESC
+						 LIMIT 6
+					`;
+					const generalRes = await db.query(generalQuery, generalParams);
+					if (generalRes.rows.length > 0) {
+						providers = generalRes.rows.map(r => ({ ...r, is_recommended_fallback: true }));
+					}
 				}
 			} catch (fbErr) {
 				console.warn("Fallback providers query warning:", fbErr.message);
@@ -1346,9 +1465,27 @@ async function getKycStatus(req, res, next) {
 			return res.status(404).json({ error: "Provider not found" });
 		}
 
+		const kyc = { ...result.rows[0] };
+		if (isS3Configured) {
+			const frontKey = extractS3Key(kyc.kyc_doc_front);
+			if (frontKey) {
+				try {
+					const { downloadUrl } = await generatePresignedDownloadUrl({ key: frontKey });
+					kyc.kyc_doc_front_view = downloadUrl;
+				} catch (_) {}
+			}
+			const backKey = extractS3Key(kyc.kyc_doc_back);
+			if (backKey) {
+				try {
+					const { downloadUrl } = await generatePresignedDownloadUrl({ key: backKey });
+					kyc.kyc_doc_back_view = downloadUrl;
+				} catch (_) {}
+			}
+		}
+
 		res.json({
 			success: true,
-			kyc: result.rows[0],
+			kyc,
 		});
 	} catch (err) {
 		next(err);
@@ -1421,6 +1558,7 @@ async function submitKyc(req, res, next) {
 module.exports = {
 	createProvider,
 	uploadKycDocument,
+	getKycPresignedUrl,
 	getProviders,
 	matchProviders,
 	getProviderById,

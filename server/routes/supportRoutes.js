@@ -110,4 +110,7 @@ router.post("/tickets", async (req, res, next) => {
 	}
 });
 
+const accountController = require("../controllers/accountController");
+router.post("/feedback", accountController.submitFeedback);
+
 module.exports = router;

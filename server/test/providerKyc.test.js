@@ -74,3 +74,44 @@ test("kyc: Document number sanitization trims and strips invalid special charact
 	assert.strictEqual(sanitizeDocNumber("dl-0420110012345"), "DL-0420110012345");
 	assert.strictEqual(sanitizeDocNumber(null), "");
 });
+
+test("s3: generatePresignedUploadUrl returns valid upload URL and scoped fileKey", async () => {
+	const { generatePresignedUploadUrl, bucketName } = require("../config/s3");
+	const key = "kyc-documents/user_123/1700000000-abc123-id_card.png";
+	const result = await generatePresignedUploadUrl({
+		key,
+		contentType: "image/png",
+		expiresIn: 300,
+	});
+
+	assert.strictEqual(result.fileKey, key);
+	assert.ok(result.uploadUrl, "Should have uploadUrl");
+	assert.ok(result.fileUrl.includes(bucketName), "File URL should reference configured S3 bucket");
+});
+
+test("s3: generatePresignedDownloadUrl returns signed URL for private documents", async () => {
+	const { generatePresignedDownloadUrl, bucketName } = require("../config/s3");
+	const key = "kyc-documents/user_123/1700000000-abc123-id_card.png";
+	const result = await generatePresignedDownloadUrl({
+		key,
+		expiresIn: 3600,
+	});
+
+	assert.ok(result.downloadUrl, "Should return a downloadUrl");
+	assert.ok(result.downloadUrl.includes(bucketName), "Download URL should include bucket name");
+});
+
+test("s3: uploadBufferToS3 correctly processes file buffer and returns URL", async () => {
+	const { uploadBufferToS3 } = require("../config/s3");
+	const dummyBuffer = Buffer.from("fake-image-bytes");
+	const key = "kyc-documents/user_456/test_doc.png";
+	const res = await uploadBufferToS3({
+		buffer: dummyBuffer,
+		key,
+		contentType: "image/png",
+	});
+
+	assert.strictEqual(res.key, key);
+	assert.ok(res.fileUrl, "Should return fileUrl");
+});
+

@@ -90,6 +90,7 @@ const reviewRoutes = require("./routes/reviewRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const supportRoutes = require("./routes/supportRoutes");
+const accountRoutes = require("./routes/accountRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 app.use("/api/providers", providerRoutes);
@@ -99,11 +100,22 @@ app.use("/api/earnings", earningsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/account", accountRoutes);
 app.use("/api/availability", availabilityRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/support", supportRoutes);
+
+// Mock S3 direct upload endpoint for local zero-config offline development & testing
+app.put("/api/providers/mock-s3-upload", express.raw({ type: "*/*", limit: "10mb" }), (req, res) => {
+	res.status(200).json({
+		success: true,
+		message: "Mock S3 direct upload successful",
+		key: req.query.key,
+		bytesReceived: req.body ? req.body.length : 0,
+	});
+});
 
 app.get("/", (req, res) => {
 	res.send("Backend running..");

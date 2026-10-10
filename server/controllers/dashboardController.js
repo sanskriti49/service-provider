@@ -14,7 +14,10 @@ const getCustomerDashboardStats = async (req, res) => {
 				[userId],
 			),
 			db.query(
-				`SELECT b.booking_id, b.date, b.start_time, s.name AS service_name, u.name AS provider_name, u.photo AS provider_photo
+				`SELECT b.booking_id, b.date, b.start_time, b.end_time, b.status, b.price, b.address,
+				        COALESCE(b.completion_otp, b.otp) AS completion_otp, b.otp,
+				        s.name AS service_name, u.name AS provider_name, u.photo AS provider_photo,
+				        u.phone AS provider_phone, u.custom_id AS provider_custom_id
                 FROM bookings b
                 JOIN services s ON s.id=b.service_id
                 JOIN users u ON u.id=b.provider_id

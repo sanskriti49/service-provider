@@ -135,7 +135,12 @@ export default function NotificationBell() {
 		setIsOpen(false);
 
 		if (notif.data?.booking_id) {
-			const role = localStorage.getItem("role");
+			let role = localStorage.getItem("role");
+			if (!role) {
+				try {
+					role = JSON.parse(localStorage.getItem("user") || "{}")?.role;
+				} catch (_) {}
+			}
 			if (role === "provider") {
 				navigate("/provider/dashboard/bookings");
 			} else {

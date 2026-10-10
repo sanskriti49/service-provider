@@ -103,12 +103,7 @@ export default function BookingDetailsSheet({
 	const isCancelable = ["pending", "booked", "confirmed"].includes(
 		booking.status,
 	);
-	const canReview = [
-		"completed",
-		"booked",
-		"confirmed",
-		"in_progress",
-	].includes(booking.status);
+	const canReview = booking.status === "completed";
 
 	return createPortal(
 		<>
