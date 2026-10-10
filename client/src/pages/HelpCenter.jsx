@@ -1,32 +1,17 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import {
-	Search,
-	ChevronDown,
-	ChevronRight,
-	ShieldCheck,
-	Briefcase,
-	User,
-	IndianRupee,
-	LifeBuoy,
-	CalendarCheck,
-	Wrench,
-} from "lucide-react";
+import { Search, LifeBuoy, ChevronRight } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import KycVerificationModal from "../ui/KycVerificationModal";
 import SupportTicketModal from "../ui/SupportTicketModal";
 import SupportBanner from "./SupportBanner";
 import useKeyboardShortcut from "../hooks/useKeyboardShortcut";
-import gsap from "gsap";
 
 const RetroGrid = () => {
 	return (
 		<div className="absolute top-0 inset-x-0 h-[500px] overflow-hidden pointer-events-none select-none -z-10">
-			{/* Background base fade */}
 			<div className="absolute inset-0 bg-gradient-to-b from-violet-50/60 via-white/40 to-white" />
-
-			{/* Perspective 3D Grid */}
 			<div className="absolute inset-0 [perspective:1000px] [transform-style:preserve-3d]">
 				<div
 					className="absolute inset-0 h-[200%] w-full origin-top"
@@ -44,15 +29,6 @@ const RetroGrid = () => {
 					}}
 				/>
 			</div>
-
-			{/* Radial glow without heavy mix-blend or excessive blur */}
-			<div
-				className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[280px] pointer-events-none"
-				style={{
-					background:
-						"radial-gradient(circle at center top, rgba(139, 92, 246, 0.08) 0%, transparent 70%)",
-				}}
-			/>
 		</div>
 	);
 };
@@ -222,7 +198,7 @@ const AUDIENCE_LABEL = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Small helpers                                                      */
+/*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
 const focusRing =
@@ -232,12 +208,13 @@ const rowFocusRing =
 
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// Search matches get a highlighter-pen swipe
 const Highlight = ({ text, terms }) => {
 	if (!terms.length) return text;
 	const re = new RegExp(`(${terms.map(escapeRegExp).join("|")})`, "gi");
 	return text.split(re).map((part, i) =>
 		i % 2 === 1 ? (
-			<mark key={i} className="bg-violet-100 text-violet-900 rounded-sm">
+			<mark key={i} className="bg-amber-200 text-slate-950 rounded-sm">
 				{part}
 			</mark>
 		) : (
@@ -246,18 +223,29 @@ const Highlight = ({ text, terms }) => {
 	);
 };
 
-const scrollToId = (e, id) => {
-	const el = document.getElementById(id);
-	if (!el) return;
-	e.preventDefault();
-	const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-	el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-};
-
-const STATUS_TONE = {
+const STATUS_TEXT = {
 	good: "text-emerald-700",
 	wait: "text-amber-700",
 	todo: "text-violet-700",
+};
+
+const STATUS_BADGE = {
+	good: "bg-emerald-50 text-emerald-800 border border-emerald-200/80",
+	wait: "bg-amber-50 text-amber-800 border border-amber-200/80",
+	todo: "bg-violet-50 text-violet-800 border border-violet-200/80",
+};
+
+// The one thing worth doing next, per topic
+const ACTIONS = {
+	bookings: { label: "Open my bookings", to: "/dashboard/bookings" },
+	payments: { label: "Ask about a payment", ticket: "booking" },
+	trust: { label: "Report a problem", ticket: "booking" },
+	kyc: { label: "Check my KYC status", kyc: true },
+	earnings: { label: "See my earnings", to: "/provider/dashboard/earnings" },
+	schedules: {
+		label: "Update my availability",
+		to: "/provider/dashboard/settings",
+	},
 };
 
 /* ------------------------------------------------------------------ */
@@ -270,6 +258,7 @@ const HelpCenter = () => {
 
 	const [activeTab, setActiveTab] = useState("customer");
 	const [searchQuery, setSearchQuery] = useState("");
+	const [selectedKey, setSelectedKey] = useState(null);
 
 	// Modals
 	const [showKycModal, setShowKycModal] = useState(false);
@@ -308,7 +297,6 @@ const HelpCenter = () => {
 		setShowTicketModal(true);
 	};
 
-	// Keyboard shortcuts using centralized hook & modalStack awareness
 	useKeyboardShortcut(
 		["ctrl+k", "cmd+k", "/"],
 		() => {
@@ -347,8 +335,6 @@ const HelpCenter = () => {
 
 	// Common tasks, tailored to who's signed in
 	const quickLinks = useMemo(() => {
-		const icon = "w-5 h-5";
-
 		if (userRole === "provider") {
 			const kyc = user?.is_verified
 				? { label: "Verified", tone: "good" }
@@ -359,7 +345,6 @@ const HelpCenter = () => {
 				{
 					title: "KYC verification",
 					sub: "Documents and status",
-					icon: <ShieldCheck className={icon} />,
 					status: kyc,
 					shortcut: "K",
 					onClick: handleKycClick,
@@ -367,20 +352,17 @@ const HelpCenter = () => {
 				{
 					title: "Open a ticket",
 					sub: "Partner support",
-					icon: <LifeBuoy className={icon} />,
 					shortcut: "T",
 					onClick: () => handleOpenTicket("kyc"),
 				},
 				{
 					title: "Payouts and earnings",
 					sub: "Paid every Wednesday",
-					icon: <IndianRupee className={icon} />,
 					to: "/provider/dashboard/earnings",
 				},
 				{
 					title: "Service settings",
 					sub: "Rates and working hours",
-					icon: <Wrench className={icon} />,
 					to: "/provider/dashboard/settings",
 				},
 			];
@@ -391,57 +373,48 @@ const HelpCenter = () => {
 				{
 					title: "My bookings",
 					sub: "Track and reschedule",
-					icon: <CalendarCheck className={icon} />,
 					to: "/dashboard/bookings",
 				},
 				{
 					title: "Open a ticket",
 					sub: "Refunds and other questions",
-					icon: <LifeBuoy className={icon} />,
 					shortcut: "T",
 					onClick: () => handleOpenTicket("booking"),
 				},
 				{
 					title: "Account settings",
 					sub: "Profile and addresses",
-					icon: <User className={icon} />,
 					to: "/account/settings",
 				},
 				{
 					title: "Become a provider",
 					sub: "Earn with TaskGenie",
-					icon: <Briefcase className={icon} />,
 					to: "/apply-provider",
 				},
 			];
 		}
 
-		// Guest
 		return [
 			{
 				title: "Open a ticket",
 				sub: "Send us a question",
-				icon: <LifeBuoy className={icon} />,
 				shortcut: "T",
 				onClick: () => handleOpenTicket("general"),
 			},
 			{
 				title: "Provider KYC",
 				sub: "Sign in to verify your identity",
-				icon: <ShieldCheck className={icon} />,
 				shortcut: "K",
 				onClick: handleKycClick,
 			},
 			{
 				title: "Join as a provider",
 				sub: "Start earning with TaskGenie",
-				icon: <Briefcase className={icon} />,
 				to: "/apply-provider",
 			},
 			{
 				title: "Your bookings",
 				sub: "Sign in to track them",
-				icon: <CalendarCheck className={icon} />,
 				to: "/auth/signin",
 			},
 		];
@@ -478,36 +451,48 @@ const HelpCenter = () => {
 			.filter((cat) => cat.questions.length > 0);
 	}, [roleKey, activeTab, isSearching, terms]);
 
-	const resultCount = sections.reduce((n, c) => n + c.questions.length, 0);
+	// Flat list so one question is always selected (falls back to the first)
+	const entries = useMemo(
+		() =>
+			sections.flatMap((cat) =>
+				cat.questions.map((item) => ({
+					key: `${cat.id}:${item.q}`,
+					cat,
+					item,
+				})),
+			),
+		[sections],
+	);
+	const active = entries.find((e) => e.key === selectedKey) || entries[0];
+
+	const resultCount = entries.length;
 	const showTabs = !roleKey && !isSearching;
 
 	return (
 		<MotionConfig reducedMotion="user">
-			<div className="font-geist min-h-screen  text-slate-900 selection:bg-violet-600 selection:text-white">
+			<div className="bricolage-grotesque min-h-screen bg-slate-50/50 text-slate-900 selection:bg-violet-950 selection:text-white">
 				<RetroGrid />
 				<div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-32 pb-24 z-10">
-					{/* Hero: heading + search on the left, common tasks on the right */}
-					<div className="grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-10 lg:gap-16 items-start mb-20">
+					{/* Hero: big headline and search, with the docket beside it */}
+					<div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-12 lg:gap-20 items-start mb-24">
 						<div>
-							<h1
-								className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] text-slate-900 max-w-xl"
-								style={{ fontFamily: "P22Mackinac, serif" }}
-							>
+							<div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-100/90 border border-violet-200 text-violet-900 text-xs font-bold tracking-wide uppercase mb-6 shadow-xs">
+								<LifeBuoy className="w-3.5 h-3.5 text-violet-700" />
+								Help & Knowledge Base
+							</div>
+							<h1 className="font-mackinac text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.05] text-slate-950 max-w-2xl">
 								{HERO[heroKey].title}
 							</h1>
-							<p className="mt-5 text-lg text-slate-600 max-w-xl leading-relaxed">
+							<p className="bricolage-grotesque mt-5 text-lg sm:text-xl text-slate-700 max-w-xl leading-relaxed font-normal">
 								{HERO[heroKey].sub}
 							</p>
 
-							<div className="mt-8 max-w-xl">
+							<div className="relative mt-10 max-w-2xl">
 								<label htmlFor="help-search" className="sr-only">
 									Search help
 								</label>
-								<div className="relative">
-									<Search
-										aria-hidden="true"
-										className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"
-									/>
+								<div className="relative flex items-center border-b-2 border-slate-900 focus-within:border-violet-600 focus-within:shadow-[0_2px_0_0_#7c3aed] transition-all pb-1">
+									<Search className="w-6 h-6 text-slate-500 mr-3 shrink-0" />
 									<input
 										id="help-search"
 										ref={searchInputRef}
@@ -516,19 +501,19 @@ const HelpCenter = () => {
 										placeholder={PLACEHOLDER[heroKey]}
 										value={searchQuery}
 										onChange={(e) => setSearchQuery(e.target.value)}
-										className="w-full h-14 pl-12 pr-24 rounded-xl border border-slate-300 bg-white text-base text-slate-900 placeholder:text-slate-400 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-600/20 transition-colors"
+										className="bricolage-grotesque w-full bg-transparent py-2.5 pr-20 text-xl sm:text-2xl font-medium text-slate-950 placeholder:text-slate-400 outline-none"
 									/>
-									<div className="absolute right-3 top-1/2 -translate-y-1/2">
+									<div className="absolute right-0 bottom-3.5">
 										{searchQuery ? (
 											<button
 												type="button"
 												onClick={() => setSearchQuery("")}
-												className={`px-2 py-1 text-sm font-medium text-slate-500 hover:text-slate-900 rounded cursor-pointer ${focusRing}`}
+												className={`px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md cursor-pointer transition-colors ${focusRing}`}
 											>
 												Clear
 											</button>
 										) : (
-											<kbd className="hidden sm:inline-block px-2 py-0.5 text-xs font-mono text-slate-400 border border-slate-200 rounded">
+											<kbd className="hidden sm:inline-flex items-center justify-center px-2 py-0.5 text-xs font-mono font-semibold text-slate-600 bg-slate-100 border border-slate-300 rounded shadow-xs">
 												/
 											</kbd>
 										)}
@@ -536,25 +521,25 @@ const HelpCenter = () => {
 								</div>
 
 								<div
-									className="mt-4 min-h-[1.75rem] text-sm text-slate-500"
+									className="mt-4 min-h-[1.75rem] text-sm text-slate-600"
 									aria-live="polite"
 								>
 									{isSearching ? (
-										<p>
+										<p className="font-medium text-slate-800">
 											{resultCount === 0
 												? "No matching answers"
 												: `${resultCount} ${resultCount === 1 ? "answer" : "answers"}`}{" "}
-											for “{searchQuery.trim()}”
+											for “<span className="text-violet-700 font-semibold">{searchQuery.trim()}</span>”
 										</p>
 									) : (
-										<p className="flex flex-wrap items-center gap-x-4 gap-y-1">
-											<span>Popular:</span>
+										<p className="flex flex-wrap items-center gap-x-3 gap-y-2">
+											<span className="font-semibold text-xs uppercase tracking-wider text-slate-500">Popular:</span>
 											{POPULAR[heroKey].map((term) => (
 												<button
 													key={term}
 													type="button"
 													onClick={() => setSearchQuery(term)}
-													className={`text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-violet-700 hover:decoration-violet-600 cursor-pointer rounded ${focusRing}`}
+													className={`bricolage-grotesque px-2.5 py-1 text-xs font-semibold rounded-md bg-white border border-slate-200 text-slate-800 hover:border-violet-400 hover:text-violet-700 hover:bg-violet-50/50 shadow-2xs transition-all cursor-pointer ${focusRing}`}
 												>
 													{term}
 												</button>
@@ -565,16 +550,22 @@ const HelpCenter = () => {
 							</div>
 						</div>
 
+						{/* Docket: a typeset list with dotted leaders, like an index page */}
 						<section
 							aria-labelledby="common-tasks"
-							className="rounded-xl border border-slate-200 bg-white overflow-hidden"
+							className="bg-white border border-slate-200/90 shadow-xl shadow-slate-900/[0.04] border-t-4 border-t-violet-950 rounded-2xl overflow-hidden ring-1 ring-slate-900/5"
 						>
-							<h2
-								id="common-tasks"
-								className="mackinac px-4 pt-4 pb-2 text-lg font-bold text-slate-900"
-							>
-								Common tasks
-							</h2>
+							<div className="px-6 pt-5 pb-3 border-b border-slate-100 flex items-center justify-between">
+								<h2
+									id="common-tasks"
+									className="font-mackinac text-xl sm:text-2xl font-bold text-slate-950"
+								>
+									Common tasks
+								</h2>
+								<span className="bricolage-grotesque text-xs font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
+									Quick Actions
+								</span>
+							</div>
 							<ul className="divide-y divide-slate-100">
 								{quickLinks.map((link) => (
 									<li key={link.title}>
@@ -582,119 +573,199 @@ const HelpCenter = () => {
 									</li>
 								))}
 							</ul>
+							<div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 text-xs sm:text-sm font-semibold text-slate-700 flex items-center gap-2.5">
+								<span className="relative flex h-2.5 w-2.5">
+									{isSupportOnline && (
+										<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+									)}
+									<span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isSupportOnline ? "bg-emerald-500" : "bg-slate-400"}`}></span>
+								</span>
+								<span>
+									{isSupportOnline
+										? "Live support is online now"
+										: "Support desk is offline, back at 9 AM"}
+								</span>
+							</div>
 						</section>
 					</div>
 
-					{/* Answers */}
-					<div
-						className={
-							sections.length > 0
-								? "grid lg:grid-cols-[13rem_minmax(0,1fr)] gap-x-16 gap-y-8 mb-24"
-								: "mb-24"
-						}
-					>
-						{sections.length > 0 && (
-							<nav
-								aria-label="Help topics"
-								className="lg:self-start lg:sticky lg:top-28"
-							>
-								<p className="hidden lg:block text-sm font-semibold text-slate-900 mb-3">
-									Topics
-								</p>
-								<ul className="flex lg:flex-col gap-x-6 gap-y-0.5 overflow-x-auto lg:overflow-visible border-b border-slate-200 lg:border-b-0 pb-2 lg:pb-0">
+					{/* Answers: an index of every question, one answer read large beside it */}
+					{sections.length === 0 ? (
+						<div className="mb-24 max-w-xl border-l-4 border-violet-950 pl-6 bg-white p-6 rounded-r-2xl border border-slate-200 shadow-md">
+							<h2 className="font-mackinac text-3xl font-bold text-slate-950">
+								No answers for “{searchQuery.trim()}”
+							</h2>
+							<p className="bricolage-grotesque mt-3 text-slate-700 leading-relaxed">
+								Try a shorter word like “refund” or “KYC”. Or send us the
+								question and a person will reply.
+							</p>
+							<div className="mt-6 flex flex-wrap gap-3">
+								<button
+									type="button"
+									onClick={() => setSearchQuery("")}
+									className={`bricolage-grotesque px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer ${focusRing}`}
+								>
+									Clear search
+								</button>
+								<button
+									type="button"
+									onClick={() => handleOpenTicket("general")}
+									className={`bricolage-grotesque px-4 py-2.5 rounded-xl bg-violet-950 text-sm font-bold text-white hover:bg-violet-900 transition-colors cursor-pointer shadow-sm ${focusRing}`}
+								>
+									Open a ticket
+								</button>
+							</div>
+						</div>
+					) : (
+						<div className="grid lg:grid-cols-[minmax(0,25rem)_minmax(0,1fr)] gap-x-20 gap-y-10 mb-24">
+							<div className="min-w-0">
+								{showTabs && (
+									<div
+										role="tablist"
+										aria-label="Help for"
+										className="mb-8 flex flex-wrap items-center gap-3"
+									>
+										<span className="bricolage-grotesque text-xs font-bold uppercase tracking-wider text-slate-500 mr-2">
+											Audience:
+										</span>
+										<div className="inline-flex p-1 bg-slate-200/80 rounded-xl border border-slate-300/60 shadow-inner">
+											{TABS.map((tab) => {
+												const on = activeTab === tab.key;
+												return (
+													<button
+														key={tab.key}
+														type="button"
+														role="tab"
+														aria-selected={on}
+														onClick={() => setActiveTab(tab.key)}
+														className={`bricolage-grotesque text-sm sm:text-base font-bold px-5 py-2 rounded-lg cursor-pointer transition-all ${focusRing} ${
+															on
+																? "bg-slate-900 text-white shadow-sm"
+																: "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
+														}`}
+													>
+														{tab.label}
+													</button>
+												);
+											})}
+										</div>
+									</div>
+								)}
+
+								<div>
 									{sections.map((cat) => (
-										<li key={cat.id} className="shrink-0">
-											<a
-												href={`#${cat.id}`}
-												onClick={(e) => scrollToId(e, cat.id)}
-												className={`block py-1.5 text-sm text-slate-600 hover:text-violet-700 whitespace-nowrap lg:whitespace-normal rounded ${focusRing}`}
+										<section
+											key={cat.id}
+											id={cat.id}
+											aria-labelledby={`${cat.id}-title`}
+											className="border-t border-slate-200 pt-7 pb-9 first:border-t-0 first:pt-0"
+										>
+											{!roleKey && isSearching && (
+												<span className="bricolage-grotesque inline-block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+													{AUDIENCE_LABEL[cat.audience]}
+												</span>
+											)}
+											<h2
+												id={`${cat.id}-title`}
+												className="font-mackinac text-2xl font-bold text-slate-950 tracking-tight"
 											>
 												{cat.category}
-											</a>
-										</li>
-									))}
-									<li className="shrink-0 lg:mt-3 lg:pt-3 lg:border-t lg:border-slate-200">
-										<a
-											href="#contact"
-											onClick={(e) => scrollToId(e, "contact")}
-											className={`block py-1.5 text-sm font-medium text-slate-900 hover:text-violet-700 whitespace-nowrap rounded ${focusRing}`}
-										>
-											Contact support
-										</a>
-									</li>
-								</ul>
-							</nav>
-						)}
-
-						<div className="min-w-0">
-							{showTabs && (
-								<div
-									role="tablist"
-									aria-label="Help for"
-									className="flex gap-7 border-b border-slate-200 mb-10"
-								>
-									{TABS.map((tab) => {
-										const active = activeTab === tab.key;
-										return (
-											<button
-												key={tab.key}
-												type="button"
-												role="tab"
-												aria-selected={active}
-												onClick={() => setActiveTab(tab.key)}
-												className={`-mb-px pb-3 text-sm font-medium border-b-2 transition-colors cursor-pointer ${focusRing} ${
-													active
-														? "border-violet-600 text-slate-900"
-														: "border-transparent text-slate-500 hover:text-slate-800"
-												}`}
-											>
-												{tab.label}
-											</button>
-										);
-									})}
-								</div>
-							)}
-
-							{sections.length === 0 ? (
-								<div className="rounded-xl border border-dashed border-slate-300 p-8 sm:p-10">
-									<h2 className="mackinac text-2xl font-bold text-slate-900">
-										No answers for “{searchQuery.trim()}”
-									</h2>
-									<p className="mt-2 text-slate-600 max-w-md leading-relaxed">
-										Try a shorter word like “refund” or “KYC”. Or send us the
-										question and a person will reply.
-									</p>
-									<div className="mt-6 flex flex-wrap gap-3">
-										<button
-											type="button"
-											onClick={() => setSearchQuery("")}
-											className={`px-4 py-2.5 rounded-lg border border-slate-300 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer ${focusRing}`}
-										>
-											Clear search
-										</button>
-										<button
-											type="button"
-											onClick={() => handleOpenTicket("general")}
-											className={`px-4 py-2.5 rounded-lg bg-violet-600 text-sm font-semibold text-white hover:bg-violet-500 transition-colors cursor-pointer ${focusRing}`}
-										>
-											Open a ticket
-										</button>
-									</div>
-								</div>
-							) : (
-								<div className="space-y-14">
-									{sections.map((cat) => (
-										<FaqSection
-											key={cat.id}
-											category={cat}
-											terms={terms}
-											showAudience={!roleKey && isSearching}
-										/>
+											</h2>
+											<p className="bricolage-grotesque mt-1 mb-4 text-sm text-slate-600">
+												{cat.blurb}
+											</p>
+											<ul className="space-y-1 -mx-2">
+												{cat.questions.map((item) => {
+													const key = `${cat.id}:${item.q}`;
+													const on = active?.key === key;
+													const panelId = `${cat.id}-${cat.questions.indexOf(item)}-panel`;
+													return (
+														<li key={key}>
+															<button
+																type="button"
+																onClick={() => setSelectedKey(key)}
+																aria-expanded={on}
+																aria-controls={panelId}
+																className={`bricolage-grotesque w-full text-left rounded-xl px-3.5 py-3 text-[15px] sm:text-base leading-snug transition-all cursor-pointer flex items-center justify-between gap-3 ${focusRing} ${
+																	on
+																		? "bg-violet-950 text-white font-semibold shadow-md"
+																		: "text-slate-800 font-medium hover:bg-violet-50 hover:text-violet-950"
+																}`}
+															>
+																<span className="flex-1">
+																	<Highlight text={item.q} terms={terms} />
+																</span>
+																<ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${on ? "text-violet-300 rotate-90 lg:rotate-0" : "text-slate-400"}`} />
+															</button>
+															{/* On small screens the answer opens right under its question */}
+															<AnimatePresence initial={false}>
+																{on && (
+																	<motion.div
+																		id={panelId}
+																		role="region"
+																		aria-label={item.q}
+																		initial={{ height: 0, opacity: 0 }}
+																		animate={{ height: "auto", opacity: 1 }}
+																		exit={{ height: 0, opacity: 0 }}
+																		transition={{ duration: 0.2 }}
+																		className="overflow-hidden lg:hidden"
+																	>
+																		<div className="px-3.5 pt-3 pb-5">
+																			<p className="bricolage-grotesque text-slate-700 text-base leading-relaxed">
+																				<Highlight
+																					text={item.a}
+																					terms={terms}
+																				/>
+																			</p>
+																			<AnswerActions
+																				action={ACTIONS[cat.id]}
+																				onKyc={handleKycClick}
+																				onTicket={handleOpenTicket}
+																			/>
+																		</div>
+																	</motion.div>
+																)}
+															</AnimatePresence>
+														</li>
+													);
+												})}
+											</ul>
+										</section>
 									))}
 								</div>
-							)}
+							</div>
+
+							{/* Reading pane (desktop) */}
+							<div className="hidden lg:block lg:sticky lg:top-28 lg:self-start bg-white border border-slate-200/90 rounded-2xl p-8 shadow-xl shadow-slate-900/[0.04] ring-1 ring-slate-900/5 min-h-[22rem]">
+								<AnimatePresence mode="wait" initial={false}>
+									{active && (
+										<motion.div
+											key={active.key}
+											initial={{ opacity: 0, y: 8 }}
+											animate={{ opacity: 1, y: 0 }}
+											exit={{ opacity: 0 }}
+											transition={{ duration: 0.18 }}
+										>
+											<span className="bricolage-grotesque inline-block text-xs font-bold uppercase tracking-wider text-violet-800 bg-violet-50 px-3 py-1 rounded-full border border-violet-200/70 mb-4">
+												{active.cat.category}
+											</span>
+											<h2 className="font-mackinac mt-2 max-w-xl text-3xl xl:text-4xl font-extrabold tracking-tight leading-[1.18] text-slate-950">
+												<Highlight text={active.item.q} terms={terms} />
+											</h2>
+											<p className="bricolage-grotesque mt-6 max-w-[60ch] text-lg leading-[1.8] text-slate-700 font-normal">
+												<Highlight text={active.item.a} terms={terms} />
+											</p>
+											<AnswerActions
+												action={ACTIONS[active.cat.id]}
+												onKyc={handleKycClick}
+												onTicket={handleOpenTicket}
+											/>
+										</motion.div>
+									)}
+								</AnimatePresence>
+							</div>
 						</div>
-					</div>
+					)}
 
 					<div id="contact" className="scroll-mt-28">
 						<SupportBanner
@@ -726,33 +797,31 @@ const HelpCenter = () => {
 /* ------------------------------------------------------------------ */
 
 const TaskRow = ({ link }) => {
-	const className = `group flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 cursor-pointer ${rowFocusRing}`;
+	const className = `group block w-full px-6 py-3.5 text-left transition-colors hover:bg-violet-50/70 cursor-pointer ${rowFocusRing}`;
 
 	const content = (
 		<>
-			<span className="text-slate-500 group-hover:text-violet-700 transition-colors">
-				{link.icon}
-			</span>
-			<span className="flex-1 min-w-0">
-				<span className="block font-medium text-slate-900">{link.title}</span>
-				<span className="block text-sm text-slate-500">{link.sub}</span>
-			</span>
-			{link.status && (
-				<span
-					className={`text-xs font-semibold ${STATUS_TONE[link.status.tone]}`}
-				>
-					{link.status.label}
+			<span className="flex items-baseline gap-3">
+				<span className="bricolage-grotesque font-semibold text-slate-900 group-hover:text-violet-700 transition-colors text-[15px]">
+					{link.title}
 				</span>
-			)}
-			{link.shortcut && (
-				<kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[11px] font-mono text-slate-400 border border-slate-200 rounded">
-					{link.shortcut}
-				</kbd>
-			)}
-			<ChevronRight
-				aria-hidden="true"
-				className="w-4 h-4 shrink-0 text-slate-300 group-hover:text-slate-500 transition-colors"
-			/>
+				<span
+					aria-hidden="true"
+					className="flex-1 border-b border-dotted border-slate-300 group-hover:border-violet-300 transition-colors"
+				/>
+				{link.status ? (
+					<span
+						className={`bricolage-grotesque text-xs font-bold px-2.5 py-0.5 rounded-full ${STATUS_BADGE[link.status.tone] || "text-slate-700"}`}
+					>
+						{link.status.label}
+					</span>
+				) : link.shortcut ? (
+					<kbd className="bricolage-grotesque hidden sm:inline-block px-1.5 py-0.5 text-[11px] font-mono font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded">
+						{link.shortcut}
+					</kbd>
+				) : null}
+			</span>
+			<span className="bricolage-grotesque block mt-0.5 text-xs sm:text-sm text-slate-600 group-hover:text-slate-800">{link.sub}</span>
 		</>
 	);
 
@@ -770,95 +839,37 @@ const TaskRow = ({ link }) => {
 	);
 };
 
-const FaqSection = ({ category, terms, showAudience }) => (
-	<section
-		id={category.id}
-		aria-labelledby={`${category.id}-title`}
-		className="scroll-mt-28"
-	>
-		{showAudience && (
-			<p className="text-sm text-slate-500 mb-1">
-				{AUDIENCE_LABEL[category.audience]}
-			</p>
-		)}
-		<h2
-			id={`${category.id}-title`}
-			className="mackinac text-2xl sm:text-3xl font-bold tracking-tight text-slate-900"
-		>
-			{category.category}
-		</h2>
-		<p className="mt-1.5 mb-5 text-slate-600">{category.blurb}</p>
-
-		<div className="border-y border-slate-200 divide-y divide-slate-200">
-			{category.questions.map((item, i) => (
-				<AccordionItem
-					key={item.q}
-					id={`${category.id}-${i}`}
-					question={item.q}
-					answer={item.a}
-					terms={terms}
-					expandAll={terms.length > 0}
-				/>
-			))}
-		</div>
-	</section>
-);
-
-const AccordionItem = ({ id, question, answer, terms, expandAll }) => {
-	const [isOpen, setIsOpen] = useState(false);
-
-	// While searching, open every result so matches inside answers are visible
-	useEffect(() => {
-		setIsOpen(expandAll);
-	}, [expandAll]);
-
-	const panelId = `${id}-panel`;
+const AnswerActions = ({ action, onKyc, onTicket }) => {
+	const btn = `bricolage-grotesque inline-flex items-center rounded-xl bg-violet-950 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-violet-900 shadow-sm hover:shadow active:scale-[0.98] cursor-pointer ${focusRing}`;
 
 	return (
-		<div>
-			<h3>
+		<div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 pt-4 border-t border-slate-100">
+			{action?.to && (
+				<Link to={action.to} className={btn}>
+					{action.label}
+				</Link>
+			)}
+			{action?.kyc && (
+				<button type="button" onClick={onKyc} className={btn}>
+					{action.label}
+				</button>
+			)}
+			{action?.ticket && (
 				<button
 					type="button"
-					onClick={() => setIsOpen((o) => !o)}
-					aria-expanded={isOpen}
-					aria-controls={panelId}
-					className={`group w-full flex items-start justify-between gap-6 py-5 text-left cursor-pointer ${focusRing}`}
+					onClick={() => onTicket(action.ticket)}
+					className={btn}
 				>
-					<span
-						className={`mackinac text-lg font-semibold leading-snug transition-colors ${
-							isOpen
-								? "text-violet-700"
-								: "text-slate-900 group-hover:text-violet-700"
-						}`}
-					>
-						<Highlight text={question} terms={terms} />
-					</span>
-					<ChevronDown
-						aria-hidden="true"
-						className={`w-5 h-5 mt-1 shrink-0 transition-transform duration-200 ${
-							isOpen ? "rotate-180 text-violet-600" : "text-slate-400"
-						}`}
-					/>
+					{action.label}
 				</button>
-			</h3>
-			<AnimatePresence initial={false}>
-				{isOpen && (
-					<motion.div
-						id={panelId}
-						role="region"
-						aria-label={question}
-						initial={{ height: 0, opacity: 0 }}
-						animate={{ height: "auto", opacity: 1 }}
-						exit={{ height: 0, opacity: 0 }}
-						transition={{ duration: 0.2 }}
-						className="overflow-hidden"
-					>
-						<p className="pb-6 pr-10 max-w-[65ch] text-slate-600 leading-relaxed">
-							<Highlight text={answer} terms={terms} />
-						</p>
-					</motion.div>
-				)}
-			</AnimatePresence>
+			)}
+			<button
+				type="button"
+				onClick={() => onTicket("general")}
+				className={`bricolage-grotesque text-sm font-semibold text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-violet-700 hover:decoration-violet-600 cursor-pointer rounded ${focusRing}`}
+			>
+				Not what you needed? Open a ticket
+			</button>
 		</div>
 	);
 };

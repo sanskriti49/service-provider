@@ -1,4 +1,4 @@
-import { useLocation, useParams, useNavigate } from "react-router-dom";
+import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -13,9 +13,12 @@ import {
 	ShieldCheck,
 	Star,
 	Wallet,
+	Home,
+	Briefcase,
 } from "lucide-react";
 import Alerts from "../../ui/Alerts";
 import Logo from "../../ui/Logo";
+import BookingHeader from "./BookingHeader";
 import { toast } from "sonner";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
@@ -466,10 +469,40 @@ export default function BookingPage() {
 	const [alert, setAlert] = useState(null);
 	const [paymentMethod, setPaymentMethod] = useState("cash");
 	const [nudge, setNudge] = useState(null); // "when" | "address"
+	const [savedAddresses, setSavedAddresses] = useState([]);
+
+	useEffect(() => {
+		const loadSavedAddresses = async () => {
+			try {
+				const res = await api.get("/api/account/addresses");
+				const list = res.data?.addresses || [];
+				setSavedAddresses(list);
+
+				// Auto-populate default address if not provided in navigation state
+				if (!state?.address && list.length > 0) {
+					const defaultAddr = list.find((a) => a.is_default) || list[0];
+					if (defaultAddr) {
+						setAddress(defaultAddr.full_address);
+						setTempAddress(defaultAddr.full_address);
+						if (defaultAddr.lat && defaultAddr.lng) {
+							setCoords({ lat: defaultAddr.lat, lng: defaultAddr.lng });
+						}
+					}
+				}
+			} catch (err) {
+				console.warn(
+					"Could not load saved addresses on booking page:",
+					err.message,
+				);
+			}
+		};
+		loadSavedAddresses();
+	}, [state?.address]);
 
 	const whenRef = useRef(null);
 	const addressRef = useRef(null);
 	const stripRef = useRef(null);
+	const payRef = useRef(null);
 
 	const refreshAvailability = async (prov = provider) => {
 		try {
@@ -539,13 +572,11 @@ export default function BookingPage() {
 	}, [days, selectedDate]);
 
 	useEffect(() => {
-		stripRef.current
-			?.querySelector('[aria-pressed="true"]')
-			?.scrollIntoView({
-				inline: "center",
-				block: "nearest",
-				behavior: "smooth",
-			});
+		stripRef.current?.querySelector('[aria-pressed="true"]')?.scrollIntoView({
+			inline: "center",
+			block: "nearest",
+			behavior: "smooth",
+		});
 	}, [selectedDate]);
 
 	const periodGroups = useMemo(
@@ -663,20 +694,26 @@ export default function BookingPage() {
 			await refreshAvailability();
 		};
 
-		const rzp = new window.Razorpay({
-			key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-			amount: (booking.price || provider.price) * 100,
+		const rzpKey =
+			import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_SAa72yHcAfg93t";
+		const rzpAmount = Math.round(
+			Number(booking.price || provider.price || 499) * 100,
+		);
+
+		const rzpOptions = {
+			key: rzpKey,
+			amount: rzpAmount,
 			currency: "INR",
 			name: "TaskGenie",
-			description: `Booking for ${booking.service_name || serviceName}`,
-			order_id: orderId,
+			description: `Booking for ${booking.service_name || serviceName || "Home Service"}`,
 			handler: async (response) => {
 				isPaymentHandled = true;
 				try {
-					const verifyRes = await api.post(
-						"/api/bookings/verify-payment",
-						response,
-					);
+					const verifyRes = await api.post("/api/bookings/verify-payment", {
+						...response,
+						razorpay_order_id: response.razorpay_order_id || orderId,
+						booking_id: booking?.booking_id,
+					});
 					if (verifyRes.data?.booking) {
 						navigate("/booking-success", {
 							state: {
@@ -702,23 +739,35 @@ export default function BookingPage() {
 				},
 			},
 			prefill: {
-				name: user?.name || "",
-				email: user?.email || "",
-				contact: user?.phone || "",
+				name: user?.name || "Customer",
+				email: user?.email || "customer@taskgenie.com",
+				contact: user?.phone || "+919876543210",
 			},
 			theme: { color: "#6d28d9" },
-		});
-		rzp.on("payment.failed", async (response) => {
-			await cleanupUnpaidBooking();
+		};
+
+		if (orderId && !orderId.startsWith("test_order_")) {
+			rzpOptions.order_id = orderId;
+		}
+
+		const rzp = new window.Razorpay(rzpOptions);
+		rzp.on("payment.failed", (response) => {
+			// Do NOT delete the booking here! Razorpay leaves the modal open for retries via UPI or Netbanking.
 			setIsSubmitting(false);
-			toast.error(
-				`Payment failed: ${response.error?.description || "Transaction declined"}. The slot was released.`,
-			);
+			const desc = response.error?.description || "Transaction declined";
+			if (desc.toLowerCase().includes("international")) {
+				toast.error(
+					"International card rejected by Razorpay. Please retry using UPI (QR Code / GPay) or Netbanking.",
+					{ duration: 7000 },
+				);
+			} else {
+				toast.error(`Payment failed: ${desc}. You can retry with UPI or Netbanking in the modal.`);
+			}
 		});
 		rzp.open();
 	};
 
-	async function handleConfirm() {
+	async function handleConfirm(opts = {}) {
 		if (!hasSchedule) return flashNudge("when", whenRef);
 		if (!hasAddress) return flashNudge("address", addressRef);
 
@@ -732,6 +781,7 @@ export default function BookingPage() {
 			const res = await api.post("/api/bookings", {
 				provider_id: provider.user_id || provider.id || provider.custom_id,
 				service_id: provider.service_id,
+				price: provider.price,
 				date: selectedDate,
 				start_time: selectedTime.start_time || selectedTime.start,
 				end_time: selectedTime.end_time || selectedTime.end,
@@ -741,6 +791,24 @@ export default function BookingPage() {
 				longitude: coords.lng,
 			});
 			const data = res.data;
+
+			if (opts?.mockPay && isOnline && data.razorpay_order) {
+				const verifyRes = await api.post("/api/bookings/verify-payment", {
+					razorpay_order_id: data.razorpay_order,
+					razorpay_payment_id: `pay_test_${Date.now()}`,
+					razorpay_signature: "mock_test_signature",
+				});
+				toast.success("Test payment authorized successfully!");
+				navigate("/booking-success", {
+					state: {
+						success: true,
+						booking: verifyRes.data?.booking || data.booking,
+						address,
+					},
+					replace: true,
+				});
+				return;
+			}
 
 			if (isOnline && data.razorpay_order) {
 				handleRazorpayPayment(data.booking, data.razorpay_order);
@@ -768,6 +836,14 @@ export default function BookingPage() {
 
 	const confirmLabel = isOnline ? "Book and pay" : "Confirm booking";
 
+	const goBack = () =>
+		window.history.state?.idx > 0 ? navigate(-1) : navigate("/");
+	const steps = [
+		{ key: "when", label: "Time", done: hasSchedule, ref: whenRef },
+		{ key: "where", label: "Address", done: hasAddress, ref: addressRef },
+		{ key: "pay", label: "Payment", done: false, ref: payRef },
+	];
+
 	return (
 		<div className="min-h-screen bg-[#0d0b12] text-stone-200 bricolage-grotesque antialiased selection:bg-violet-400/30 pb-32 lg:pb-16">
 			<div
@@ -783,23 +859,7 @@ export default function BookingPage() {
 				/>
 			)}
 
-			<header className="sticky top-0 z-40 bg-[#0d0b12]/90 backdrop-blur-md border-b border-white/[0.06]">
-				<div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-3">
-					<button
-						type="button"
-						onClick={() => navigate(-1)}
-						aria-label="Go back"
-						className="p-2 -ml-2 rounded-md text-stone-300 hover:text-white hover:bg-white/[0.06] transition-colors"
-					>
-						<ArrowLeft size={19} />
-					</button>
-					<p className="flex-1 min-w-0 text-sm text-stone-400 truncate">
-						Booking{" "}
-						<span className="text-white font-medium">{serviceName}</span>
-					</p>
-					<Logo to="/" size="md" theme="dark" />
-				</div>
-			</header>
+			<BookingHeader steps={steps} onBack={goBack} />
 
 			<main className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
 				<div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
@@ -939,6 +999,70 @@ export default function BookingPage() {
 								nudgeText="Add the address where the work happens."
 								innerRef={addressRef}
 							>
+								{/* 1-Click Saved Address Picker */}
+								{savedAddresses.length > 0 && (
+									<div className="mb-3 space-y-2">
+										<div className="flex items-center justify-between text-xs text-stone-400">
+											<span className="font-medium text-stone-300">
+												Choose from saved addresses:
+											</span>
+											<Link
+												to="/account/profile?open=addresses"
+												target="_blank"
+												rel="noopener noreferrer"
+												className="text-[11px] text-violet-300 hover:text-white transition-colors underline decoration-dotted"
+											>
+												Manage addresses ↗
+											</Link>
+										</div>
+										<div className="flex flex-wrap gap-2">
+											{savedAddresses.map((addr) => {
+												const isSelected =
+													address.trim() === addr.full_address.trim();
+												const Icon =
+													addr.label === "Work"
+														? Briefcase
+														: addr.label === "Home"
+															? Home
+															: MapPin;
+												return (
+													<button
+														key={addr.id}
+														type="button"
+														onClick={() => {
+															setAddress(addr.full_address);
+															setTempAddress(addr.full_address);
+															if (addr.lat && addr.lng) {
+																setCoords({ lat: addr.lat, lng: addr.lng });
+															}
+															setIsEditingAddress(false);
+															toast.success(`Selected "${addr.label}" address`);
+														}}
+														className={`h-8 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all ${
+															isSelected
+																? "border-amber-400/60 bg-amber-400/15 text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.15)] ring-1 ring-amber-400/30"
+																: "border-white/[0.08] bg-white/[0.03] text-stone-300 hover:bg-white/[0.06] hover:text-white hover:border-white/[0.15]"
+														}`}
+													>
+														<Icon
+															size={13}
+															className={
+																isSelected ? "text-amber-300" : "text-stone-400"
+															}
+														/>
+														<span>{addr.label || "Address"}</span>
+														{addr.is_default && (
+															<span className="text-[10px] text-amber-300/80 font-mono">
+																(Default)
+															</span>
+														)}
+													</button>
+												);
+											})}
+										</div>
+									</div>
+								)}
+
 								{isEditingAddress ? (
 									<div className="rounded-xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
 										<div className="flex items-center justify-between gap-3">
@@ -1044,6 +1168,83 @@ export default function BookingPage() {
 										subtitle="Cash to the provider once it's done"
 									/>
 								</div>
+
+								{paymentMethod === "online" && (
+									<div className="mt-3.5 p-3.5 rounded-xl bg-violet-950/40 border border-violet-500/20 text-xs space-y-2.5">
+										<div className="flex items-center justify-between">
+											<span className="font-semibold text-violet-300 flex items-center gap-1.5">
+												<span>🧪</span> Razorpay Test Credentials (India Domestic)
+											</span>
+											<span className="text-[10px] text-amber-300 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full font-medium">
+												Sandbox Mode
+											</span>
+										</div>
+										<p className="text-stone-300 text-[11px] leading-relaxed">
+											Razorpay sandbox blocks foreign test cards (e.g. 4111 11...). Use these <strong>pre-approved Indian domestic cards</strong> or <strong>UPI</strong>:
+										</p>
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+											<button
+												type="button"
+												onClick={() => {
+													navigator.clipboard.writeText("5104015555555558");
+													toast.success("Copied Mastercard: 5104 0155 5555 5558");
+												}}
+												className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-white/10 hover:border-violet-400/50 text-left transition-all cursor-pointer group"
+											>
+												<div>
+													<span className="block font-medium text-stone-200 group-hover:text-violet-300 text-[11px]">
+														Mastercard (Domestic)
+													</span>
+													<span className="font-mono text-[11px] text-stone-400">
+														5104 0155 5555 5558
+													</span>
+												</div>
+												<span className="text-[10px] text-violet-400 group-hover:underline">
+													Copy
+												</span>
+											</button>
+											<button
+												type="button"
+												onClick={() => {
+													navigator.clipboard.writeText("6527658900001005");
+													toast.success("Copied RuPay: 6527 6589 0000 1005");
+												}}
+												className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-white/10 hover:border-violet-400/50 text-left transition-all cursor-pointer group"
+											>
+												<div>
+													<span className="block font-medium text-stone-200 group-hover:text-violet-300 text-[11px]">
+														RuPay (Domestic)
+													</span>
+													<span className="font-mono text-[11px] text-stone-400">
+														6527 6589 0000 1005
+													</span>
+												</div>
+												<span className="text-[10px] text-violet-400 group-hover:underline">
+													Copy
+												</span>
+											</button>
+										</div>
+										<div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-stone-400 border-t border-white/5">
+											<span>
+												<strong>UPI:</strong>{" "}
+												<button
+													type="button"
+													onClick={() => {
+														navigator.clipboard.writeText("success@razorpay");
+														toast.success("Copied UPI ID: success@razorpay");
+													}}
+													className="text-violet-300 underline underline-offset-2 hover:text-violet-200 cursor-pointer"
+												>
+													success@razorpay
+												</button>{" "}
+												or scan the QR
+											</span>
+											<span>
+												<strong>CVV:</strong> 123 &bull; <strong>Expiry:</strong> 12/28 &bull; <strong>OTP:</strong> 123456
+											</span>
+										</div>
+									</div>
+								)}
 							</Step>
 						</ol>
 					</div>
@@ -1084,7 +1285,7 @@ export default function BookingPage() {
 								<TicketRow
 									icon={isOnline ? CreditCard : Wallet}
 									label="Payment"
-									value={isOnline ? "Pay now" : "Pay after service"}
+									value={isOnline ? "Online" : "Cash"}
 									placeholder=""
 								/>
 
@@ -1110,6 +1311,17 @@ export default function BookingPage() {
 								>
 									{isSubmitting ? <Spinner /> : confirmLabel}
 								</button>
+
+								{isOnline && (
+									<button
+										type="button"
+										onClick={() => handleConfirm({ mockPay: true })}
+										disabled={isSubmitting}
+										className="w-full mt-2.5 py-2.5 px-3 rounded-xl border border-dashed border-violet-400/40 text-xs font-semibold text-violet-300 hover:bg-violet-950/40 hover:border-violet-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+									>
+										<span>⚡</span> Instant Test Pay (Bypass Modal)
+									</button>
+								)}
 							</div>
 						</div>
 					</aside>
@@ -1131,22 +1343,34 @@ export default function BookingPage() {
 									: "Pay after service"}
 						</p>
 					</div>
-					<button
-						type="button"
-						onClick={handleConfirm}
-						disabled={isSubmitting}
-						className={`flex-1 h-12 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-70 ${primaryBtn}`}
-					>
-						{isSubmitting ? (
-							<Spinner className="w-4 h-4" />
-						) : !hasSchedule ? (
-							"Choose a time"
-						) : !hasAddress ? (
-							"Add address"
-						) : (
-							confirmLabel
+					<div className="flex-1 flex flex-col gap-1.5">
+						<button
+							type="button"
+							onClick={handleConfirm}
+							disabled={isSubmitting}
+							className={`w-full h-11 rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-70 ${primaryBtn}`}
+						>
+							{isSubmitting ? (
+								<Spinner className="w-4 h-4" />
+							) : !hasSchedule ? (
+								"Choose a time"
+							) : !hasAddress ? (
+								"Add address"
+							) : (
+								confirmLabel
+							)}
+						</button>
+						{isOnline && hasSchedule && hasAddress && (
+							<button
+								type="button"
+								onClick={() => handleConfirm({ mockPay: true })}
+								disabled={isSubmitting}
+								className="text-[11px] font-semibold text-violet-300 hover:underline flex items-center justify-center gap-1 cursor-pointer"
+							>
+								<span>⚡</span> Instant Test Pay
+							</button>
 						)}
-					</button>
+					</div>
 				</div>
 			</div>
 		</div>

@@ -58,7 +58,7 @@ const SupportBanner = ({ isSupportOnline, userRole, onOpenTicket }) => {
 	return (
 		<section
 			aria-labelledby="support-heading"
-			className="mackinac bg-slate-900 text-white rounded-3xl overflow-hidden shadow-xl shadow-slate-900/10 grid lg:grid-cols-[1.35fr_1fr]"
+			className="bricolage-grotesque bg-slate-900 text-white rounded-3xl overflow-hidden shadow-xl shadow-slate-900/10 grid lg:grid-cols-[1.35fr_1fr]"
 		>
 			{/* Left: message, topics, actions */}
 			<div className="p-8 md:p-12">
@@ -76,7 +76,7 @@ const SupportBanner = ({ isSupportOnline, userRole, onOpenTicket }) => {
 
 				<h3
 					id="support-heading"
-					className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4"
+					className="font-mackinac text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4"
 				>
 					Didn't find your answer?
 					<br className="hidden sm:block" /> Talk to a person.

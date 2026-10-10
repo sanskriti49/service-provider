@@ -1,6 +1,21 @@
 version: "3.8"
 
 services:
+  # TaskGenie React / Vite SPA Client
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: taskgenie_client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "5173:80"
+    depends_on:
+      - api
+    networks:
+      - taskgenie_network
+
   # TaskGenie Express REST API
   api:
     build:

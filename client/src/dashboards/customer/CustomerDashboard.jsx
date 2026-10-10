@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import ChatButton from "../../chat/ChatButton";
 import {
 	NavLink,
 	Outlet,
@@ -1086,6 +1087,7 @@ function CustomerOverview({ user, bookings, totalSpent, notifications }) {
 							</div>
 							{otp && <OtpTicket code={otp} />}
 						</div>
+						<div className="relative mt-4"><ChatButton booking={nextBooking} /></div>
 
 						<div className="relative mt-7 pt-6 border-t border-white/[0.07]">
 							<ProgressTracker status={nextBooking.status} />

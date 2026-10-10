@@ -20,6 +20,7 @@ import {
 import { FadeLoader } from "react-spinners";
 import CompletionOtpModal from "./CompletionOtpModal";
 import useModal from "../../hooks/useModal";
+import ChatButton from "../../chat/ChatButton";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -161,6 +162,7 @@ export default function BookingDetailsSheet({
 
 					{/* Detail Rows */}
 					<div className="space-y-4">
+						<ChatButton booking={booking} onOpen={onClose} className="w-full" />
 						<div className="flex items-start gap-3.5 p-3 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
 							<div className="p-2 rounded-xl bg-violet-500/10 text-violet-300 border border-violet-500/20 shrink-0">
 								<Calendar size={16} />

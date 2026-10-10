@@ -22,6 +22,7 @@ import {
 import BookingDetailsSheet from "./BookingDetailsSheet";
 import ConfirmModal from "../../ui/ConfirmModal";
 import api from "../../api/axiosInstance";
+import ChatButton from "../../chat/ChatButton";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants & helpers                                                       */
@@ -383,8 +384,9 @@ function BookingRow({ item, busy, onOpen, onCancel, onRebook }) {
 				</div>
 			</button>
 
-			{(canCancel || canRebook || canRate) && (
-				<div className="flex items-center gap-2 px-4 pb-4 sm:p-0 sm:pr-5 shrink-0">
+			{item.booking_id && (
+				<div className="flex flex-wrap items-center gap-2 px-4 pb-4 sm:p-0 sm:pr-5 shrink-0">
+					<ChatButton booking={item} />
 					{canRate && (
 						<RowButton tone="violet" icon={Star} onClick={() => onOpen(item)}>
 							Rate

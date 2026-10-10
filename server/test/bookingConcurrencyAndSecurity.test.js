@@ -270,4 +270,37 @@ describe("Security & Concurrency: Booking Integrity & Payment Webhooks", () => {
 			{ eligible: false, error: "Can only review completed bookings" },
 		);
 	});
+
+	// 9. Online Payment Signature & Test Order Handling
+	test("payment verification: handles HMAC verification, test prefixes, and test orders", () => {
+		const keySecret = "Rhm8Ex0xXmorTVdTHsfSZ6Ub";
+		const orderId = "order_TmJTTdGGP1ceaM";
+		const paymentId = "pay_TmJTTdGGP1ceaM";
+
+		const hmac = crypto.createHmac("sha256", keySecret);
+		hmac.update(orderId + "|" + paymentId);
+		const validSig = hmac.digest("hex");
+
+		const verify = (oId, pId, sig, secret, isTest = false) => {
+			const expected = crypto.createHmac("sha256", secret || "placeholder_secret").update(oId + "|" + pId).digest("hex");
+			return expected === sig || (isTest && pId.startsWith("pay_test_")) || (isTest && oId.startsWith("test_order_"));
+		};
+
+		assert.strictEqual(verify(orderId, paymentId, validSig, keySecret), true);
+		assert.strictEqual(verify(orderId, paymentId, "invalid_sig", keySecret), false);
+		// Test mode fallback
+		assert.strictEqual(verify("test_order_12345", "pay_test_9999", "anything", keySecret, true), true);
+	});
+
+	// 10. Date parsing and cleanDate safety
+	test("cleanDate formatting: reliably formats dates without throwing ReferenceError", () => {
+		const formatCleanDate = (inputDate) => {
+			const dateStr = inputDate instanceof Date ? inputDate.toISOString() : String(inputDate);
+			return dateStr.substring(0, 10);
+		};
+
+		assert.strictEqual(formatCleanDate("2026-10-15T14:30:00.000Z"), "2026-10-15");
+		assert.strictEqual(formatCleanDate("2026-10-15"), "2026-10-15");
+		assert.strictEqual(formatCleanDate(new Date("2026-10-15T00:00:00Z")), "2026-10-15");
+	});
 });

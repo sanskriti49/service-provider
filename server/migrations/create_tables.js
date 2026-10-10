@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { chatSchema } = require("./migrate_chat");
 
 const queries = [
 	`CREATE TABLE IF NOT EXISTS public.users (
@@ -187,6 +188,7 @@ const queries = [
   )`,
 	`CREATE INDEX IF NOT EXISTS ix_notifications_user_unread ON public.notifications(user_id, is_read, created_at DESC)`,
 
+	chatSchema,
 	// Admin & Ops Schema Updates
 	`ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check`,
 	`ALTER TABLE public.users ADD CONSTRAINT users_role_check CHECK (role = ANY (ARRAY['customer'::text, 'provider'::text, 'admin'::text]))`,

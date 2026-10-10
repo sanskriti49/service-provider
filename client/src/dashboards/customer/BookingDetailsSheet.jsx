@@ -20,6 +20,7 @@ import {
 import ReviewModal from "../../ui/ReviewModal";
 import api from "../../api/axiosInstance";
 import useModal from "../../hooks/useModal";
+import ChatButton from "../../chat/ChatButton";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -208,6 +209,7 @@ export default function BookingDetailsSheet({
 						</div>
 					)}
 
+					<ChatButton booking={booking} onOpen={onClose} className="w-full" />
 					<div className="space-y-5">
 						{[
 							{

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import ChatButton from "../../chat/ChatButton";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -529,6 +530,7 @@ export default function ProviderBookings() {
 															#{item.booking_id?.slice(0, 6).toUpperCase()}
 														</span>
 													</div>
+													<ChatButton booking={item} className="mt-2 sm:hidden" />
 												</div>
 											</td>
 
@@ -572,6 +574,7 @@ export default function ProviderBookings() {
 											{/* Actions */}
 											<td className="py-4 px-6 text-right">
 												<div className="flex items-center justify-end gap-2">
+													<ChatButton booking={item} className="hidden sm:inline-flex" />
 													{item.status === "pending" && (
 														<button
 															onClick={() =>

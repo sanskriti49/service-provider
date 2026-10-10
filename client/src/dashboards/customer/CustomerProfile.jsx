@@ -34,6 +34,7 @@ import Logo from "../../ui/Logo";
 import SavedAddressesModal from "./SavedAddressesModal";
 import SavedPaymentsModal from "./SavedPaymentsModal";
 import FeedbackModal from "./FeedbackModal";
+import ReferralModal from "./ReferralModal";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -493,10 +494,11 @@ export default function CustomerProfile() {
 	const [loading, setLoading] = useState(true);
 	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-	// Modals for Saved Addresses, Payment Accounts, and Feedback
+	// Modals for Saved Addresses, Payment Accounts, Feedback, and Referral
 	const [showAddressModal, setShowAddressModal] = useState(false);
 	const [showPaymentModal, setShowPaymentModal] = useState(false);
 	const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+	const [showReferralModal, setShowReferralModal] = useState(false);
 	const [addressCount, setAddressCount] = useState(0);
 	const [paymentCount, setPaymentCount] = useState(0);
 
@@ -512,6 +514,8 @@ export default function CustomerProfile() {
 			setShowPaymentModal(true);
 		} else if (openParam === "feedback") {
 			setShowFeedbackModal(true);
+		} else if (openParam === "referral" || openParam === "refer") {
+			setShowReferralModal(true);
 		}
 	}, []);
 
@@ -738,9 +742,9 @@ export default function CustomerProfile() {
 									<MenuRow
 										icon={Share2}
 										title="Refer friends"
-										desc="Share TaskGenie, earn rewards"
+										desc="Give ₹150, get ₹150 rewards"
 										tone="violet"
-										soon
+										onClick={() => setShowReferralModal(true)}
 									/>
 									<MenuRow
 										icon={MessageSquare}
@@ -797,6 +801,12 @@ export default function CustomerProfile() {
 				<FeedbackModal
 					isOpen={showFeedbackModal}
 					onClose={() => setShowFeedbackModal(false)}
+				/>
+
+				<ReferralModal
+					isOpen={showReferralModal}
+					onClose={() => setShowReferralModal(false)}
+					user={user}
 				/>
 			</div>
 		</MotionConfig>

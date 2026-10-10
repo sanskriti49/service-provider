@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import ChatButton from "../../chat/ChatButton";
 import {
 	NavLink,
 	Outlet,
@@ -912,11 +913,11 @@ function ProviderOverview({ user, stats, recentBookings, onOpenKyc }) {
 							const dateObj = b.date ? new Date(b.date) : null;
 							const validDate = dateObj && !isNaN(dateObj);
 							return (
-								<li key={b.booking_id || i}>
+								<li key={b.booking_id || i} className="flex flex-wrap sm:flex-nowrap items-center">
 									<button
 										type="button"
 										onClick={() => navigate("/provider/dashboard/bookings")}
-										className="w-full flex items-center gap-4 px-4 sm:px-5 py-4 text-left hover:bg-white/[0.03] transition-colors group"
+										className="w-full min-w-0 flex-1 flex items-center gap-4 px-4 sm:px-5 py-4 text-left hover:bg-white/[0.03] transition-colors group"
 									>
 										{/* Date tile: color reflects status */}
 										<div
@@ -975,6 +976,7 @@ function ProviderOverview({ user, stats, recentBookings, onOpenKyc }) {
 											/>
 										</div>
 									</button>
+									<ChatButton booking={b} className="mr-4" />
 								</li>
 							);
 						})}

@@ -44,6 +44,12 @@ export function getSocket() {
 			console.log("⚡ Real-time WebSocket disconnected");
 		});
 	}
+	// A renewed token must never reuse another session's authenticated socket.
+	if (socketInstance.auth.token !== token) {
+		socketInstance.disconnect();
+		socketInstance.auth = { token };
+		socketInstance.connect();
+	}
 
 	return socketInstance;
 }
