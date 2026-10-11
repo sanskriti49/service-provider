@@ -1,5 +1,9 @@
 const { test, describe, before, after } = require("node:test");
 const assert = require("node:assert/strict");
+const { randomUUID } = require("node:crypto");
+const accountTestUrl = process.env.ACCOUNT_TEST_DATABASE_URL;
+if (accountTestUrl) process.env.DATABASE_URL = accountTestUrl;
+process.env.NODE_ENV = "test";
 const db = require("../config/db");
 const {
 	ensureAccountTables,
@@ -31,7 +35,7 @@ function createMockRes() {
 	};
 }
 
-describe("accountController: Saved Addresses, Payment Methods & Feedback", () => {
+describe("accountController: Saved Addresses, Payment Methods & Feedback", { skip: !accountTestUrl }, () => {
 	let testUser;
 	let createdAddressId;
 	let createdPaymentId;
@@ -39,16 +43,9 @@ describe("accountController: Saved Addresses, Payment Methods & Feedback", () =>
 
 	before(async () => {
 		await ensureAccountTables();
-		const res = await db.query(
-			"SELECT id, name, email FROM users WHERE role = 'customer' LIMIT 1",
-		);
-		testUser = res.rows[0];
-		if (!testUser) {
-			const uRes = await db.query(
-				`INSERT INTO users (name, email, role) VALUES ('Test Customer', 'testcustomer@example.com', 'customer') RETURNING id, name, email`,
-			);
-			testUser = uRes.rows[0];
-		}
+        const id = randomUUID();
+        const res = await db.query("INSERT INTO users (id,name,email,password,role,custom_id) VALUES ($1,'Test Customer',$2,'unused','customer',$3) RETURNING id,name,email", [id, `${id}@example.com`, `CUS${id.replaceAll("-", "").slice(0,20).toUpperCase()}`]);
+        testUser = res.rows[0];
 	});
 
 	after(async () => {
@@ -56,7 +53,9 @@ describe("accountController: Saved Addresses, Payment Methods & Feedback", () =>
 			await db.query("DELETE FROM user_addresses WHERE user_id = $1", [testUser.id]);
 			await db.query("DELETE FROM user_payment_methods WHERE user_id = $1", [testUser.id]);
 			await db.query("DELETE FROM platform_feedback WHERE user_id = $1", [testUser.id]);
+			await db.query("DELETE FROM users WHERE id = $1", [testUser.id]);
 		}
+		await db.end();
 	});
 
 	test("Address: create, list, set default, update, delete", async () => {

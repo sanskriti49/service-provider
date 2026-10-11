@@ -139,7 +139,7 @@ export default function NotificationBell() {
 			if (!role) {
 				try {
 					role = JSON.parse(localStorage.getItem("user") || "{}")?.role;
-				} catch (_) {}
+				} catch { /* Malformed cached user data falls back to the customer destination. */ }
 			}
 			if (role === "provider") {
 				navigate("/provider/dashboard/bookings");

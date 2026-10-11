@@ -27,8 +27,9 @@ async function createReview(req, res, next) {
 	const customerId = req.user.id;
 	const { provider_id, booking_id, rating, comment, tags } = req.body;
 
-	const numRating = parseInt(rating, 10);
-	if (isNaN(numRating) || numRating < 1 || numRating > 5) {
+	if (!booking_id || !UUID_REGEX.test(booking_id)) return res.status(400).json({ error: "A completed booking is required" });
+	const numRating = Number(rating);
+	if (!Number.isInteger(numRating) || numRating < 1 || numRating > 5) {
 		return res
 			.status(400)
 			.json({ error: "Rating must be an integer between 1 and 5" });
@@ -63,7 +64,7 @@ async function createReview(req, res, next) {
 		let validBookingId = null;
 		if (booking_id && UUID_REGEX.test(booking_id)) {
 			const bCheck = await client.query(
-				`SELECT booking_id, user_id, provider_id, status FROM bookings WHERE booking_id = $1::uuid`,
+				`SELECT booking_id, user_id, provider_id, status FROM bookings WHERE booking_id = $1::uuid FOR UPDATE`,
 				[booking_id],
 			);
 			if (bCheck.rows.length > 0) {
@@ -80,10 +81,12 @@ async function createReview(req, res, next) {
 						error: `Reviews can only be submitted for completed services (current status: ${b.status})`,
 					});
 				}
+				if (b.provider_id !== targetProviderId) { await client.query("ROLLBACK"); return res.status(400).json({ error: "Provider must match the completed booking" }); }
 				validBookingId = b.booking_id;
 			}
 		}
 
+		if (!validBookingId) { await client.query("ROLLBACK"); return res.status(404).json({ error: "Completed booking not found" }); }
 		let insertRes;
 		if (validBookingId) {
 			const existingReview = await client.query(
@@ -403,7 +406,8 @@ async function getAllReviews(req, res, next) {
 		let paramIdx = 1;
 
 		if (rating) {
-			const numRating = parseInt(rating, 10);
+			if (!booking_id || !UUID_REGEX.test(booking_id)) return res.status(400).json({ error: "A completed booking is required" });
+	const numRating = Number(rating);
 			if (!isNaN(numRating) && numRating >= 1 && numRating <= 5) {
 				whereClauses.push(`r.rating = $${paramIdx++}`);
 				params.push(numRating);

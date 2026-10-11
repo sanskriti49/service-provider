@@ -97,7 +97,7 @@ export default function BookingDetailsSheet({
 		dot: "bg-slate-400",
 	};
 
-	const isRefunded = ["cancelled", "no_show"].includes(booking.status);
+	const isRefunded = ["refunded", "partially_refunded"].includes(booking.payment_status);
 
 	return createPortal(
 		<>
@@ -231,10 +231,10 @@ export default function BookingDetailsSheet({
 						<div className="bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/20 space-y-2.5">
 							<div className="flex items-center gap-2 text-emerald-300 font-bold text-xs">
 								<ShieldCheck size={15} />
-								<span>Secure Job Completion</span>
+								<span>{booking.status === "in_progress" ? "Secure Job Completion" : "Verify Arrival"}</span>
 							</div>
 							<p className="text-[11px] text-slate-300 leading-normal">
-								Completed this service? Ask the customer for their 4-digit Completion OTP to verify delivery and release payout.
+								{booking.status === "in_progress" ? "Ask for the completion code only after the work is done." : "Ask for the arrival code when you reach the customer to start this service."}
 							</p>
 							<button
 								onClick={() => setShowOtpModal(true)}
@@ -248,7 +248,7 @@ export default function BookingDetailsSheet({
 								) : (
 									<CheckCircle2 size={14} />
 								)}
-								Complete Job (Enter Customer OTP)
+								{booking.status === "in_progress" ? "Complete Job (Completion Code)" : "Start Job (Arrival Code)"}
 							</button>
 						</div>
 					)}
@@ -284,6 +284,7 @@ export default function BookingDetailsSheet({
 						<div className="flex items-center gap-2 text-slate-300 text-xs font-bold">
 							<CreditCard size={14} className="text-violet-400" />
 							<span>{isRefunded ? "Refund Details" : "Payment Breakdown"}</span>
+                            <span className="text-xs text-amber-200">{booking.payment_status?.replaceAll("_", " ")}</span>
 						</div>
 
 						<div className="space-y-2 text-xs">
@@ -329,13 +330,14 @@ export default function BookingDetailsSheet({
 
 			<CompletionOtpModal
 				isOpen={showOtpModal}
+                mode={booking.status === "in_progress" ? "completion" : "arrival"}
 				onClose={() => setShowOtpModal(false)}
 				booking={booking}
 				loading={actionLoading === booking.booking_id}
 				onConfirm={async (otp, setError) => {
 					const success = await onUpdateStatus(
 						booking.booking_id,
-						"completed",
+						booking.status === "in_progress" ? "completed" : "in_progress",
 						otp,
 						setError,
 					);

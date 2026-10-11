@@ -11,6 +11,7 @@ export default function CompletionOtpModal({
 	onConfirm,
 	booking,
 	loading = false,
+    mode = "completion",
 }) {
 	const [otpDigits, setOtpDigits] = useState(["", "", "", ""]);
 	const [error, setError] = useState("");
@@ -113,7 +114,7 @@ export default function CompletionOtpModal({
 						</div>
 						<div>
 							<h3 className="text-lg font-bold text-white tracking-tight">
-								Verify Job Completion
+								{mode === "arrival" ? "Verify Arrival" : "Verify Job Completion"}
 							</h3>
 							<p className="text-xs text-slate-400">
 								4-Digit Customer Handshake Code
@@ -139,7 +140,7 @@ export default function CompletionOtpModal({
 
 					{/* Instructions */}
 					<p className="text-xs text-slate-300 leading-relaxed mb-4">
-						Please ask the customer for the <strong className="text-violet-300">4-digit Completion OTP</strong> displayed in their customer dashboard to finalize this booking and verify completed work.
+						Ask the customer for their <strong className="text-violet-300">{mode === "arrival" ? "arrival code" : "completion code"}</strong> {mode === "arrival" ? "when you arrive to start the service." : "only after the work is complete."}
 					</p>
 
 					{/* OTP Inputs Form */}
@@ -199,7 +200,7 @@ export default function CompletionOtpModal({
 								) : (
 									<>
 										<CheckCircle2 size={14} />
-										<span>Verify & Complete</span>
+										<span>{mode === "arrival" ? "Verify & Start" : "Verify & Complete"}</span>
 									</>
 								)}
 							</button>

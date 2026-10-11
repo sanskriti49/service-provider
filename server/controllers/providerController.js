@@ -1,5 +1,6 @@
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const crypto = require("crypto");
+const { activeBookingPredicate } = require("../utils/bookingLifecycle");
 const { customAlphabet } = require("nanoid");
 const Joi = require("joi");
 const db = require("../config/db");
@@ -80,6 +81,7 @@ async function checkPostGisSupport(clientOrPool) {
 }
 
 const providerSchema = Joi.object({
+	password: Joi.string().min(8).max(72).required(),
 	name: Joi.string().min(3).max(100).required(),
 	email: Joi.string().email().lowercase().required(),
 	phone: Joi.string()
@@ -117,8 +119,8 @@ const providerSchema = Joi.object({
 		.allow("")
 		.optional(),
 	kyc_doc_number: Joi.string().max(100).allow("").optional(),
-	kyc_doc_front: Joi.string().allow("").optional(),
-	kyc_doc_back: Joi.string().allow("").optional(),
+	kyc_doc_front: Joi.string().allow("", null).optional(),
+	kyc_doc_back: Joi.string().allow("", null).optional(),
 });
 
 const providerUpdateSchema = Joi.object({
@@ -229,13 +231,15 @@ async function createProvider(req, res, next) {
 		const sRow = await client.query("SELECT id FROM services WHERE slug=$1", [
 			service,
 		]);
-		if (!sRow.rows.length)
+		if (!sRow.rows.length) {
+			await client.query("ROLLBACK");
 			return res
 				.status(400)
 				.json({ error: `Unknown service slug: ${service}` });
+		}
 		const serviceId = sRow.rows[0].id;
 
-		const hashed = await hashIfPresent(password || "Password123!");
+		const hashed = await hashIfPresent(password);
 		const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20);
 		const customId = "SRV" + nano();
 
@@ -745,7 +749,7 @@ async function getProviderById(req, res, next) {
 						WHERE b.provider_id = s.provider_id
 						  AND b.date = s.date
 						  AND b.start_time = s.start_time
-						  AND b.status IN ('pending', 'booked', 'confirmed', 'in_progress')
+						  AND ${activeBookingPredicate}
 					) AS is_booked
 				 FROM availability_slots s
 				 WHERE s.provider_id = $1 
@@ -843,10 +847,12 @@ async function updateProvider(req, res, next) {
 			const s = await client.query("SELECT id FROM services WHERE slug=$1", [
 				service,
 			]);
-			if (!s.rows.length)
+			if (!s.rows.length) {
+				await client.query("ROLLBACK");
 				return res
 					.status(400)
 					.json({ error: `Unknown service slug: ${service}` });
+			}
 			serviceId = s.rows[0].id;
 		}
 
@@ -1106,9 +1112,7 @@ async function getProviderAvailability(req, res, next) {
                      FROM bookings
                      WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
                      AND (
-                         status IN ('booked', 'confirmed', 'in_progress')
-                         OR (status = 'pending' AND payment_method IN ('cod', 'cash'))
-                         OR (status = 'pending' AND payment_method = 'online' AND payment_status = 'pending' AND created_at > NOW() - INTERVAL '5 minutes')
+                         ${activeBookingPredicate}
                      )`,
 					[providerIdValue, fromStr, endDateStr],
 				);
@@ -1123,9 +1127,7 @@ async function getProviderAvailability(req, res, next) {
                          FROM bookings
                          WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
                          AND (
-                             status IN ('booked', 'confirmed', 'in_progress')
-                             OR (status = 'pending' AND payment_method IN ('cod', 'cash'))
-                             OR (status = 'pending' AND payment_method = 'online' AND payment_status = 'pending' AND created_at > NOW() - INTERVAL '5 minutes')
+                             ${activeBookingPredicate}
                          )`,
 						[providerIdValue, fromStr, endDateStr],
 					);
@@ -1175,34 +1177,8 @@ async function getProviderAvailability(req, res, next) {
 					start_time: (a.start || a.start_time || "09:00").slice(0, 5),
 					end_time: (a.end || a.end_time || "18:00").slice(0, 5),
 				}));
-			} else {
-				// Standard operational business hours for mock / newly registered providers (7 days)
-				masterRows = [
-					{ day_of_week: 0, start_time: "10:00", end_time: "16:00" },
-					{ day_of_week: 1, start_time: "09:00", end_time: "18:00" },
-					{ day_of_week: 2, start_time: "09:00", end_time: "18:00" },
-					{ day_of_week: 3, start_time: "09:00", end_time: "18:00" },
-					{ day_of_week: 4, start_time: "09:00", end_time: "18:00" },
-					{ day_of_week: 5, start_time: "09:00", end_time: "18:00" },
-					{ day_of_week: 6, start_time: "10:00", end_time: "17:00" },
-				];
 			}
 
-			// Self-heal: Backfill into provider_master_availability table asynchronously
-			(async () => {
-				try {
-					for (const s of masterRows) {
-						await db.query(
-							`INSERT INTO provider_master_availability (provider_id, day_of_week, start_time, end_time)
-							 VALUES ($1, $2, $3::time, $4::time)
-							 ON CONFLICT (provider_id, day_of_week, start_time, end_time) DO NOTHING`,
-							[providerIdValue, s.day_of_week, s.start_time, s.end_time],
-						);
-					}
-				} catch (healErr) {
-					console.warn("Self-heal master availability notice:", healErr.message);
-				}
-			})();
 		}
 
 		const serviceName = providerServiceRes.rows[0]?.name || "default";
@@ -1556,6 +1532,7 @@ async function submitKyc(req, res, next) {
 }
 
 module.exports = {
+	providerSchema,
 	createProvider,
 	uploadKycDocument,
 	getKycPresignedUrl,

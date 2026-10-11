@@ -246,11 +246,11 @@ function MiniProgress({ status }) {
 }
 
 /** OTP as a small ticket stub: dashed edge, amber, same as the overview's OtpTicket. */
-function OtpStub({ code }) {
+function OtpStub({ code, label = "Completion code" }) {
 	return (
 		<span className="inline-flex items-center gap-2 h-6 pl-2 pr-2.5 rounded-md border border-dashed border-amber-300/35 bg-amber-300/[0.07] text-xs text-amber-200">
 			<KeyRound size={12} aria-hidden />
-			<span className="sr-only">Completion OTP</span>
+			<span>{label}</span>
 			<span className="font-mono text-[13px] font-semibold tracking-[0.2em] text-white tabular-nums">
 				{code}
 			</span>
@@ -365,6 +365,7 @@ function BookingRow({ item, busy, onOpen, onCancel, onRebook }) {
 						<StatusLabel status={status} />
 						<MiniProgress status={status} />
 						{showOtp && <OtpStub code={otp} />}
+                                    {["booked", "confirmed"].includes(item.status) && item.otp && <OtpStub code={item.otp} label="Arrival code" />}
 					</div>
 				</div>
 
@@ -750,16 +751,16 @@ export default function AllBookings() {
 	const executeApiUpdate = async (bookingId, newStatus) => {
 		setActionLoading(bookingId);
 		try {
-			await api.put(`/api/bookings/${bookingId}/status`, { status: newStatus });
+			const response = await api.put(`/api/bookings/${bookingId}/status`, { status: newStatus });
 			setHistory((prev) =>
 				prev.map((item) =>
-					item.booking_id === bookingId ? { ...item, status: newStatus } : item,
+					item.booking_id === bookingId ? { ...item, ...response.data.booking } : item,
 				),
 			);
 			setOverrides((o) => ({ ...o, [bookingId]: newStatus }));
 			setSelectedBooking((prev) =>
 				prev && prev.booking_id === bookingId
-					? { ...prev, status: newStatus }
+					? { ...prev, ...response.data.booking }
 					: prev,
 			);
 			setConfirmConfig((c) => ({ ...c, isOpen: false }));

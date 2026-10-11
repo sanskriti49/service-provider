@@ -573,68 +573,31 @@ async function createDispute(req, res, next) {
  * Resolve or dismiss dispute, optionally granting a refund
  */
 async function resolveDispute(req, res, next) {
-	try {
-		const disputeId = req.params.id;
-		const { status, refund_amount = 0, resolution_notes = "" } = req.body;
-
-		if (!["resolved", "rejected"].includes(status)) {
-			return res.status(400).json({ error: "Status must be 'resolved' or 'rejected'" });
-		}
-
-		const dRes = await db.query(
-			"SELECT * FROM disputes WHERE id = $1",
-			[disputeId],
-		);
-		if (dRes.rows.length === 0) {
-			return res.status(404).json({ error: "Dispute not found" });
-		}
-		const dispute = dRes.rows[0];
-
-		// Update dispute
-		await db.query(
-			`UPDATE disputes 
-			 SET status = $1, 
-			     refund_amount = $2, 
-			     resolution_notes = $3, 
-			     resolved_by = $4, 
-			     resolved_at = now()
-			 WHERE id = $5`,
-			[status, parseFloat(refund_amount) || 0, resolution_notes, req.user.id, disputeId],
-		);
-
-		// If refund granted, update booking payment status
-		if (status === "resolved" && parseFloat(refund_amount) > 0) {
-			await db.query(
-				"UPDATE bookings SET payment_status = 'refunded' WHERE booking_id = $1",
-				[dispute.booking_id],
-			);
-		}
-
-		// Dispatch notifications
-		try {
-			const outcomeMsg =
-				status === "resolved"
-					? `Your dispute has been resolved.${parseFloat(refund_amount) > 0 ? ` A refund of ₹${refund_amount} has been approved.` : ""}`
-					: "Your dispute has been reviewed and closed.";
-
-			await db.query(
-				`INSERT INTO notifications (user_id, title, message, type, data)
-				 VALUES ($1, 'Dispute Resolution Update', $2, 'system', $3)`,
-				[dispute.raised_by, outcomeMsg, JSON.stringify({ dispute_id: disputeId, status })],
-			);
-		} catch (notifErr) {
-			console.warn("Dispute resolution notification warning:", notifErr.message);
-		}
-
-		res.json({
-			success: true,
-			message: `Dispute marked as ${status}`,
-			dispute_id: disputeId,
-			refund_amount: parseFloat(refund_amount) || 0,
-		});
-	} catch (err) {
-		next(err);
-	}
+    const { BookingError, lockBooking } = require("../utils/bookingLifecycle");
+    const { paymentService } = require("./bookingController");
+    const amount = Number(req.body.refund_amount || 0);
+    if (!["resolved", "rejected"].includes(req.body.status) || !Number.isFinite(amount) || amount < 0 || !/^\d+(?:\.\d{1,2})?$/.test(String(req.body.refund_amount || 0)) || (req.body.status === "rejected" && amount > 0)) return res.status(400).json({ error: "Invalid dispute status or refund amount" });
+    const client = await db.connect();
+    try {
+        await client.query("BEGIN");
+        const found = await client.query("SELECT booking_id FROM disputes WHERE id=$1", [req.params.id]);
+        if (!found.rows.length) throw new BookingError(404, "Dispute not found");
+        const booking = await lockBooking(client, found.rows[0].booking_id);
+        const locked = await client.query("SELECT * FROM disputes WHERE id=$1 FOR UPDATE", [req.params.id]);
+        const dispute = locked.rows[0];
+        if (!["opened", "reviewing"].includes(dispute.status)) throw new BookingError(409, "Dispute already resolved");
+        if (amount > 0) {
+            await paymentService.requestRefund(client, booking, Math.round(amount * 100), `dispute:${dispute.id}`);
+            await client.query("UPDATE bookings SET status=CASE WHEN status IN ('pending','booked','confirmed','in_progress') THEN 'cancelled' ELSE status END, updated_at=NOW() WHERE booking_id=$1", [booking.booking_id]);
+        }
+        await client.query("UPDATE disputes SET status=$1,refund_amount=$2,resolution_notes=$3,resolved_by=$4,resolved_at=NOW() WHERE id=$5", [req.body.status, amount, req.body.resolution_notes || "", req.user.id, dispute.id]);
+        await client.query("COMMIT");
+        res.json({ success: true, message: "Dispute resolved; any refund is pending gateway confirmation", refund_pending: amount > 0 });
+    } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        if (error.status) return res.status(error.status).json({ error: error.message });
+        next(error);
+    } finally { client.release(); }
 }
 
 /**

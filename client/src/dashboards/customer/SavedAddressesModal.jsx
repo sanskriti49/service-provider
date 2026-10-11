@@ -25,7 +25,14 @@ const LABELS = [
 	{ id: "Other", label: "Other", icon: MapPin },
 ];
 
-export default function SavedAddressesModal({ isOpen, onClose, onUpdate }) {
+export default function SavedAddressesModal({
+	isOpen,
+	onClose,
+	onUpdate,
+	onSelect,
+	selectedId,
+	startWithAdd = false,
+}) {
 	const [addresses, setAddresses] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [showForm, setShowForm] = useState(false);
@@ -71,10 +78,15 @@ export default function SavedAddressesModal({ isOpen, onClose, onUpdate }) {
 	useEffect(() => {
 		if (isOpen) {
 			fetchAddresses();
-			setShowForm(false);
+			if (startWithAdd) {
+				resetForm();
+				setShowForm(true);
+			} else {
+				setShowForm(false);
+			}
 			setEditingId(null);
 		}
-	}, [isOpen]);
+	}, [isOpen, startWithAdd]);
 
 	const resetForm = () => {
 		setFormData({
@@ -172,15 +184,22 @@ export default function SavedAddressesModal({ isOpen, onClose, onUpdate }) {
 
 		setSubmitting(true);
 		try {
+			let savedItem = null;
 			if (editingId) {
-				await api.put(`/api/account/addresses/${editingId}`, formData);
+				const res = await api.put(`/api/account/addresses/${editingId}`, formData);
 				toast.success("Address updated successfully!");
+				savedItem = res.data?.address;
 			} else {
-				await api.post("/api/account/addresses", formData);
+				const res = await api.post("/api/account/addresses", formData);
 				toast.success("New address saved!");
+				savedItem = res.data?.address;
 			}
 			resetForm();
-			fetchAddresses();
+			await fetchAddresses();
+			if (onSelect && savedItem) {
+				onSelect(savedItem);
+				onClose();
+			}
 		} catch (err) {
 			console.error("Save address error:", err);
 			toast.error(err.response?.data?.error || "Failed to save address.");
@@ -535,20 +554,23 @@ export default function SavedAddressesModal({ isOpen, onClose, onUpdate }) {
 													? Home
 													: MapPin;
 
+										const isCurrentSelected = selectedId && (selectedId === addr.id || String(selectedId) === String(addr.id));
 										return (
 											<div
 												key={addr.id}
 												className={`p-4 rounded-2xl border transition-all relative ${
-													addr.is_default
-														? "border-amber-400/40 bg-gradient-to-r from-amber-400/[0.08] to-transparent shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
-														: "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04]"
+													isCurrentSelected
+														? "border-amber-400/80 bg-amber-400/[0.08] shadow-[0_0_20px_rgba(251,191,36,0.15)] ring-1 ring-amber-400/30"
+														: addr.is_default
+															? "border-amber-400/40 bg-gradient-to-r from-amber-400/[0.08] to-transparent shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
+															: "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04]"
 												}`}
 											>
 												<div className="flex items-start justify-between gap-3">
 													<div className="flex items-start gap-3 min-w-0">
 														<span
 															className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-																addr.is_default
+																isCurrentSelected || addr.is_default
 																	? "bg-amber-400/20 text-amber-300"
 																	: "bg-white/[0.06] text-stone-400"
 															}`}
@@ -564,6 +586,12 @@ export default function SavedAddressesModal({ isOpen, onClose, onUpdate }) {
 																	<span className="h-5 px-2 rounded-full bg-amber-400/20 border border-amber-400/30 text-[10px] font-semibold text-amber-300 flex items-center gap-1">
 																		<Star size={9} className="fill-amber-300" />
 																		Default
+																	</span>
+																)}
+																{isCurrentSelected && (
+																	<span className="h-5 px-2 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-semibold text-emerald-300 flex items-center gap-1">
+																		<Check size={9} />
+																		Selected
 																	</span>
 																)}
 															</div>
@@ -583,7 +611,24 @@ export default function SavedAddressesModal({ isOpen, onClose, onUpdate }) {
 													</div>
 
 													{/* Actions */}
-													<div className="flex items-center gap-1 shrink-0">
+													<div className="flex items-center gap-1.5 shrink-0">
+														{onSelect && (
+															<button
+																type="button"
+																onClick={() => {
+																	onSelect(addr);
+																	onClose();
+																}}
+																className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+																	isCurrentSelected
+																		? "bg-amber-400 text-stone-900 shadow-md shadow-amber-400/20"
+																		: "bg-violet-600 hover:bg-violet-500 text-white shadow-sm"
+																}`}
+															>
+																<Check size={13} />
+																<span>{isCurrentSelected ? "Active" : "Use this"}</span>
+															</button>
+														)}
 														{!addr.is_default && (
 															<button
 																type="button"

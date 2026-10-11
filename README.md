@@ -8,9 +8,15 @@
 [![Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?style=flat&logo=terraform)](https://terraform.io)
 [![Prometheus](https://img.shields.io/badge/Metrics-Prometheus-E6522C?style=flat&logo=prometheus)](https://prometheus.io)
 
-TaskGenie is a cloud-native, high-concurrency hyper-local on-demand service marketplace connecting consumers with vetted professionals in real-time. Built on a decoupled **PERN stack** (PostgreSQL, Express.js, React, Node.js), TaskGenie combines **PostGIS spatial indexing**, **Redis distributed locks (Redlock)** and PostgreSQL row locks for multi-tiered concurrency, **durable BullMQ + Redis event-driven background workers**, **PgBouncer-compatible connection pooling safeguards**, **API rate limiting & Opossum circuit breakers**, and **Prometheus cloud observability**.
+TaskGenie is a full-stack hyper-local on-demand service marketplace connecting consumers with vetted professionals in real-time. Built on a decoupled **PERN stack** (PostgreSQL, Express.js, React, Node.js), TaskGenie combines **PostGIS spatial indexing**, **Redis single-instance locks** and PostgreSQL row locks for multi-tiered concurrency, **durable BullMQ + Redis event-driven background workers**, **PgBouncer-compatible connection pooling safeguards**, **API rate limiting & Opossum circuit breakers**, and **Prometheus cloud observability**.
 
 ---
+
+## Booking integrity and verification
+
+Booking creation and payment finalization share provider/date PostgreSQL locks. Captured payments must match the stored order, amount and currency; expired/cancelled intents remain stored and enter refund reconciliation. Refund completion is reported only after gateway confirmation. Independent arrival/completion codes are visible only to the owning customer.
+
+See [booking integrity and migration runbook](docs/BOOKING_INTEGRITY.md) for invariants, deployment commands, uncertain-refund handling and isolated PostgreSQL tests. Apply the integrity migration before running the updated API. The runtime queue uses BullMQ; Terraform's SQS resources are optional infrastructure and are not wired into application dispatch. Discovery caching currently uses process memory.
 
 ## 🏛️ System Architecture
 
@@ -37,7 +43,7 @@ flowchart TD
         EventQueue[Asynchronous Worker Queue]
         EmailWorker[Email Notification Worker]
         SocketWorker[Real-Time WebSocket Dispatcher]
-        DLQ[Dead Letter Queue & Exponential Backoff]
+        DLQ[Retained Failed Jobs]
     end
 
     subgraph Storage ["Cloud Data Tier"]
@@ -53,7 +59,7 @@ flowchart TD
 
     MetricsMiddleware -.-> MetricsEndpoint
     BookingCtrl --> DB
-    BookingCtrl -- "Publish Event (<40ms)" --> EventQueue
+    BookingCtrl -- "Publish Event" --> EventQueue
     EventQueue --> EmailWorker
     EventQueue --> SocketWorker
     EventQueue -. Failures .-> DLQ
@@ -71,19 +77,19 @@ flowchart TD
 ### 1. ⚡ BullMQ + Redis Distributed Background Workers (EDA)
 
 - Migrated asynchronous workload processing from an in-memory queue to **BullMQ on Redis** with persistent job storage, worker concurrency limits, and distributed locking.
-- Employs **exponential backoff retries** (up to 3 attempts) and routes permanently failed jobs to a **Dead-Letter Queue (DLQ)**.
-- Features **resilient dual-mode fallback**: automatically degrades to an in-memory worker queue if Redis is temporarily unreachable, guaranteeing zero downtime.
-- Offloads slow transactional email (Nodemailer) and push notifications, keeping HTTP request-response latency strictly under **$<40\text{ms}$**.
+- Employs **exponential backoff retries** (up to 3 attempts) and retains failed BullMQ jobs for inspection and emits failure events.
+- Features **resilient dual-mode fallback**: automatically degrades to an in-memory worker queue if Redis is temporarily unreachable, with reduced durability during fallback.
+- Offloads slow transactional email (Nodemailer) and push notifications, reducing synchronous request work; latency requires benchmarking.
 
-### 2. 📍 Sub-10ms PostGIS Geospatial Proximity Matching
+### 2. 📍 PostGIS Geospatial Proximity Matching
 
 - Replaced table-scanning trigonometry with native PostgreSQL **PostGIS (`GEOGRAPHY(Point, 4326)`)** and **R-Tree GIST spatial indexing (`idx_users_geom_gist`)**.
 - Uses `ST_DWithin()` for bounded radius filtering and `ST_Distance()` for database-engine distance calculation.
 - Backed by an automatic database trigger (`trg_users_geom_sync`) to keep coordinates synchronized, and falls back to spherical **Haversine Distance algorithms** if running on standard non-spatial PostgreSQL.
 
-### 3. 🔒 Two-Tiered Concurrency Control & Double-Booking Elimination
+### 3. 🔒 Booking Concurrency and Payment Integrity
 
-- **Tier 1 (Redis Edge Lock):** Employs the **Redlock pattern** (`SET lock:slot <token> PX 15000 NX`) with atomic Lua script releasing. Under concurrent booking spikes, conflicting requests fail fast with HTTP 409 before opening or stalling database connections.
+- **Tier 1 (Redis Edge Lock):** Employs the **single-Redis lock pattern** (`SET lock:slot <token> PX 15000 NX`) with atomic Lua script releasing. Under concurrent booking spikes, conflicting requests fail fast with HTTP 409 before entering the booking transaction.
 - **Tier 2 (PostgreSQL ACID Isolation):** Uses row-level locks (`SELECT ... FOR UPDATE`) inside atomic database transactions (`BEGIN ... COMMIT`) during the final slot allocation and transit buffer verification.
 
 ### 4. 🛡️ API Rate Limiting & Circuit Breakers (Chaos Resilience)
@@ -205,7 +211,7 @@ Access:
 
 ## 🛡️ Security Best Practices
 
-- **Parameterized SQL Queries**: Complete protection against SQL injection.
+- **Parameterized SQL Queries**: Parameterized values in the implemented query paths.
 - **Stateless Authentication**: Signed JWT tokens with strict expiration.
 - **Cryptographic Verification**: HMAC-SHA256 signature verification for payment webhooks.
 - **Least-Privilege IAM**: Granular policies restricting cloud storage and queue permissions.

@@ -7,6 +7,8 @@ const Module = require("node:module");
 // Exercise the real controller without creating application bookings, sending
 // notifications or making a payment request to Razorpay.
 function loadController(source = fs.readFileSync(path.join(__dirname, "../controllers/bookingController.js"), "utf8")) {
+	process.env.RAZORPAY_KEY_ID = "rzp_test_unit";
+	process.env.RAZORPAY_KEY_SECRET = "unit-secret";
 	const providerId = "11111111-1111-4111-8111-111111111111";
 	const customerId = "22222222-2222-4222-8222-222222222222";
 	const serviceId = "33333333-3333-4333-8333-333333333333";
@@ -15,12 +17,14 @@ function loadController(source = fs.readFileSync(path.join(__dirname, "../contro
 		async query(sql, params = []) {
 			queries.push({ sql, params });
 			if (sql.includes("SELECT ps.price")) return { rows: [{ price: 1200, name: "House Cleaning", service_id: serviceId }] };
+			if (sql.includes("AS valid")) return { rows: [{ valid: true }] };
+			if (sql.includes("SELECT start_time,end_time FROM provider_master")) return { rows: [{ start_time: "08:00", end_time: "20:00" }] };
 			if (sql.includes("SELECT start_time")) return { rows: [] };
 			if (sql.includes("INSERT INTO bookings")) return { rows: [{
 				booking_id: "44444444-4444-4444-8444-444444444444", provider_id: providerId,
-				user_id: customerId, service_id: serviceId, date: params[3], start_time: params[4],
-				end_time: params[5], price: params[7], payment_method: params[8], payment_status: params[9],
-				razorpay_order_id: params[10], otp: params[11], completion_otp: params[11],
+				user_id: customerId, service_id: serviceId, date: params[4], start_time: params[5],
+				end_time: params[6], price: params[8], payment_method: params[9], payment_status: "pending",
+				razorpay_order_id: params[10], otp: params[11], completion_otp: params[12],
 			}] };
 			return { rows: [] };
 		},
@@ -28,7 +32,7 @@ function loadController(source = fs.readFileSync(path.join(__dirname, "../contro
 	};
 	const stubs = {
 		razorpay: class {
-			constructor() { this.orders = { create: async (options) => { orders.push(options); return { id: "order_regression_test" }; } }; }
+			constructor() { this.orders = { create: async (options) => { orders.push(options); return { id: "order_unit", amount: options.amount, currency: options.currency }; } }; }
 		},
 		"../config/db": { query: async () => ({ rows: [{ id: providerId }] }), connect: async () => client },
 		"../utils/sendEmail": async () => {},
@@ -62,7 +66,7 @@ test("booking controller: online booking uses the normalized date before the adv
 	const lock = fixture.queries.find((query) => query.sql.includes("pg_advisory_xact_lock"));
 	assert.equal(lock.params[1], "2026-11-12");
 	assert.equal(res.data.booking.date, "2026-11-12");
-	assert.equal(res.data.razorpay_order, "order_regression_test");
+	assert.equal(res.data.razorpay_order, "order_unit");
 	assert.equal(fixture.orders[0].amount, 120000);
 	assert.equal(fixture.orders[0].currency, "INR");
 	assert.ok(fixture.queries.some((query) => query.sql === "COMMIT"));

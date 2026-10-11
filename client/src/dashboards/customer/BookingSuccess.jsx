@@ -31,6 +31,8 @@ export default function BookingSuccess() {
 	);
 	const [timeLeft, setTimeLeft] = useState(0);
 	const [isSaving, setIsSaving] = useState(false);
+	const [addressMatches, setAddressMatches] = useState([]);
+	const [selectedLocation, setSelectedLocation] = useState(null);
 	const [errorMsg, setErrorMsg] = useState(null);
 
 	useEffect(() => {
@@ -66,7 +68,16 @@ export default function BookingSuccess() {
 		setErrorMsg(null);
 
 		try {
-			await api.patch(`/api/bookings/${booking.booking_id}/address`, {
+			if (!selectedLocation) {
+                const lookup = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(tempAddress)}`, { signal: AbortSignal.timeout(5000) });
+                if (!lookup.ok) throw new Error("Location lookup unavailable");
+                const matches = await lookup.json();
+                setAddressMatches(matches);
+                setErrorMsg(matches.length ? "Choose the matching location below, then save." : "Location not found. Enter a more complete address.");
+                return;
+            }
+            await api.patch(`/api/bookings/${booking.booking_id}/address`, {
+                latitude: Number(selectedLocation.lat), longitude: Number(selectedLocation.lon),
 				address: tempAddress,
 			});
 			setAddress(tempAddress);
@@ -192,11 +203,17 @@ export default function BookingSuccess() {
 									<div className="mt-2 animate-fade-in">
 										<textarea
 											value={tempAddress}
-											onChange={(e) => setTempAddress(e.target.value)}
+											onChange={(e) => { setTempAddress(e.target.value); setSelectedLocation(null); setAddressMatches([]); }}
 											className="w-full bg-black/30 border border-white/10 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-violet-500 outline-none mb-3 resize-none h-20"
 											placeholder="Enter new address..."
 										/>
-										{errorMsg && (
+										{addressMatches.length > 0 && <label className="block text-xs text-gray-300">Service location
+                                        <select className="block w-full mt-2 bg-[#19152d] text-white p-2 rounded" value={selectedLocation ? addressMatches.indexOf(selectedLocation) : ""} onChange={(event) => setSelectedLocation(addressMatches[Number(event.target.value)])}>
+                                            <option value="" disabled>Select the matching address</option>
+                                            {addressMatches.map((match,index) => <option key={match.place_id} value={index}>{match.display_name}</option>)}
+                                        </select>
+                                    </label>}
+                                    {errorMsg && (
 											<div className="flex items-center gap-1 text-red-400 text-xs mb-2">
 												<CircleAlert size={12} /> {errorMsg}
 											</div>
@@ -206,6 +223,7 @@ export default function BookingSuccess() {
 												onClick={() => {
 													setIsEditing(false);
 													setTempAddress(address);
+                                                    setSelectedLocation(null); setAddressMatches([]);
 													setErrorMsg(null);
 												}}
 												className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition"

@@ -488,8 +488,8 @@ export default function ApplyProvider() {
 				);
 				return;
 			}
-			if (!formData.password || formData.password.length < 6) {
-				setErrorMsg("Password must be at least 6 characters");
+			if (!formData.password || formData.password.length < 8) {
+				setErrorMsg("Password must be at least 8 characters");
 				return;
 			}
 		} else if (step === 2) {
@@ -858,7 +858,7 @@ export default function ApplyProvider() {
 											<Field
 												id="password"
 												label="Password"
-												hint="Use at least 6 characters"
+												hint="Use at least 8 characters"
 											>
 												<PasswordInput
 													id="password"

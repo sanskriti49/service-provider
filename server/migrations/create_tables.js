@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { integritySchema } = require("./migrate_booking_integrity");
 const { chatSchema } = require("./migrate_chat");
 
 const queries = [
@@ -276,18 +277,22 @@ const queries = [
 	`CREATE TRIGGER trg_users_geom_sync
 	BEFORE INSERT OR UPDATE OF lat, lng ON public.users
 	FOR EACH ROW EXECUTE FUNCTION sync_user_geom();`,
+	integritySchema,
 ];
 
 const runMigration = async () => {
 	try {
 		console.log("⏳ Starting migration...");
+		let spatialAvailable = true;
 		for (const [index, query] of queries.entries()) {
+			if (!spatialAvailable && /postgis|geography|geom/i.test(query)) continue;
 			try {
 				console.log(`... Running Step ${index + 1}/${queries.length}`);
 				await db.query(query);
 			} catch (stepErr) {
 				// If postgis extension is not supported on this specific PG server, log and continue
 				if (query.includes("postgis") || query.includes("geography") || query.includes("geom")) {
+					spatialAvailable = false;
 					console.warn(`⚠️ PostGIS step skipped (standard PostgreSQL without spatial module): ${stepErr.message}`);
 				} else {
 					throw stepErr;
@@ -297,6 +302,7 @@ const runMigration = async () => {
 		console.log("✅ All tables created successfully!");
 	} catch (err) {
 		console.error("❌ Migration failed:", err.message);
+		process.exitCode = 1;
 	} finally {
 		db.end();
 	}

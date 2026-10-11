@@ -15,10 +15,12 @@ import {
 	Wallet,
 	Home,
 	Briefcase,
+	Plus,
 } from "lucide-react";
 import Alerts from "../../ui/Alerts";
 import Logo from "../../ui/Logo";
 import BookingHeader from "./BookingHeader";
+import SavedAddressesModal from "./SavedAddressesModal";
 import { toast } from "sonner";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
@@ -470,6 +472,10 @@ export default function BookingPage() {
 	const [paymentMethod, setPaymentMethod] = useState("cash");
 	const [nudge, setNudge] = useState(null); // "when" | "address"
 	const [savedAddresses, setSavedAddresses] = useState([]);
+	const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+	const [addressModalStartAdd, setAddressModalStartAdd] = useState(false);
+	const [saveToAccount, setSaveToAccount] = useState(false);
+	const [saveLabel, setSaveLabel] = useState("Home");
 
 	useEffect(() => {
 		const loadSavedAddresses = async () => {
@@ -498,6 +504,27 @@ export default function BookingPage() {
 		};
 		loadSavedAddresses();
 	}, [state?.address]);
+
+	const matchedSavedAddr = useMemo(() => {
+		if (!address) return null;
+		const clean = address.trim().toLowerCase();
+		return (
+			savedAddresses.find(
+				(a) => a.full_address.trim().toLowerCase() === clean,
+			) || null
+		);
+	}, [address, savedAddresses]);
+
+	const handleSelectAddress = (addr) => {
+		if (!addr) return;
+		setAddress(addr.full_address);
+		setTempAddress(addr.full_address);
+		if (addr.lat && addr.lng) {
+			setCoords({ lat: addr.lat, lng: addr.lng });
+		}
+		setIsEditingAddress(false);
+		toast.success(`Selected "${addr.label || "Saved"}" address`);
+	};
 
 	const whenRef = useRef(null);
 	const addressRef = useRef(null);
@@ -622,9 +649,33 @@ export default function BookingPage() {
 			end: slot.end,
 		});
 
-	const saveAddress = () => {
-		setAddress(tempAddress.trim());
+	const saveAddress = async () => {
+		const trimmed = tempAddress.trim();
+		if (!trimmed) {
+			toast.error("Please enter a valid address");
+			return;
+		}
+		setAddress(trimmed);
 		setIsEditingAddress(false);
+
+		// If customer selected "Save this address to my profile", persist it via API
+		if (saveToAccount && user) {
+			try {
+				const res = await api.post("/api/account/addresses", {
+					label: saveLabel || "Home",
+					full_address: trimmed,
+					lat: coords?.lat || null,
+					lng: coords?.lng || null,
+				});
+				if (res.data?.success) {
+					toast.success(`Address saved to your profile as "${saveLabel || "Home"}"`);
+					const listRes = await api.get("/api/account/addresses");
+					setSavedAddresses(listRes.data?.addresses || []);
+				}
+			} catch (err) {
+				console.warn("Could not save address to profile:", err);
+			}
+		}
 	};
 
 	const detectLocation = () => {
@@ -695,7 +746,7 @@ export default function BookingPage() {
 		};
 
 		const rzpKey =
-			import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_SAa72yHcAfg93t";
+			import.meta.env.VITE_RAZORPAY_KEY_ID;
 		const rzpAmount = Math.round(
 			Number(booking.price || provider.price || 499) * 100,
 		);
@@ -714,7 +765,12 @@ export default function BookingPage() {
 						razorpay_order_id: response.razorpay_order_id || orderId,
 						booking_id: booking?.booking_id,
 					});
-					if (verifyRes.data?.booking) {
+					if (verifyRes.data?.refund_pending) {
+                        toast.error("The slot hold expired. Your payment is being refunded; check your booking history.");
+                        setIsSubmitting(false);
+                        return;
+                    }
+                    if (verifyRes.data?.booking) {
 						navigate("/booking-success", {
 							state: {
 								success: true,
@@ -746,7 +802,7 @@ export default function BookingPage() {
 			theme: { color: "#6d28d9" },
 		};
 
-		if (orderId && !orderId.startsWith("test_order_")) {
+		if (orderId) {
 			rzpOptions.order_id = orderId;
 		}
 
@@ -767,7 +823,7 @@ export default function BookingPage() {
 		rzp.open();
 	};
 
-	async function handleConfirm(opts = {}) {
+	async function handleConfirm() {
 		if (!hasSchedule) return flashNudge("when", whenRef);
 		if (!hasAddress) return flashNudge("address", addressRef);
 
@@ -791,24 +847,6 @@ export default function BookingPage() {
 				longitude: coords.lng,
 			});
 			const data = res.data;
-
-			if (opts?.mockPay && isOnline && data.razorpay_order) {
-				const verifyRes = await api.post("/api/bookings/verify-payment", {
-					razorpay_order_id: data.razorpay_order,
-					razorpay_payment_id: `pay_test_${Date.now()}`,
-					razorpay_signature: "mock_test_signature",
-				});
-				toast.success("Test payment authorized successfully!");
-				navigate("/booking-success", {
-					state: {
-						success: true,
-						booking: verifyRes.data?.booking || data.booking,
-						address,
-					},
-					replace: true,
-				});
-				return;
-			}
 
 			if (isOnline && data.razorpay_order) {
 				handleRazorpayPayment(data.booking, data.razorpay_order);
@@ -999,26 +1037,51 @@ export default function BookingPage() {
 								nudgeText="Add the address where the work happens."
 								innerRef={addressRef}
 							>
-								{/* 1-Click Saved Address Picker */}
-								{savedAddresses.length > 0 && (
-									<div className="mb-3 space-y-2">
-										<div className="flex items-center justify-between text-xs text-stone-400">
-											<span className="font-medium text-stone-300">
-												Choose from saved addresses:
-											</span>
-											<Link
-												to="/account/profile?open=addresses"
-												target="_blank"
-												rel="noopener noreferrer"
-												className="text-[11px] text-violet-300 hover:text-white transition-colors underline decoration-dotted"
-											>
-												Manage addresses ↗
-											</Link>
+								{/* Saved Address Chooser Header & Options */}
+								<div className="mb-3.5 space-y-2.5">
+									<div className="flex items-center justify-between text-xs">
+										<div className="flex items-center gap-1.5 font-medium text-stone-300">
+											<MapPin size={13} className="text-violet-400" />
+											<span>Saved addresses</span>
+											{savedAddresses.length > 0 && (
+												<span className="px-1.5 py-0.5 rounded-full bg-white/[0.08] text-[10px] text-stone-400 font-mono">
+													{savedAddresses.length}
+												</span>
+											)}
 										</div>
+										<div className="flex items-center gap-2">
+											<button
+												type="button"
+												onClick={() => {
+													setAddressModalStartAdd(true);
+													setIsAddressModalOpen(true);
+												}}
+												className="text-[11px] text-violet-300 hover:text-white transition-colors flex items-center gap-1 font-medium"
+											>
+												<Plus size={11} />
+												<span>Add new</span>
+											</button>
+											{savedAddresses.length > 0 && (
+												<button
+													type="button"
+													onClick={() => {
+														setAddressModalStartAdd(false);
+														setIsAddressModalOpen(true);
+													}}
+													className="text-[11px] text-stone-400 hover:text-white transition-colors underline decoration-dotted"
+												>
+													Manage all
+												</button>
+											)}
+										</div>
+									</div>
+
+									{/* Saved Addresses Pills or Prompt */}
+									{savedAddresses.length > 0 ? (
 										<div className="flex flex-wrap gap-2">
 											{savedAddresses.map((addr) => {
 												const isSelected =
-													address.trim() === addr.full_address.trim();
+													address.trim().toLowerCase() === addr.full_address.trim().toLowerCase();
 												const Icon =
 													addr.label === "Work"
 														? Briefcase
@@ -1029,15 +1092,7 @@ export default function BookingPage() {
 													<button
 														key={addr.id}
 														type="button"
-														onClick={() => {
-															setAddress(addr.full_address);
-															setTempAddress(addr.full_address);
-															if (addr.lat && addr.lng) {
-																setCoords({ lat: addr.lat, lng: addr.lng });
-															}
-															setIsEditingAddress(false);
-															toast.success(`Selected "${addr.label}" address`);
-														}}
+														onClick={() => handleSelectAddress(addr)}
 														className={`h-8 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all ${
 															isSelected
 																? "border-amber-400/60 bg-amber-400/15 text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.15)] ring-1 ring-amber-400/30"
@@ -1059,16 +1114,45 @@ export default function BookingPage() {
 													</button>
 												);
 											})}
+											<button
+												type="button"
+												onClick={() => {
+													setAddressModalStartAdd(true);
+													setIsAddressModalOpen(true);
+												}}
+												className="h-8 px-2.5 rounded-lg border border-dashed border-white/[0.12] bg-white/[0.02] hover:bg-white/[0.05] text-stone-400 hover:text-white text-xs font-medium flex items-center gap-1 transition-colors"
+											>
+												<Plus size={12} />
+												<span>New</span>
+											</button>
 										</div>
-									</div>
-								)}
+									) : (
+										<div className="p-3 rounded-xl border border-dashed border-white/[0.1] bg-white/[0.02] flex items-center justify-between gap-3">
+											<p className="text-xs text-stone-400">
+												No saved addresses yet. Save your home or office for 1-click booking!
+											</p>
+											<button
+												type="button"
+												onClick={() => {
+													setAddressModalStartAdd(true);
+													setIsAddressModalOpen(true);
+												}}
+												className="shrink-0 h-7 px-2.5 rounded-lg bg-violet-500/20 hover:bg-violet-500/30 text-violet-200 border border-violet-500/30 text-xs font-medium flex items-center gap-1 transition-colors"
+											>
+												<Plus size={12} />
+												<span>Save Address</span>
+											</button>
+										</div>
+									)}
+								</div>
 
+								{/* Manual Editing or Displaying Current Address */}
 								{isEditingAddress ? (
 									<div className="rounded-xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
 										<div className="flex items-center justify-between gap-3">
 											<label
 												htmlFor="svc-address"
-												className="text-sm text-stone-300"
+												className="text-sm font-medium text-stone-300"
 											>
 												Service address
 											</label>
@@ -1091,7 +1175,42 @@ export default function BookingPage() {
 											placeholder="Flat or house number, building, street, area"
 											className="w-full resize-none rounded-lg bg-[#0d0b12] border border-white/[0.1] p-3 text-sm text-white placeholder:text-stone-600 focus:outline-none focus:border-violet-400/50 focus:ring-2 focus:ring-violet-400/20"
 										/>
-										<div className="flex justify-end gap-2">
+
+										{/* Save to profile checkbox & tag selector */}
+										{user && (
+											<div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] space-y-2">
+												<label className="flex items-center gap-2 cursor-pointer text-xs text-stone-300 select-none">
+													<input
+														type="checkbox"
+														checked={saveToAccount}
+														onChange={(e) => setSaveToAccount(e.target.checked)}
+														className="rounded bg-black/40 border-white/[0.2] text-violet-500 focus:ring-0"
+													/>
+													<span>Save this address to my profile for future bookings</span>
+												</label>
+												{saveToAccount && (
+													<div className="flex items-center gap-2 pl-5 pt-1">
+														<span className="text-[11px] text-stone-400">Save as:</span>
+														{["Home", "Work", "Other"].map((tag) => (
+															<button
+																key={tag}
+																type="button"
+																onClick={() => setSaveLabel(tag)}
+																className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
+																	saveLabel === tag
+																		? "border-amber-400/60 bg-amber-400/15 text-amber-200"
+																		: "border-white/[0.1] bg-white/[0.02] text-stone-400 hover:text-white"
+																}`}
+															>
+																{tag}
+															</button>
+														))}
+													</div>
+												)}
+											</div>
+										)}
+
+										<div className="flex justify-end gap-2 pt-1">
 											<button
 												type="button"
 												onClick={() => {
@@ -1107,40 +1226,91 @@ export default function BookingPage() {
 												onClick={saveAddress}
 												className={`h-9 px-4 rounded-lg text-sm ${primaryBtn}`}
 											>
-												Save address
+												Use this address
 											</button>
 										</div>
 									</div>
 								) : hasAddress ? (
 									<div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
 										<span className="mt-0.5 w-9 h-9 shrink-0 rounded-lg bg-violet-400/15 text-violet-300 flex items-center justify-center">
-											<MapPin size={17} />
+											{matchedSavedAddr?.label === "Work" ? (
+												<Briefcase size={17} />
+											) : matchedSavedAddr?.label === "Home" ? (
+												<Home size={17} />
+											) : (
+												<MapPin size={17} />
+											)}
 										</span>
-										<p className="flex-1 min-w-0 text-sm text-white leading-relaxed">
-											{address}
-										</p>
+										<div className="flex-1 min-w-0">
+											{matchedSavedAddr && (
+												<div className="flex items-center gap-1.5 mb-1">
+													<span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-violet-400/15 text-violet-300 border border-violet-400/20">
+														{matchedSavedAddr.label}
+													</span>
+													{matchedSavedAddr.is_default && (
+														<span className="text-[10px] text-amber-300/80 font-mono">
+															(Default)
+														</span>
+													)}
+												</div>
+											)}
+											<p className="text-sm text-white leading-relaxed break-words">
+												{address}
+											</p>
+										</div>
+										<div className="flex items-center gap-2 shrink-0">
+											<button
+												type="button"
+												onClick={() => {
+													setTempAddress(address);
+													setIsEditingAddress(true);
+												}}
+												className="text-xs text-violet-300 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/[0.04]"
+											>
+												Edit
+											</button>
+										</div>
+									</div>
+								) : (
+									<div className="grid sm:grid-cols-2 gap-2.5">
 										<button
 											type="button"
 											onClick={() => {
-												setTempAddress(address);
-												setIsEditingAddress(true);
+												setAddressModalStartAdd(true);
+												setIsAddressModalOpen(true);
 											}}
-											className="shrink-0 text-sm text-violet-300 hover:text-white transition-colors"
+											className="flex items-center gap-3 rounded-xl border border-dashed border-violet-400/30 bg-violet-500/[0.04] p-3.5 text-left text-violet-200 hover:bg-violet-500/[0.08] hover:border-violet-400/50 transition-colors"
 										>
-											Change
+											<span className="w-8 h-8 rounded-lg bg-violet-400/20 text-violet-300 flex items-center justify-center">
+												<Plus size={16} />
+											</span>
+											<div>
+												<p className="text-xs font-semibold text-white">
+													Choose or Add Saved Address
+												</p>
+												<p className="text-[11px] text-stone-400">
+													1-click select from account
+												</p>
+											</div>
+										</button>
+										<button
+											type="button"
+											onClick={() => setIsEditingAddress(true)}
+											className="flex items-center gap-3 rounded-xl border border-dashed border-white/[0.16] bg-white/[0.015] p-3.5 text-left text-stone-400 hover:text-white hover:border-violet-400/40 hover:bg-violet-400/[0.05] transition-colors"
+										>
+											<span className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center">
+												<MapPin size={16} />
+											</span>
+											<div>
+												<p className="text-xs font-medium text-stone-300">
+													Type address manually
+												</p>
+												<p className="text-[11px] text-stone-500">
+													Or use GPS detection
+												</p>
+											</div>
 										</button>
 									</div>
-								) : (
-									<button
-										type="button"
-										onClick={() => setIsEditingAddress(true)}
-										className="w-full flex items-center gap-3 rounded-xl border border-dashed border-white/[0.16] bg-white/[0.015] p-4 text-left text-stone-400 hover:text-white hover:border-violet-400/40 hover:bg-violet-400/[0.05] transition-colors"
-									>
-										<span className="w-9 h-9 rounded-lg bg-white/[0.05] flex items-center justify-center">
-											<MapPin size={17} />
-										</span>
-										<span className="text-sm">Add your service address</span>
-									</button>
 								)}
 							</Step>
 
@@ -1312,16 +1482,7 @@ export default function BookingPage() {
 									{isSubmitting ? <Spinner /> : confirmLabel}
 								</button>
 
-								{isOnline && (
-									<button
-										type="button"
-										onClick={() => handleConfirm({ mockPay: true })}
-										disabled={isSubmitting}
-										className="w-full mt-2.5 py-2.5 px-3 rounded-xl border border-dashed border-violet-400/40 text-xs font-semibold text-violet-300 hover:bg-violet-950/40 hover:border-violet-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-									>
-										<span>⚡</span> Instant Test Pay (Bypass Modal)
-									</button>
-								)}
+
 							</div>
 						</div>
 					</aside>
@@ -1360,19 +1521,20 @@ export default function BookingPage() {
 								confirmLabel
 							)}
 						</button>
-						{isOnline && hasSchedule && hasAddress && (
-							<button
-								type="button"
-								onClick={() => handleConfirm({ mockPay: true })}
-								disabled={isSubmitting}
-								className="text-[11px] font-semibold text-violet-300 hover:underline flex items-center justify-center gap-1 cursor-pointer"
-							>
-								<span>⚡</span> Instant Test Pay
-							</button>
-						)}
+
 					</div>
 				</div>
 			</div>
+
+			{/* In-page Saved Addresses Management Modal */}
+			<SavedAddressesModal
+				isOpen={isAddressModalOpen}
+				onClose={() => setIsAddressModalOpen(false)}
+				onUpdate={(list) => setSavedAddresses(list)}
+				onSelect={handleSelectAddress}
+				selectedId={matchedSavedAddr?.id}
+				startWithAdd={addressModalStartAdd}
+			/>
 		</div>
 	);
 }

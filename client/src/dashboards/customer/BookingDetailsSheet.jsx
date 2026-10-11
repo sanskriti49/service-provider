@@ -59,7 +59,6 @@ export default function BookingDetailsSheet({
 				setCurrentOtp(newCode);
 				if (booking) {
 					booking.completion_otp = newCode;
-					booking.otp = newCode;
 				}
 				toast.success("New 4-digit Completion OTP generated!");
 			}
@@ -185,7 +184,8 @@ export default function BookingDetailsSheet({
 								</button>
 							</div>
 
-							<p className="text-xs text-slate-300 text-center leading-relaxed">
+							{["booked", "confirmed"].includes(booking.status) && booking.otp && <p className="text-sm text-center text-amber-200">Arrival code: <strong className="font-mono">{booking.otp}</strong>. Share when your provider arrives.</p>}
+                            <p className="text-xs text-slate-300 text-center leading-relaxed">
 								Share this 4-digit completion code with your provider{" "}
 								<strong className="text-white">
 									only after the work is completely done
@@ -195,7 +195,9 @@ export default function BookingDetailsSheet({
 						</div>
 					)}
 
-					{booking.status === "completed" && (
+					{booking.payment_status?.startsWith("refund") && <p role="status" className="p-3 text-sm text-amber-200">Payment: {booking.payment_status.replaceAll("_", " ")}. A pending or failed refund has not been confirmed as returned.</p>}
+
+                    {booking.status === "completed" && (
 						<div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
 							<ShieldCheck size={22} className="text-emerald-400 shrink-0" />
 							<div>

@@ -229,7 +229,7 @@ export default function ProviderBookings() {
 				newStatus,
 				title: "Decline Booking Request?",
 				message:
-					"Are you sure you want to decline this booking? The customer will receive an immediate notification and full payment refund.",
+					"Are you sure you want to decline this booking? The customer will be notified. Eligible online refunds remain pending until the gateway confirms processing.",
 			});
 			return;
 		}
@@ -244,14 +244,14 @@ export default function ProviderBookings() {
 				if (otpProvided) {
 					payload.otp_provided = otpProvided;
 				}
-				await api.put(`/api/bookings/${bookingId}/status`, payload);
+				const response = await api.put(`/api/bookings/${bookingId}/status`, payload);
 				setBookings((prev) =>
 					prev.map((b) =>
-						b.booking_id === bookingId ? { ...b, status: newStatus } : b,
+						b.booking_id === bookingId ? { ...b, ...response.data.booking } : b,
 					),
 				);
 				if (selectedBooking?.booking_id === bookingId) {
-					setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
+					setSelectedBooking((prev) => ({ ...prev, ...response.data.booking }));
 				}
 				setConfirmConfig((c) => ({ ...c, isOpen: false }));
 				toast.success(`Booking ${newStatus.replace(/_/g, " ")} successfully`);
@@ -626,7 +626,7 @@ export default function ProviderBookings() {
 				title={confirmConfig.title || "Decline Booking Request?"}
 				message={
 					confirmConfig.message ||
-					"The customer will receive an immediate notification and full payment refund."
+					"The customer will be notified. Eligible online refunds remain pending until the gateway confirms processing."
 				}
 				confirmText="Decline booking"
 				cancelText="Keep booking"

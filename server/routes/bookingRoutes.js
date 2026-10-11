@@ -1,3 +1,4 @@
+const { serializeBooking } = require("../utils/bookingLifecycle");
 const express = require("express");
 const router = express.Router();
 const {
@@ -64,7 +65,7 @@ router.get(
             ORDER BY b.date ASC
         `;
 			const result = await db.query(q, [req.user.id]);
-			res.json(result.rows);
+			res.json(result.rows.map((booking) => serializeBooking(booking, req.user)));
 		} catch (err) {
 			res.status(500).json({ message: "Error fetching provider bookings" });
 		}
@@ -98,7 +99,7 @@ router.get(
             ORDER BY b.date ASC
         `;
 			const result = await db.query(q);
-			res.json(result.rows);
+			res.json(result.rows.map((booking) => serializeBooking(booking, req.user)));
 		} catch (err) {
 			console.error(err);
 			res.status(500).json({ message: "Error fetching bookings" });
@@ -145,7 +146,7 @@ router.get("/:booking_id", authMiddleware, async (req, res) => {
 			delete booking.completion_otp;
 		}
 
-		res.json(booking);
+		res.json(serializeBooking(booking, req.user));
 	} catch (err) {
 		res.status(500).json({ message: "Server error" });
 	}
