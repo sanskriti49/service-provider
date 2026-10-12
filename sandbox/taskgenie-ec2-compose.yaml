@@ -1,0 +1,65 @@
+name: taskgenie-sandbox
+services:
+  postgres:
+    image: postgis/postgis:15-3.4-alpine
+    environment:
+      POSTGRES_USER: taskgenie
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Generate DB_PASSWORD in .env}
+      POSTGRES_DB: taskgenie_sandbox
+    volumes:
+      - sandbox_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskgenie -d taskgenie_sandbox"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - sandbox_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+  api:
+    build: ./server
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      DATABASE_URL: postgresql://taskgenie:${DB_PASSWORD}@postgres:5432/taskgenie_sandbox?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      DB_POOL_MAX: "5"
+      DB_POOL_MIN: "0"
+      JWT_SECRET: ${JWT_SECRET:?Generate JWT_SECRET in .env}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:?Generate DEMO_PASSWORD in .env}
+      CLIENT_URL: http://localhost:5173
+      FRONTEND_URL: http://localhost:5173
+      TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+      PAYMENT_RECONCILIATION_ENABLED: "false"
+    ports:
+      - "127.0.0.1:5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+volumes:
+  sandbox_pg:
+  sandbox_redis:
