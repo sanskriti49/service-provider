@@ -17,5 +17,6 @@ router.get("/unread", handle((req) => chat.unread(req.user.id)));
 router.get("/:bookingId/messages", handle((req) => chat.history(req.user.id, req.params.bookingId, req.query)));
 router.post("/:bookingId/messages", handle((req) => chat.send(req.user.id, req.params.bookingId, req.body)));
 router.post("/:bookingId/read", handle((req) => chat.markRead(req.user.id, req.params.bookingId, req.body)));
+router.post("/:bookingId/report", handle((req) => chat.report(req.user.id, req.params.bookingId, req.body)));
 
 module.exports = router;

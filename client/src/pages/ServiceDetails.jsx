@@ -406,6 +406,73 @@ const ServiceDetails = () => {
 	);
 };
 
+const generateFallbackSlots = (weeklySchedule) => {
+	let schedule = weeklySchedule;
+	if (typeof schedule === "string") {
+		try {
+			schedule = JSON.parse(schedule);
+		} catch {
+			schedule = [];
+		}
+	}
+	if (!Array.isArray(schedule) || schedule.length === 0) {
+		schedule = [
+			{ day: 1, start: "09:00", end: "18:00" },
+			{ day: 2, start: "09:00", end: "18:00" },
+			{ day: 3, start: "09:00", end: "18:00" },
+			{ day: 4, start: "09:00", end: "18:00" },
+			{ day: 5, start: "09:00", end: "18:00" },
+			{ day: 6, start: "10:00", end: "17:00" },
+		];
+	}
+
+	const scheduleMap = {};
+	schedule.forEach((s) => {
+		const dayNum = Number(s.day);
+		if (!isNaN(dayNum)) {
+			scheduleMap[dayNum] = {
+				start: (s.start || s.start_time || "09:00").slice(0, 5),
+				end: (s.end || s.end_time || "18:00").slice(0, 5),
+			};
+		}
+	});
+
+	const days = [];
+	const today = new Date();
+
+	for (let i = 0; i < 14; i++) {
+		const curDate = new Date(today);
+		curDate.setDate(today.getDate() + i);
+		const y = curDate.getFullYear();
+		const m = String(curDate.getMonth() + 1).padStart(2, "0");
+		const d = String(curDate.getDate()).padStart(2, "0");
+		const dateStr = `${y}-${m}-${d}`;
+		const dow = curDate.getDay();
+
+		const config = scheduleMap[dow];
+		const freeSlots = [];
+		if (config) {
+			const startH = parseInt(config.start.split(":")[0], 10) || 9;
+			const endH = parseInt(config.end.split(":")[0], 10) || 18;
+			for (let h = startH; h < endH; h++) {
+				const sTime = `${String(h).padStart(2, "0")}:00`;
+				const eTime = `${String(h + 1).padStart(2, "0")}:00`;
+				freeSlots.push({
+					start: sTime,
+					end: eTime,
+					start_time: sTime,
+					end_time: eTime,
+					isBooked: false,
+					is_booked: false,
+				});
+			}
+		}
+		days.push({ date: dateStr, free_slots: freeSlots });
+	}
+
+	return days;
+};
+
 const ProviderCard = ({
 	provider,
 	service,
@@ -447,6 +514,10 @@ const ProviderCard = ({
 
 			const providerIdentifier =
 				provider.user_id || provider.id || provider.custom_id;
+			if (!providerIdentifier) {
+				throw new Error("Provider identifier not found");
+			}
+
 			const cacheKey = `avail_${providerIdentifier}_${todayStr}_${userCoords?.lat || ""}`;
 			let data = apiCache.get(cacheKey);
 
@@ -454,18 +525,28 @@ const ProviderCard = ({
 				const res = await fetch(
 					`${API_URL}/api/providers/v1/${providerIdentifier}/availability?${params.toString()}`,
 				);
-				if (!res.ok) throw new Error("Failed to load slots");
+				if (!res.ok) {
+					const errorData = await res.json().catch(() => ({}));
+					throw new Error(
+						errorData.error || `Failed to load slots (status: ${res.status})`,
+					);
+				}
 				data = await res.json();
 				apiCache.set(cacheKey, data, 60000);
 			}
 
-			setAvailability(
-				Array.isArray(data.availability) ? data.availability : [],
-			);
+			let slotsList = Array.isArray(data.availability) ? data.availability : [];
+			if (slotsList.length === 0 && provider.availability) {
+				slotsList = generateFallbackSlots(provider.availability);
+			}
+
+			setAvailability(slotsList);
 			setHasLoadedSlots(true);
 		} catch (error) {
 			console.error("Availability error:", error);
-			setAvailability([]);
+			const fallback = generateFallbackSlots(provider.availability);
+			setAvailability(fallback);
+			setHasLoadedSlots(true);
 		} finally {
 			setLoadingSlots(false);
 		}

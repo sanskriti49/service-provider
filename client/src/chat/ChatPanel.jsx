@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowUp, Check, CheckCheck, ChevronLeft, LoaderCircle, LockKeyhole, MessageCircle, RefreshCw, WifiOff, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, CheckCheck, ChevronLeft, LoaderCircle, LockKeyhole, MessageCircle, RefreshCw, ShieldAlert, WifiOff, X } from "lucide-react";
 import useModal from "../hooks/useModal";
 import useConversation from "./useConversation";
+import ChatReportModal from "./ChatReportModal";
 import "./chat.css";
 
 const time = (value) => new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -22,6 +23,7 @@ export default function ChatPanel({ booking, user, socket, connection, cache, on
 	const [newMessages, setNewMessages] = useState(false);
 	const [announcement, setAnnouncement] = useState("");
 	const [viewport, setViewport] = useState(null);
+	const [showReport, setShowReport] = useState(false);
 	const peer = user.role === "provider" ? booking.customer_name || "Your customer" : booking.provider_name || booking.provider?.name || "Your provider";
 	const initials = peer.split(/\s+/).slice(0, 2).map((name) => name[0]).join("").toUpperCase();
 	useModal({ isOpen: true, onClose, id: "booking-chat" });
@@ -126,8 +128,27 @@ export default function ChatPanel({ booking, user, socket, connection, cache, on
 					<h2 id="chat-title" className="truncate text-lg font-semibold text-white">{peer}</h2>
 					<p id="chat-description" className="mt-1 flex items-center gap-1.5 text-xs text-stone-400"><LockKeyhole size={11} aria-hidden="true" /> Just you and your {user.role === "provider" ? "customer" : "provider"}</p>
 				</div>
-				<button type="button" onClick={onClose} className="tg-chat-icon tg-chat-close" aria-label="Close chat"><X size={20} /></button>
+				<div className="tg-chat-actions">
+					<button
+						type="button"
+						onClick={() => setShowReport(true)}
+						className="tg-chat-icon tg-chat-report-btn"
+						title={`Report ${peer}`}
+						aria-label={`Report ${peer}`}
+					>
+						<ShieldAlert size={19} />
+					</button>
+					<button type="button" onClick={onClose} className="tg-chat-icon tg-chat-close" aria-label="Close chat"><X size={20} /></button>
+				</div>
 			</header>
+			<ChatReportModal
+				booking={booking}
+				peer={peer}
+				user={user}
+				socket={socket}
+				isOpen={showReport}
+				onClose={() => setShowReport(false)}
+			/>
 			<div className="tg-chat-booking">
 				<div className="min-w-0"><p className="truncate text-sm font-medium text-stone-200">{booking.service_name || "Your service booking"}</p>
 					<p className="mt-1 text-[11px] text-stone-400">{booking.date ? new Date(booking.date).toLocaleDateString([], { day: "numeric", month: "short" }) : "Scheduled service"}<span className="mx-2 text-stone-600">/</span><span className="font-mono">#{booking.booking_id.slice(0, 8).toUpperCase()}</span></p></div>

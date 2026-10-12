@@ -21,5 +21,6 @@ export async function chatRequest(socket, operation, input = {}) {
 	const config = { timeout: 12000 };
 	if (operation === "unread") return (await api.get("/api/chat/unread", config)).data;
 	if (operation === "history") return (await api.get(`${base}/messages`, { ...config, params: data })).data;
+	if (operation === "report") return (await api.post(`${base}/report`, data, config)).data;
 	return (await api.post(`${base}/${operation === "send" ? "messages" : "read"}`, data, config)).data;
 }

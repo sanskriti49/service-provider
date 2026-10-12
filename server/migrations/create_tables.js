@@ -124,6 +124,8 @@ const queries = [
 	`ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS completion_otp varchar(6) NULL`,
 	`ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS latitude float4 NULL`,
 	`ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS longitude float4 NULL`,
+	`ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS hold_expires_at timestamptz NULL`,
+	`ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS last_payment_check_at timestamptz NULL`,
 	`UPDATE public.bookings SET completion_otp = otp WHERE completion_otp IS NULL AND otp IS NOT NULL`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_booking_id ON public.bookings USING btree (booking_id)`,
 	`CREATE INDEX IF NOT EXISTS ix_bookings_provider_date ON public.bookings USING btree (provider_id, date)`,

@@ -27,6 +27,7 @@ not modify booking status, payments, OTPs, phone contact or notifications.
 | `GET /api/chat/:bookingId/messages` | Optional `limit=1..100` (default 50), `before=<id>` **or** `after=<id>` | History and current conversation summary |
 | `POST /api/chat/:bookingId/messages` | `{ "clientMessageId": "UUID", "body": "text" }` | `{ message, duplicate }` (200, including retry) |
 | `POST /api/chat/:bookingId/read` | `{ "throughMessageId": "123" }` | Receipt and current reader summary |
+| `POST /api/chat/:bookingId/report` | `{ "reason": "text", "details"?: "text", "messageId"?: "123" }` | `{ success: true, report, message }` |
 | `GET /api/chat/unread` | None | `{ conversations: [{ booking_id, unread_count }], total_unread }`; only nonzero conversations |
 
 Message:
@@ -93,6 +94,7 @@ Every request uses one acknowledgement callback:
 | `chat:send` | `{ bookingId, clientMessageId, body }` |
 | `chat:read` | `{ bookingId, throughMessageId }` |
 | `chat:unread` | `{}` |
+| `chat:report` | `{ bookingId, reason, details?, messageId? }` |
 
 Server events:
 - `chat:message`: the persisted message (emitted after a new send commits, whether

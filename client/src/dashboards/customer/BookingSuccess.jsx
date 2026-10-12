@@ -1,17 +1,26 @@
-import { useNavigate, useLocation, Navigate, Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useNavigate, useLocation, Navigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import {
 	Check,
 	Home,
-	Calendar,
-	Clock,
-	Navigation,
 	X,
 	CircleAlert,
 	Mail,
+	MapPin,
+	Copy,
+	CalendarPlus,
+	Search,
+	Pencil,
+	Lock,
 } from "lucide-react";
 import { FadeLoader } from "react-spinners";
 import api from "../../api/axiosInstance";
+
+const EDIT_WINDOW_MS = 10 * 60 * 1000;
+const WARN_MS = 2 * 60 * 1000;
+const RING_R = 18;
+const RING_C = 2 * Math.PI * RING_R;
+const CONFETTI_COLORS = ["#7C5CFF", "#19C37D", "#F5A524", "#F5F2FF"];
 
 export default function BookingSuccess() {
 	const navigate = useNavigate();
@@ -34,27 +43,54 @@ export default function BookingSuccess() {
 	const [addressMatches, setAddressMatches] = useState([]);
 	const [selectedLocation, setSelectedLocation] = useState(null);
 	const [errorMsg, setErrorMsg] = useState(null);
+	const [copied, setCopied] = useState(false);
+	const [showConfetti, setShowConfetti] = useState(true);
+
+	// One-time celebration: pieces are generated once and removed after they land.
+	const confetti = useMemo(
+		() =>
+			Array.from({ length: 26 }, (_, i) => ({
+				id: i,
+				left: 8 + Math.random() * 84,
+				delay: Math.random() * 0.35,
+				duration: 1.9 + Math.random() * 1.2,
+				drift: (Math.random() - 0.5) * 160,
+				rotate: 180 + Math.random() * 540,
+				color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+				w: 6 + Math.random() * 5,
+				h: 10 + Math.random() * 6,
+			})),
+		[],
+	);
+
+	useEffect(() => {
+		const t = setTimeout(() => setShowConfetti(false), 3600);
+		return () => clearTimeout(t);
+	}, []);
 
 	useEffect(() => {
 		if (!isValid || !booking.created_at) return;
-		const createdAt = new Date(booking.created_at || Date.now());
-		const deadline = new Date(createdAt.getTime() + 10 * 60000);
+		const deadline = new Date(booking.created_at).getTime() + EDIT_WINDOW_MS;
 
-		const timer = setInterval(() => {
-			const now = new Date();
-			const difference = deadline - now;
+		const tick = () => {
+			const difference = deadline - Date.now();
 			if (difference <= 0) {
 				setTimeLeft(0);
 				setIsEditing(false);
-				clearInterval(timer);
-			} else {
-				setTimeLeft(difference);
+				return true;
 			}
+			setTimeLeft(difference);
+			return false;
+		};
+
+		// Tick immediately so the stub never flashes "expired" on first paint.
+		if (tick()) return;
+		const timer = setInterval(() => {
+			if (tick()) clearInterval(timer);
 		}, 1000);
 
 		return () => clearInterval(timer);
 	}, [isValid, booking.created_at]);
-
 
 	const formatCountDown = (ms) => {
 		const minutes = Math.floor(ms / 60000);
@@ -69,39 +105,111 @@ export default function BookingSuccess() {
 
 		try {
 			if (!selectedLocation) {
-                const lookup = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(tempAddress)}`, { signal: AbortSignal.timeout(5000) });
-                if (!lookup.ok) throw new Error("Location lookup unavailable");
-                const matches = await lookup.json();
-                setAddressMatches(matches);
-                setErrorMsg(matches.length ? "Choose the matching location below, then save." : "Location not found. Enter a more complete address.");
-                return;
-            }
-            await api.patch(`/api/bookings/${booking.booking_id}/address`, {
-                latitude: Number(selectedLocation.lat), longitude: Number(selectedLocation.lon),
+				const lookup = await fetch(
+					`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(tempAddress)}`,
+					{ signal: AbortSignal.timeout(5000) },
+				);
+				if (!lookup.ok) throw new Error("Location lookup unavailable");
+				const matches = await lookup.json();
+				setAddressMatches(matches);
+				setErrorMsg(
+					matches.length
+						? null
+						: "We couldn't find that place. Add a street, area or pincode and search again.",
+				);
+				return;
+			}
+			await api.patch(`/api/bookings/${booking.booking_id}/address`, {
+				latitude: Number(selectedLocation.lat),
+				longitude: Number(selectedLocation.lon),
 				address: tempAddress,
 			});
 			setAddress(tempAddress);
 			setIsEditing(false);
+			setAddressMatches([]);
+			setSelectedLocation(null);
 		} catch (err) {
 			console.error(err);
 			setErrorMsg(
-				err.response?.data?.message || "Failed to update address. Try again.",
+				err.response?.data?.message ||
+					"We couldn't update the address. Check your connection and try again.",
 			);
 		} finally {
 			setIsSaving(false);
 		}
 	};
 
+	const cancelEdit = () => {
+		setIsEditing(false);
+		setTempAddress(address);
+		setSelectedLocation(null);
+		setAddressMatches([]);
+		setErrorMsg(null);
+	};
+
+	const copyRef = async () => {
+		try {
+			await navigator.clipboard.writeText(String(booking.booking_id));
+			setCopied(true);
+			setTimeout(() => setCopied(false), 1600);
+		} catch {
+			/* clipboard unavailable: fail silently */
+		}
+	};
+
+	const downloadIcs = () => {
+		const day = String(booking.date).slice(0, 10).replaceAll("-", "");
+		const hhmmss = (t, addHour = 0) => {
+			const [h = "00", m = "00"] = String(t).split(":");
+			const hour = Math.min(Number(h) + addHour, 23);
+			const minute = hour === 23 && Number(h) + addHour > 23 ? 59 : Number(m);
+			return `${String(hour).padStart(2, "0")}${String(minute).padStart(2, "0")}00`;
+		};
+		const start = `${day}T${hhmmss(booking.start_time)}`;
+		const end = booking.end_time
+			? `${day}T${hhmmss(booking.end_time)}`
+			: `${day}T${hhmmss(booking.start_time, 1)}`;
+		const stamp =
+			new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+		const esc = (s) =>
+			String(s)
+				.replace(/([,;\\])/g, "\\$1")
+				.replace(/\n/g, "\\n");
+
+		const ics = [
+			"BEGIN:VCALENDAR",
+			"VERSION:2.0",
+			"PRODID:-//Booking//EN",
+			"BEGIN:VEVENT",
+			`UID:booking-${booking.booking_id}@bookings`,
+			`DTSTAMP:${stamp}`,
+			`DTSTART:${start}`,
+			`DTEND:${end}`,
+			"SUMMARY:Service booking",
+			`LOCATION:${esc(address || "")}`,
+			"END:VEVENT",
+			"END:VCALENDAR",
+		].join("\r\n");
+
+		const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `booking-${booking.booking_id}.ics`;
+		a.click();
+		URL.revokeObjectURL(url);
+	};
+
 	if (!isValid) {
 		return <Navigate to="/" replace />;
 	}
 
-	const formatDate = (dateStr) =>
-		new Date(dateStr).toLocaleDateString("en-IN", {
-			weekday: "short",
-			month: "short",
-			day: "numeric",
-		});
+	const weekday = new Date(booking.date).toLocaleDateString("en-IN", {
+		weekday: "long",
+	});
+	const dayMonth = new Date(booking.date).toLocaleDateString("en-IN", {
+		day: "numeric",
+		month: "short",
+	});
 
 	const formatTime = (timeStr) => {
 		if (!timeStr) return "";
@@ -112,167 +220,362 @@ export default function BookingSuccess() {
 			hour12: true,
 		});
 	};
+	const [clock, meridiem] = formatTime(booking.start_time).split(/\s+/);
+
+	const canEdit = timeLeft > 0;
+	const ringOffset = RING_C * (1 - Math.min(timeLeft / EDIT_WINDOW_MS, 1));
+	const ringColor = timeLeft < WARN_MS ? "#F5A524" : "#5B3DF5";
 
 	return (
-		<div className="bricolage-grotesque min-h-screen flex items-center justify-center bg-[#0d0b21] relative overflow-hidden font-sans p-4">
-			<div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-violet-600/20 rounded-full blur-[120px] pointer-events-none" />
-			<div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
+		<div className="bricolage-grotesque min-h-screen flex items-center justify-center bg-[#0E0B1E] p-4 py-10 overflow-hidden">
+			<style>{`
+				@keyframes bs-draw { to { stroke-dashoffset: 0; } }
+				@keyframes bs-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+				@keyframes bs-halo { 0% { transform: scale(.8); opacity: .55; } 100% { transform: scale(2.1); opacity: 0; } }
+				@keyframes bs-ticket { 0% { transform: translateY(28px) rotate(-1.2deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+				@keyframes bs-fall {
+					0% { transform: translate3d(0,-20px,0) rotate(0); opacity: 1; }
+					100% { transform: translate3d(var(--drift), 105vh, 0) rotate(var(--rot)); opacity: 0; }
+				}
+				.bs-check path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: bs-draw .5s .35s ease-out forwards; }
+				.bs-badge { animation: bs-pop .5s ease-out both; }
+				.bs-halo { animation: bs-halo 1.2s .3s ease-out both; }
+				.bs-ticket { animation: bs-ticket .7s .15s cubic-bezier(.2,.8,.2,1) both; }
+				.bs-confetti { animation: bs-fall var(--dur) var(--delay) cubic-bezier(.3,.6,.4,1) forwards; }
+				@media (prefers-reduced-motion: reduce) {
+					.bs-check path { animation: none; stroke-dashoffset: 0; }
+					.bs-badge, .bs-halo, .bs-ticket { animation: none; }
+					.bs-confetti { display: none; }
+				}
+			`}</style>
 
-			<div className="relative z-10 w-full max-w-md animate-fade-in-up">
-				<div className="bg-white/10 backdrop-blur-2xl border border-white/10 rounded-t-3xl p-8 text-center relative overflow-hidden">
-					<div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500" />
-					<div className="w-20 h-20 mx-auto bg-gradient-to-tr from-green-400 to-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30 mb-6 animate-bounce-slow">
-						<Check className="w-10 h-10 text-white" strokeWidth={4} />
-					</div>
-
-					<h1 className="text-3xl font-bold text-white mb-2 tracking-tight">
-						Booking Confirmed!
-					</h1>
-					<p className="text-violet-200/70 text-sm mb-6">
-						Your appointment is scheduled successfully.
-					</p>
-
-					<div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.15)] animate-pulse-slow">
-						<Mail className="w-4 h-4 text-emerald-400" />
-						<span className="text-emerald-100 text-xs font-medium">
-							Confirmation email sent!
-						</span>
-					</div>
+			{showConfetti && (
+				<div
+					className="pointer-events-none fixed inset-0 z-20 overflow-hidden"
+					aria-hidden="true"
+				>
+					{confetti.map((c) => (
+						<span
+							key={c.id}
+							className="bs-confetti absolute top-0 rounded-[2px]"
+							style={{
+								left: `${c.left}%`,
+								width: c.w,
+								height: c.h,
+								background: c.color,
+								"--drift": `${c.drift}px`,
+								"--rot": `${c.rotate}deg`,
+								"--dur": `${c.duration}s`,
+								"--delay": `${c.delay}s`,
+							}}
+						/>
+					))}
 				</div>
+			)}
 
-				<div className="relative bg-[#13112b]/80 backdrop-blur-xl border-x border-white/10 p-6">
-					<div className="absolute top-0 left-0 w-full flex justify-between transform -translate-y-1/2">
-						<div className="w-6 h-6 bg-[#0d0b21] rounded-full -ml-3" />
-						<div className="flex-1 border-t-2 border-dashed border-white/10 mx-2" />
-						<div className="w-6 h-6 bg-[#0d0b21] rounded-full -mr-3" />
+			<main className="relative z-10 w-full max-w-md">
+				{/* Confirmation header */}
+				<header className="text-center mb-8">
+					<div className="relative mx-auto mb-5 w-16 h-16">
+						<span className="bs-halo absolute inset-0 rounded-full bg-[#19C37D]" />
+						<div className="bs-badge relative w-16 h-16 rounded-full bg-[#19C37D] flex items-center justify-center shadow-[0_8px_30px_rgba(25,195,125,.35)]">
+							<svg
+								className="bs-check"
+								width="30"
+								height="30"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="#0E0B1E"
+								strokeWidth="3.2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
+								<path d="M5 12.5l4.5 4.5L19 7.5" pathLength="1" />
+							</svg>
+						</div>
+					</div>
+					<h1 className="text-4xl font-extrabold tracking-tight text-white">
+						You're booked
+					</h1>
+					<p className="mt-2 text-sm text-violet-200/70 inline-flex items-center gap-1.5">
+						<Mail className="w-4 h-4 text-[#19C37D]" />
+						We've emailed your confirmation
+					</p>
+				</header>
+
+				{/* Ticket */}
+				<section
+					className="bs-ticket relative rounded-[28px] bg-[#F5F2FF] text-[#1A1636] shadow-[0_30px_80px_-20px_rgba(91,61,245,.55)]"
+					aria-label="Booking details"
+				>
+					{/* When */}
+					<div className="grid grid-cols-[1.25fr_1fr] px-7 pt-7 pb-8">
+						<div className="pr-5 border-r-2 border-dashed border-[#1A1636]/15">
+							<p className="text-sm text-[#6B6590]">{weekday}</p>
+							<p className="mt-1 text-4xl font-extrabold leading-none tracking-tight">
+								{dayMonth}
+							</p>
+						</div>
+						<div className="pl-5">
+							<p className="text-sm text-[#6B6590]">Arrival</p>
+							<p className="mt-1 text-4xl font-extrabold leading-none tracking-tight tabular-nums">
+								{clock}
+								<span className="ml-1 text-base font-bold text-[#6B6590]">
+									{meridiem}
+								</span>
+							</p>
+						</div>
 					</div>
 
-					<div className="space-y-6 pt-2">
-						<div className="grid grid-cols-2 gap-4">
-							<div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-								<div className="flex items-center gap-2 text-violet-300 mb-1">
-									<Calendar className="w-4 h-4" />
-									<span className="text-xs uppercase tracking-wider font-semibold">
-										Date
-									</span>
-								</div>
-								<p className="text-white font-semibold text-lg">
-									{formatDate(booking.date)}
-								</p>
-							</div>
-							<div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-								<div className="flex items-center gap-2 text-violet-300 mb-1">
-									<Clock className="w-4 h-4" />
-									<span className="text-xs uppercase tracking-wider font-semibold">
-										Time
-									</span>
-								</div>
-								<p className="text-white font-semibold text-lg">
-									{formatTime(booking.start_time)}
-								</p>
-							</div>
-						</div>
+					{/* Perforation */}
+					<div className="relative h-0" aria-hidden="true">
+						<div className="absolute -left-3 -top-3 w-6 h-6 rounded-full bg-[#0E0B1E]" />
+						<div className="absolute -right-3 -top-3 w-6 h-6 rounded-full bg-[#0E0B1E]" />
+						<div className="absolute left-5 right-5 top-0 border-t-2 border-dashed border-[#1A1636]/15" />
+					</div>
 
-						<div
-							className={`rounded-2xl border transition-all duration-300 overflow-hidden ${
-								isEditing
-									? "bg-white/10 border-violet-500/50"
-									: "bg-gradient-to-r from-violet-500/10 to-transparent border-violet-500/20"
-							}`}
-						>
-							<div className="p-4">
-								<div className="flex justify-between items-start mb-2">
-									<div className="flex items-center gap-2">
-										<Navigation className="w-4 h-4 text-violet-400" />
-										<span className="text-xs text-violet-300 uppercase tracking-wider font-semibold">
-											Provider Location
-										</span>
-									</div>
-									{timeLeft > 0 && !isEditing && (
-										<button
-											onClick={() => setIsEditing(true)}
-											className="cursor-pointer flex items-center gap-1.5 text-xs font-bold bg-white/10 hover:bg-white/20 px-2 py-1 rounded-full text-white transition-colors border border-white/5"
-										>
-											<span className="text-green-400">●</span>
-											Change
-										</button>
-									)}
-								</div>
+					{/* Where */}
+					<div className="px-7 pt-8 pb-6">
+						<div className="flex items-start justify-between gap-4">
+							<div className="min-w-0 flex-1">
+								<p className="flex items-center gap-1.5 text-sm text-[#6B6590]">
+									<MapPin className="w-4 h-4 text-[#5B3DF5]" />
+									Service address
+								</p>
 
-								{isEditing ? (
-									<div className="mt-2 animate-fade-in">
-										<textarea
-											value={tempAddress}
-											onChange={(e) => { setTempAddress(e.target.value); setSelectedLocation(null); setAddressMatches([]); }}
-											className="w-full bg-black/30 border border-white/10 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-violet-500 outline-none mb-3 resize-none h-20"
-											placeholder="Enter new address..."
-										/>
-										{addressMatches.length > 0 && <label className="block text-xs text-gray-300">Service location
-                                        <select className="block w-full mt-2 bg-[#19152d] text-white p-2 rounded" value={selectedLocation ? addressMatches.indexOf(selectedLocation) : ""} onChange={(event) => setSelectedLocation(addressMatches[Number(event.target.value)])}>
-                                            <option value="" disabled>Select the matching address</option>
-                                            {addressMatches.map((match,index) => <option key={match.place_id} value={index}>{match.display_name}</option>)}
-                                        </select>
-                                    </label>}
-                                    {errorMsg && (
-											<div className="flex items-center gap-1 text-red-400 text-xs mb-2">
-												<CircleAlert size={12} /> {errorMsg}
-											</div>
-										)}
-										<div className="flex gap-2 justify-end">
-											<button
-												onClick={() => {
-													setIsEditing(false);
-													setTempAddress(address);
-                                                    setSelectedLocation(null); setAddressMatches([]);
-													setErrorMsg(null);
-												}}
-												className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition"
-											>
-												<X size={16} />
-											</button>
-											<button
-												onClick={handleUpdateAddress}
-												disabled={isSaving}
-												className="flex cursor-pointer disabled:cursor-not-allowed items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition disabled:opacity-50"
-											>
-												{isSaving ? (
-													<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
-														<FadeLoader color="#ffffff" />
-													</span>
-												) : (
-													<Check size={14} />
-												)}
-												Save
-											</button>
-										</div>
-									</div>
-								) : (
-									<div className="mt-1">
-										<p className="text-white text-sm leading-relaxed break-words">
-											{address || "No address provided."}
-										</p>
-										<p className="text-[12px] text-gray-400 mt-2 italic">
-											{timeLeft > 0
-												? `Editable for ${formatCountDown(timeLeft)} mins`
-												: "Edit window expired"}
-										</p>
-									</div>
+								{!isEditing && (
+									<p className="mt-2 text-base font-semibold leading-snug break-words">
+										{address || "No address added yet."}
+									</p>
 								)}
 							</div>
-						</div>
-					</div>
-				</div>
 
-				<div className="bg-white/5 backdrop-blur-2xl border border-t-0 border-white/10 rounded-b-3xl p-6">
+							{/* Countdown ring */}
+							<div
+								className="relative shrink-0 w-12 h-12"
+								role="timer"
+								aria-label={
+									canEdit
+										? `Address can be changed for ${formatCountDown(timeLeft)}`
+										: "Address changes closed"
+								}
+							>
+								<svg viewBox="0 0 44 44" className="w-12 h-12 -rotate-90">
+									<circle
+										cx="22"
+										cy="22"
+										r={RING_R}
+										fill="none"
+										stroke="#E0D9FA"
+										strokeWidth="4"
+									/>
+									<circle
+										cx="22"
+										cy="22"
+										r={RING_R}
+										fill="none"
+										stroke={canEdit ? ringColor : "transparent"}
+										strokeWidth="4"
+										strokeLinecap="round"
+										strokeDasharray={RING_C}
+										strokeDashoffset={ringOffset}
+										style={{
+											transition: "stroke-dashoffset 1s linear, stroke .3s",
+										}}
+									/>
+								</svg>
+								<span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums">
+									{canEdit ? (
+										formatCountDown(timeLeft)
+									) : (
+										<Lock className="w-4 h-4 text-[#6B6590]" />
+									)}
+								</span>
+							</div>
+						</div>
+
+						{!isEditing && (
+							<div className="mt-4 flex items-center justify-between gap-3">
+								<p
+									className={`text-xs ${
+										canEdit && timeLeft < WARN_MS
+											? "text-[#B7791F] font-semibold"
+											: "text-[#6B6590]"
+									}`}
+								>
+									{canEdit
+										? timeLeft < WARN_MS
+											? "Last chance to change the address"
+											: "You can still change the address"
+										: "Address is locked for this booking"}
+								</p>
+								{canEdit && (
+									<button
+										onClick={() => setIsEditing(true)}
+										className="cursor-pointer inline-flex items-center gap-1.5 rounded-full bg-[#1A1636] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#2B2552] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B3DF5] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F2FF]"
+									>
+										<Pencil className="w-3.5 h-3.5" />
+										Change
+									</button>
+								)}
+							</div>
+						)}
+
+						{/* Edit mode */}
+						{isEditing && (
+							<div className="mt-3">
+								<textarea
+									value={tempAddress}
+									onChange={(e) => {
+										setTempAddress(e.target.value);
+										setSelectedLocation(null);
+										setAddressMatches([]);
+										setErrorMsg(null);
+									}}
+									aria-label="New service address"
+									className="w-full h-20 resize-none rounded-xl border border-[#1A1636]/15 bg-white p-3 text-sm text-[#1A1636] placeholder:text-[#6B6590]/70 outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/25"
+									placeholder="House no., street, area, city"
+								/>
+
+								{addressMatches.length > 0 && (
+									<div className="mt-3">
+										<p className="text-xs font-semibold mb-2">
+											Pick the matching location
+										</p>
+										<ul
+											role="radiogroup"
+											aria-label="Matching locations"
+											className="space-y-2 max-h-44 overflow-y-auto pr-1"
+										>
+											{addressMatches.map((match) => {
+												const active =
+													selectedLocation?.place_id === match.place_id;
+												return (
+													<li key={match.place_id}>
+														<button
+															type="button"
+															role="radio"
+															aria-checked={active}
+															onClick={() => setSelectedLocation(match)}
+															className={`cursor-pointer w-full text-left flex items-start gap-2.5 rounded-xl border p-3 text-xs leading-snug transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B3DF5] ${
+																active
+																	? "border-[#5B3DF5] bg-[#5B3DF5]/10"
+																	: "border-[#1A1636]/10 bg-white hover:border-[#5B3DF5]/50"
+															}`}
+														>
+															<span
+																className={`mt-0.5 flex w-4 h-4 shrink-0 items-center justify-center rounded-full border ${
+																	active
+																		? "bg-[#5B3DF5] border-[#5B3DF5]"
+																		: "border-[#1A1636]/25"
+																}`}
+															>
+																{active && (
+																	<Check
+																		className="w-3 h-3 text-white"
+																		strokeWidth={4}
+																	/>
+																)}
+															</span>
+															<span className="line-clamp-2">
+																{match.display_name}
+															</span>
+														</button>
+													</li>
+												);
+											})}
+										</ul>
+									</div>
+								)}
+
+								{errorMsg && (
+									<p
+										role="alert"
+										className="mt-3 flex items-start gap-1.5 text-xs text-[#C0392B]"
+									>
+										<CircleAlert className="w-4 h-4 shrink-0" />
+										{errorMsg}
+									</p>
+								)}
+
+								<div className="mt-4 flex items-center justify-end gap-2">
+									<button
+										onClick={cancelEdit}
+										aria-label="Cancel editing"
+										className="cursor-pointer rounded-xl p-2.5 text-[#6B6590] hover:bg-[#1A1636]/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B3DF5]"
+									>
+										<X size={18} />
+									</button>
+									<button
+										onClick={handleUpdateAddress}
+										disabled={isSaving || !tempAddress.trim()}
+										className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center gap-2 rounded-xl bg-[#5B3DF5] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#4B2FE0] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B3DF5] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F5F2FF]"
+									>
+										{isSaving ? (
+											<span className="inline-flex items-center justify-center w-4 h-4 scale-[0.35] origin-center -mx-1">
+												<FadeLoader color="#ffffff" />
+											</span>
+										) : selectedLocation ? (
+											<Check size={16} strokeWidth={3} />
+										) : (
+											<Search size={16} />
+										)}
+										{selectedLocation ? "Save address" : "Find location"}
+									</button>
+								</div>
+							</div>
+						)}
+					</div>
+
+					{/* Reference stub */}
+					<div className="flex items-center justify-between gap-3 rounded-b-[28px] bg-[#E9E3FF] px-7 py-4">
+						<div>
+							<p className="text-xs text-[#6B6590]">Booking reference</p>
+							<p className="mt-0.5 font-mono text-sm font-bold tracking-wide">
+								#{booking.booking_id}
+							</p>
+						</div>
+						<button
+							onClick={copyRef}
+							className="cursor-pointer inline-flex items-center gap-1.5 rounded-full border border-[#1A1636]/15 px-3 py-1.5 text-xs font-bold hover:bg-white/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B3DF5]"
+							aria-live="polite"
+						>
+							{copied ? (
+								<>
+									<Check
+										className="w-3.5 h-3.5 text-[#0F8F58]"
+										strokeWidth={3}
+									/>
+									Copied
+								</>
+							) : (
+								<>
+									<Copy className="w-3.5 h-3.5" />
+									Copy
+								</>
+							)}
+						</button>
+					</div>
+				</section>
+
+				{/* Actions */}
+				<div className="mt-6 grid grid-cols-2 gap-3">
+					<button
+						onClick={downloadIcs}
+						className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3.5 text-sm font-bold text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+					>
+						<CalendarPlus className="w-4 h-4" />
+						Add to calendar
+					</button>
 					<button
 						onClick={() => navigate("/", { replace: true })}
-						className="cursor-pointer w-full py-4 bg-white text-violet-950 rounded-xl font-bold text-lg hover:bg-gray-100 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-xl flex items-center justify-center gap-2 opacity-90 hover:opacity-75"
+						className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3.5 text-sm font-bold text-[#1A1636] hover:bg-violet-100 active:scale-[0.98] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
 					>
-						<Home className="w-5 h-5" />
-						Back to Home
+						<Home className="w-4 h-4" />
+						Back to home
 					</button>
 				</div>
-			</div>
+			</main>
 		</div>
 	);
 }

@@ -142,4 +142,111 @@ async function unread(userId) {
 	return { conversations: rows, total_unread: rows.reduce((sum, row) => sum + row.unread_count, 0) };
 }
 
-module.exports = { ChatError, uuid, errorPayload, history, send, markRead, unread };
+let reportsTableReady = false;
+async function ensureChatReportsTable(clientOrDb) {
+	if (reportsTableReady) return;
+	try {
+		await clientOrDb.query(`
+			CREATE TABLE IF NOT EXISTS public.chat_reports (
+				id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+				booking_id uuid NOT NULL REFERENCES public.bookings(booking_id) ON DELETE CASCADE,
+				reporter_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+				reported_user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+				message_id bigint REFERENCES public.chat_messages(id) ON DELETE SET NULL,
+				reason text NOT NULL,
+				details text,
+				status varchar(20) DEFAULT 'pending' NOT NULL,
+				action_taken text,
+				created_at timestamptz DEFAULT now() NOT NULL,
+				updated_at timestamptz DEFAULT now() NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS ix_chat_reports_booking ON public.chat_reports(booking_id);
+			CREATE INDEX IF NOT EXISTS ix_chat_reports_reporter ON public.chat_reports(reporter_id);
+			CREATE INDEX IF NOT EXISTS ix_chat_reports_reported ON public.chat_reports(reported_user_id);
+			CREATE INDEX IF NOT EXISTS ix_chat_reports_status ON public.chat_reports(status);
+		`);
+		reportsTableReady = true;
+	} catch (err) {
+		console.warn("Could not ensure chat_reports table:", err.message);
+	}
+}
+
+async function report(userId, bookingId, input = {}) {
+	userId = uuid(userId, "userId");
+	bookingId = uuid(bookingId, "bookingId");
+
+	if (!input || typeof input !== "object" || Array.isArray(input)) {
+		throw new ChatError(400, "INVALID_INPUT", "Invalid report payload");
+	}
+
+	const rawReason = input.reason;
+	if (typeof rawReason !== "string" || !rawReason.trim() || rawReason.trim().length > 100) {
+		throw new ChatError(400, "INVALID_INPUT", "reason must be 1-100 characters");
+	}
+	const reason = rawReason.trim();
+
+	let details = null;
+	if (input.details !== undefined && input.details !== null) {
+		if (typeof input.details !== "string" || input.details.length > 2000) {
+			throw new ChatError(400, "INVALID_INPUT", "details must be at most 2000 characters");
+		}
+		details = input.details.trim() || null;
+	}
+
+	let targetMessageId = null;
+	if (input.messageId !== undefined && input.messageId !== null) {
+		targetMessageId = messageId(String(input.messageId), "messageId");
+	}
+
+	await ensureChatReportsTable(db);
+
+	const { result } = await withBooking(userId, bookingId, async (client, booking, actor) => {
+		const reportedUserId = actor === booking.user_id ? booking.provider_id : booking.user_id;
+
+		if (targetMessageId) {
+			const checkMsg = await client.query(
+				"SELECT id FROM chat_messages WHERE booking_id = $1 AND id = $2",
+				[booking.booking_id, targetMessageId]
+			);
+			if (!checkMsg.rows.length) {
+				throw new ChatError(400, "INVALID_INPUT", "Reported message does not belong to this conversation");
+			}
+		}
+
+		const insertRes = await client.query(
+			`INSERT INTO chat_reports (booking_id, reporter_id, reported_user_id, message_id, reason, details)
+			 VALUES ($1, $2, $3, $4, $5, $6)
+			 RETURNING id, booking_id, reporter_id, reported_user_id, message_id, reason, details, status, created_at`,
+			[booking.booking_id, actor, reportedUserId, targetMessageId, reason, details]
+		);
+
+		const createdReport = insertRes.rows[0];
+
+		// Dispatch confirmation in-app notification to the reporter
+		try {
+			await client.query(
+				`INSERT INTO notifications (user_id, title, message, type, data)
+				 VALUES ($1, $2, $3, 'system', $4)`,
+				[
+					actor,
+					"🛡️ Safety Report Submitted",
+					`We received your report regarding booking #${booking.booking_id.slice(0, 8).toUpperCase()}. Our Trust & Safety team is reviewing the interaction.`,
+					JSON.stringify({ report_id: createdReport.id, booking_id: booking.booking_id, reason }),
+				]
+			);
+		} catch (notifErr) {
+			console.warn("Could not dispatch safety report notification:", notifErr.message);
+		}
+
+		return {
+			success: true,
+			report: createdReport,
+			message: "Report submitted successfully. Our Trust & Safety team will review this conversation.",
+		};
+	});
+
+	return result;
+}
+
+module.exports = { ChatError, uuid, errorPayload, history, send, markRead, unread, report };
+

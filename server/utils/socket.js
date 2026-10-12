@@ -1,4 +1,4 @@
-﻿const { Server } = require("socket.io");
+const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
 const chat = require("./chatService");
@@ -85,6 +85,7 @@ function initSocket(httpServer, corsOptions) {
 		handle("chat:send", (input) => chat.send(socket.userId, input.bookingId, input));
 		handle("chat:read", (input) => chat.markRead(socket.userId, input.bookingId, input));
 		handle("chat:unread", () => chat.unread(socket.userId));
+		handle("chat:report", (input) => chat.report(socket.userId, input.bookingId, input));
 
 		socket.on("disconnect", () => {
 			clearTimeout(expiryTimer);

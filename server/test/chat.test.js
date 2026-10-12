@@ -21,6 +21,10 @@ test("chat validates payloads before acquiring a database connection", async () 
 		await assert.rejects(chat.history(user, booking, options), { code: "INVALID_INPUT" });
 	}
 	await assert.rejects(chat.markRead(user, booking, { throughMessageId: 1 }), { code: "INVALID_INPUT" });
+	for (const badReason of [null, "", "   ", "x".repeat(101)]) {
+		await assert.rejects(chat.report(user, booking, { reason: badReason }), { code: "INVALID_INPUT" });
+	}
+	await assert.rejects(chat.report(user, booking, { reason: "harassment", details: "x".repeat(2001) }), { code: "INVALID_INPUT" });
 });
 
 test("chat PostgreSQL, HTTP and real Socket.IO integration", { skip: !testUrl, timeout: 60000 }, async (t) => {

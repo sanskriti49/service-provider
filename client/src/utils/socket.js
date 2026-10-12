@@ -2,6 +2,7 @@ import { io } from "socket.io-client";
 import { toast } from "sonner";
 
 import { API_URL } from "../config";
+import { socketOptions } from "./socketOptions";
 let socketInstance = null;
 
 export function getSocket() {
@@ -15,13 +16,7 @@ export function getSocket() {
 	}
 
 	if (!socketInstance) {
-		socketInstance = io(API_URL || undefined, {
-			auth: { token },
-			transports: ["websocket", "polling"],
-			reconnection: true,
-			reconnectionAttempts: 10,
-			reconnectionDelay: 2000,
-		});
+		socketInstance = io(API_URL || undefined, socketOptions(token));
 
 		socketInstance.on("connect", () => {
 			console.log("⚡ Real-time WebSocket connected");

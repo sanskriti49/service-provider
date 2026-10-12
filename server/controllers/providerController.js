@@ -1118,21 +1118,25 @@ async function getProviderAvailability(req, res, next) {
 				);
 			} catch (bErr) {
 				if (bErr.code === "42703") {
-					// Fallback if latitude/longitude columns are missing on legacy tables
-					return await db.query(
-						`SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date_str, 
-                                TO_CHAR(start_time, 'HH24:MI') AS start_time, 
-                                TO_CHAR(end_time, 'HH24:MI') AS end_time,
-                                status
-                         FROM bookings
-                         WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
-                         AND (
-                             ${activeBookingPredicate}
-                         )`,
-						[providerIdValue, fromStr, endDateStr],
-					);
+					// Fallback if latitude/longitude or hold_expires_at columns are missing on legacy tables
+					try {
+						return await db.query(
+							`SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date_str, 
+	                                TO_CHAR(start_time, 'HH24:MI') AS start_time, 
+	                                TO_CHAR(end_time, 'HH24:MI') AS end_time,
+	                                status
+	                         FROM bookings
+	                         WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
+	                         AND (status IN ('booked','confirmed','in_progress','pending'))`,
+							[providerIdValue, fromStr, endDateStr],
+						);
+					} catch (fallbackErr) {
+						console.warn("Bookings query fallback warning:", fallbackErr.message);
+						return { rows: [] };
+					}
 				}
-				throw bErr;
+				console.warn("Bookings query warning in availability:", bErr.message);
+				return { rows: [] };
 			}
 		};
 
@@ -1178,7 +1182,17 @@ async function getProviderAvailability(req, res, next) {
 					end_time: (a.end || a.end_time || "18:00").slice(0, 5),
 				}));
 			}
+		}
 
+		if (masterRows.length === 0) {
+			masterRows = [
+				{ day_of_week: 1, start_time: "09:00", end_time: "18:00" },
+				{ day_of_week: 2, start_time: "09:00", end_time: "18:00" },
+				{ day_of_week: 3, start_time: "09:00", end_time: "18:00" },
+				{ day_of_week: 4, start_time: "09:00", end_time: "18:00" },
+				{ day_of_week: 5, start_time: "09:00", end_time: "18:00" },
+				{ day_of_week: 6, start_time: "10:00", end_time: "17:00" },
+			];
 		}
 
 		const serviceName = providerServiceRes.rows[0]?.name || "default";
