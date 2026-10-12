@@ -25,6 +25,22 @@ function requireAdmin(req, res, next) {
 
 router.post("/", usersController.createUser);
 router.get("/", authMiddleware, requireAdmin, usersController.getUsers);
+
+const accountController = require("../controllers/accountController");
+
+// Addresses aliases (defined before /:custom_id to avoid shadowing)
+router.get("/addresses", authMiddleware, accountController.getAddresses);
+router.post("/addresses", authMiddleware, accountController.createAddress);
+router.put("/addresses/:id", authMiddleware, accountController.updateAddress);
+router.delete("/addresses/:id", authMiddleware, accountController.deleteAddress);
+router.patch("/addresses/:id/default", authMiddleware, accountController.setDefaultAddress);
+
+// Payment methods aliases (defined before /:custom_id to avoid shadowing)
+router.get("/payment-methods", authMiddleware, accountController.getPaymentMethods);
+router.post("/payment-methods", authMiddleware, accountController.createPaymentMethod);
+router.delete("/payment-methods/:id", authMiddleware, accountController.deletePaymentMethod);
+router.patch("/payment-methods/:id/default", authMiddleware, accountController.setDefaultPaymentMethod);
+
 router.get("/:custom_id", usersController.getUserByCustomId);
 router.put(
 	"/:id",
@@ -39,20 +55,5 @@ router.delete(
 	requireSelfOrAdmin,
 	usersController.deleteUser,
 );
-
-const accountController = require("../controllers/accountController");
-
-// Addresses aliases
-router.get("/addresses", authMiddleware, accountController.getAddresses);
-router.post("/addresses", authMiddleware, accountController.createAddress);
-router.put("/addresses/:id", authMiddleware, accountController.updateAddress);
-router.delete("/addresses/:id", authMiddleware, accountController.deleteAddress);
-router.patch("/addresses/:id/default", authMiddleware, accountController.setDefaultAddress);
-
-// Payment methods aliases
-router.get("/payment-methods", authMiddleware, accountController.getPaymentMethods);
-router.post("/payment-methods", authMiddleware, accountController.createPaymentMethod);
-router.delete("/payment-methods/:id", authMiddleware, accountController.deletePaymentMethod);
-router.patch("/payment-methods/:id/default", authMiddleware, accountController.setDefaultPaymentMethod);
 
 module.exports = router;

@@ -2,14 +2,22 @@ const rateLimit = require("express-rate-limit");
 const { RedisStore } = require("rate-limit-redis");
 const { getRedisClient, isRedisReady } = require("../config/redisClient");
 
+function isTestEnvironment() {
+	return (
+		process.env.NODE_ENV === "test" ||
+		process.argv.includes("--test") ||
+		process.argv.some((a) => typeof a === "string" && a.includes("test"))
+	);
+}
+
 /**
  * Creates a resilient rate limiter that uses Redis store if available,
- * falling back to MemoryStore if Redis is offline.
+ * falling back to MemoryStore in test environments or if Redis is offline.
  */
 function createResilientLimiter(options) {
 	let store;
 	try {
-		if (isRedisReady()) {
+		if (!isTestEnvironment() && (process.env.REDIS_URL || process.env.REDIS_HOST)) {
 			const client = getRedisClient();
 			store = new RedisStore({
 				sendCommand: (...args) => client.call(...args),

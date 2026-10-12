@@ -145,14 +145,17 @@ async function seedReviews() {
 		const bookingRes = await db.query(
 			`INSERT INTO bookings (
 				user_id, provider_id, service_id, date, start_time, end_time, price, 
-				status, payment_method, payment_status, address, cancellation_reason, created_at
+				status, payment_method, payment_status, address, cancellation_reason, created_at,
+				razorpay_order_id, razorpay_payment_id
 			)
 			VALUES (
 				$1, $2, $3, 
 				CURRENT_DATE - INTERVAL '${daysAgo} days', 
 				'10:00:00', '12:00:00', 499.00,
 				'completed', 'online', 'paid', 'Verified Address, India', 'SEED_REVIEW_BOOKING',
-				NOW() - INTERVAL '${daysAgo} days'
+				NOW() - INTERVAL '${daysAgo} days',
+				'order_seed_' || substr(md5(random()::text), 1, 16),
+				'pay_seed_' || substr(md5(random()::text), 1, 16)
 			)
 			RETURNING booking_id`,
 			[customerId, provider.provider_id, provider.service_id],
@@ -205,14 +208,17 @@ async function seedReviews() {
 		const bRes = await db.query(
 			`INSERT INTO bookings (
 				user_id, provider_id, service_id, date, start_time, end_time, price, 
-				status, payment_method, payment_status, address, cancellation_reason, created_at
+				status, payment_method, payment_status, address, cancellation_reason, created_at,
+				razorpay_order_id, razorpay_payment_id
 			)
 			VALUES (
 				$1, $2, $3, 
 				CURRENT_DATE - INTERVAL '1 days', 
 				'11:00:00', '13:00:00', 550.00,
 				'completed', 'online', 'paid', 'Metro Tower 4B, Sector 62', 'SEED_REVIEW_BOOKING',
-				NOW() - INTERVAL '1 days'
+				NOW() - INTERVAL '1 days',
+				'order_seed_' || substr(md5(random()::text), 1, 16),
+				'pay_seed_' || substr(md5(random()::text), 1, 16)
 			)
 			RETURNING booking_id`,
 			[custId, demoProv.id, demoProv.service_id],

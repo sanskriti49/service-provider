@@ -10,7 +10,8 @@
 		"reset-db": "npm --prefix server run reset-db",
 		"seed-db": "npm --prefix server run seed-db",
 		"seed-services": "npm --prefix server run seed-services",
-		"ensure-providers": "npm --prefix server run ensure-providers"
+		"ensure-providers": "npm --prefix server run ensure-providers",
+		"ensure-admin": "npm --prefix server run ensure-admin"
 	},
 	"devDependencies": {
 		"concurrently": "^9.1.2"

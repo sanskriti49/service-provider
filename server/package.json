@@ -15,7 +15,8 @@
 		"migrate:chat": "node migrations/migrate_chat.js",
 		"migrate:integrity": "node migrations/migrate_booking_integrity.js",
 		"reconcile:payments": "node scripts/reconcilePayments.js",
-		"validate:integrity": "node scripts/validateIntegrity.js"
+		"validate:integrity": "node scripts/validateIntegrity.js",
+		"ensure-admin": "node scripts/ensureAdmin.js"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1140.0",
