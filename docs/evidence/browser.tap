@@ -1,0 +1,70 @@
+TAP version 13
+# 🔌 Socket connected: YNy1fJO-UCODKsvYAAAC (User: a4e4a192-36b0-4261-9c10-57a652072f42, Role: customer)
+# 🔌 Socket connected: CSWGchKj8E40ll0HAAAF (User: 4f3ea68c-9d22-4c6b-b965-35c6365fcb1f, Role: provider)
+# Subtest: customer/provider browser chat integration
+    # Subtest: empty state, real send, unread badge, receipt and keyboard focus
+    ok 1 - empty state, real send, unread badge, receipt and keyboard focus
+      ---
+      duration_ms: 22929.4293
+      type: 'test'
+      ...
+# 🔌 Socket disconnected: YNy1fJO-UCODKsvYAAAC
+# 🔌 Socket connected: qkqszkRRysFTqb0pAAAI (User: a4e4a192-36b0-4261-9c10-57a652072f42, Role: customer)
+    # Subtest: history persists across reload and conversations stay isolated
+    ok 2 - history persists across reload and conversations stay isolated
+      ---
+      duration_ms: 22148.9223
+      type: 'test'
+      ...
+# 🔌 Socket disconnected: qkqszkRRysFTqb0pAAAI
+# 🔌 Socket connected: 5Y3oiRD5z5gCjiNCAAAL (User: a4e4a192-36b0-4261-9c10-57a652072f42, Role: customer)
+    # Subtest: reconnect replays more than one page and earlier history preserves scroll
+    ok 3 - reconnect replays more than one page and earlier history preserves scroll
+      ---
+      duration_ms: 13095.7128
+      type: 'test'
+      ...
+# 🔌 Socket disconnected: 5Y3oiRD5z5gCjiNCAAAL
+    # Subtest: failed send retries with the same UUID and renders once
+    ok 4 - failed send retries with the same UUID and renders once
+      ---
+      duration_ms: 530.8327
+      type: 'test'
+      ...
+    # Subtest: closing a pending send retains its eventual failure and draft on reopen
+    ok 5 - closing a pending send retains its eventual failure and draft on reopen
+      ---
+      duration_ms: 2307.0611
+      type: 'test'
+      ...
+    # Subtest: mobile fit, safe text rendering and booking actions remain available
+    ok 6 - mobile fit, safe text rendering and booking actions remain available
+      ---
+      duration_ms: 1901.168
+      type: 'test'
+      ...
+# 🔌 Socket connected: IJDYGvYZp4Z8qZUwAAAO (User: 293ddd4f-8e10-453d-adec-4e5ac096a723, Role: customer)
+# Chat screenshots: C:\\Users\\sansk\\AppData\\Local\\Temp\\taskgenie-chat-ui
+    # Subtest: forged booking access is rejected by the real backend
+    ok 7 - forged booking access is rejected by the real backend
+      ---
+      duration_ms: 1026.9115
+      type: 'test'
+      ...
+# 🔌 Socket disconnected: IJDYGvYZp4Z8qZUwAAAO
+# 🔌 Socket disconnected: CSWGchKj8E40ll0HAAAF
+    1..7
+ok 1 - customer/provider browser chat integration
+  ---
+  duration_ms: 73459.3118
+  type: 'test'
+  ...
+1..1
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 73626.0179

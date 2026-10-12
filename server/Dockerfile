@@ -12,6 +12,7 @@ FROM node:20-alpine AS runner
 
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
+ENV PORT=5000
 
 # Security: Run as non-root user
 USER node

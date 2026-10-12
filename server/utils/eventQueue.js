@@ -7,9 +7,9 @@ const { sendNotification } = require("./notificationService");
  * Decouples slow I/O (transactional email, push notifications, external webhooks)
  * from synchronous HTTP request/response lifecycles.
  *
- * Enterprise Dual-Engine:
+ * Queue modes:
  * 1. Redis-backed BullMQ Queue & Worker: distributed, persistent, horizontal scaling.
- * 2. In-Memory Resilient Fallback: zero-downtime execution if Redis is unavailable/offline.
+ * 2. In-memory fallback: best-effort execution; pending jobs are lost on restart.
  */
 class EventQueue extends EventEmitter {
 	constructor(options = {}) {
@@ -120,7 +120,7 @@ class EventQueue extends EventEmitter {
 						eventQueueJobsTotal.inc({ event_type: job.name, status: "failed" });
 					} catch (_) {}
 					this.emit("job:dead_letter", { job, error: err.message });
-					console.error(`[BullMQ Worker] Job ${job.id} permanently failed and moved to DLQ.`);
+					console.error(`[BullMQ Worker] Job ${job.id} exhausted retries; retained in the failed set.`);
 				}
 			});
 
@@ -235,7 +235,7 @@ class EventQueue extends EventEmitter {
 				} catch (_) {}
 				this.emit("job:dead_letter", { job, error: err.message });
 				if (process.env.NODE_ENV !== "test") {
-					console.error(`[EventQueue] Job ${job.id} permanently failed and moved to Dead Letter Queue.`);
+					console.error(`[EventQueue] Job ${job.id} exhausted retries; emitted job:dead_letter (no durable fallback store).`);
 				}
 			}
 		} finally {

@@ -2,6 +2,10 @@
 
 ## Invariants
 
+For reproducible measurements, lock/constraint explanations and interview
+boundaries, see [ENGINEERING.md](ENGINEERING.md). The actor transition table is in
+[STATE_MACHINE.md](STATE_MACHINE.md); deployment procedures are in [OPERATIONS.md](OPERATIONS.md).
+
 - Booking creation takes a PostgreSQL transaction advisory lock for provider/date before schedule and conflict checks. Redis is an optional fail-fast optimization.
 - Duration and price come from the selected service. Providers must be approved, offer the visible service, and publish a working interval. A booking needs 45 minutes lead time; marketplace times use Asia/Kolkata.
 - Online bookings retain a five-minute hold. Expired or cancelled intents remain in PostgreSQL; captured late payments request a full refund and never reacquire a slot.

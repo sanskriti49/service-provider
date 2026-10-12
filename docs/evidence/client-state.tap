@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: chat: push before ack reconciles optimistic send without a duplicate
+ok 1 - chat: push before ack reconciles optimistic send without a duplicate
+  ---
+  duration_ms: 1.3705
+  type: 'test'
+  ...
+# Subtest: chat: bigint order is exact and retry IDs are scoped by sender
+ok 2 - chat: bigint order is exact and retry IDs are scoped by sender
+  ---
+  duration_ms: 0.3038
+  type: 'test'
+  ...
+# Subtest: chat: stale history and receipts never clear or move a read receipt backwards
+ok 3 - chat: stale history and receipts never clear or move a read receipt backwards
+  ---
+  duration_ms: 0.2859
+  type: 'test'
+  ...
+# Subtest: chat: failed sends are replaced by committed history, not duplicated
+ok 4 - chat: failed sends are replaced by committed history, not duplicated
+  ---
+  duration_ms: 0.2991
+  type: 'test'
+  ...
+# Subtest: chat: retry UUIDs and useful error messages
+ok 5 - chat: retry UUIDs and useful error messages
+  ---
+  duration_ms: 2.7973
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 137.2136

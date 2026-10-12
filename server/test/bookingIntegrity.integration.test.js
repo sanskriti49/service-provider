@@ -15,7 +15,7 @@ function load(filename, stubs) {
 }
 const response = () => ({ statusCode: 200, status(n) { this.statusCode=n; return this; }, json(data) { this.data=data; return this; } });
 const url = process.env.BOOKING_TEST_DATABASE_URL;
-test("booking integrity: actual controllers, PostgreSQL constraints, concurrent captures and refund recovery", { skip: !url, timeout: 60000 }, async (t) => {
+test("booking integrity: actual controllers, PostgreSQL constraints, concurrent captures and refund recovery", { skip: !url, timeout: 120000 }, async (t) => {
 	const { Pool } = require("pg");
 	const admin = new Pool({ connectionString: url });
 	const schema = `booking_test_${randomUUID().replaceAll("-", "")}`;
@@ -153,5 +153,144 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 		gateway.orders.create=async()=>{throw new Error("Gateway unavailable");};
 		const failed=await book("14:00","online",{date:"2040-01-06"});assert.ok(failed.statusCode>=500);gateway.orders.create=original;
 		assert.equal(Number((await pool.query("SELECT COUNT(*) FROM bookings")).rows[0].count),count);
+	});
+	await t.test("signed webhook before browser confirmation and repeated events activate and notify once", async () => {
+		const created = await book("10:00", "online", { date: "2040-02-01" });
+		assert.equal(created.statusCode, 201);
+		const b = created.data.booking, payment = capture(b), before = notices.length;
+		const body = { event: "payment.captured", payload: { payment: { entity: { id: payment.id } } } };
+		const rawBody = Buffer.from(JSON.stringify(body));
+		const webhook = () => controller.handleRazorpayWebhook({ body, rawBody, headers: {
+			"x-razorpay-signature": createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET).update(rawBody).digest("hex"),
+		} }, response());
+		assert.equal((await webhook()).statusCode, 200);
+		const signature = createHmac("sha256", process.env.RAZORPAY_KEY_SECRET).update(`${payment.order_id}|${payment.id}`).digest("hex");
+		const callback = response();
+		await controller.verifyPayment({ user: actor, body: { razorpay_order_id: payment.order_id,
+			razorpay_payment_id: payment.id, razorpay_signature: signature } }, callback);
+		assert.equal(callback.statusCode, 200);
+		assert.equal(callback.data.already_paid, true);
+		await Promise.all(Array.from({ length: 8 }, webhook));
+		const saved = (await pool.query("SELECT status,payment_status FROM bookings WHERE booking_id=$1", [b.booking_id])).rows[0];
+		assert.deepEqual(saved, { status: "booked", payment_status: "paid" });
+		assert.equal(notices.length - before, 2);
+		assert.equal((await pool.query("SELECT id FROM booking_refunds WHERE booking_id=$1", [b.booking_id])).rowCount, 0);
+	});
+	await t.test("hold expiring while finalization waits for a schedule lock cannot be resurrected", async () => {
+		const created = await book("10:00", "online", { date: "2040-02-02" });
+		assert.equal(created.statusCode, 201);
+		const b = created.data.booking, payment = capture(b), blocker = await pool.connect();
+		let pending;
+		try {
+			await blocker.query("BEGIN");
+			await require("../utils/bookingLifecycle").lockSchedule(blocker, provider, "2040-02-02");
+			await pool.query("UPDATE bookings SET hold_expires_at=clock_timestamp()+INTERVAL '2 seconds' WHERE booking_id=$1", [b.booking_id]);
+			pending = controller.paymentService.finalize(payment.order_id, payment, actor);
+			// Wait for an actual lock waiter, rather than assume timing from a sleep.
+			const deadline = Date.now() + 1500;
+			let waiting = false;
+			while (!waiting && Date.now() < deadline) {
+				waiting = (await pool.query("SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory' AND query LIKE 'SELECT pg_advisory_xact_lock%' LIMIT 1")).rowCount > 0;
+				if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			assert.equal(waiting, true, "Finalizer must begin before expiry and wait for the held lock");
+			assert.equal((await pool.query("SELECT hold_expires_at > clock_timestamp() AS valid FROM bookings WHERE booking_id=$1", [b.booking_id])).rows[0].valid, true);
+			await blocker.query("SELECT pg_sleep(2.1)");
+			await blocker.query("COMMIT");
+			const result = await pending;
+			assert.equal(result.late, true);
+			assert.equal(result.booking.status, "expired");
+			assert.equal(result.booking.payment_status, "refund_pending");
+		} finally {
+			await blocker.query("ROLLBACK").catch(() => {}); blocker.release();
+			await pending?.catch(() => {});
+		}
+	});
+	await t.test("hold expiring behind a chat-style booking row lock is checked after acquiring the row", async () => {
+		const created = await book("10:00", "online", { date: "2040-02-04" });
+		assert.equal(created.statusCode, 201);
+		const b = created.data.booking, payment = capture(b), blocker = await pool.connect();
+		let pending;
+		try {
+			await pool.query("UPDATE bookings SET hold_expires_at=clock_timestamp()+INTERVAL '2 seconds' WHERE booking_id=$1", [b.booking_id]);
+			await blocker.query("BEGIN");
+			await blocker.query("SELECT booking_id FROM bookings WHERE booking_id=$1 FOR UPDATE", [b.booking_id]);
+			pending = controller.paymentService.finalize(payment.order_id, payment, actor);
+			const deadline = Date.now() + 1500;
+			let waiting = false;
+			while (!waiting && Date.now() < deadline) {
+				waiting = (await pool.query("SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE 'SELECT *, TO_CHAR(date%' LIMIT 1")).rowCount > 0;
+				if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			assert.equal(waiting, true);
+			assert.equal((await pool.query("SELECT hold_expires_at > clock_timestamp() AS valid FROM bookings WHERE booking_id=$1", [b.booking_id])).rows[0].valid, true);
+			await blocker.query("SELECT pg_sleep(2.1)");
+			await blocker.query("COMMIT");
+			assert.equal((await pending).late, true);
+		} finally {
+			await blocker.query("ROLLBACK").catch(() => {}); blocker.release();
+			await pending?.catch(() => {});
+		}
+	});
+	await t.test("uncertain refund with no discoverable receipt is never blindly submitted again", async () => {
+		const created = await book("10:00", "online", { date: "2040-02-03" });
+		assert.equal(created.statusCode, 201);
+		const b = created.data.booking, payment = capture(b);
+		await pool.query("UPDATE bookings SET hold_expires_at=clock_timestamp()-INTERVAL '1 second' WHERE booking_id=$1", [b.booking_id]);
+		await controller.paymentService.finalize(payment.order_id, payment);
+		const intent = (await pool.query("SELECT * FROM booking_refunds WHERE booking_id=$1", [b.booking_id])).rows[0];
+		const original = gateway.payments.refund;
+		let attempted = 0;
+		gateway.payments.refund = async () => { attempted++; throw new Error("Uncertain gateway timeout"); };
+		try {
+			await assert.rejects(controller.paymentService.reconcileRefund(intent.id));
+			await controller.paymentService.reconcileRefund(intent.id);
+			await controller.paymentService.reconcileRefund(intent.id);
+			assert.equal(attempted, 1);
+			assert.equal((await pool.query("SELECT state FROM booking_refunds WHERE id=$1", [intent.id])).rows[0].state, "unknown");
+		} finally { gateway.payments.refund = original; }
+	});
+	await t.test("HTTP contention evidence: 50 COD and 50 online requests each reserve only one slot", async () => {
+		const express = require("express"), http = require("node:http"), jwt = require("jsonwebtoken");
+		process.env.JWT_SECRET = "isolated-evidence-secret";
+		const app = express(); app.use(express.json());
+		app.use("/api/bookings", load("../routes/bookingRoutes.js", {
+			"../config/db": stubDb, "../controllers/bookingController": controller,
+			"../middleware/rateLimiter": { bookingLimiter: (req, res, next) => next() },
+		}));
+		const server = http.createServer(app);
+		await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+		const rounds = [];
+		try {
+			for (const [method, date] of [["cod", "2040-03-01"], ["online", "2040-03-02"]]) {
+				const start = performance.now();
+				const outcomes = await Promise.all(Array.from({ length: 50 }, async () => {
+					const began = performance.now();
+					const reply = await fetch(`http://127.0.0.1:${server.address().port}/api/bookings`, {
+						method: "POST", signal: AbortSignal.timeout(30000),
+						headers: { Authorization: `Bearer ${jwt.sign(actor, process.env.JWT_SECRET)}`, "Content-Type": "application/json" },
+						body: JSON.stringify({ provider_id: provider, service_id: service, date, start_time: "10:00", address: "Synthetic contention fixture", payment_method: method }),
+					});
+					await reply.json();
+					return { status: reply.status, ms: performance.now() - began };
+				}));
+				const committed = Number((await pool.query("SELECT COUNT(*) FROM bookings WHERE provider_id=$1 AND date=$2", [provider, date])).rows[0].count);
+				const accepted = outcomes.filter((r) => r.status === 201).length;
+				const rejected = outcomes.filter((r) => r.status === 409).length;
+				const errors = outcomes.filter((r) => ![201, 409].includes(r.status)).length;
+				const timings = outcomes.map((r) => r.ms).sort((a, b) => a - b);
+				rounds.push({ method, requests: 50, accepted, rejected, errors, committed,
+					elapsedMs: Math.round(performance.now() - start), p50Ms: Math.round(timings[24]), p95Ms: Math.round(timings[47]) });
+				assert.deepEqual({ accepted, rejected, errors, committed }, { accepted: 1, rejected: 49, errors: 0, committed: 1 });
+			}
+			const report = { measuredAt: new Date().toISOString(), node: process.version,
+				postgres: (await pool.query("SHOW server_version")).rows[0].server_version, poolMax: 10,
+				conditions: "Loopback HTTP; actual JWT middleware, routes, controllers and PostgreSQL. Synthetic provider, 1200 INR service, one slot per round. Redis admission lock, rate limiter, gateway and notification delivery stubbed. This verifies DB contention correctness, not production throughput.", rounds };
+			console.log("CONTENTION_REPORT " + JSON.stringify(report));
+			if (process.env.TASKGENIE_EVIDENCE_DIR) {
+				fs.mkdirSync(process.env.TASKGENIE_EVIDENCE_DIR, { recursive: true });
+				fs.writeFileSync(path.join(process.env.TASKGENIE_EVIDENCE_DIR, "concurrency.json"), JSON.stringify(report, null, 2) + "\n");
+			}
+		} finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
 	});
 });

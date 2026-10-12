@@ -9,6 +9,7 @@ client/.env
 
 
 # Logs
+work/
 logs
 *.log
 npm-debug.log*

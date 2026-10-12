@@ -98,7 +98,7 @@ async function createBooking(req, res) {
             orderId = order.id;
         }
         const result = await client.query(`INSERT INTO bookings (booking_id,provider_id,user_id,service_id,date,start_time,end_time,status,address,price,payment_method,payment_status,razorpay_order_id,otp,completion_otp,latitude,longitude,hold_expires_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,'pending',$11,$12,$13,$14,$15,CASE WHEN $10::varchar='online' THEN NOW()+INTERVAL '5 minutes' ELSE NULL END) RETURNING *`,
+            VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,'pending',$11,$12,$13,$14,$15,CASE WHEN $10::varchar='online' THEN clock_timestamp()+INTERVAL '5 minutes' ELSE NULL END) RETURNING *`,
             [id,providerId,req.user.id,selected.service_id,date,booking.start_time,booking.end_time,value.address,amount/100,value.payment_method === "cash" ? "cod" : value.payment_method,orderId,arrivalCode,completionCode,value.latitude ?? null,value.longitude ?? null]);
         await client.query("COMMIT");
         client.release(); client = null;

@@ -1,0 +1,72 @@
+{
+  "measuredAt": "2026-10-12T08:20:59.129Z",
+  "revision": "64d2582fbc4084fc48a31738e248151180520c01",
+  "dirty": true,
+  "node": "v22.22.0",
+  "sourceSha256": "65777d631689d5901777d6fb9be205b4f7452a02829c217f2425bedce5aa622d",
+  "sourceFiles": [
+    "client/package-lock.json",
+    "client/src/chat/ChatPanel.jsx",
+    "client/src/chat/chatState.js",
+    "client/src/chat/chatTransport.js",
+    "client/src/chat/useConversation.js",
+    "client/test/chat.browser.cjs",
+    "client/test/chatState.test.js",
+    "server/controllers/bookingController.js",
+    "server/migrations/20261010_booking_chat.sql",
+    "server/migrations/20261011_booking_integrity.sql",
+    "server/package-lock.json",
+    "server/routes/bookingRoutes.js",
+    "server/routes/chatRoutes.js",
+    "server/routes/healthRoutes.js",
+    "server/scripts/verifyEngineering.js",
+    "server/services/bookingSchedule.js",
+    "server/services/paymentService.js",
+    "server/test/bookingCompletionOtp.test.js",
+    "server/test/bookingConcurrencyAndSecurity.test.js",
+    "server/test/bookingIntegrity.integration.test.js",
+    "server/test/bookingPaymentFlow.test.js",
+    "server/test/chat.test.js",
+    "server/test/health.test.js",
+    "server/utils/bookingLifecycle.js",
+    "server/utils/chatService.js",
+    "server/utils/socket.js"
+  ],
+  "platform": "win32",
+  "browserRequested": true,
+  "suites": [
+    {
+      "name": "backend",
+      "passed": true,
+      "tests": 37,
+      "pass": 37,
+      "fail": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    {
+      "name": "client-state",
+      "passed": true,
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    {
+      "name": "browser",
+      "passed": true,
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "exitCode": 0
+    }
+  ],
+  "limitations": [
+    "Synthetic local fixtures; external gateway and notification delivery stubbed.",
+    "Contention disables Redis admission and rate limiting to exercise PostgreSQL protection.",
+    "Not a production throughput benchmark, real payment capture, or AWS deployment verification."
+  ],
+  "passed": true
+}

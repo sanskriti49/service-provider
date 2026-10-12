@@ -16,7 +16,7 @@ test('customer/provider browser chat integration', { skip: !process.env.CHAT_TES
 	process.env.DATABASE_URL = process.env.CHAT_TEST_DATABASE_URL;
 	process.env.NODE_ENV = 'test';
 	process.env.JWT_SECRET = randomUUID();
-	const { chromium } = require('playwright');
+	const { chromium } = require(require.resolve('playwright', { paths: [path.join(root, 'client')] }));
 	const { Pool } = serverRequire('pg');
 	const express = serverRequire('express');
 	const jwt = serverRequire('jsonwebtoken');
@@ -72,7 +72,7 @@ test('customer/provider browser chat integration', { skip: !process.env.CHAT_TES
 	const { createServer } = await import(pathToFileURL(path.join(root, 'client/node_modules/vite/dist/node/index.js')).href);
 	vite = await createServer({ root: path.join(root, 'client'), server: { port: 5188, strictPort: true, host: '127.0.0.1' } });
 	await vite.listen();
-	browser = await chromium.launch({ channel: 'chrome', headless: true });
+	browser = await chromium.launch({ headless: true, ...(process.env.TASKGENIE_BROWSER_CHANNEL ? { channel: process.env.TASKGENIE_BROWSER_CHANNEL } : {}) });
 	const errors = [];
 	const createPage = async (user, viewport = { width: 1440, height: 1000 }) => {
 		const context = await browser.newContext({ viewport });
@@ -81,7 +81,9 @@ test('customer/provider browser chat integration', { skip: !process.env.CHAT_TES
 		await context.addInitScript(({ token, user }) => { localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify(user)); }, { token, user });
 		const page = await context.newPage();
 		page.on('pageerror', (err) => errors.push(err.message));
-		await page.goto(`http://127.0.0.1:5188/${user.role === 'provider' ? 'provider/' : ''}dashboard/bookings`);
+		// Cold Vite compilation and unrelated resources need not finish loading
+		// before the app is usable; the controls below provide the readiness gate.
+		await page.goto(`http://127.0.0.1:5188/${user.role === 'provider' ? 'provider/' : ''}dashboard/bookings`, { waitUntil: 'domcontentloaded', timeout: 60000 });
 		return { page, context };
 	};
 	const { page: customer, context: customerContext } = await createPage(users[0]);
@@ -110,10 +112,13 @@ test('customer/provider browser chat integration', { skip: !process.env.CHAT_TES
 		await customer.bringToFront();
 		await customer.getByText('Absolutely, Aarav. I’ll call you when I arrive. See you at 10!', { exact: true }).waitFor();
 		await customer.screenshot({ path: path.join(output, 'desktop-conversation.png') });
-		await customer.getByRole('button', { name: 'Send message', exact: true }).evaluate((element) => element.disabled = false);
+		await customer.getByRole('textbox', { name: /Message to/ }).fill('Unsent draft for keyboard verification');
 		await customer.getByRole('button', { name: 'Send message', exact: true }).focus();
 		await customer.keyboard.press('Tab');
-		assert.equal(await customer.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Close chat');
+		assert.equal(await customer.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Report Priya Mehta');
+		await customer.keyboard.press('Shift+Tab');
+		assert.equal(await customer.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Send message');
+		await customer.getByRole('textbox', { name: /Message to/ }).fill('');
 		await customer.keyboard.press('Escape');
 		assert.equal(await customer.getByRole('dialog').count(), 0);
 		assert.match(await customer.evaluate(() => document.activeElement.getAttribute('aria-label')), /Chat about/);

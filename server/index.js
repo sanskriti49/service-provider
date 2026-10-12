@@ -132,59 +132,9 @@ app.get("/metrics", async (req, res) => {
 	}
 });
 
-// Cloud Liveness Probe (process vitality)
-app.get("/health/live", (req, res) => {
-	res.status(200).json({
-		status: "alive",
-		uptime: process.uptime(),
-		memory: process.memoryUsage(),
-		timestamp: new Date().toISOString(),
-	});
-});
-
-// Cloud Readiness Probe (DB connectivity & queue worker health)
-app.get("/health/ready", async (req, res) => {
-	try {
-		const dbStart = Date.now();
-		await db.query("SELECT 1");
-		const dbLatency = Date.now() - dbStart;
-
-		const poolStats = db.getPoolStats ? db.getPoolStats() : null;
-		if (poolStats) {
-			updatePoolMetrics(poolStats);
-		}
-
-		const queueStats = eventQueue.getStats();
-		const circuitBreakerStats = getCircuitBreakerStatus();
-
-		res.status(200).json({
-			status: "ready",
-			checks: {
-				database: { status: "connected", latencyMs: dbLatency, pool: poolStats },
-				eventQueue: { status: "healthy", ...queueStats },
-				circuitBreakers: circuitBreakerStats,
-			},
-			timestamp: new Date().toISOString(),
-		});
-	} catch (err) {
-		res.status(503).json({
-			status: "degraded",
-			checks: {
-				database: { status: "disconnected", error: err.message },
-			},
-			timestamp: new Date().toISOString(),
-		});
-	}
-});
-
-// General Health Endpoint
-app.get("/health", (req, res) => {
-	res.status(200).json({
-		status: "ok",
-		uptime: process.uptime(),
-		timestamp: new Date().toISOString(),
-	});
-});
+app.use("/health", require("./routes/healthRoutes").createHealthRouter({
+    db, eventQueue, updatePoolMetrics, getCircuitBreakerStatus,
+}));
 
 app.use(errorHandler);
 

@@ -8,11 +8,24 @@
 [![Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?style=flat&logo=terraform)](https://terraform.io)
 [![Prometheus](https://img.shields.io/badge/Metrics-Prometheus-E6522C?style=flat&logo=prometheus)](https://prometheus.io)
 
-TaskGenie is a full-stack hyper-local on-demand service marketplace connecting consumers with vetted professionals in real-time. Built on a decoupled **PERN stack** (PostgreSQL, Express.js, React, Node.js), TaskGenie combines **PostGIS spatial indexing**, **Redis single-instance locks** and PostgreSQL row locks for multi-tiered concurrency, **durable BullMQ + Redis event-driven background workers**, **PgBouncer-compatible connection pooling safeguards**, **API rate limiting & Opossum circuit breakers**, and **Prometheus cloud observability**.
+TaskGenie is a full-stack service marketplace built with PostgreSQL, Express.js,
+React and Node.js. Booking correctness uses PostgreSQL transaction advisory locks,
+row locks and an exclusion constraint; Redis provides optional early admission.
+Payment capture and refund intents remain in PostgreSQL for reconciliation.
+Socket.IO chat persists messages before best-effort live delivery. PostGIS provider
+discovery, BullMQ workers, rate limiting, circuit breakers and Prometheus metrics
+support the application; in-memory queue fallback is volatile.
 
 ---
 
 ## Booking integrity and verification
+
+For reproducible contention measurements, payment ordering/refund recovery, and
+browser chat replay, see the [engineering evidence guide](docs/ENGINEERING.md).
+It includes an interview explanation of advisory locks versus exclusion constraints,
+the [state machine](docs/STATE_MACHINE.md), and the [sandbox operations runbook](docs/OPERATIONS.md).
+Run `npm run verify:engineering -- --browser` against a disposable PostgreSQL DB;
+CI runs the same checks and uploads their results.
 
 Booking creation and payment finalization share provider/date PostgreSQL locks. Captured payments must match the stored order, amount and currency; expired/cancelled intents remain stored and enter refund reconciliation. Refund completion is reported only after gateway confirmation. Independent arrival/completion codes are visible only to the owning customer.
 

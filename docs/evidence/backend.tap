@@ -1,0 +1,251 @@
+TAP version 13
+# Subtest: codes use four digits and serializers disclose codes only to the owning customer
+ok 1 - codes use four digits and serializers disclose codes only to the owning customer
+  ---
+  duration_ms: 2.7537
+  type: 'test'
+  ...
+# Subtest: terminal states cannot be resurrected and completion requires in-progress
+ok 2 - terminal states cannot be resurrected and completion requires in-progress
+  ---
+  duration_ms: 5.0874
+  type: 'test'
+  ...
+# Subtest: production HMAC verifier fails closed for missing secrets, forged prefixes and tampered bodies
+ok 3 - production HMAC verifier fails closed for missing secrets, forged prefixes and tampered bodies
+  ---
+  duration_ms: 6.9607
+  type: 'test'
+  ...
+# Subtest: booking integrity: actual controllers, PostgreSQL constraints, concurrent captures and refund recovery
+    # Subtest: forged prefixes/signatures and unbound booking IDs cannot mark paid
+    ok 1 - forged prefixes/signatures and unbound booking IDs cannot mark paid
+      ---
+      duration_ms: 394.1793
+      type: 'test'
+      ...
+    # Subtest: expired hold replacement survives concurrent callback/webhook finalization
+    ok 2 - expired hold replacement survives concurrent callback/webhook finalization
+      ---
+      duration_ms: 89.6572
+      type: 'test'
+      ...
+    # Subtest: valid concurrent captures activate once; mismatch cannot change financial state
+    ok 3 - valid concurrent captures activate once; mismatch cannot change financial state
+      ---
+      duration_ms: 47.1014
+      type: 'test'
+      ...
+    # Subtest: address IDOR, terminal resurrection, and admin/provider OTP disclosures are rejected
+    ok 4 - address IDOR, terminal resurrection, and admin/provider OTP disclosures are rejected
+      ---
+      duration_ms: 20.5013
+      type: 'test'
+      ...
+    # Subtest: refund submission with lost response reconciles without double refund
+    ok 5 - refund submission with lost response reconciles without double refund
+      ---
+      duration_ms: 11.2888
+      type: 'test'
+      ...
+    # Subtest: database rejects duplicate payment, invalid states/times and overlapping active bookings
+    ok 6 - database rejects duplicate payment, invalid states/times and overlapping active bookings
+      ---
+      duration_ms: 115.3244
+      type: 'test'
+      ...
+    # Subtest: simultaneous COD bookings allocate only one interval
+    ok 7 - simultaneous COD bookings allocate only one interval
+      ---
+      duration_ms: 127.4166
+      type: 'test'
+      ...
+    # Subtest: server rejects unavailable providers, hidden services and out-of-hours slots
+    ok 8 - server rejects unavailable providers, hidden services and out-of-hours slots
+      ---
+      duration_ms: 36.8749
+      type: 'test'
+      ...
+    # Subtest: webhooks require raw-body signatures; replay cannot resurrect refunded booking
+    ok 9 - webhooks require raw-body signatures; replay cannot resurrect refunded booking
+      ---
+      duration_ms: 8.1245
+      type: 'test'
+      ...
+    # Subtest: pending and failed refunds never claim refunded; concurrent workers submit once
+    ok 10 - pending and failed refunds never claim refunded; concurrent workers submit once
+      ---
+      duration_ms: 31.7692
+      type: 'test'
+      ...
+    # Subtest: actual HTTP routes strip codes from every provider/admin response
+    ok 11 - actual HTTP routes strip codes from every provider/admin response
+      ---
+      duration_ms: 596.0021
+      type: 'test'
+      ...
+# Booking operation failed: Error Gateway unavailable
+    # Subtest: periodic reconciliation recovers missed callbacks and order failures create no fake booking
+    ok 12 - periodic reconciliation recovers missed callbacks and order failures create no fake booking
+      ---
+      duration_ms: 67.1878
+      type: 'test'
+      ...
+    # Subtest: signed webhook before browser confirmation and repeated events activate and notify once
+    ok 13 - signed webhook before browser confirmation and repeated events activate and notify once
+      ---
+      duration_ms: 147.7928
+      type: 'test'
+      ...
+    # Subtest: hold expiring while finalization waits for a schedule lock cannot be resurrected
+    ok 14 - hold expiring while finalization waits for a schedule lock cannot be resurrected
+      ---
+      duration_ms: 2172.9316
+      type: 'test'
+      ...
+    # Subtest: hold expiring behind a chat-style booking row lock is checked after acquiring the row
+    ok 15 - hold expiring behind a chat-style booking row lock is checked after acquiring the row
+      ---
+      duration_ms: 2154.2213
+      type: 'test'
+      ...
+    # Subtest: uncertain refund with no discoverable receipt is never blindly submitted again
+    ok 16 - uncertain refund with no discoverable receipt is never blindly submitted again
+      ---
+      duration_ms: 29.817
+      type: 'test'
+      ...
+# CONTENTION_REPORT {"measuredAt":"2026-10-12T08:21:07.157Z","node":"v22.22.0","postgres":"18.4","poolMax":10,"conditions":"Loopback HTTP; actual JWT middleware, routes, controllers and PostgreSQL. Synthetic provider, 1200 INR service, one slot per round. Redis admission lock, rate limiter, gateway and notification delivery stubbed. This verifies DB contention correctness, not production throughput.","rounds":[{"method":"cod","requests":50,"accepted":1,"rejected":49,"errors":0,"committed":1,"elapsedMs":540,"p50Ms":413,"p95Ms":500},{"method":"online","requests":50,"accepted":1,"rejected":49,"errors":0,"committed":1,"elapsedMs":311,"p50Ms":205,"p95Ms":286}]}
+    # Subtest: HTTP contention evidence: 50 COD and 50 online requests each reserve only one slot
+    ok 17 - HTTP contention evidence: 50 COD and 50 online requests each reserve only one slot
+      ---
+      duration_ms: 860.4035
+      type: 'test'
+      ...
+    1..17
+ok 4 - booking integrity: actual controllers, PostgreSQL constraints, concurrent captures and refund recovery
+  ---
+  duration_ms: 7884.3383
+  type: 'test'
+  ...
+# Subtest: booking controller: online booking uses the normalized date before the advisory lock and returns its Razorpay order
+ok 5 - booking controller: online booking uses the normalized date before the advisory lock and returns its Razorpay order
+  ---
+  duration_ms: 407.1024
+  type: 'test'
+  ...
+# Subtest: booking controller: cash booking still commits and sends booking notifications without creating an online order
+ok 6 - booking controller: cash booking still commits and sends booking notifications without creating an online order
+  ---
+  duration_ms: 6.1051
+  type: 'test'
+  ...
+# Subtest: chat validates payloads before acquiring a database connection
+ok 7 - chat validates payloads before acquiring a database connection
+  ---
+  duration_ms: 5.9775
+  type: 'test'
+  ...
+# Subtest: chat PostgreSQL, HTTP and real Socket.IO integration
+    # Subtest: authorization denies outsiders on all operations without revealing existence
+    ok 1 - authorization denies outsiders on all operations without revealing existence
+      ---
+      duration_ms: 13.0284
+      type: 'test'
+      ...
+    # Subtest: simultaneous retries persist once and conflicting reuse is rejected
+    ok 2 - simultaneous retries persist once and conflicting reuse is rejected
+      ---
+      duration_ms: 323.9467
+      type: 'test'
+      ...
+    # Subtest: history pagination, bounded receipts and conversation isolation
+    ok 3 - history pagination, bounded receipts and conversation isolation
+      ---
+      duration_ms: 48.6994
+      type: 'test'
+      ...
+    # Subtest: HTTP auth, participant restrictions and safe error responses
+    ok 4 - HTTP auth, participant restrictions and safe error responses
+      ---
+      duration_ms: 128.3037
+      type: 'test'
+      ...
+# Socket auth error: jwt malformed
+# Socket auth error: jwt expired
+    # Subtest: socket auth rejects missing, invalid, expired and deleted-user tokens
+    ok 5 - socket auth rejects missing, invalid, expired and deleted-user tokens
+      ---
+      duration_ms: 132.2334
+      type: 'test'
+      ...
+# 🔌 Socket connected: MKLlZf7l5IuU4KtDAAAJ (User: ca704a1f-5f85-407d-a9a3-72c50456b4c3, Role: customer)
+# 🔌 Socket connected: NM_2eIH1Xa6djAMoAAAL (User: cb39063a-dd5d-49fb-9366-bf7b249b08ee, Role: provider)
+# 🔌 Socket connected: kte9Rt0cASt_c73jAAAN (User: 1ebc11f7-a23f-488d-876e-e77d5274e543, Role: customer)
+# 🔌 Socket disconnected: NM_2eIH1Xa6djAMoAAAL
+# 🔌 Socket connected: Pvnd42H9G_0TMdxUAAAP (User: cb39063a-dd5d-49fb-9366-bf7b249b08ee, Role: provider)
+    # Subtest: private socket delivery, acknowledgements, read receipts and reconnect replay
+    ok 6 - private socket delivery, acknowledgements, read receipts and reconnect replay
+      ---
+      duration_ms: 154.25
+      type: 'test'
+      ...
+# 🔌 Socket connected: R61eyJh_gofszvCWAAAR (User: ca704a1f-5f85-407d-a9a3-72c50456b4c3, Role: customer)
+# 🔌 Socket disconnected: R61eyJh_gofszvCWAAAR
+    # Subtest: active sockets disconnect on token expiry
+    ok 7 - active sockets disconnect on token expiry
+      ---
+      duration_ms: 1694.1361
+      type: 'test'
+      ...
+# Chat operation failed: 08006
+    # Subtest: failed database operations do not leak SQL
+    ok 8 - failed database operations do not leak SQL
+      ---
+      duration_ms: 16.4852
+      type: 'test'
+      ...
+    # Subtest: transaction failure rolls back a pending message and allows a safe retry
+    ok 9 - transaction failure rolls back a pending message and allows a safe retry
+      ---
+      duration_ms: 7.2914
+      type: 'test'
+      ...
+# 🔌 Socket connected: 7hRa30mXvt3R0p6SAAAT (User: ca704a1f-5f85-407d-a9a3-72c50456b4c3, Role: customer)
+    # Subtest: socket request limits and server-owned sender identity
+    ok 10 - socket request limits and server-owned sender identity
+      ---
+      duration_ms: 87.6884
+      type: 'test'
+      ...
+# 🔌 Socket disconnected: MKLlZf7l5IuU4KtDAAAJ
+# 🔌 Socket disconnected: kte9Rt0cASt_c73jAAAN
+# 🔌 Socket disconnected: Pvnd42H9G_0TMdxUAAAP
+# 🔌 Socket disconnected: 7hRa30mXvt3R0p6SAAAT
+    # Subtest: booking deletion cascades messages and prevents future access
+    ok 11 - booking deletion cascades messages and prevents future access
+      ---
+      duration_ms: 9.6283
+      type: 'test'
+      ...
+    1..11
+ok 8 - chat PostgreSQL, HTTP and real Socket.IO integration
+  ---
+  duration_ms: 3618.1768
+  type: 'test'
+  ...
+# Subtest: health distinguishes unavailable DB from live process and volatile queue fallback
+ok 9 - health distinguishes unavailable DB from live process and volatile queue fallback
+  ---
+  duration_ms: 133.111
+  type: 'test'
+  ...
+1..9
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8109.9645

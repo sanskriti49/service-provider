@@ -1,0 +1,31 @@
+{
+  "measuredAt": "2026-10-12T08:21:07.157Z",
+  "node": "v22.22.0",
+  "postgres": "18.4",
+  "poolMax": 10,
+  "conditions": "Loopback HTTP; actual JWT middleware, routes, controllers and PostgreSQL. Synthetic provider, 1200 INR service, one slot per round. Redis admission lock, rate limiter, gateway and notification delivery stubbed. This verifies DB contention correctness, not production throughput.",
+  "rounds": [
+    {
+      "method": "cod",
+      "requests": 50,
+      "accepted": 1,
+      "rejected": 49,
+      "errors": 0,
+      "committed": 1,
+      "elapsedMs": 540,
+      "p50Ms": 413,
+      "p95Ms": 500
+    },
+    {
+      "method": "online",
+      "requests": 50,
+      "accepted": 1,
+      "rejected": 49,
+      "errors": 0,
+      "committed": 1,
+      "elapsedMs": 311,
+      "p50Ms": 205,
+      "p95Ms": 286
+    }
+  ]
+}
