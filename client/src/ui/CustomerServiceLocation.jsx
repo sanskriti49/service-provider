@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api/axiosInstance";
 import { useAuth } from "../contexts/AuthContext";
+import { apiCache } from "../utils/apiCache";
 import { addressCandidates, createRequestGuard, serviceLocation, validCoordinates } from "../utils/serviceLocation";
 export default function CustomerServiceLocation({
   value,
@@ -21,9 +22,17 @@ export default function CustomerServiceLocation({
   }, [value?.address]);
   useEffect(() => {
     if (!user?.id) return;
+    const cacheKey = `user_addresses_${user.id}`;
+    const cached = apiCache.get(cacheKey);
+    if (cached) {
+      setSaved(cached);
+      return;
+    }
     let active = true;
     api.get('/api/account/addresses').then(res => {
-      if (active) setSaved(res.data?.addresses || []);
+      const list = res.data?.addresses || [];
+      if (active) setSaved(list);
+      apiCache.set(cacheKey, list, 60000);
     }).catch(() => {});
     return () => {
       active = false;

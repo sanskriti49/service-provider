@@ -27,7 +27,7 @@ import CustomerServiceLocation from "../ui/CustomerServiceLocation";
 import useModal from "../hooks/useModal";
 
 import { API_URL } from "../config";
-import { locationParams, requestCacheKey, createRequestGuard, serviceLocation, indiaDate, validCoordinates } from "../utils/serviceLocation";
+import { locationParams, requestCacheKey, createRequestGuard, serviceLocation, indiaDate, validCoordinates, reverseLocation } from "../utils/serviceLocation";
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
 const formatTime = (timeStr) => {
@@ -50,7 +50,8 @@ const ServiceDetails = () => {
 	const [service, setService] = useState(null);
 	const navigate = useNavigate();
 	const [providers, setProviders] = useState([]);
-	const [loading, setLoading] = useState(true);
+	const [serviceLoading, setServiceLoading] = useState(true);
+	const [providersLoading, setProvidersLoading] = useState(true);
 	const [error, setError] = useState(null);
 	const [expandedIndex, setExpandedIndex] = useState(-1);
 	const [userCoords, setUserCoords] = useState(null);
@@ -58,8 +59,9 @@ const ServiceDetails = () => {
 	const [radius, setRadius] = useState(50);
 	const providerRequests = useRef(createRequestGuard());
 	const locationRevision = useRef(0);
-	const [retry,setRetry]=useState(0);
+	const [retry, setRetry] = useState(0);
 	const [isLocating, setIsLocating] = useState(false);
+	const initialLocationChecked = useRef(false);
 
 	const mainRef = useRef(null);
 	const headerRef = useRef(null);
@@ -68,79 +70,160 @@ const ServiceDetails = () => {
 
 	const isAnyExpanded = expandedIndex !== -1;
 
+	const updateLocationWithReverse = async (lat, lng, revision) => {
+		const initial = serviceLocation({
+			lat,
+			lng,
+			address: "Current Location",
+			source: "browser",
+		});
+		if (revision === locationRevision.current) {
+			setUserCoords(initial);
+			setIsLocating(false);
+		}
+		try {
+			const resolved = await reverseLocation(lat, lng);
+			if (revision === locationRevision.current) {
+				setUserCoords((prev) =>
+					prev && prev.lat === lat && prev.lng === lng
+						? { ...prev, address: resolved.address }
+						: prev,
+				);
+			}
+		} catch (_) {
+			// keep initial
+		}
+	};
+
 	// Request browser geolocation once on mount
 	useEffect(() => {
-		let active=true; const revision=locationRevision.current;
-		if ("geolocation" in navigator) {
-			navigator.geolocation.getCurrentPosition(
-				(pos) => {
-					if(!active || revision!==locationRevision.current)return;
-					setUserCoords({
-						lat: pos.coords.latitude,
-						lng: pos.coords.longitude,
-					});
-				},
-				() => {
-					console.log("Geolocation prompt dismissed or denied.");
-				},
-				{ timeout: 10000, enableHighAccuracy: true, maximumAge: 0 },
-			);
+		let active = true;
+		const revision = ++locationRevision.current;
+		if (!("geolocation" in navigator)) {
+			initialLocationChecked.current = true;
+			return;
 		}
-		return ()=>{active=false;};
+
+		setIsLocating(true);
+		navigator.geolocation.getCurrentPosition(
+			(pos) => {
+				if (!active || revision !== locationRevision.current) return;
+				initialLocationChecked.current = true;
+				updateLocationWithReverse(
+					pos.coords.latitude,
+					pos.coords.longitude,
+					revision,
+				);
+			},
+			() => {
+				if (!active) return;
+				initialLocationChecked.current = true;
+				setIsLocating(false);
+			},
+			{ timeout: 8000, enableHighAccuracy: true, maximumAge: 60000 },
+		);
+		return () => {
+			active = false;
+		};
 	}, []);
 
 	const requestLocation = () => {
 		if (!navigator.geolocation) return;
-		const revision=++locationRevision.current;
+		const revision = ++locationRevision.current;
 		setIsLocating(true);
 		navigator.geolocation.getCurrentPosition(
 			(pos) => {
-				if(revision!==locationRevision.current)return;
-				setUserCoords({
-					lat: pos.coords.latitude,
-					lng: pos.coords.longitude,
-				});
-				setIsLocating(false);
+				if (revision !== locationRevision.current) return;
+				updateLocationWithReverse(
+					pos.coords.latitude,
+					pos.coords.longitude,
+					revision,
+				);
 			},
 			() => {
-				setIsLocating(false);
+				if (revision === locationRevision.current) setIsLocating(false);
 			},
 			{ timeout: 10000, enableHighAccuracy: true, maximumAge: 0 },
 		);
 	};
 
 	useEffect(() => {
-  if (!slug) return;
-  const request = providerRequests.current.begin();
-  async function fetchServiceAndProviders() {
-   setLoading(true); setError(null);
-   try {
-    const serviceKey = requestCacheKey("service",{slug});
-    let serviceData = apiCache.get(serviceKey);
-    if (!serviceData) {
-     const response = await fetch(`${API_URL}/api/services/v1/${slug}`,{signal:request.signal});
-     if (!response.ok) throw new Error("Service not found");
-     serviceData = await response.json(); if (request.current()) apiCache.set(serviceKey,serviceData,300000);
-    }
-    if (!request.current()) return; setService(serviceData);
-    const parameters = { service:slug, sort_by:sortBy, radius:String(radius), ...locationParams(userCoords) };
-    const key = requestCacheKey("providers",parameters);
-    let data = apiCache.get(key);
-    if (!data) {
-     const response = await fetch(`${API_URL}/api/providers/v1?${new URLSearchParams(parameters)}`,{signal:request.signal});
-     if (!response.ok) { const failure=await response.json().catch(()=>({})); throw new Error(failure.error || "Couldn't load providers. Please try again."); }
-     data = await response.json(); if (!Array.isArray(data)) throw new Error("Couldn't load providers.");
-     if (request.current()) apiCache.set(key,data,15000);
-    }
-    if (request.current()) { setProviders(data); setExpandedIndex(-1); }
-   } catch (err) { if (request.current()) setError(err.message); }
-   finally { if (request.current()) setLoading(false); }
-  }
-  fetchServiceAndProviders(); return request.cancel;
- }, [slug,userCoords,sortBy,radius,retry]);
+		if (!slug) return;
+		const request = providerRequests.current.begin();
+		async function fetchServiceAndProviders() {
+			setProvidersLoading(true);
+			setError(null);
+			try {
+				const serviceKey = requestCacheKey("service", { slug });
+				let serviceData = apiCache.get(serviceKey);
+				if (!serviceData) {
+					const response = await fetch(`${API_URL}/api/services/v1/${slug}`, {
+						signal: request.signal,
+					});
+					if (!response.ok) throw new Error("Service not found");
+					serviceData = await response.json();
+					if (request.current()) apiCache.set(serviceKey, serviceData, 300000);
+				}
+				if (!request.current()) return;
+				setService(serviceData);
+				setServiceLoading(false);
+
+				// Wait briefly (up to 800ms) on initial mount if geolocation is actively resolving
+				if (
+					!userCoords &&
+					!initialLocationChecked.current &&
+					"geolocation" in navigator
+				) {
+					let waited = 0;
+					while (!initialLocationChecked.current && waited < 800) {
+						await new Promise((r) => setTimeout(r, 50));
+						waited += 50;
+						if (!request.current()) return;
+					}
+				}
+
+				const parameters = {
+					service: slug,
+					sort_by: sortBy,
+					radius: String(radius),
+					...locationParams(userCoords),
+				};
+				const key = requestCacheKey("providers", parameters);
+				let data = apiCache.get(key);
+				if (!data) {
+					const response = await fetch(
+						`${API_URL}/api/providers/v1?${new URLSearchParams(parameters)}`,
+						{ signal: request.signal },
+					);
+					if (!response.ok) {
+						const failure = await response.json().catch(() => ({}));
+						throw new Error(
+							failure.error || "Couldn't load providers. Please try again.",
+						);
+					}
+					data = await response.json();
+					if (!Array.isArray(data)) throw new Error("Couldn't load providers.");
+					if (request.current()) apiCache.set(key, data, 15000);
+				}
+				if (request.current()) {
+					setProviders(data);
+					setExpandedIndex(-1);
+				}
+			} catch (err) {
+				if (request.current()) setError(err.message);
+			} finally {
+				if (request.current()) {
+					setServiceLoading(false);
+					setProvidersLoading(false);
+				}
+			}
+		}
+		fetchServiceAndProviders();
+		return request.cancel;
+	}, [slug, userCoords, sortBy, radius, retry]);
 
 	useEffect(() => {
-		if (!loading && service && mainRef.current) {
+		if (!serviceLoading && service && mainRef.current) {
 			let ctx = gsap.context(() => {
 				const tl = gsap.timeline({
 					scrollTrigger: {
@@ -194,7 +277,7 @@ const ServiceDetails = () => {
 
 			return () => ctx.revert();
 		}
-	}, [loading, service]);
+	}, [serviceLoading, service]);
 
 	const handleScrollDown = () => {
 		gsap.to(window, {
@@ -208,7 +291,7 @@ const ServiceDetails = () => {
 		setExpandedIndex((prevIndex) => (prevIndex === index ? -1 : index));
 	};
 
-	if (loading) {
+	if (serviceLoading && !service) {
 		return (
 			<TaskGenieLoader
 				fullScreen
@@ -218,7 +301,7 @@ const ServiceDetails = () => {
 		);
 	}
 
-	if (!service) {
+	if (!service && !serviceLoading) {
 		return (
 			<section className="bg-[#191034] text-white min-h-screen flex items-center justify-center p-4">
 				<div className="text-center max-w-lg mx-auto">
@@ -330,9 +413,16 @@ const ServiceDetails = () => {
 								<span>{isLocating ? "Locating..." : "Use My Location"}</span>
 							</button>
 						) : (
-							<div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-green-500/10 border border-green-500/30 text-green-300 text-xs font-medium">
-								<MapPin size={12} />
-								<span>Location active</span>
+							<div
+								className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-500/10 border border-green-500/30 text-green-300 text-xs font-medium max-w-[240px] truncate"
+								title={userCoords.address || "Location active"}
+							>
+								<MapPin size={12} className="shrink-0" />
+								<span className="truncate">
+									{userCoords.address && userCoords.address !== "Current Location"
+										? userCoords.address.split(",").slice(0, 2).join(",")
+										: "Location active"}
+								</span>
 							</div>
 						)}
 
@@ -370,10 +460,16 @@ const ServiceDetails = () => {
 				<CustomerServiceLocation value={userCoords} onChange={location=>{locationRevision.current++;setUserCoords(location);setIsLocating(false);}} />
  {error && <div role="alert" className="mb-6 rounded-xl border border-amber-400/30 p-4 text-amber-300">{error}<button onClick={()=>setRetry(current=>current+1)} className="ml-4 underline">Retry</button></div>}
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
-					{!error && providers.length === 0 && <div className="col-span-full rounded-3xl border border-violet-500/20 bg-[#22194A] p-10 text-center">
+					{providersLoading ? (
+						[...Array(3)].map((_, i) => (
+							<SkeletonCard key={i} />
+						))
+					) : (
+						<>
+							{!error && providers.length === 0 && <div className="col-span-full rounded-3xl border border-violet-500/20 bg-[#22194A] p-10 text-center">
  <h3 className="text-xl font-bold text-white">{userCoords ? `No providers found within ${radius} km` : "No providers available for this service"}</h3>
  <p className="mt-3 text-gray-400">{userCoords ? "Try a wider search area. Your service and filters will stay selected." : "Share your service location to search nearby."}</p>
- {userCoords && radius < 500 && <button className="mt-5 rounded-xl bg-violet-600 px-5 py-3 text-white" onClick={()=>setRadius(radius < 100 ? 100 : Math.min(500,radius*2))}>Expand to {radius < 100 ? 100 : Math.min(500,radius*2)} km</button>}
+ {userCoords && radius < 500 && <button className="mt-5 rounded-xl bg-violet-600 px-5 py-3 text-white cursor-pointer hover:bg-violet-500 transition-colors" onClick={()=>setRadius(radius < 100 ? 100 : Math.min(500,radius*2))}>Expand to {radius < 100 ? 100 : Math.min(500,radius*2)} km</button>}
  </div>}
  {providers.map((p, index) => (
 						<ProviderCard
@@ -387,6 +483,8 @@ const ServiceDetails = () => {
 							onToggleExpand={() => handleToggleExpand(index)}
 						/>
 					))}
+						</>
+					)}
 				</div>
 			</div>
 		</section>
@@ -578,7 +676,7 @@ const ProviderCard = ({
 						<h3 className="plus-jakarta-sans font-bold text-[22px] text-white truncate">
 							{provider.name}
 						</h3>
-						<div className="flex items-center gap-2 text-xs text-violet-300/80 mt-1 mb-2.5">
+						<div className="flex items-center gap-2 text-xs text-violet-300/80 mt-1 mb-2.5 flex-wrap">
 							{provider.is_verified ? (
 								<VerifiedBadge size="sm" />
 							) : (
@@ -588,11 +686,24 @@ const ProviderCard = ({
 								</div>
 							)}
 
+							{provider.location && (
+								<span className="text-gray-400 text-[11px] truncate max-w-[150px]" title={provider.location}>
+									📍 {provider.location}
+								</span>
+							)}
+
 							{provider.distance_km == null && <span className="text-gray-400">Distance unknown</span>}
 							{provider.distance_km != null && (
-								<div className="flex items-center gap-1 text-violet-300 bg-violet-500/10 px-2 py-0.5 rounded-md text-[11px] font-medium border border-violet-500/20">
-									<MapPin size={10} className="text-violet-400" />
+								<div className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+									provider.distance_km > 100
+										? "text-amber-300 bg-amber-500/10 border-amber-500/20"
+										: "text-violet-300 bg-violet-500/10 border-violet-500/20"
+								}`}>
+									<MapPin size={10} className={provider.distance_km > 100 ? "text-amber-400" : "text-violet-400"} />
 									<span>{Number(provider.distance_km).toFixed(1)} km</span>
+									{provider.distance_km > 100 && (
+										<span className="text-[10px] opacity-75">(long distance)</span>
+									)}
 								</div>
 							)}
 						</div>
