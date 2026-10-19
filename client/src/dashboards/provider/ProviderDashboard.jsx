@@ -43,6 +43,7 @@ import VerifiedBadge from "../../ui/VerifiedBadge";
 import KycVerificationModal from "../../ui/KycVerificationModal";
 import SupportTicketModal from "../../ui/SupportTicketModal";
 import ScrollToTop from "../../ui/ScrollToTop";
+import ServiceIllustration from "../../ui/ServiceIllustration";
 
 const PLATFORM_FEE = 0.15; // Estimate only; replace with backend value if available
 
@@ -739,9 +740,9 @@ function ProviderOverview({ user, stats, recentBookings, onOpenKyc }) {
 			{/* Header */}
 			<motion.header
 				variants={rise}
-				className="flex flex-col sm:flex-row sm:items-end justify-between gap-5"
+				className="grid grid-cols-[minmax(0,1fr)_96px] sm:grid-cols-[minmax(0,1fr)_220px] items-center gap-x-3 gap-y-5 pb-6 border-b border-white/[0.07]"
 			>
-				<div>
+				<div className="min-w-0">
 					<h1 className="font-mackinac text-3xl sm:text-4xl font-bold text-white tracking-tight">
 						{firstName ? (
 							<>
@@ -772,7 +773,12 @@ function ProviderOverview({ user, stats, recentBookings, onOpenKyc }) {
 						)}
 					</p>
 				</div>
-				<div className="flex items-center gap-2">
+				<ServiceIllustration
+					scene="workbench"
+					priority
+					className="col-start-2 row-start-1 sm:row-span-2 w-full h-auto"
+				/>
+				<div className="col-span-2 sm:col-span-1 sm:col-start-1 sm:row-start-2 flex flex-wrap items-center gap-2">
 					<Link
 						to="/provider/dashboard/services"
 						className="h-10 px-4 inline-flex items-center rounded-lg border border-white/15 text-sm font-medium text-stone-200 hover:bg-white/[0.06] hover:border-white/25 transition-colors"
@@ -894,10 +900,8 @@ function ProviderOverview({ user, stats, recentBookings, onOpenKyc }) {
 				</div>
 
 				{recentBookings.length === 0 ? (
-					<div className="py-16 text-center rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.015]">
-						<span className="mx-auto w-11 h-11 rounded-full bg-violet-400/10 text-violet-300 flex items-center justify-center">
-							<CalendarCheck size={20} />
-						</span>
+					<div className="py-9 px-5 text-center rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.015]">
+						<ServiceIllustration scene="calendar" className="mx-auto w-44 h-auto" />
 						<p className="mt-4 text-sm font-medium text-stone-100">
 							No bookings yet
 						</p>

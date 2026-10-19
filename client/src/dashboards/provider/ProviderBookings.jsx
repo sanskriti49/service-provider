@@ -25,6 +25,7 @@ import { FadeLoader } from "react-spinners";
 import api from "../../api/axiosInstance";
 import ConfirmModal from "../../ui/ConfirmModal";
 import BookingDetailsSheet from "../provider/BookingDetailsSheet";
+import ServiceIllustration from "../../ui/ServiceIllustration";
 
 const formatCurrency = (n) =>
 	new Intl.NumberFormat("en-IN", {
@@ -469,9 +470,7 @@ export default function ProviderBookings() {
 						</div>
 					) : bookings.length === 0 ? (
 						<div className="flex flex-col items-center justify-center h-72 text-center p-8 space-y-3">
-							<div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-slate-500">
-								<CalendarCheck size={22} />
-							</div>
+							<ServiceIllustration scene="calendar" className="w-44 h-auto" />
 							<div>
 								<p className="font-bold text-sm text-slate-200">
 									{activeTab === "upcoming"

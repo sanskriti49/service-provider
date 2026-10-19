@@ -8,7 +8,6 @@ import {
 	ArrowRight,
 	ArrowLeft,
 	X,
-	MessageSquare,
 	RotateCcw,
 	BadgeCheck,
 } from "lucide-react";
@@ -18,6 +17,7 @@ import { useAuth } from "../contexts/AuthContext";
 import VerifiedBadge from "../ui/VerifiedBadge";
 import { API_URL } from "../config";
 import Logo from "../ui/Logo";
+import ServiceIllustration from "../ui/ServiceIllustration";
 
 const CATEGORIES = [
 	{ id: "all", label: "All" },
@@ -415,9 +415,7 @@ export default function Reviews() {
 						</div>
 					) : reviews.length === 0 ? (
 						<div className="py-20 text-center max-w-sm mx-auto space-y-4">
-							<div className="w-11 h-11 mx-auto rounded-full border border-white/10 flex items-center justify-center text-stone-500">
-								<MessageSquare size={18} />
-							</div>
+							<ServiceIllustration scene={hasActiveFilters ? "search" : "reviews"} className="mx-auto w-48 h-auto" />
 							<h3 className="font-mackinac text-xl font-bold text-white">
 								No matching reviews
 							</h3>

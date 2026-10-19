@@ -4,7 +4,6 @@ import {
 	Star,
 	Search,
 	RotateCcw,
-	MessageSquare,
 	ArrowUpRight,
 	X,
 	BadgeCheck,
@@ -13,6 +12,7 @@ import { FadeLoader } from "react-spinners";
 import gsap from "gsap";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
+import ServiceIllustration from "../../ui/ServiceIllustration";
 
 const RATING_FILTERS = [
 	{ key: "all", label: "All" },
@@ -398,9 +398,7 @@ export default function ProviderReviews() {
 					</div>
 				) : reviews.length === 0 ? (
 					<div className="py-20 text-center max-w-sm mx-auto space-y-4">
-						<div className="w-11 h-11 mx-auto rounded-full border border-white/10 flex items-center justify-center text-stone-500">
-							<MessageSquare size={18} />
-						</div>
+						<ServiceIllustration scene={hasActiveFilter ? "search" : "reviews"} className="mx-auto w-48 h-auto" />
 						<h3 className="font-mackinac text-xl font-bold text-white">
 							{hasActiveFilter ? "No matching reviews" : "No reviews yet"}
 						</h3>

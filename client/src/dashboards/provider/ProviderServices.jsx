@@ -23,6 +23,7 @@ import api from "../../api/axiosInstance";
 import { useAuth } from "../../hooks/useAuth";
 import { UNIT_LABELS, getAllowedUnits } from "../../utils/pricingHelper";
 import ConfirmDialog from "../../ui/ConfirmDialog";
+import ServiceIllustration from "../../ui/ServiceIllustration";
 
 const DAYS_OF_WEEK = [
 	{ label: "Sun", value: 0 },
@@ -283,7 +284,7 @@ export default function ProviderServices() {
 					>
 						{myServices.length === 0 ? (
 							<div className="flex flex-col items-center justify-center text-center p-14 border border-dashed border-white/[0.08] bg-white/[0.01] rounded-3xl space-y-3">
-								<Briefcase size={36} className="text-slate-600" />
+								<ServiceIllustration scene="workbench" className="w-52 h-auto" />
 								<p className="text-white font-bold text-[17.5px]">
 									No active services added yet
 								</p>

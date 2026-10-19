@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { getSocket } from "../utils/socket";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import Logo from "../ui/Logo";
+import ServiceIllustration from "../ui/ServiceIllustration";
 import { useAuth } from "../contexts/AuthContext";
 import { API_URL } from "../config";
 
@@ -408,10 +409,8 @@ export default function NotificationsPage() {
 						</p>
 					</div>
 				) : filteredNotifications.length === 0 ? (
-					<div className="py-20 px-6 text-center bg-white rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-						<div className="w-16 h-16 bg-gradient-to-br from-violet-100 to-indigo-50 border border-violet-200/80 rounded-3xl flex items-center justify-center mx-auto text-violet-600 shadow-sm">
-							<Bell size={28} className="text-violet-600" />
-						</div>
+					<div className="py-12 px-6 text-center bg-white rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+						<ServiceIllustration scene="mail" className="mx-auto w-52 h-auto" />
 						<div className="space-y-1.5 max-w-sm mx-auto">
 							<h3 className="text-lg font-bold text-slate-900">
 								No notifications right now

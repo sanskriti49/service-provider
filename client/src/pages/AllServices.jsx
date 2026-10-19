@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Search, ArrowRight, X, Filter, CircleAlert } from "lucide-react";
+import { Search, ArrowRight, X, CircleAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 import gsap from "gsap";
+import ServiceIllustration from "../ui/ServiceIllustration";
 
 import { API_URL } from "../config";
 const CATEGORIES = [
@@ -146,11 +147,9 @@ export default function AllServices() {
 					</div>
 				)}
 
-				{!loading && filtered.length === 0 && (
-					<div className="bricolage-grotesque text-center py-24 bg-white rounded-3xl border border-dashed border-slate-300">
-						<div className="inline-flex p-4 bg-violet-50 rounded-full mb-4">
-							<Filter size={32} className="text-violet-600" />
-						</div>
+				{!loading && !error && filtered.length === 0 && (
+					<div className="bricolage-grotesque text-center px-5 py-12 bg-white rounded-3xl border border-dashed border-slate-300">
+						<ServiceIllustration scene="search" className="mx-auto mb-5 w-52 h-auto" />
 						<h3 className="text-xl font-bold text-slate-800 mb-2">
 							No services found
 						</h3>

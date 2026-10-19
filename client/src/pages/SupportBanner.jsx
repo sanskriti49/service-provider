@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MessageCircle, Mail, Copy, Check, CheckCircle2 } from "lucide-react";
+import ServiceIllustration from "../ui/ServiceIllustration";
 
 const WHATSAPP_DIGITS = "919876543201";
 const WHATSAPP_DISPLAY = "+91 98765 43201";
@@ -62,17 +63,20 @@ const SupportBanner = ({ isSupportOnline, userRole, onOpenTicket }) => {
 		>
 			{/* Left: message, topics, actions */}
 			<div className="p-8 md:p-12">
-				<p className="flex items-center gap-2.5 text-sm font-medium text-slate-300 mb-6">
-					<span
-						aria-hidden="true"
-						className={`w-2 h-2 rounded-full shrink-0 ${
-							isSupportOnline ? "bg-emerald-400" : "bg-slate-500"
-						}`}
-					/>
-					{isSupportOnline
-						? "Support desk is open until 11 PM"
-						: "Support desk is closed. It opens at 9 AM"}
-				</p>
+				<div className="mb-6 flex items-center justify-between gap-4">
+					<p className="flex items-center gap-2.5 text-sm font-medium text-slate-300">
+						<span
+							aria-hidden="true"
+							className={`w-2 h-2 rounded-full shrink-0 ${
+								isSupportOnline ? "bg-emerald-400" : "bg-slate-500"
+							}`}
+						/>
+						{isSupportOnline
+							? "Support desk is open until 11 PM"
+							: "Support desk is closed. It opens at 9 AM"}
+					</p>
+					<ServiceIllustration scene="support" className="w-28 sm:w-36 h-auto shrink-0" />
+				</div>
 
 				<h3
 					id="support-heading"

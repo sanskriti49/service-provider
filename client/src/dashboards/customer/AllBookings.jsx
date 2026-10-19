@@ -23,6 +23,7 @@ import BookingDetailsSheet from "./BookingDetailsSheet";
 import ConfirmModal from "../../ui/ConfirmModal";
 import api from "../../api/axiosInstance";
 import ChatButton from "../../chat/ChatButton";
+import ServiceIllustration from "../../ui/ServiceIllustration";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants & helpers                                                       */
@@ -501,18 +502,22 @@ function ListSkeleton() {
 	);
 }
 
-function Notice({ icon: Icon, tone = "violet", title, body, children }) {
+function Notice({ icon: Icon, illustration, tone = "violet", title, body, children }) {
 	const tones = {
 		violet: "bg-violet-400/10 text-violet-300",
 		rose: "bg-rose-400/10 text-rose-300",
 	};
 	return (
-		<div className="py-16 px-6 text-center rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.015]">
-			<span
-				className={`mx-auto w-11 h-11 rounded-full flex items-center justify-center ${tones[tone]}`}
-			>
-				<Icon size={20} />
-			</span>
+		<div className={`${illustration ? "py-10" : "py-16"} px-6 text-center rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.015]`}>
+			{illustration ? (
+				<ServiceIllustration scene={illustration} className="mx-auto w-48 h-auto" />
+			) : (
+				<span
+					className={`mx-auto w-11 h-11 rounded-full flex items-center justify-center ${tones[tone]}`}
+				>
+					<Icon size={20} />
+				</span>
+			)}
 			<p className="mt-4 text-sm font-medium text-white">{title}</p>
 			<p className="mt-1 text-sm text-stone-500 max-w-xs mx-auto">{body}</p>
 			{children}
@@ -542,6 +547,7 @@ function EmptyState({ tab, filtered, onClear }) {
 	return (
 		<Notice
 			icon={CalendarCheck}
+			illustration="calendar"
 			title={upcoming ? "Nothing scheduled" : "No past bookings yet"}
 			body={
 				upcoming

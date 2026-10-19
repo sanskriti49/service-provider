@@ -3,6 +3,7 @@ import emailjs from "@emailjs/browser";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import ServiceIllustration from "../ui/ServiceIllustration";
 import {
 	Mail,
 	User,
@@ -226,6 +227,10 @@ export default function ContactSection() {
 						Questions, ideas, or something not working? Tell us what's going on
 						and the right person will get back to you.
 					</p>
+					<ServiceIllustration
+						scene="support"
+						className="mt-6 mx-auto w-56 h-auto sm:w-64 lg:mx-0 lg:w-full lg:max-w-sm"
+					/>
 				</motion.div>
 
 				{/* Form */}

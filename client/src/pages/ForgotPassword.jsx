@@ -2,6 +2,7 @@ import { useState } from "react";
 import api from "../api/axiosInstance";
 import { Link } from "react-router-dom";
 import Logo from "../ui/Logo";
+import ServiceIllustration from "../ui/ServiceIllustration";
 
 const ForgotPassword = () => {
 	const [email, setEmail] = useState("");
@@ -30,6 +31,7 @@ const ForgotPassword = () => {
 			<div className="auth-card w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-slate-100" style={{ color: "#0f172a" }}>
 				<div className="text-center mb-8 flex flex-col items-center">
 					<Logo to="/" size="xl" theme="light" className="mb-4 hover:scale-105 transition-transform" />
+					<ServiceIllustration scene="mail" priority className="mb-4 w-36 h-auto" />
 					<h2 className="text-2xl font-bold text-slate-900" style={{ color: "#0f172a" }}>Forgot Password</h2>
 					<p className="auth-subtext text-slate-600 mt-2" style={{ color: "#475569" }}>
 						Enter your email to receive a password reset link

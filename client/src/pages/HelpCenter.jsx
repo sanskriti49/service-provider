@@ -7,6 +7,7 @@ import KycVerificationModal from "../ui/KycVerificationModal";
 import SupportTicketModal from "../ui/SupportTicketModal";
 import SupportBanner from "./SupportBanner";
 import useKeyboardShortcut from "../hooks/useKeyboardShortcut";
+import ServiceIllustration from "../ui/ServiceIllustration";
 
 const RetroGrid = () => {
 	return (
@@ -592,6 +593,7 @@ const HelpCenter = () => {
 					{/* Answers: an index of every question, one answer read large beside it */}
 					{sections.length === 0 ? (
 						<div className="mb-24 max-w-xl border-l-4 border-violet-950 pl-6 bg-white p-6 rounded-r-2xl border border-slate-200 shadow-md">
+							<ServiceIllustration scene="search" className="mb-5 w-40 h-auto" />
 							<h2 className="font-mackinac text-3xl font-bold text-slate-950">
 								No answers for “{searchQuery.trim()}”
 							</h2>
