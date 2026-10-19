@@ -46,6 +46,25 @@ resource "aws_s3_bucket_cors_configuration" "assets_cors" {
 }
 
 # ==============================================================================
+# ElastiCache Redis: Distributed Cache, Edge Locks & BullMQ Worker Tier
+# ==============================================================================
+resource "aws_elasticache_replication_group" "taskgenie_redis" {
+  replication_group_id       = "taskgenie-${var.environment}-redis"
+  description                = "TaskGenie Redis for BullMQ queues, Socket.IO adapter, and distributed locks"
+  node_type                  = "cache.t4g.micro"
+  port                       = 6379
+  parameter_group_name       = "default.redis7"
+  automatic_failover_enabled = false
+  at_rest_encryption_enabled = true
+  transit_encryption_enabled = true
+
+  tags = {
+    Environment = var.environment
+    Service     = "TaskGenie"
+  }
+}
+
+# ==============================================================================
 # SQS: Asynchronous Event-Driven Architecture (EDA) & Dead-Letter Queue (DLQ)
 # ==============================================================================
 resource "aws_sqs_queue" "booking_events_dlq" {

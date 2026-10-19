@@ -49,7 +49,17 @@ function createPaymentService({ db, gateway, notify = async () => {} }) {
 				AND ${activeBookingPredicate} AND start_time < $4::time AND end_time > $5::time LIMIT 1`,
 				[booking.provider_id, booking.date_string, booking.booking_id, booking.end_time, booking.start_time]);
 			// Expired/cancelled intents never regain a slot, even when it happens to be free.
-			const late = booking.status !== "pending" || expired || conflict.rows.length > 0;
+			let late = booking.status !== "pending" || expired || conflict.rows.length > 0;
+			if (!late) {
+				try {
+					await require("./bookingSchedule").validateLocationChange(client, { ...booking, date: booking.date_string });
+				} catch (error) {
+					if (![400, 409, 503].includes(error.status)) throw error;
+					// Account for the captured money even when the location/travel check fails.
+					// The existing idempotent refund flow handles the unsafe reservation.
+					late = true;
+				}
+			}
 			const updated = await client.query(`UPDATE bookings SET razorpay_payment_id=$1, payment_status='paid',
 				status=$2, updated_at=NOW() WHERE booking_id=$3 RETURNING *`,
 				[payment.id, late ? (booking.status === "pending" ? "expired" : booking.status) : "booked", booking.booking_id]);

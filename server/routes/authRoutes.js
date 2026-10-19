@@ -53,6 +53,24 @@ const getSafeUser = (user) => {
 	};
 };
 
+const cache = require("../utils/cache");
+
+router.post("/logout", verifyToken, (req, res) => {
+	const authHeader = req.headers.authorization;
+	if (authHeader) {
+		const token = authHeader.split(" ")[1];
+		if (token) {
+			const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+			// Blacklist token in distributed cache for 7 days
+			cache.set(`token_revoked:${tokenHash}`, true, 7 * 24 * 60 * 60 * 1000);
+		}
+	}
+	if (req.user?.id) {
+		cache.del(`auth_user:${req.user.id}`);
+	}
+	res.status(200).json({ success: true, message: "Logged out successfully. Token revoked." });
+});
+
 router.get("/me", verifyToken, async (req, res) => {
 	try {
 		const userId = req.user.id;
@@ -191,6 +209,7 @@ router.post("/verify-email-change", authLimiter, verifyToken, async (req, res) =
              WHERE id = $1`,
 			[userId],
 		);
+		cache.del(`auth_user:${userId}`);
 
 		res.json({
 			message: "Email updated successfully!",
@@ -446,6 +465,7 @@ router.put("/reset-password/:resetToken", authLimiter, async (req, res) => {
              WHERE id = $2`,
 			[hashedPassword, user.id],
 		);
+		cache.del(`auth_user:${user.id}`);
 
 		res.json({ message: "Password updated successfully! You can now log in." });
 	} catch (err) {
@@ -484,6 +504,7 @@ router.post("/set-role", verifyToken, async (req, res) => {
              RETURNING *`,
 			[role, customId, userId],
 		);
+		cache.del(`auth_user:${userId}`);
 
 		const updatedUser = update.rows[0];
 		const newToken = generateToken(updatedUser);

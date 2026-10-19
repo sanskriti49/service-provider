@@ -1,9 +1,11 @@
 require("dotenv").config();
 const http = require("http");
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
 const app = express();
+app.set("trust proxy", 1);
 const httpServer = http.createServer(app);
 const db = require("./config/db");
 const { initSocket } = require("./utils/socket");
@@ -25,12 +27,19 @@ const corsOptions = {
 		// Allow all localhost / 127.0.0.1 / [::1] on any port
 		const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
 		const isPrivateIp = /^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin);
-		const isAllowedDomain =
-			origin === process.env.CLIENT_URL ||
-			origin === process.env.FRONTEND_URL ||
-			origin.endsWith(".vercel.app") ||
-			origin === "https://taskgenieee.vercel.app" ||
-			origin === "https://service-provider-git-main-sanskriti49s-projects.vercel.app";
+		
+		const configuredOrigins = new Set(
+			[
+				process.env.CLIENT_URL,
+				process.env.FRONTEND_URL,
+				"https://taskgenieee.vercel.app",
+				"https://service-provider-git-main-sanskriti49s-projects.vercel.app",
+				...(process.env.ALLOWED_ORIGINS
+					? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
+					: []),
+			].filter(Boolean),
+		);
+		const isAllowedDomain = configuredOrigins.has(origin);
 
 		if (isLocalhost || isPrivateIp || isAllowedDomain) {
 			return callback(null, true);
@@ -60,6 +69,15 @@ const corsOptions = {
 
 initSocket(httpServer, corsOptions);
 
+const helmet = require("helmet");
+app.use(
+	helmet({
+		contentSecurityPolicy: false,
+		crossOriginEmbedderPolicy: false,
+		crossOriginResourcePolicy: { policy: "cross-origin" },
+	}),
+);
+app.disable("x-powered-by");
 app.use(compression());
 app.use(cors(corsOptions));
 app.use(
@@ -70,6 +88,7 @@ app.use(
 		},
 	}),
 );
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const { register, metricsMiddleware, updatePoolMetrics } = require("./utils/metrics");
 const { globalLimiter } = require("./middleware/rateLimiter");
@@ -155,3 +174,48 @@ if (process.env.NODE_ENV !== "test" && process.env.RAZORPAY_KEY_ID && process.en
     }, 30000);
     timer.unref();
 }
+
+// Graceful Shutdown: Handle container stops cleanly (Kubernetes / Docker / ECS)
+let isShuttingDown = false;
+async function gracefulShutdown(signal) {
+	if (isShuttingDown) return;
+	isShuttingDown = true;
+	console.log(`\n🛑 [Server] Received ${signal}. Starting graceful shutdown...`);
+
+	try {
+		await new Promise((resolve, reject) => {
+			httpServer.close((err) => {
+				if (err) return reject(err);
+				console.log("🔒 [Server] Closed HTTP & WebSocket listener.");
+				resolve();
+			});
+		});
+
+		if (eventQueue && typeof eventQueue.close === "function") {
+			console.log("⏳ [Server] Closing background event queue workers...");
+			await eventQueue.close();
+		}
+
+		if (db && typeof db.end === "function") {
+			console.log("⏳ [Server] Draining PostgreSQL connection pool...");
+			await db.end();
+		}
+
+		const { closeRedis } = require("./config/redisClient");
+		await closeRedis();
+
+		console.log("✅ [Server] Graceful shutdown completed cleanly.");
+		process.exit(0);
+	} catch (err) {
+		console.error("❌ [Server] Error during graceful shutdown:", err);
+		process.exit(1);
+	}
+
+	setTimeout(() => {
+		console.error("⚠️ [Server] Graceful shutdown timed out after 10s. Forcing exit.");
+		process.exit(1);
+	}, 10000).unref();
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));

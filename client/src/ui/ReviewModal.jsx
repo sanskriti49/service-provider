@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import useModal from "../hooks/useModal";
 
 import { API_URL } from "../config";
+import { apiCache } from "../utils/apiCache";
 const RATING_LABELS = {
 	5: "Outstanding Experience! 🌟",
 	4: "Very Good & Professional 👍",
@@ -81,6 +82,8 @@ export default function ReviewModal({
 				throw new Error(data.error || "Failed to submit review");
 			}
 
+			apiCache.deletePrefix("providers_");
+			apiCache.deletePrefix("reviews_");
 			toast.success("Thank you for your review!");
 			if (onReviewSubmitted) onReviewSubmitted(data.review);
 			onClose();

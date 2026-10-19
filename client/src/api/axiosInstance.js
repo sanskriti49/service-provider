@@ -1,4 +1,5 @@
 import axios from "axios";
+import { apiCache } from "../utils/apiCache";
 
 import { API_URL as BASE_URL } from "../config";
 
@@ -26,7 +27,10 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-	(response) => response,
+	(response) => {
+		if(["post","put","patch","delete"].includes(response.config?.method) && /^\/api\/(users|providers|reviews|admin)\b/.test(response.config?.url || ""))apiCache.deletePrefix("providers_");
+		return response;
+	},
 	(error) => {
 		if (error.response && error.response.status === 401) {
 			console.warn("Session expired or unauthorized. Clearing credentials...");

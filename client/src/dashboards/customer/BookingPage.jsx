@@ -24,6 +24,7 @@ import SavedAddressesModal from "./SavedAddressesModal";
 import { toast } from "sonner";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
+import { initialCustomerLocation, serviceLocation as normalizeLocation, editServiceAddress, validCoordinates, locationParams, bookingCoordinates, addressCandidates, reverseLocation, createRequestGuard, indiaDate } from "../../utils/serviceLocation";
 
 /* -------------------------------------------------------------------------- */
 /*  Pure helpers                                                              */
@@ -31,11 +32,7 @@ import { useAuth } from "../../contexts/AuthContext";
 
 const pad = (n) => String(n).padStart(2, "0");
 
-function shiftDay(n) {
-	const d = new Date();
-	d.setDate(d.getDate() + n);
-	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+const shiftDay = (n) => indiaDate(new Date(),n);
 const todayStr = () => shiftDay(0);
 
 const formatINR = (n) =>
@@ -107,8 +104,7 @@ function isSlotExpired(date, start) {
 	if (date > today) return false;
 	const t = parseTime(start);
 	if (!t) return false;
-	const at = new Date();
-	at.setHours(t[0], t[1], 0, 0);
+	const at = new Date(`${date}T${pad(t[0])}:${pad(t[1])}:00+05:30`);
 	return new Date() >= at;
 }
 
@@ -443,20 +439,29 @@ function BookingSkeleton() {
 export default function BookingPage() {
 	const { customId } = useParams();
 	const navigate = useNavigate();
-	const { state } = useLocation();
+	const { state, search } = useLocation();
+	const selectedServiceId = new URLSearchParams(search).get("service_id");
+	const searchRadius = Number(new URLSearchParams(search).get("radius") ?? state?.searchRadius ?? 50);
 	const { user } = useAuth();
 
 	const [provider, setProvider] = useState(state?.provider || null);
-	const [availability, setAvailability] = useState(
-		state?.preloadedAvailability || state?.provider?.availability || [],
-	);
-
-	const [address, setAddress] = useState(state?.address || "");
-	const [tempAddress, setTempAddress] = useState(state?.address || "");
-	const [coords, setCoords] = useState({
-		lat: state?.provider?.latitude || state?.provider?.lat || null,
-		lng: state?.provider?.longitude || state?.provider?.lng || null,
-	});
+	const [availability, setAvailability] = useState([]);
+ const [serviceLocation, setServiceLocation] = useState(()=>initialCustomerLocation(state));
+ const [draftLocation, setDraftLocation] = useState(()=>initialCustomerLocation(state));
+ const [addressMatches, setAddressMatches] = useState([]);
+ const [addressSearching, setAddressSearching] = useState(false);
+ const addressRequests = useRef(createRequestGuard());
+ const availabilityRequests = useRef(createRequestGuard());
+ const providerRequests = useRef(createRequestGuard());
+ const availabilityKey = useRef(null);
+ const locationRevision = useRef(0);
+ const address = serviceLocation.address;
+ const tempAddress = draftLocation.address;
+ const setTempAddress = (text) => {
+  locationRevision.current++; addressRequests.current.cancel(); setAddressSearching(false); setIsLocating(false);
+  setAddressMatches([]); setDraftLocation(current=>editServiceAddress(current,text));
+ };
+ useEffect(()=>()=>{addressRequests.current.cancel();availabilityRequests.current.cancel();providerRequests.current.cancel();},[]);
 
 	const [selectedDate, setSelectedDate] = useState(
 		state?.selectedDateStr || null,
@@ -464,7 +469,7 @@ export default function BookingPage() {
 	const [selectedTime, setSelectedTime] = useState(state?.selectedSlot || null);
 	const serviceName = state?.serviceName || provider?.service || "Service";
 
-	const [isEditingAddress, setIsEditingAddress] = useState(false);
+	const [isEditingAddress, setIsEditingAddress] = useState(()=>{const customer=initialCustomerLocation(state);return !validCoordinates(customer.lat,customer.lng);});
 	const [isLocating, setIsLocating] = useState(false);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [loading, setLoading] = useState(!state?.provider);
@@ -478,32 +483,23 @@ export default function BookingPage() {
 	const [saveLabel, setSaveLabel] = useState("Home");
 
 	useEffect(() => {
-		const loadSavedAddresses = async () => {
-			try {
-				const res = await api.get("/api/account/addresses");
-				const list = res.data?.addresses || [];
-				setSavedAddresses(list);
-
-				// Auto-populate default address if not provided in navigation state
-				if (!state?.address && list.length > 0) {
-					const defaultAddr = list.find((a) => a.is_default) || list[0];
-					if (defaultAddr) {
-						setAddress(defaultAddr.full_address);
-						setTempAddress(defaultAddr.full_address);
-						if (defaultAddr.lat && defaultAddr.lng) {
-							setCoords({ lat: defaultAddr.lat, lng: defaultAddr.lng });
-						}
-					}
-				}
-			} catch (err) {
-				console.warn(
-					"Could not load saved addresses on booking page:",
-					err.message,
-				);
-			}
-		};
-		loadSavedAddresses();
-	}, [state?.address]);
+  let active=true; const revision=locationRevision.current;
+  api.get("/api/account/addresses").then(res=>{
+   if(!active)return; const list=res.data?.addresses||[]; setSavedAddresses(list);
+   if(!state?.serviceLocation && !state?.address && revision===locationRevision.current && list.length){
+    const selected=normalizeLocation({...list.find(a=>a.is_default)||list[0],source:"saved"});
+    setServiceLocation(selected);setDraftLocation(selected);setIsEditingAddress(!validCoordinates(selected.lat,selected.lng));
+   }
+  }).catch(()=>{});
+  const customer=initialCustomerLocation(state);
+  if(!customer.address && validCoordinates(customer.lat,customer.lng)){
+   const request=addressRequests.current.begin();
+   reverseLocation(customer.lat,customer.lng,request.signal).then(location=>{
+    if(active && request.current() && revision===locationRevision.current){setServiceLocation(location);setDraftLocation(location);}
+   }).catch(()=>{});
+  }
+  return ()=>{active=false;};
+ }, [state]);
 
 	const matchedSavedAddr = useMemo(() => {
 		if (!address) return null;
@@ -516,62 +512,51 @@ export default function BookingPage() {
 	}, [address, savedAddresses]);
 
 	const handleSelectAddress = (addr) => {
-		if (!addr) return;
-		setAddress(addr.full_address);
-		setTempAddress(addr.full_address);
-		if (addr.lat && addr.lng) {
-			setCoords({ lat: addr.lat, lng: addr.lng });
-		}
-		setIsEditingAddress(false);
-		toast.success(`Selected "${addr.label || "Saved"}" address`);
-	};
+  if(!addr)return; locationRevision.current++; addressRequests.current.cancel();
+  const location=normalizeLocation({...addr,source:"saved"});setServiceLocation(location);setDraftLocation(location);setAddressMatches([]);
+  setIsEditingAddress(!validCoordinates(location.lat,location.lng));toast.success(`Selected "${addr.label || "Saved"}" address`);
+ };
 
 	const whenRef = useRef(null);
 	const addressRef = useRef(null);
 	const stripRef = useRef(null);
 	const payRef = useRef(null);
 
-	const refreshAvailability = async (prov = provider) => {
-		try {
-			const currentProvider = prov;
-			if (currentProvider && (currentProvider.id || currentProvider.user_id)) {
-				const provIdentifier = currentProvider.user_id || currentProvider.id;
-				const slotsRes = await api.get(
-					`/api/providers/v1/${provIdentifier}/availability`,
-				);
-				if (slotsRes.data) setAvailability(slotsRes.data);
-			}
-		} catch (err) {
-			console.warn("Failed refreshing slots:", err);
-		}
-	};
-
-	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				let currentProvider = provider;
-				if (!currentProvider) {
-					setLoading(true);
-					const provRes = await api.get(`/api/providers/v1/${customId}`);
-					currentProvider = provRes.data?.provider;
-					setProvider(currentProvider);
-				}
-				if (currentProvider) {
-					await refreshAvailability(currentProvider);
-				}
-			} catch (err) {
-				console.error("Failed to load data", err);
-				setAlert({
-					type: "error",
-					message: "Failed to load provider details.",
-				});
-			} finally {
-				setLoading(false);
-			}
-		};
-		if (!provider || availability.length === 0) fetchData();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [customId]);
+	const refreshAvailability = async (prov=provider) => {
+  if(!prov)return;
+  if(!validCoordinates(serviceLocation.lat,serviceLocation.lng)){availabilityRequests.current.cancel();setAvailability([]);setSelectedTime(null);return;}
+  const request=availabilityRequests.current.begin();setAvailability([]);
+  try {
+   const identifier=prov.user_id || prov.id || prov.custom_id;
+   const parameters={from:indiaDate(),days:"14",service_id:prov.service_id,...locationParams(serviceLocation),...(validCoordinates(serviceLocation.lat,serviceLocation.lng)?{radius:searchRadius}:{})};
+   const response=await api.get(`/api/providers/v1/${identifier}/availability`,{params:parameters,signal:request.signal});
+   if(request.current()){
+    setAvailability(response.data);
+    const slots=groupSlots(response.data);
+    setSelectedTime(current=>current && slots[current.date || selectedDate]?.some(slot=>slot.start===(current.start_time || current.start)) ? current : null);
+   }
+  } catch(err) {if(request.current()){setAvailability([]);setSelectedTime(null);setAlert({type:"error",message:err.response?.data?.message || err.response?.data?.error || "Availability couldn't be verified. Please try again."});}}
+ };
+ useEffect(()=>{
+  const request=providerRequests.current.begin();
+  if(state?.provider?.custom_id===customId && (!selectedServiceId || String(state.provider.service_id)===selectedServiceId)){setProvider(state.provider);setLoading(false);return request.cancel;}
+  setLoading(true);
+  api.get(`/api/providers/v1/${customId}`,{signal:request.signal,params:selectedServiceId?{service_id:selectedServiceId}:{}}).then(res=>{if(request.current())setProvider(res.data?.provider);})
+   .catch(()=>{if(request.current())setAlert({type:"error",message:"Failed to load provider details."});})
+   .finally(()=>{if(request.current())setLoading(false);});
+  return request.cancel;
+  // Navigation state is tied to this provider URL.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[customId,selectedServiceId]);
+ useEffect(()=>{
+  const guard=availabilityRequests.current;
+  const key=JSON.stringify([provider?.user_id||provider?.id,provider?.service_id,serviceLocation.lat,serviceLocation.lng,searchRadius]);
+  if(availabilityKey.current!==null && availabilityKey.current!==key)setSelectedTime(null);
+  availabilityKey.current=key;refreshAvailability();
+  return ()=>guard.cancel();
+  // The location and service, rather than slot selection, invalidate availability.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[provider?.user_id,provider?.id,provider?.service_id,serviceLocation.lat,serviceLocation.lng,searchRadius]);
 
 	const groupedSlots = useMemo(() => groupSlots(availability), [availability]);
 
@@ -650,66 +635,30 @@ export default function BookingPage() {
 		});
 
 	const saveAddress = async () => {
-		const trimmed = tempAddress.trim();
-		if (!trimmed) {
-			toast.error("Please enter a valid address");
-			return;
-		}
-		setAddress(trimmed);
-		setIsEditingAddress(false);
-
-		// If customer selected "Save this address to my profile", persist it via API
-		if (saveToAccount && user) {
-			try {
-				const res = await api.post("/api/account/addresses", {
-					label: saveLabel || "Home",
-					full_address: trimmed,
-					lat: coords?.lat || null,
-					lng: coords?.lng || null,
-				});
-				if (res.data?.success) {
-					toast.success(`Address saved to your profile as "${saveLabel || "Home"}"`);
-					const listRes = await api.get("/api/account/addresses");
-					setSavedAddresses(listRes.data?.addresses || []);
-				}
-			} catch (err) {
-				console.warn("Could not save address to profile:", err);
-			}
-		}
-	};
-
-	const detectLocation = () => {
-		if (!navigator.geolocation) {
-			setAlert({
-				message: "Your browser can't share your location.",
-				type: "error",
-			});
-			return;
-		}
-		setIsLocating(true);
-		navigator.geolocation.getCurrentPosition(
-			async ({ coords: c }) => {
-				setCoords({ lat: c.latitude, lng: c.longitude });
-				try {
-					const res = await fetch(
-						`https://nominatim.openstreetmap.org/reverse?format=json&lat=${c.latitude}&lon=${c.longitude}`,
-					);
-					const data = await res.json();
-					if (data?.display_name) setTempAddress(data.display_name);
-				} catch {
-					toast.error(
-						"Couldn't turn your location into an address. Type it in.",
-					);
-				} finally {
-					setIsLocating(false);
-				}
-			},
-			() => {
-				setIsLocating(false);
-				toast.error("Location is blocked. Allow access or type your address.");
-			},
-		);
-	};
+  if(draftLocation.address.trim().length<5){toast.error("Please enter a complete service address");return;}
+  if(!validCoordinates(draftLocation.lat,draftLocation.lng)){
+   const request=addressRequests.current.begin();setAddressSearching(true);
+   try{const candidates=await addressCandidates(draftLocation.address,request.signal);if(request.current()){setAddressMatches(candidates);if(!candidates.length)toast.error("No matching location found. Add the city and postcode, or use your location.");}}
+   catch(err){if(request.current())toast.error(err.message);}
+   finally{if(request.current())setAddressSearching(false);}
+   return;
+  }
+  const confirmed=normalizeLocation(draftLocation);locationRevision.current++;setServiceLocation(confirmed);setDraftLocation(confirmed);setIsEditingAddress(false);setAddressMatches([]);setNudge(null);
+  if(saveToAccount && user){
+   try{await api.post("/api/account/addresses",{label:saveLabel || "Home",full_address:confirmed.address,lat:confirmed.lat,lng:confirmed.lng});const res=await api.get("/api/account/addresses");setSavedAddresses(res.data?.addresses||[]);toast.success("Address saved to your profile");}
+   catch{toast.error("The address is selected, but couldn't be saved to your profile.");}
+  }
+ };
+ const detectLocation = () => {
+  if(!navigator.geolocation){toast.error("Your browser can't share your location.");return;}
+  locationRevision.current++;const request=addressRequests.current.begin();setIsLocating(true);setAddressMatches([]);
+  navigator.geolocation.getCurrentPosition(async ({coords})=>{
+   if(!request.current())return;
+   try{const location=await reverseLocation(coords.latitude,coords.longitude,request.signal);if(request.current())setDraftLocation(location);}
+   catch(err){if(request.current())toast.error(err.message);}
+   finally{if(request.current())setIsLocating(false);}
+  },()=>{if(request.current()){setIsLocating(false);toast.error("Location is blocked or unavailable. Search your address instead.");}},{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+ };
 
 	/* ---- payment ---- */
 
@@ -824,8 +773,9 @@ export default function BookingPage() {
 	};
 
 	async function handleConfirm() {
+		if(isEditingAddress || addressSearching || isLocating)return flashNudge("address",addressRef);
 		if (!hasSchedule) return flashNudge("when", whenRef);
-		if (!hasAddress) return flashNudge("address", addressRef);
+		if (!hasAddress || !validCoordinates(serviceLocation.lat,serviceLocation.lng)) { setIsEditingAddress(true); return flashNudge("address",addressRef); }
 
 		if (!localStorage.getItem("token")) {
 			setAlert({ message: "Sign in to book this service.", type: "error" });
@@ -843,8 +793,8 @@ export default function BookingPage() {
 				end_time: selectedTime.end_time || selectedTime.end,
 				address,
 				payment_method: paymentMethod === "cash" ? "cod" : paymentMethod,
-				latitude: coords.lat,
-				longitude: coords.lng,
+				...bookingCoordinates(serviceLocation),
+				radius: searchRadius,
 			});
 			const data = res.data;
 
@@ -1176,7 +1126,12 @@ export default function BookingPage() {
 											className="w-full resize-none rounded-lg bg-[#0d0b12] border border-white/[0.1] p-3 text-sm text-white placeholder:text-stone-600 focus:outline-none focus:border-violet-400/50 focus:ring-2 focus:ring-violet-400/20"
 										/>
 
-										{/* Save to profile checkbox & tag selector */}
+										{addressMatches.length>0 && <div className="space-y-2" aria-label="Matching service locations">
+ <p className="text-xs text-violet-200">Confirm the location that matches your address:</p>
+ {addressMatches.map((match,index)=><button key={index} type="button" className="block w-full rounded-lg border border-violet-400/30 p-3 text-left text-xs text-stone-200" onClick={()=>{setDraftLocation(normalizeLocation({...match,address:tempAddress.trim()}));setAddressMatches([]);}}>{match.address}</button>)}
+ </div>}
+ {validCoordinates(draftLocation.lat,draftLocation.lng) && <p className="text-xs text-green-300">Service location confirmed. Add your flat or house details before saving.</p>}
+ {/* Save to profile checkbox & tag selector */}
 										{user && (
 											<div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] space-y-2">
 												<label className="flex items-center gap-2 cursor-pointer text-xs text-stone-300 select-none">
@@ -1214,7 +1169,7 @@ export default function BookingPage() {
 											<button
 												type="button"
 												onClick={() => {
-													setTempAddress(address);
+													addressRequests.current.cancel(); setDraftLocation(serviceLocation); setAddressMatches([]); setAddressSearching(false); setIsLocating(false);
 													setIsEditingAddress(false);
 												}}
 												className="h-9 px-3 rounded-lg text-sm text-stone-400 hover:text-white transition-colors"
@@ -1224,9 +1179,10 @@ export default function BookingPage() {
 											<button
 												type="button"
 												onClick={saveAddress}
+												disabled={addressSearching || isLocating}
 												className={`h-9 px-4 rounded-lg text-sm ${primaryBtn}`}
 											>
-												Use this address
+												{addressSearching ? "Finding location…" : validCoordinates(draftLocation.lat,draftLocation.lng) ? "Use this address" : "Find location"}
 											</button>
 										</div>
 									</div>
@@ -1262,7 +1218,7 @@ export default function BookingPage() {
 											<button
 												type="button"
 												onClick={() => {
-													setTempAddress(address);
+													setDraftLocation(serviceLocation);
 													setIsEditingAddress(true);
 												}}
 												className="text-xs text-violet-300 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/[0.04]"

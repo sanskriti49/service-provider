@@ -20,6 +20,9 @@ export const apiCache = {
 	delete: (key) => {
 		cacheStore.delete(key);
 	},
+	deletePrefix: (prefix) => {
+		for(const key of cacheStore.keys())if(key.startsWith(prefix))cacheStore.delete(key);
+	},
 	clear: () => {
 		cacheStore.clear();
 	},

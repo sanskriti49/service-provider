@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { createRequestGuard } from "../../utils/serviceLocation";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -40,6 +41,9 @@ export default function SavedAddressesModal({
 	const [submitting, setSubmitting] = useState(false);
 	const [locating, setLocating] = useState(false);
 
+	const locationRequests=useRef(createRequestGuard());
+	useEffect(()=>()=>locationRequests.current.cancel(),[]);
+	const changeAddressField=(field,value)=>{locationRequests.current.cancel();setLocating(false);setFormData(prev=>({...prev,[field]:value,lat:null,lng:null}));};
 	const [formData, setFormData] = useState({
 		label: "Home",
 		full_address: "",
@@ -76,6 +80,7 @@ export default function SavedAddressesModal({
 	};
 
 	useEffect(() => {
+		if (!isOpen) {locationRequests.current.cancel();setLocating(false);}
 		if (isOpen) {
 			fetchAddresses();
 			if (startWithAdd) {
@@ -89,6 +94,7 @@ export default function SavedAddressesModal({
 	}, [isOpen, startWithAdd]);
 
 	const resetForm = () => {
+		locationRequests.current.cancel();setLocating(false);
 		setFormData({
 			label: "Home",
 			full_address: "",
@@ -106,6 +112,7 @@ export default function SavedAddressesModal({
 	};
 
 	const handleEdit = (addr) => {
+		locationRequests.current.cancel();setLocating(false);
 		setFormData({
 			label: addr.label || "Home",
 			full_address: addr.full_address || "",
@@ -114,8 +121,8 @@ export default function SavedAddressesModal({
 			city: addr.city || "Bengaluru",
 			state: addr.state || "Karnataka",
 			postal_code: addr.postal_code || "",
-			lat: addr.lat || null,
-			lng: addr.lng || null,
+			lat: addr.lat ?? null,
+			lng: addr.lng ?? null,
 			is_default: addr.is_default || false,
 		});
 		setEditingId(addr.id);
@@ -128,26 +135,26 @@ export default function SavedAddressesModal({
 			return;
 		}
 
+		const request=locationRequests.current.begin();
 		setLocating(true);
+		setFormData(prev=>({...prev,lat:null,lng:null}));
 		navigator.geolocation.getCurrentPosition(
 			async (position) => {
 				const { latitude, longitude } = position.coords;
-				setFormData((prev) => ({
-					...prev,
-					lat: latitude,
-					lng: longitude,
-				}));
+				if(!request.current())return;
 
 				try {
 					// Reverse geocode via free OpenStreetMap Nominatim
 					const geoRes = await fetch(
 						`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-						{ headers: { "User-Agent": "TaskGenieServicePlatform/1.0" } },
+						{ signal:request.signal },
 					);
-					if (geoRes.ok) {
+					if(!geoRes.ok)throw new Error("Address not verified");
+					if (request.current()) {
 						const data = await geoRes.json();
 						const addr = data.address || {};
 						const formatted = data.display_name || "";
+						if(!formatted)throw new Error("Address not verified");
 						setFormData((prev) => ({
 							...prev,
 							full_address: formatted,
@@ -161,12 +168,13 @@ export default function SavedAddressesModal({
 						toast.success("Current location captured!");
 					}
 				} catch {
-					toast.info("Location coordinates captured! Please fill in building/street details.");
+					if(request.current())toast.error("Couldn't verify this location. Please search your address during booking.");
 				} finally {
-					setLocating(false);
+					if(request.current())setLocating(false);
 				}
 			},
 			(err) => {
+				if(!request.current())return;
 				console.warn("Location access denied:", err.message);
 				toast.error("Location permission denied. Please type your address.");
 				setLocating(false);
@@ -385,12 +393,7 @@ export default function SavedAddressesModal({
 												rows={2}
 												required
 												value={formData.full_address}
-												onChange={(e) =>
-													setFormData((prev) => ({
-														...prev,
-														full_address: e.target.value,
-													}))
-												}
+												onChange={(e)=>changeAddressField("full_address",e.target.value)}
 												placeholder="e.g. Flat 301, Silver Oak Apartments, 12th Main Road, Indiranagar"
 												className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/[0.12] text-white text-sm placeholder:text-stone-600 focus:outline-none focus:border-violet-400 transition-colors"
 											/>
@@ -423,12 +426,7 @@ export default function SavedAddressesModal({
 													type="text"
 													maxLength={6}
 													value={formData.postal_code}
-													onChange={(e) =>
-														setFormData((prev) => ({
-															...prev,
-															postal_code: e.target.value,
-														}))
-													}
+													onChange={(e)=>changeAddressField("postal_code",e.target.value)}
 													placeholder="e.g. 560038"
 													className="w-full px-3.5 py-2 rounded-xl bg-black/40 border border-white/[0.12] text-white text-sm placeholder:text-stone-600 focus:outline-none focus:border-violet-400"
 												/>
@@ -444,12 +442,7 @@ export default function SavedAddressesModal({
 												<input
 													type="text"
 													value={formData.city}
-													onChange={(e) =>
-														setFormData((prev) => ({
-															...prev,
-															city: e.target.value,
-														}))
-													}
+													onChange={(e)=>changeAddressField("city",e.target.value)}
 													className="w-full px-3.5 py-2 rounded-xl bg-black/40 border border-white/[0.12] text-white text-sm focus:outline-none focus:border-violet-400"
 												/>
 											</div>
@@ -460,12 +453,7 @@ export default function SavedAddressesModal({
 												<input
 													type="text"
 													value={formData.state}
-													onChange={(e) =>
-														setFormData((prev) => ({
-															...prev,
-															state: e.target.value,
-														}))
-													}
+													onChange={(e)=>changeAddressField("state",e.target.value)}
 													className="w-full px-3.5 py-2 rounded-xl bg-black/40 border border-white/[0.12] text-white text-sm focus:outline-none focus:border-violet-400"
 												/>
 											</div>

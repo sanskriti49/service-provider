@@ -23,9 +23,11 @@ import ReviewModal from "../ui/ReviewModal";
 import { apiCache } from "../utils/apiCache";
 import VerifiedBadge from "../ui/VerifiedBadge";
 import TaskGenieLoader from "../ui/TaskGenieLoader";
+import CustomerServiceLocation from "../ui/CustomerServiceLocation";
 import useModal from "../hooks/useModal";
 
 import { API_URL } from "../config";
+import { locationParams, requestCacheKey, createRequestGuard, serviceLocation, indiaDate, validCoordinates } from "../utils/serviceLocation";
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
 const formatTime = (timeStr) => {
@@ -53,6 +55,10 @@ const ServiceDetails = () => {
 	const [expandedIndex, setExpandedIndex] = useState(-1);
 	const [userCoords, setUserCoords] = useState(null);
 	const [sortBy, setSortBy] = useState("recommended");
+	const [radius, setRadius] = useState(50);
+	const providerRequests = useRef(createRequestGuard());
+	const locationRevision = useRef(0);
+	const [retry,setRetry]=useState(0);
 	const [isLocating, setIsLocating] = useState(false);
 
 	const mainRef = useRef(null);
@@ -64,9 +70,11 @@ const ServiceDetails = () => {
 
 	// Request browser geolocation once on mount
 	useEffect(() => {
+		let active=true; const revision=locationRevision.current;
 		if ("geolocation" in navigator) {
 			navigator.geolocation.getCurrentPosition(
 				(pos) => {
+					if(!active || revision!==locationRevision.current)return;
 					setUserCoords({
 						lat: pos.coords.latitude,
 						lng: pos.coords.longitude,
@@ -75,16 +83,19 @@ const ServiceDetails = () => {
 				() => {
 					console.log("Geolocation prompt dismissed or denied.");
 				},
-				{ timeout: 3000, enableHighAccuracy: false },
+				{ timeout: 10000, enableHighAccuracy: true, maximumAge: 0 },
 			);
 		}
+		return ()=>{active=false;};
 	}, []);
 
 	const requestLocation = () => {
 		if (!navigator.geolocation) return;
+		const revision=++locationRevision.current;
 		setIsLocating(true);
 		navigator.geolocation.getCurrentPosition(
 			(pos) => {
+				if(revision!==locationRevision.current)return;
 				setUserCoords({
 					lat: pos.coords.latitude,
 					lng: pos.coords.longitude,
@@ -94,77 +105,39 @@ const ServiceDetails = () => {
 			() => {
 				setIsLocating(false);
 			},
-			{ timeout: 5000 },
+			{ timeout: 10000, enableHighAccuracy: true, maximumAge: 0 },
 		);
 	};
 
 	useEffect(() => {
-		if (!slug) return;
-		async function fetchServiceAndProviders() {
-			try {
-				setLoading(true);
-				setError(null);
-
-				const cacheKeyService = `service_${slug.toLowerCase()}`;
-				let serviceData = apiCache.get(cacheKeyService);
-				if (!serviceData) {
-					const serviceRes = await fetch(`${API_URL}/api/services/v1/${slug}`);
-					if (!serviceRes.ok) throw new Error("Service not found");
-					serviceData = await serviceRes.json();
-					apiCache.set(cacheKeyService, serviceData, 300000);
-				}
-				setService(serviceData);
-
-				const params = new URLSearchParams({
-					service: slug,
-					sort_by: sortBy,
-					...(userCoords?.lat && { lat: String(userCoords.lat) }),
-					...(userCoords?.lng && { lng: String(userCoords.lng) }),
-				});
-
-				const cacheKeyProviders = `providers_${slug.toLowerCase()}_${sortBy}_${userCoords?.lat || ""}`;
-				let providersData = apiCache.get(cacheKeyProviders);
-				if (
-					!providersData ||
-					(Array.isArray(providersData) && providersData.length === 0)
-				) {
-					const providersRes = await fetch(
-						`${API_URL}/api/providers/v1?${params.toString()}`,
-					);
-					if (providersRes.ok) {
-						providersData = await providersRes.json();
-					}
-
-					// If 0 providers returned with geolocation coords, fallback to fetching all providers for the service
-					if (
-						(!providersData || providersData.length === 0) &&
-						userCoords?.lat
-					) {
-						const fallbackRes = await fetch(
-							`${API_URL}/api/providers/v1?service=${encodeURIComponent(slug)}&sort_by=recommended`,
-						);
-						if (fallbackRes.ok) {
-							const fallbackData = await fallbackRes.json();
-							if (Array.isArray(fallbackData) && fallbackData.length > 0) {
-								providersData = fallbackData;
-							}
-						}
-					}
-
-					if (Array.isArray(providersData) && providersData.length > 0) {
-						apiCache.set(cacheKeyProviders, providersData, 60000);
-					}
-				}
-				setProviders(Array.isArray(providersData) ? providersData : []);
-			} catch (err) {
-				console.error("Error fetching providers:", err);
-				setError(err.message);
-			} finally {
-				setLoading(false);
-			}
-		}
-		fetchServiceAndProviders();
-	}, [slug, userCoords?.lat, userCoords?.lng, sortBy]);
+  if (!slug) return;
+  const request = providerRequests.current.begin();
+  async function fetchServiceAndProviders() {
+   setLoading(true); setError(null);
+   try {
+    const serviceKey = requestCacheKey("service",{slug});
+    let serviceData = apiCache.get(serviceKey);
+    if (!serviceData) {
+     const response = await fetch(`${API_URL}/api/services/v1/${slug}`,{signal:request.signal});
+     if (!response.ok) throw new Error("Service not found");
+     serviceData = await response.json(); if (request.current()) apiCache.set(serviceKey,serviceData,300000);
+    }
+    if (!request.current()) return; setService(serviceData);
+    const parameters = { service:slug, sort_by:sortBy, radius:String(radius), ...locationParams(userCoords) };
+    const key = requestCacheKey("providers",parameters);
+    let data = apiCache.get(key);
+    if (!data) {
+     const response = await fetch(`${API_URL}/api/providers/v1?${new URLSearchParams(parameters)}`,{signal:request.signal});
+     if (!response.ok) { const failure=await response.json().catch(()=>({})); throw new Error(failure.error || "Couldn't load providers. Please try again."); }
+     data = await response.json(); if (!Array.isArray(data)) throw new Error("Couldn't load providers.");
+     if (request.current()) apiCache.set(key,data,15000);
+    }
+    if (request.current()) { setProviders(data); setExpandedIndex(-1); }
+   } catch (err) { if (request.current()) setError(err.message); }
+   finally { if (request.current()) setLoading(false); }
+  }
+  fetchServiceAndProviders(); return request.cancel;
+ }, [slug,userCoords,sortBy,radius,retry]);
 
 	useEffect(() => {
 		if (!loading && service && mainRef.current) {
@@ -245,7 +218,7 @@ const ServiceDetails = () => {
 		);
 	}
 
-	if (!service || (providers.length === 0 && !loading)) {
+	if (!service) {
 		return (
 			<section className="bg-[#191034] text-white min-h-screen flex items-center justify-center p-4">
 				<div className="text-center max-w-lg mx-auto">
@@ -338,7 +311,7 @@ const ServiceDetails = () => {
 							Available Experts
 						</h2>
 						<p className="mt-1 text-gray-400 text-sm">
-							Matched by proximity, customer reviews, and verified expertise.
+							Choose your service location and search radius to find nearby providers.
 						</p>
 					</div>
 
@@ -363,7 +336,13 @@ const ServiceDetails = () => {
 							</div>
 						)}
 
-						<div className="flex items-center gap-2 bg-[#22194A] border border-white/10 px-3 py-1.5 rounded-xl text-xs">
+						<label className="flex items-center gap-2 bg-[#22194A] border border-white/10 px-3 py-1.5 rounded-xl text-xs">
+ <span className="text-gray-400">Within:</span>
+ <select aria-label="Search radius" value={radius} onChange={(event)=>setRadius(Number(event.target.value))} disabled={!userCoords} className="bg-[#22194A] text-white outline-none">
+ {[25,50,100,200,500].map(km=><option key={km} value={km}>{km} km</option>)}
+ </select>
+ </label>
+ <div className="flex items-center gap-2 bg-[#22194A] border border-white/10 px-3 py-1.5 rounded-xl text-xs">
 							<SlidersHorizontal size={12} className="text-violet-400" />
 							<span className="text-gray-400">Sort by:</span>
 							<select
@@ -374,7 +353,7 @@ const ServiceDetails = () => {
 								<option value="recommended" className="bg-[#191034]">
 									Recommended
 								</option>
-								<option value="distance" className="bg-[#191034]">
+								<option value="distance" disabled={!userCoords} className="bg-[#191034]">
 									Nearest First
 								</option>
 								<option value="rating" className="bg-[#191034]">
@@ -388,13 +367,21 @@ const ServiceDetails = () => {
 					</div>
 				</div>
 
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
-					{providers.map((p, index) => (
+				<CustomerServiceLocation value={userCoords} onChange={location=>{locationRevision.current++;setUserCoords(location);setIsLocating(false);}} />
+ {error && <div role="alert" className="mb-6 rounded-xl border border-amber-400/30 p-4 text-amber-300">{error}<button onClick={()=>setRetry(current=>current+1)} className="ml-4 underline">Retry</button></div>}
+ <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
+					{!error && providers.length === 0 && <div className="col-span-full rounded-3xl border border-violet-500/20 bg-[#22194A] p-10 text-center">
+ <h3 className="text-xl font-bold text-white">{userCoords ? `No providers found within ${radius} km` : "No providers available for this service"}</h3>
+ <p className="mt-3 text-gray-400">{userCoords ? "Try a wider search area. Your service and filters will stay selected." : "Share your service location to search nearby."}</p>
+ {userCoords && radius < 500 && <button className="mt-5 rounded-xl bg-violet-600 px-5 py-3 text-white" onClick={()=>setRadius(radius < 100 ? 100 : Math.min(500,radius*2))}>Expand to {radius < 100 ? 100 : Math.min(500,radius*2)} km</button>}
+ </div>}
+ {providers.map((p, index) => (
 						<ProviderCard
 							key={p.user_id || index}
 							provider={p}
 							service={service}
 							userCoords={userCoords}
+							searchRadius={radius}
 							isExpanded={expandedIndex === index}
 							isAnyExpanded={isAnyExpanded}
 							onToggleExpand={() => handleToggleExpand(index)}
@@ -406,77 +393,11 @@ const ServiceDetails = () => {
 	);
 };
 
-const generateFallbackSlots = (weeklySchedule) => {
-	let schedule = weeklySchedule;
-	if (typeof schedule === "string") {
-		try {
-			schedule = JSON.parse(schedule);
-		} catch {
-			schedule = [];
-		}
-	}
-	if (!Array.isArray(schedule) || schedule.length === 0) {
-		schedule = [
-			{ day: 1, start: "09:00", end: "18:00" },
-			{ day: 2, start: "09:00", end: "18:00" },
-			{ day: 3, start: "09:00", end: "18:00" },
-			{ day: 4, start: "09:00", end: "18:00" },
-			{ day: 5, start: "09:00", end: "18:00" },
-			{ day: 6, start: "10:00", end: "17:00" },
-		];
-	}
-
-	const scheduleMap = {};
-	schedule.forEach((s) => {
-		const dayNum = Number(s.day);
-		if (!isNaN(dayNum)) {
-			scheduleMap[dayNum] = {
-				start: (s.start || s.start_time || "09:00").slice(0, 5),
-				end: (s.end || s.end_time || "18:00").slice(0, 5),
-			};
-		}
-	});
-
-	const days = [];
-	const today = new Date();
-
-	for (let i = 0; i < 14; i++) {
-		const curDate = new Date(today);
-		curDate.setDate(today.getDate() + i);
-		const y = curDate.getFullYear();
-		const m = String(curDate.getMonth() + 1).padStart(2, "0");
-		const d = String(curDate.getDate()).padStart(2, "0");
-		const dateStr = `${y}-${m}-${d}`;
-		const dow = curDate.getDay();
-
-		const config = scheduleMap[dow];
-		const freeSlots = [];
-		if (config) {
-			const startH = parseInt(config.start.split(":")[0], 10) || 9;
-			const endH = parseInt(config.end.split(":")[0], 10) || 18;
-			for (let h = startH; h < endH; h++) {
-				const sTime = `${String(h).padStart(2, "0")}:00`;
-				const eTime = `${String(h + 1).padStart(2, "0")}:00`;
-				freeSlots.push({
-					start: sTime,
-					end: eTime,
-					start_time: sTime,
-					end_time: eTime,
-					isBooked: false,
-					is_booked: false,
-				});
-			}
-		}
-		days.push({ date: dateStr, free_slots: freeSlots });
-	}
-
-	return days;
-};
-
 const ProviderCard = ({
 	provider,
 	service,
 	userCoords,
+	searchRadius,
 	isExpanded,
 	isAnyExpanded,
 	onToggleExpand,
@@ -486,7 +407,9 @@ const ProviderCard = ({
 	const [activeTab, setActiveTab] = useState("schedule"); // 'schedule' or 'reviews'
 	const [availability, setAvailability] = useState([]);
 	const [loadingSlots, setLoadingSlots] = useState(false);
-	const [hasLoadedSlots, setHasLoadedSlots] = useState(false);
+	const [slotsError, setSlotsError] = useState(null);
+	const slotRequests = useRef(createRequestGuard());
+	useEffect(()=>()=>slotRequests.current.cancel(),[]);
 
 	const [reviewsData, setReviewsData] = useState(null);
 	const [loadingReviews, setLoadingReviews] = useState(false);
@@ -497,60 +420,17 @@ const ProviderCard = ({
 	const dateScrollRef = useRef(null);
 
 	const loadAvailability = async () => {
-		if (hasLoadedSlots) return;
-		setLoadingSlots(true);
-
-		try {
-			const today = new Date();
-			const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-
-			const params = new URLSearchParams({
-				from: todayStr,
-				days: "14",
-				service: service?.slug || "",
-				...(userCoords?.lat && { lat: String(userCoords.lat) }),
-				...(userCoords?.lng && { lng: String(userCoords.lng) }),
-			});
-
-			const providerIdentifier =
-				provider.user_id || provider.id || provider.custom_id;
-			if (!providerIdentifier) {
-				throw new Error("Provider identifier not found");
-			}
-
-			const cacheKey = `avail_${providerIdentifier}_${todayStr}_${userCoords?.lat || ""}`;
-			let data = apiCache.get(cacheKey);
-
-			if (!data) {
-				const res = await fetch(
-					`${API_URL}/api/providers/v1/${providerIdentifier}/availability?${params.toString()}`,
-				);
-				if (!res.ok) {
-					const errorData = await res.json().catch(() => ({}));
-					throw new Error(
-						errorData.error || `Failed to load slots (status: ${res.status})`,
-					);
-				}
-				data = await res.json();
-				apiCache.set(cacheKey, data, 60000);
-			}
-
-			let slotsList = Array.isArray(data.availability) ? data.availability : [];
-			if (slotsList.length === 0 && provider.availability) {
-				slotsList = generateFallbackSlots(provider.availability);
-			}
-
-			setAvailability(slotsList);
-			setHasLoadedSlots(true);
-		} catch (error) {
-			console.error("Availability error:", error);
-			const fallback = generateFallbackSlots(provider.availability);
-			setAvailability(fallback);
-			setHasLoadedSlots(true);
-		} finally {
-			setLoadingSlots(false);
-		}
-	};
+  if (!validCoordinates(userCoords?.lat,userCoords?.lng)) {slotRequests.current.cancel();setAvailability([]);setSelectedTime(null);setSlotsError("Choose your service location above to check travel availability.");setLoadingSlots(false);return;}
+  const request = slotRequests.current.begin(); setLoadingSlots(true); setSlotsError(null); setSelectedTime(null);
+  try {
+   const parameters = { from:indiaDate(), days:"14", service_id:String(provider.service_id || service?.id || ""), ...locationParams(userCoords), ...(userCoords ? {radius:String(searchRadius)} : {}) };
+   const identifier = provider.user_id || provider.id || provider.custom_id;
+   const response = await fetch(`${API_URL}/api/providers/v1/${identifier}/availability?${new URLSearchParams(parameters)}`,{signal:request.signal});
+   if (!response.ok) { const failure=await response.json().catch(()=>({})); throw new Error(failure.message || failure.error || "Availability couldn't be verified. Please try again."); }
+   const data=await response.json(); if(request.current()) setAvailability(Array.isArray(data.availability)?data.availability:[]);
+  } catch(err) { if(request.current()){setAvailability([]);setSlotsError(err.message);} }
+  finally { if(request.current()) setLoadingSlots(false); }
+ };
 
 	const loadReviews = async () => {
 		if (reviewsData) return;
@@ -581,10 +461,15 @@ const ProviderCard = ({
 	const handleOpenSchedule = () => {
 		setActiveTab("schedule");
 		onToggleExpand();
-		if (!isExpanded) {
-			loadAvailability();
-		}
 	};
+	useEffect(()=>{
+		const requests=slotRequests.current;
+		requests.cancel();setAvailability([]);setSelectedTime(null);setSelectedDateStr(null);setSlotsError(null);
+		if(isExpanded && activeTab==="schedule") loadAvailability();
+		return ()=>requests.cancel();
+		// Requests depend on the complete location/service/radius selection.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	},[isExpanded,activeTab,userCoords?.lat,userCoords?.lng,provider.service_id,searchRadius]);
 
 	const handleOpenReviews = () => {
 		if (isExpanded && activeTab === "reviews") {
@@ -604,7 +489,7 @@ const ProviderCard = ({
 			const slots = dayGroup.free_slots || [];
 
 			const now = new Date();
-			const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+			const todayStr = indiaDate(now);
 			const isToday = dateStr === todayStr;
 
 			const validTimes = slots
@@ -614,8 +499,7 @@ const ProviderCard = ({
 					if (!isToday) return true;
 
 					const [h, m] = sStart.split(":").map(Number);
-					const slotTime = new Date();
-					slotTime.setHours(h, m, 0, 0);
+					const slotTime = new Date(`${dateStr}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00+05:30`);
 
 					return slotTime > new Date();
 				})
@@ -685,7 +569,7 @@ const ProviderCard = ({
 						<div className="absolute -bottom-3 -right-2 bg-[#1a103f] border border-violet-500/30 px-2 py-1 rounded-lg flex items-center gap-1 shadow-lg">
 							<StarIcon className="h-3.5 w-3.5 text-yellow-400" />
 							<span className="text-xs font-bold text-white">
-								{provider.rating ? Number(provider.rating).toFixed(1) : "5.0"}
+								{provider.rating != null ? Number(provider.rating).toFixed(1) : "New"}
 							</span>
 						</div>
 					</div>
@@ -704,10 +588,11 @@ const ProviderCard = ({
 								</div>
 							)}
 
+							{provider.distance_km == null && <span className="text-gray-400">Distance unknown</span>}
 							{provider.distance_km != null && (
 								<div className="flex items-center gap-1 text-violet-300 bg-violet-500/10 px-2 py-0.5 rounded-md text-[11px] font-medium border border-violet-500/20">
 									<MapPin size={10} className="text-violet-400" />
-									<span>{provider.distance_km} km</span>
+									<span>{Number(provider.distance_km).toFixed(1)} km</span>
 								</div>
 							)}
 						</div>
@@ -726,6 +611,7 @@ const ProviderCard = ({
 					</div>
 				</div>
 
+				<p className="mt-4 text-xs text-violet-300">{provider.availability_status === "available" ? "Available for your selected date" : "Check availability for your service date"}</p>
 				<p className="text-md text-gray-400 mt-6 leading-relaxed line-clamp-2">
 					{provider.bio ||
 						"Experienced professional dedicated to delivering high-quality service tailored to your specific needs."}
@@ -743,6 +629,7 @@ const ProviderCard = ({
 								: "bg-violet-500/20 text-violet-200 border border-violet-500/30 hover:bg-violet-500/30"
 						}`}
 					>
+
 						{loadingSlots ? (
 							<>
 								<div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -780,7 +667,8 @@ const ProviderCard = ({
 					{/* TAB: SCHEDULE */}
 					{activeTab === "schedule" && (
 						<div className="px-6 pb-6">
-							{!loadingSlots && validDates.length === 0 && (
+							{slotsError && <p role="alert" className="px-6 py-3 text-sm text-amber-300">{slotsError}</p>}
+							{!loadingSlots && !slotsError && validDates.length === 0 && (
 								<div className="text-center py-8 bg-white/5 rounded-2xl border border-dashed border-white/10">
 									<Calendar className="w-10 h-10 text-violet-300/20 mx-auto mb-3" />
 									<p className="text-gray-400 text-sm">
@@ -862,13 +750,15 @@ const ProviderCard = ({
 										<button
 											disabled={!selectedTime}
 											onClick={() =>
-												navigate(`/book/${provider.custom_id}`, {
+												navigate(`/book/${provider.custom_id}?service_id=${encodeURIComponent(provider.service_id)}&radius=${searchRadius}`, {
 													state: {
 														provider: {
 															...provider,
 															service_id: provider.service_id,
 														},
-														serviceName: service.name,
+														serviceName: provider.service || service.name,
+														serviceLocation: serviceLocation(userCoords || {}),
+														searchRadius,
 														preloadedAvailability: availability,
 														selectedDateStr,
 														selectedSlot: {
@@ -914,7 +804,7 @@ const ProviderCard = ({
 											<div className="text-3xl font-bold text-white">
 												{reviewsData?.average_rating
 													? Number(reviewsData.average_rating).toFixed(1)
-													: provider.rating || "5.0"}
+													: provider.rating ?? "Not rated"}
 											</div>
 											<div>
 												<div className="flex items-center gap-0.5">

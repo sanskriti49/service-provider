@@ -26,3 +26,8 @@ test("apiCache: expired item returns null", async () => {
 	await new Promise((r) => setTimeout(r, 35));
 	assert.strictEqual(apiCache.get("short_lived"), null);
 });
+
+test("discovery invalidation clears every location/filter variant while preserving service metadata",()=>{
+	apiCache.clear();apiCache.set('providers_service=cleaning&radius=50',[]);apiCache.set('providers_service=cleaning&radius=100',[]);apiCache.set('service_cleaning',{name:'Cleaning'});
+	apiCache.deletePrefix('providers_');assert.equal(apiCache.get('providers_service=cleaning&radius=50'),null);assert.equal(apiCache.get('providers_service=cleaning&radius=100'),null);assert.deepEqual(apiCache.get('service_cleaning'),{name:'Cleaning'});
+});

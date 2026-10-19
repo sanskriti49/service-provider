@@ -1,28 +1,10 @@
 const axios = require("axios");
+const { validCoordinates } = require("./location");
 
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
-	if (
-		lat1 == null ||
-		lon1 == null ||
-		lat2 == null ||
-		lon2 == null ||
-		isNaN(lat1) ||
-		isNaN(lon1) ||
-		isNaN(lat2) ||
-		isNaN(lon2) ||
-		lat1 < -90 ||
-		lat1 > 90 ||
-		lat2 < -90 ||
-		lat2 > 90 ||
-		lon1 < -180 ||
-		lon1 > 180 ||
-		lon2 < -180 ||
-		lon2 > 180
-	) {
-		return null;
-	}
-
-	const R = 6371;
+	if (!validCoordinates(lat1, lon1) || !validCoordinates(lat2, lon2)) return null;
+	// Mean WGS84 radius used by PostGIS geography with use_spheroid=false.
+	const R = 6371.00877141506;
 	const toRad = (deg) => (deg * Math.PI) / 180;
 
 	const dLat = toRad(lat2 - lat1);
@@ -30,14 +12,15 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 	const rLat1 = toRad(lat1);
 	const rLat2 = toRad(lat2);
 
-	const a =
+	const rawA =
 		Math.sin(dLat / 2) * Math.sin(dLat / 2) +
 		Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
+	const a = Math.min(1, Math.max(0, rawA));
 	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	const distance = R * c;
 
-	return Math.round(distance * 10) / 10;
+	return distance;
 }
 
 function estimateTravelTimeMinutes(distanceKm, avgSpeedKmh = 28) {
@@ -49,13 +32,13 @@ function estimateTravelTimeMinutes(distanceKm, avgSpeedKmh = 28) {
 
 function calculateMatchScore({
 	distanceKm,
-	maxRadiusKm = 30,
+	maxRadiusKm = 50,
 	rating = 4.5,
 	price = 500,
 	avgPrice = 500,
-	hasAvailableSlots = true,
+	hasAvailableSlots = null,
 }) {
-	let proximityScore = 70;
+	let proximityScore = 0;
 	if (distanceKm != null && !isNaN(distanceKm)) {
 		if (distanceKm <= 2) {
 			proximityScore = 100;
@@ -69,7 +52,7 @@ function calculateMatchScore({
 		}
 	}
 
-	const effectiveRating = rating != null && rating > 0 ? rating : 4.5;
+	const effectiveRating = rating != null && Number.isFinite(Number(rating)) ? Math.min(5,Math.max(0,Number(rating))) : 0;
 	const ratingScore = Math.min(100, Math.round((effectiveRating / 5.0) * 100));
 
 	let priceScore = 80;
@@ -86,7 +69,7 @@ function calculateMatchScore({
 		}
 	}
 
-	const availabilityScore = hasAvailableSlots ? 100 : 50;
+	const availabilityScore = hasAvailableSlots === true ? 100 : hasAvailableSlots === false ? 0 : 50;
 
 	const totalScore = Math.round(
 		proximityScore * 0.4 +
@@ -98,44 +81,69 @@ function calculateMatchScore({
 	return Math.min(100, Math.max(0, totalScore));
 }
 
+const routeCache = new Map();
+async function getDirectionalTravelDurations(origin, destinations, {
+  strict = true
+} = {}) {
+  if (!destinations.length) return {
+    to: [],
+    from: []
+  };
+  if (!validCoordinates(origin?.[1], origin?.[0]) || destinations.some(p => !validCoordinates(p?.[1], p?.[0]))) throw new Error("Valid routing coordinates required");
+  const fallback = destinations.map(([lng, lat]) => estimateTravelTimeMinutes(calculateHaversineDistance(origin[1], origin[0], lat, lng) * 1.5));
+  if (destinations.every(p => calculateHaversineDistance(origin[1], origin[0], p[1], p[0]) < 0.01)) return {
+    to: destinations.map(() => 0),
+    from: destinations.map(() => 0)
+  };
+  const key = JSON.stringify([origin, destinations]);
+  const cached = routeCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.value;
+  if (destinations.length > 25) {
+    const parts = [];
+    for (let i = 0; i < destinations.length; i += 25) parts.push(await getDirectionalTravelDurations(origin, destinations.slice(i, i + 25), {
+      strict
+    }));
+    return {
+      to: parts.flatMap(p => p.to),
+      from: parts.flatMap(p => p.from)
+    };
+  }
+  try {
+    const points = [origin, ...destinations];
+    const indices = points.map((_, i) => i).join(";");
+    const base = process.env.OSRM_URL || "https://router.project-osrm.org";
+    const response = await axios.get(`${base}/table/v1/driving/${points.map(p => p.join(",")).join(";")}?sources=${indices}&destinations=${indices}&annotations=duration`, {
+      timeout: 2500
+    });
+    const matrix = response.data?.durations;
+    const to = destinations.map((_, i) => matrix?.[0]?.[i + 1]);
+    const from = destinations.map((_, i) => matrix?.[i + 1]?.[0]);
+    if ([...to, ...from].some(v => typeof v !== "number" || !Number.isFinite(v) || v < 0)) throw new Error("A route could not be verified");
+    const value = {
+      to: to.map(v => Math.ceil(v / 60)),
+      from: from.map(v => Math.ceil(v / 60))
+    };
+    if (routeCache.size >= 500) routeCache.delete(routeCache.keys().next().value);
+    routeCache.set(key, {
+      value,
+      expires: Date.now() + 60000
+    });
+    return value;
+  } catch (err) {
+    if (!strict) return {
+      to: fallback,
+      from: fallback
+    };
+    const unavailable = new Error("Travel availability couldn't be verified. Please retry shortly.");
+    unavailable.code = "ROUTING_UNAVAILABLE";
+    throw unavailable;
+  }
+}
 async function getBatchedTravelDurations(origin, destinations) {
-	if (!origin || !destinations || destinations.length === 0) return [];
-
-	const [oLng, oLat] = origin;
-	const fallbackDurations = destinations.map(([dLng, dLat]) => {
-		const dist = calculateHaversineDistance(oLat, oLng, dLat, dLng);
-		return estimateTravelTimeMinutes(dist);
-	});
-
-	if (destinations.length > 25) {
-		return fallbackDurations;
-	}
-
-	try {
-		const allCoords = [origin, ...destinations]
-			.map((c) => `${c[0]},${c[1]}`)
-			.join(";");
-		const destIndices = destinations.map((_, i) => i + 1).join(";");
-		const url = `http://router.project-osrm.org/table/v1/driving/${allCoords}?sources=0&destinations=${destIndices}&annotations=duration`;
-
-		const response = await axios.get(url, { timeout: 2500 });
-		if (
-			response.data &&
-			response.data.durations &&
-			response.data.durations[0]
-		) {
-			const row = response.data.durations[0];
-			return row.map((sec, idx) => {
-				if (sec != null && !isNaN(sec)) {
-					return Math.ceil(sec / 60);
-				}
-				return fallbackDurations[idx];
-			});
-		}
-		return fallbackDurations;
-	} catch (err) {
-		return fallbackDurations;
-	}
+  if (!origin || !destinations?.length) return [];
+  return (await getDirectionalTravelDurations(origin, destinations, {
+    strict: false
+  })).to;
 }
 
 function formatPostGisPoint(lng, lat) {
@@ -148,5 +156,6 @@ module.exports = {
 	estimateTravelTimeMinutes,
 	calculateMatchScore,
 	getBatchedTravelDurations,
+	getDirectionalTravelDurations,
 	formatPostGisPoint,
 };

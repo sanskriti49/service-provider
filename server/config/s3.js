@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const {
 	S3Client,
 	PutObjectCommand,
@@ -11,6 +13,14 @@ const bucketName =
 	process.env.AWS_S3_BUCKET ||
 	process.env.S3_BUCKET_NAME ||
 	"taskgenie-production-assets";
+
+const getPublicFileUrl = (key) => {
+	const customPublicUrl = process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL;
+	if (customPublicUrl) {
+		return `${customPublicUrl.replace(/\/$/, "")}/${key}`;
+	}
+	return `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
+};
 
 const isConfigured = Boolean(
 	(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ||
@@ -72,7 +82,7 @@ const generatePresignedUploadUrl = async ({
 	});
 
 	const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn });
-	const fileUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
+	const fileUrl = getPublicFileUrl(key);
 
 	return { uploadUrl, fileUrl, fileKey: key, isMock: false };
 };
@@ -102,11 +112,28 @@ const generatePresignedDownloadUrl = async ({ key, expiresIn = 3600 }) => {
  */
 const uploadBufferToS3 = async ({ buffer, key, contentType }) => {
 	if (!s3Client) {
-		return {
-			fileUrl: `data:${contentType || "application/octet-stream"};base64,${buffer.toString("base64")}`,
-			key,
-			isMock: true,
-		};
+		// Store file on local disk instead of inflating PostgreSQL with massive base64 strings
+		try {
+			const uploadsDir = path.join(__dirname, "../uploads");
+			const targetPath = path.join(uploadsDir, key);
+			const targetDir = path.dirname(targetPath);
+			if (!fs.existsSync(targetDir)) {
+				fs.mkdirSync(targetDir, { recursive: true });
+			}
+			await fs.promises.writeFile(targetPath, buffer);
+			return {
+				fileUrl: `/uploads/${key}`,
+				key,
+				isMock: true,
+			};
+		} catch (fsErr) {
+			console.warn("Local storage write error:", fsErr.message);
+			return {
+				fileUrl: `/uploads/${key}`,
+				key,
+				isMock: true,
+			};
+		}
 	}
 
 	const command = new PutObjectCommand({
@@ -118,16 +145,25 @@ const uploadBufferToS3 = async ({ buffer, key, contentType }) => {
 	});
 
 	await s3Client.send(command);
-	const fileUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
+	const fileUrl = getPublicFileUrl(key);
 
 	return { fileUrl, key, isMock: false };
 };
 
 /**
- * Delete an object from S3
+ * Delete an object from S3 or local fallback
  */
 const deleteS3Object = async ({ key }) => {
-	if (!s3Client || !key) return;
+	if (!key) return;
+	if (!s3Client) {
+		try {
+			const targetPath = path.join(__dirname, "../uploads", key);
+			if (fs.existsSync(targetPath)) {
+				await fs.promises.unlink(targetPath);
+			}
+		} catch (_) {}
+		return;
+	}
 
 	const command = new DeleteObjectCommand({
 		Bucket: bucketName,

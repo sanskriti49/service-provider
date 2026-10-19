@@ -20,7 +20,8 @@ function serializeBooking(booking, actor) {
 	return safe;
 }
 const generateOtp = () => crypto.randomInt(1000, 10000).toString();
-const lockSchedule = (client, provider, date) => client.query("SELECT pg_advisory_xact_lock(hashtext('booking:' || $1::text || ':' || $2::text))", [provider, date]);
+// 64-bit BigInt advisory lock via hashtextextended prevents 32-bit hash collisions across large sets of providers/dates
+const lockSchedule = (client, provider, date) => client.query("SELECT pg_advisory_xact_lock(hashtextextended('booking:' || $1::text || ':' || $2::text, 0))", [provider, date]);
 // NOW() is frozen at BEGIN; a transaction waiting for a lock may outlive a hold.
 const activeBookingPredicate = `(status IN ('booked','confirmed','in_progress') OR (status = 'pending' AND (payment_method = 'cod' OR (payment_method = 'online' AND hold_expires_at > clock_timestamp()))))`;
 async function lockBooking(client, bookingId) {

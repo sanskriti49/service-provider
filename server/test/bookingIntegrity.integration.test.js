@@ -30,8 +30,18 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 	await pool.query("ALTER TABLE providers ADD COLUMN status text NOT NULL DEFAULT 'pending'");
 	const migration = fs.readFileSync(path.join(__dirname, "../migrations/20261011_booking_integrity.sql"), "utf8").replaceAll("public.", `${schema}.`);
 	await pool.query(migration); await pool.query(migration);
+	await pool.query("CREATE FUNCTION fixture_coordinate_sync() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$");
+	await pool.query("CREATE TRIGGER fixture_user_sync BEFORE INSERT OR UPDATE OF lat,lng ON users FOR EACH ROW EXECUTE FUNCTION fixture_coordinate_sync()");
+	await pool.query("CREATE TRIGGER fixture_booking_sync BEFORE UPDATE OF latitude,longitude ON bookings FOR EACH ROW EXECUTE FUNCTION fixture_coordinate_sync()");
+	await pool.query("ALTER TABLE bookings DISABLE TRIGGER fixture_booking_sync");
+	const triggerDefinitions=(await pool.query("SELECT tgname,tgenabled,pg_get_triggerdef(oid) AS definition FROM pg_trigger WHERE tgname IN ('fixture_user_sync','fixture_booking_sync') ORDER BY tgname")).rows;
+	const locationMigration = fs.readFileSync(path.join(__dirname,"../migrations/20261014_booking_search_radius.sql"),"utf8").replaceAll("public.",`${schema}.`);
+	await pool.query(locationMigration); await pool.query(locationMigration);
+	assert.deepEqual((await pool.query("SELECT tgname,tgenabled,pg_get_triggerdef(oid) AS definition FROM pg_trigger WHERE tgname IN ('fixture_user_sync','fixture_booking_sync') ORDER BY tgname")).rows,triggerDefinitions);
 	const customer=randomUUID(), other=randomUUID(), provider=randomUUID(), service=randomUUID();
-	for (const [id,role] of [[customer,"customer"],[other,"customer"],[provider,"provider"]]) await pool.query("INSERT INTO users(id,name,email,password,role,custom_id) VALUES($1,'Test',$2,'unused',$3,$4)", [id,`${id}@example.com`,role,`${role === "provider" ? "SRV" : "CUS"}${id.replaceAll("-", "").slice(0,20).toUpperCase()}`]);
+	for (const [id,role] of [[customer,"customer"],[other,"customer"],[provider,"provider"]]) await pool.query("INSERT INTO users(id,name,email,password,role,custom_id,lat,lng) VALUES($1,'Test',$2,'unused',$3,$4,12,77)", [id,`${id}@example.com`,role,`${role === "provider" ? "SRV" : "CUS"}${id.replaceAll("-", "").slice(0,20).toUpperCase()}`]);
+	await pool.query("UPDATE users SET location='Confirmed fixture base' WHERE id=$1",[provider]);
+	await pool.query("CREATE TABLE user_addresses(id serial PRIMARY KEY,user_id uuid REFERENCES users(id),full_address text,lat double precision,lng double precision,updated_at timestamptz DEFAULT NOW())");
 	await pool.query("INSERT INTO services(id,name,description,price,slug) VALUES($1,'House Cleaning','Test',1200,'cleaning')", [service]);
 	await pool.query("INSERT INTO providers(user_id,status) VALUES($1,'approved')", [provider]);
 	await pool.query("INSERT INTO provider_services(provider_id,service_id,price) VALUES($1,$2,1200)", [provider,service]);
@@ -46,10 +56,70 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 		fetchMultipleRefund: async(id,{skip=0,count=100}={}) => ({items:refunds.filter((r)=>r.payment_id===id).slice(skip,skip+count)}),
 		refund: async(id,input) => { refundCalls++; const result={id:`rfnd_${refundCalls}`,payment_id:id,amount:input.amount,receipt:input.receipt,status:"processed"}; refunds.push(result); if(loseRefundResponse) {loseRefundResponse=false;throw new Error("Lost gateway response");} return result; },
 	}, refunds: { fetch: async(id)=>refunds.find((r)=>r.id===id) } };
-	const controller=load("../controllers/bookingController.js", { "../config/db":stubDb, razorpay:class {constructor(){Object.assign(this,gateway);}}, "../utils/eventQueue":{publish:()=>{}}, "../utils/sendEmail":async()=>{}, "../utils/notificationService":{sendNotification:async(input)=>notices.push(input)}, "../utils/distributedLock":{acquireLock:async()=>({acquired:true}),releaseLock:async()=>{}}, "../utils/circuitBreaker":{createProtectedBreaker:(action)=>({fire:action})} });
+	const schedule=load("../services/bookingSchedule.js", {"../utils/geoUtils":{...require("../utils/geoUtils"),getDirectionalTravelDurations:async(origin,destinations)=>({to:destinations.map(()=>5),from:destinations.map(()=>7)})}});
+	const payment=load("../services/paymentService.js", {"./bookingSchedule":schedule});
+	const controller=load("../controllers/bookingController.js", { "../services/paymentService":payment,"../services/bookingSchedule":schedule, "../config/db":stubDb, razorpay:class {constructor(){Object.assign(this,gateway);}}, "../utils/eventQueue":{publish:()=>{}}, "../utils/sendEmail":async()=>{}, "../utils/notificationService":{sendNotification:async(input)=>notices.push(input)}, "../utils/distributedLock":{acquireLock:async()=>({acquired:true}),releaseLock:async()=>{}}, "../utils/circuitBreaker":{createProtectedBreaker:(action)=>({fire:action})} });
 	const actor = {id:customer,role:"customer"};
-	const book = async (start="10:00", method="online", extra={}) => { const res=response(); await controller.createBooking({user:actor,body:{provider_id:provider,service_id:service,date:"2040-01-02",start_time:start,address:"Test service address",payment_method:method,...extra}},res); return res; };
+	const book = async (start="10:00", method="online", extra={}) => { const res=response(); await controller.createBooking({user:actor,body:{provider_id:provider,service_id:service,date:"2040-01-02",start_time:start,address:"Test service address",payment_method:method,latitude:12,longitude:77,...extra}},res); return res; };
 	const capture = (booking,id=`pay_${randomUUID().replaceAll("-", "")}`) => {const payment={id,order_id:booking.razorpay_order_id,amount:120000,currency:"INR",status:"captured",captured:true};payments.set(id,payment);return payment;};
+	await t.test("customer coordinates, default/expanded radius and address edits survive actual PostgreSQL storage",async()=>{
+		const missing=await book("10:00","cod",{date:"2040-04-01",latitude:null,longitude:null});assert.equal(missing.statusCode,400);
+		const far=await book("10:00","cod",{date:"2040-04-01",latitude:12.05,longitude:77.7});assert.equal(far.statusCode,409);assert.match(far.data.message,/50 km/);
+		const created=await book("10:00","cod",{date:"2040-04-01",latitude:12.05,longitude:77.7,radius:100});assert.equal(created.statusCode,201,JSON.stringify(created.data));
+		const b=(await pool.query("SELECT * FROM bookings WHERE booking_id=$1",[created.data.booking.booking_id])).rows[0];
+		assert.equal(b.search_radius_km,100);assert.equal(b.latitude,12.05);assert.equal(b.longitude,77.7);
+		assert.notEqual(b.latitude,12);assert.notEqual(b.longitude,77);
+		const denied=response();await controller.updateBookingAddress({user:actor,params:{booking_id:b.booking_id},body:{address:"Customer moved outside radius",latitude:12,longitude:79}},denied);assert.equal(denied.statusCode,409);
+		assert.equal((await pool.query("SELECT address FROM bookings WHERE booking_id=$1",[b.booking_id])).rows[0].address,b.address);
+		const changed=response();await controller.updateBookingAddress({user:actor,params:{booking_id:b.booking_id},body:{address:"Confirmed customer address",latitude:12.06,longitude:77.71}},changed);assert.equal(changed.statusCode,200,JSON.stringify(changed.data));
+	});
+	await t.test("a just-inside-radius customer point retains precision through persistence and payment finalization",async()=>{
+		const latitude=12+(0.9999999/6371.00877141506)*(180/Math.PI),longitude=77;
+		const created=await book("10:00","online",{date:"2040-04-05",latitude,longitude,radius:1});assert.equal(created.statusCode,201,JSON.stringify(created.data));
+		const b=(await pool.query("SELECT * FROM bookings WHERE booking_id=$1",[created.data.booking.booking_id])).rows[0];
+		assert.equal(b.latitude,latitude);assert.equal(b.longitude,longitude);assert.equal(b.search_radius_km,1);
+		const result=await controller.paymentService.finalize(b.razorpay_order_id,capture(b),actor);assert.equal(result.late,false);assert.equal(result.booking.status,"booked");
+	});
+	await t.test("legacy missing locations block travel and require owner confirmation of the unchanged address",async()=>{
+		const b=(await book("10:00","cod",{date:"2040-04-02"})).data.booking;
+		await pool.query("UPDATE bookings SET latitude=NULL,longitude=NULL,created_at=NOW()-INTERVAL '1 hour' WHERE booking_id=$1",[b.booking_id]);
+		await assert.rejects(schedule.getAvailability(stubDb,{provider_id:provider,service_id:service,latitude:12,longitude:77,from:"2040-04-02",days:1}),{status:409});
+		assert.equal((await book("16:00","cod",{date:"2040-04-02"})).statusCode,409);
+		for(const [user,body,status] of [[{id:other,role:"customer"},{address:b.address,confirm_location:true},403],[actor,{address:"Moved elsewhere",confirm_location:true},409],[actor,{address:b.address},409]]) {
+			const res=response();await controller.updateBookingAddress({user,params:{booking_id:b.booking_id},body:{...body,latitude:12.01,longitude:77.01}},res);assert.equal(res.statusCode,status);
+		}
+		const repaired=response();await controller.updateBookingAddress({user:actor,params:{booking_id:b.booking_id},body:{address:b.address,latitude:12.01,longitude:77.01,confirm_location:true}},repaired);assert.equal(repaired.statusCode,200,JSON.stringify(repaired.data));
+		const days=await schedule.getAvailability(stubDb,{provider_id:provider,service_id:service,latitude:12,longitude:77,from:"2040-04-02",days:1});assert.ok(days[0].free_slots.length>0);
+		for(const slot of days[0].free_slots)await schedule.validateSchedule(stubDb,{provider_id:provider,service_id:service,date:"2040-04-02",start_time:slot.start,latitude:12,longitude:77});
+	});
+	await t.test("confirmed batch repairs validate all jobs together and roll back stale or unsafe input",async()=>{
+		const jobs=[(await book("10:00","cod",{date:"2040-04-03"})).data.booking,(await book("16:00","cod",{date:"2040-04-03"})).data.booking];
+		await pool.query("UPDATE bookings SET latitude=NULL,longitude=NULL WHERE booking_id=ANY($1::uuid[])",[jobs.map(b=>b.booking_id)]);
+		const {repairLocations}=require("../scripts/locationIntegrity");
+		const manifest=jobs.map(b=>({kind:"booking",id:b.booking_id,expected_address:b.address,latitude:12,longitude:77,confirmed:true}));
+		await assert.rejects(repairLocations(stubDb,[manifest[0],{...manifest[1],expected_address:"Stale address"}],schedule,{delPattern:()=>{}}),{status:409});
+		assert.equal((await pool.query("SELECT COUNT(*)::int AS count FROM bookings WHERE booking_id=ANY($1::uuid[]) AND latitude IS NULL",[jobs.map(b=>b.booking_id)])).rows[0].count,2);
+		assert.equal((await repairLocations(stubDb,manifest,schedule,{delPattern:()=>{}})).repaired.length,2);
+	});
+	await t.test("captured payment with an unconfirmed legacy location is recorded and refunded rather than activating",async()=>{
+		const b=(await book("10:00","online",{date:"2040-04-04"})).data.booking;
+		await pool.query("UPDATE bookings SET latitude=NULL,longitude=NULL WHERE booking_id=$1",[b.booking_id]);
+		const result=await controller.paymentService.finalize(b.razorpay_order_id,capture(b),actor);
+		assert.equal(result.late,true);assert.equal(result.booking.status,"expired");assert.equal(result.booking.payment_status,"refund_pending");
+		assert.equal((await pool.query("SELECT COUNT(*)::int AS count FROM booking_refunds WHERE booking_id=$1",[b.booking_id])).rows[0].count,1);
+	});
+	await t.test("location audit is read-only and confirmed saved/provider repairs preserve labels and recheck booked jobs",async()=>{
+		const {auditLocations,repairLocations}=require("../scripts/locationIntegrity");
+		const a=(await pool.query("INSERT INTO user_addresses(user_id,full_address) VALUES($1,'Unchanged fixture saved address') RETURNING id",[customer])).rows[0];
+		const audit=await auditLocations(stubDb);assert.ok(audit.issues.some(r=>r.kind==="address"&&r.id===String(a.id)));assert.ok(!JSON.stringify(audit).includes("Unchanged fixture saved address"));
+		await repairLocations(stubDb,[{kind:"address",id:String(a.id),expected_address:"Unchanged fixture saved address",latitude:0,longitude:0,confirmed:true}],schedule,{delPattern:()=>{}});
+		assert.deepEqual((await pool.query("SELECT full_address,lat,lng FROM user_addresses WHERE id=$1",[a.id])).rows[0],{full_address:"Unchanged fixture saved address",lat:0,lng:0});
+		const base={kind:"provider",id:provider,expected_address:"Confirmed fixture base",latitude:14,longitude:79,confirmed:true};
+		await assert.rejects(repairLocations(stubDb,[base],schedule,{delPattern:()=>{}}),{status:409});
+		assert.equal((await pool.query("SELECT lat FROM users WHERE id=$1",[provider])).rows[0].lat,12);
+		await repairLocations(stubDb,[{...base,latitude:12.001,longitude:77.001}],schedule,{delPattern:()=>{}});
+		assert.equal((await pool.query("SELECT location FROM users WHERE id=$1",[provider])).rows[0].location,base.expected_address);
+	});
 	await t.test("forged prefixes/signatures and unbound booking IDs cannot mark paid", async()=>{
 		const created=await book(); assert.equal(created.statusCode,201,JSON.stringify(created.data)); const b=created.data.booking;
 		const res=response(); await controller.verifyPayment({user:actor,body:{razorpay_order_id:"test_order_fake",razorpay_payment_id:"pay_fake",razorpay_signature:"fake",booking_id:b.booking_id}},res); assert.equal(res.statusCode,400);
@@ -269,7 +339,7 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 					const reply = await fetch(`http://127.0.0.1:${server.address().port}/api/bookings`, {
 						method: "POST", signal: AbortSignal.timeout(30000),
 						headers: { Authorization: `Bearer ${jwt.sign(actor, process.env.JWT_SECRET)}`, "Content-Type": "application/json" },
-						body: JSON.stringify({ provider_id: provider, service_id: service, date, start_time: "10:00", address: "Synthetic contention fixture", payment_method: method }),
+						body: JSON.stringify({ provider_id: provider, service_id: service, date, start_time: "10:00", address: "Synthetic contention fixture", payment_method: method,latitude:12,longitude:77 }),
 					});
 					await reply.json();
 					return { status: reply.status, ms: performance.now() - began };

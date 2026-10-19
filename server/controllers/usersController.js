@@ -1,5 +1,6 @@
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
-const { default: axios } = require("axios");
+const { coordinateFields, pairedCoordinates, validCoordinates } = require("../utils/location");
+const cache = require("../utils/cache");
 const db = require("../config/db");
 const { hashIfPresent } = require("../utils/hash");
 const Joi = require("joi");
@@ -27,11 +28,11 @@ const userSchema = Joi.object({
 	role: Joi.string().valid("customer", "provider"),
 	location: Joi.string().optional(),
 	address: Joi.string().optional(),
-	lat: Joi.number().optional(),
-	lng: Joi.number().optional(),
+	lat: coordinateFields.lat.allow(null).optional(),
+	lng: coordinateFields.lng.allow(null).optional(),
 	photo: Joi.string().allow("").optional(),
 	bio: Joi.string().max(500).optional(),
-});
+}).custom(pairedCoordinates);
 
 const userUpdateSchema = Joi.object({
 	name: Joi.string().min(3).max(100).optional(),
@@ -49,9 +50,9 @@ const userUpdateSchema = Joi.object({
 	bio: Joi.string().max(500).allow("").optional(),
 	photo: Joi.string().allow("").optional(),
 
-	lat: Joi.number().optional(),
-	lng: Joi.number().optional(),
-});
+	lat: coordinateFields.lat.allow(null).optional(),
+	lng: coordinateFields.lng.allow(null).optional(),
+}).custom(pairedCoordinates);
 
 function generateCustomId(role) {
 	const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 15);
@@ -149,65 +150,42 @@ async function updateUser(req, res, next) {
 
 	if (req.file) {
 		try {
-			const result = await new Promise((resolve, reject) => {
-				const stream = cloudinary.uploader.upload_stream(
-					{ folder: "profile_photos" },
-					(err, res) => {
-						if (err) reject(err);
-						else resolve(res);
-					},
-				);
-				streamifier.createReadStream(req.file.buffer).pipe(stream);
-			});
-			updates.photo = result.secure_url;
+			if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+				const result = await new Promise((resolve, reject) => {
+					const stream = cloudinary.uploader.upload_stream(
+						{ folder: "profile_photos" },
+						(err, res) => {
+							if (err) reject(err);
+							else resolve(res);
+						},
+					);
+					streamifier.createReadStream(req.file.buffer).pipe(stream);
+				});
+				updates.photo = result.secure_url;
+			} else {
+				const { uploadBufferToS3 } = require("../config/s3");
+				const ext = req.file.mimetype ? req.file.mimetype.split("/")[1] || "jpg" : "jpg";
+				const key = `profiles/${id}_${Date.now()}.${ext}`;
+				const s3Res = await uploadBufferToS3({
+					buffer: req.file.buffer,
+					key,
+					contentType: req.file.mimetype || "image/jpeg",
+				});
+				updates.photo = s3Res.fileUrl;
+			}
 		} catch (uploadErr) {
+			console.error("Profile image upload failed:", uploadErr);
 			return res.status(500).json({ error: "Profile image upload failed" });
 		}
 	}
 
 	try {
-		if (
-			updates.location &&
-			updates.location.trim() !== "" &&
-			(!updates.lat || !updates.lng)
-		) {
-			try {
-				const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-					updates.location,
-				)}`;
-				const geoRes = await axios.get(url, {
-					headers: { "User-Agent": "TaskGenie/1.0" },
-				});
-				if (geoRes.data && geoRes.data.length > 0) {
-					updates.lat = parseFloat(geoRes.data[0].lat);
-					updates.lng = parseFloat(geoRes.data[0].lon);
-				}
-			} catch (geoErr) {
-				console.error("Forward Geocoding failed:", geoErr.message);
-			}
-		}
-
-		else if (updates.lat && updates.lng && !updates.location) {
-			try {
-				const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${updates.lat}&lon=${updates.lng}`;
-				const geoRes = await axios.get(url, {
-					headers: { "User-Agent": "TaskGenie/1.0" },
-				});
-
-				if (geoRes.data && geoRes.data.address) {
-					const addr = geoRes.data.address;
-					const cityOrTown =
-						addr.city ||
-						addr.town ||
-						addr.village ||
-						addr.suburb ||
-						"Unknown Local Region";
-					updates.location = `${cityOrTown}, ${addr.state || ""}`.trim();
-				}
-			} catch (geoErr) {
-				console.error("Reverse Geocoding failed:", geoErr.message);
-			}
-		}
+  // A city label is not a confirmed service base. Never silently geocode its first result.
+  if ((updates.location !== undefined || updates.address !== undefined) && !validCoordinates(updates.lat,updates.lng)) {
+   const current=await db.query("SELECT location,address FROM users WHERE id=$1",[id]);
+   const previous=current.rows[0];
+   if(previous && ((updates.location !== undefined && updates.location.trim()!==(previous.location||"").trim()) || (updates.address !== undefined && updates.address.trim()!==(previous.address||"").trim()))) {updates.lat=null;updates.lng=null;}
+  }
 
 		if (updates.password) {
 			updates.password = await hashIfPresent(updates.password);
@@ -239,6 +217,8 @@ async function updateUser(req, res, next) {
         `;
 
 		const result = await db.query(query, values);
+		if (typeof cache.del === "function") cache.del(`auth_user:${id}`);
+		if (typeof cache.delPattern === "function") cache.delPattern("providers_");
 
 		if (result.rowCount === 0) {
 			return res.status(404).json({ message: "User not found" });
@@ -258,6 +238,8 @@ async function deleteUser(req, res, next) {
 		const id = req.params.id;
 
 		const result = await db.query(`DELETE FROM users WHERE id=$1`, [id]);
+		if (typeof cache.del === "function") cache.del(`auth_user:${id}`);
+		if (typeof cache.delPattern === "function") cache.delPattern("providers_");
 
 		if (result.rowCount === 0)
 			return res.status(404).json({ error: "User not found" });

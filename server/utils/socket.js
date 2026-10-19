@@ -12,6 +12,31 @@ function initSocket(httpServer, corsOptions) {
 		pingInterval: 25000,
 	});
 
+	const isTest =
+		process.env.NODE_ENV === "test" ||
+		process.argv.includes("--test") ||
+		process.argv.some((a) => typeof a === "string" && a.includes("test"));
+
+	if (!isTest) {
+		try {
+			const { createAdapter } = require("@socket.io/redis-adapter");
+			const { createRedisClient } = require("../config/redisClient");
+			const pubClient = createRedisClient();
+			const subClient = pubClient.duplicate();
+
+			Promise.all([pubClient.connect().catch(() => {}), subClient.connect().catch(() => {})])
+				.then(() => {
+					io.adapter(createAdapter(pubClient, subClient));
+					console.log("⚡ [Socket.IO] Redis cluster adapter initialized for horizontal multi-instance scaling.");
+				})
+				.catch((err) => {
+					console.warn("ℹ️ [Socket.IO] Redis adapter init notice:", err.message);
+				});
+		} catch (adapterErr) {
+			console.warn("ℹ️ [Socket.IO] Operating with single-process in-memory adapter:", adapterErr.message);
+		}
+	}
+
 	io.use(async (socket, next) => {
 		const token =
 			socket.handshake.auth?.token ||

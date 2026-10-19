@@ -36,13 +36,10 @@ const {
 	calculateHaversineDistance,
 	estimateTravelTimeMinutes,
 	calculateMatchScore,
-	getBatchedTravelDurations,
 } = require("../utils/geoUtils");
 
 const {
 	generateRealSlots,
-	timeToMinutes,
-	minutesToTime,
 } = require("../utils/timeUtils");
 
 const UUID_REGEX =
@@ -66,18 +63,33 @@ async function resolveProviderId(clientOrPool, idOrCustomId) {
 	return result.rows[0]?.id ?? null;
 }
 
-let postGisSupported = null;
+const {
+  validCoordinates,
+  pairedCoordinates,
+  coordinateFields,
+  discoverySchema,
+  availabilitySchema
+} = require("../utils/location");
+let spatialCapability = {
+  supported: false,
+  expires: 0
+};
 async function checkPostGisSupport(clientOrPool) {
-	if (postGisSupported !== null) return postGisSupported;
-	try {
-		const res = await clientOrPool.query(
-			"SELECT 1 FROM pg_extension WHERE extname = 'postgis' LIMIT 1"
-		);
-		postGisSupported = res.rows.length > 0;
-	} catch (_) {
-		postGisSupported = false;
-	}
-	return postGisSupported;
+  if (Date.now() < spatialCapability.expires) return spatialCapability.supported;
+  try {
+    const result = await clientOrPool.query(`SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname='postgis') AND EXISTS (
+   SELECT 1 FROM pg_attribute a JOIN pg_type t ON t.oid=a.atttypid
+   WHERE a.attrelid=to_regclass('users') AND a.attname='geom' AND NOT a.attisdropped AND t.typname='geography'
+  ) AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('users') AND tgname='trg_users_geom_sync' AND tgenabled!='D') AS supported`);
+    const supported = result.rows[0]?.supported === true;
+    spatialCapability = {
+      supported,
+      expires: Date.now() + (supported ? 60000 : 5000)
+    };
+    return supported;
+  } catch (_) {
+    return false;
+  }
 }
 
 const providerSchema = Joi.object({
@@ -89,8 +101,8 @@ const providerSchema = Joi.object({
 		.message("Phone must be a valid Indian number (+91 followed by 10 digits)")
 		.optional(),
 	location: Joi.string().optional(),
-	lat: Joi.number().optional(),
-	lng: Joi.number().optional(),
+	lat: coordinateFields.lat.required(),
+	lng: coordinateFields.lng.required(),
 	photo: Joi.string().allow("").optional(),
 	bio: Joi.string().max(500).allow("").optional(),
 	service: Joi.string().required(),
@@ -121,7 +133,7 @@ const providerSchema = Joi.object({
 	kyc_doc_number: Joi.string().max(100).allow("").optional(),
 	kyc_doc_front: Joi.string().allow("", null).optional(),
 	kyc_doc_back: Joi.string().allow("", null).optional(),
-});
+}).custom(pairedCoordinates);
 
 const providerUpdateSchema = Joi.object({
 	name: Joi.string().min(3).max(100).optional(),
@@ -134,8 +146,8 @@ const providerUpdateSchema = Joi.object({
 		.optional(),
 	password: Joi.string().min(6).optional(),
 	location: Joi.string().optional(),
-	lat: Joi.number().optional(),
-	lng: Joi.number().optional(),
+	lat: coordinateFields.lat.optional(),
+	lng: coordinateFields.lng.optional(),
 	photo: Joi.string().allow("").optional(),
 	bio: Joi.string().max(500).optional(),
 	service: Joi.string().optional(),
@@ -144,7 +156,7 @@ const providerUpdateSchema = Joi.object({
 	price_unit: Joi.string().optional(),
 	rating: Joi.number().min(0).max(5).optional(),
 	availability: Joi.array().optional(),
-});
+}).custom(pairedCoordinates);
 
 function localDateStr(dt) {
 	const year = dt.getFullYear();
@@ -253,8 +265,8 @@ async function createProvider(req, res, next) {
 				customId,
 				hashed,
 				location,
-				lat || null,
-				lng || null,
+				lat ?? null,
+				lng ?? null,
 				photo,
 				bio,
 			],
@@ -438,221 +450,160 @@ async function getKycPresignedUrl(req, res, next) {
 }
 
 async function getProviders(req, res, next) {
-	try {
-		const { service, lat, lng, radius, sort_by, min_rating, max_price } =
-			req.query;
-
-		const cacheKey = `providers_${service || "all"}_${lat || ""}_${lng || ""}_${radius || ""}_${sort_by || ""}_${min_rating || ""}_${max_price || ""}`;
-		const cached = cache.get(cacheKey);
-		if (cached) {
-			return res.json(cached);
-		}
-
-		const userLat = parseFloat(lat);
-		const userLng = parseFloat(lng);
-		const hasUserCoords = !isNaN(userLat) && !isNaN(userLng);
-		const searchRadiusKm = parseFloat(radius) || 50;
-		const hasPostGis = hasUserCoords ? await checkPostGisSupport(db) : false;
-
-		const params = [];
-		let postGisSelect = "";
-
-		if (hasPostGis) {
-			params.push(userLng, userLat);
-			postGisSelect = `, ROUND((ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000.0)::numeric, 1) AS postgis_distance_km`;
-		}
-
-		let query = `
-            SELECT DISTINCT ON (u.id)
-                   u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
-                   u.lat, u.lng,
-                   s.name AS service, s.slug AS service_slug, s.id AS service_id,
-                   ps.price, ps.price_unit, 
-                   COALESCE(p.rating, 4.5) AS rating, p.user_id, p.availability,
-                   COALESCE(p.is_verified, FALSE) AS is_verified,
-                   p.verification_badge,
-                   COALESCE(p.kyc_status, 'pending') AS kyc_status
-                   ${postGisSelect}
-            FROM providers p
-            JOIN users u ON p.user_id = u.id
-            JOIN provider_services ps ON ps.provider_id = p.user_id AND ps.is_visible = TRUE
-            JOIN services s ON s.id = ps.service_id
-        `;
-		const whereClauses = ["COALESCE(p.status, 'approved') = 'approved'"];
-
-		if (hasPostGis && radius) {
-			params.push(searchRadiusKm * 1000);
-			whereClauses.push(
-				`ST_DWithin(u.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $${params.length})`,
-			);
-		}
-
-		if (service) {
-			const cleanService = String(service).trim();
-			params.push(cleanService);
-			whereClauses.push(
-				`(LOWER(s.slug) = LOWER($${params.length}) OR s.id::text = $${params.length})`,
-			);
-		}
-
-		if (min_rating) {
-			params.push(parseFloat(min_rating));
-			whereClauses.push(`COALESCE(p.rating, 0) >= $${params.length}`);
-		}
-
-		if (max_price) {
-			params.push(parseFloat(max_price));
-			whereClauses.push(`ps.price <= $${params.length}`);
-		}
-
-		if (whereClauses.length > 0) {
-			query += " WHERE " + whereClauses.join(" AND ");
-		}
-
-		query += " ORDER BY u.id, ps.created_at ASC";
-
-		const result = await db.query(query, params);
-		let providers = result.rows;
-
-		// Fallback: If no providers found for the specific service within filters/radius, fetch providers for that service or top experts
-		if (providers.length === 0 && service) {
-			try {
-				const cleanService = String(service).trim();
-				const svcFallbackParams = hasPostGis ? [userLng, userLat, cleanService] : [cleanService];
-				const svcFallbackQuery = `
-					SELECT DISTINCT ON (u.id)
-						   u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
-						   u.lat, u.lng,
-						   s.name AS service, s.slug AS service_slug, s.id AS service_id,
-						   ps.price, ps.price_unit, 
-						   COALESCE(p.rating, 4.8) AS rating, p.user_id, p.availability,
-						   COALESCE(p.is_verified, TRUE) AS is_verified,
-						   p.verification_badge,
-						   COALESCE(p.kyc_status, 'approved') AS kyc_status
-						   ${hasPostGis ? `, ROUND((ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000.0)::numeric, 1) AS postgis_distance_km` : ""}
-					 FROM providers p
-					 JOIN users u ON p.user_id = u.id
-					 JOIN provider_services ps ON ps.provider_id = p.user_id AND ps.is_visible = TRUE
-					 JOIN services s ON s.id = ps.service_id
-					 WHERE COALESCE(p.status, 'approved') = 'approved'
-					   AND (LOWER(s.slug) = LOWER($${hasPostGis ? 3 : 1}) OR s.id::text = $${hasPostGis ? 3 : 1})
-					 ORDER BY u.id, ps.created_at ASC
-					 LIMIT 10
-				`;
-				const svcRes = await db.query(svcFallbackQuery, svcFallbackParams);
-				if (svcRes.rows.length > 0) {
-					providers = svcRes.rows.map(r => ({ ...r, is_expanded_radius: true }));
-				} else {
-					const generalParams = hasPostGis ? [userLng, userLat] : [];
-					const generalQuery = `
-						SELECT DISTINCT ON (u.id)
-							   u.name, u.photo, u.phone, u.bio, u.location, u.custom_id,
-							   u.lat, u.lng,
-							   s.name AS service, s.slug AS service_slug, s.id AS service_id,
-							   ps.price, ps.price_unit, 
-							   COALESCE(p.rating, 4.8) AS rating, p.user_id, p.availability,
-							   COALESCE(p.is_verified, TRUE) AS is_verified,
-							   p.verification_badge,
-							   COALESCE(p.kyc_status, 'approved') AS kyc_status
-							   ${hasPostGis ? `, ROUND((ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000.0)::numeric, 1) AS postgis_distance_km` : ""}
-						 FROM providers p
-						 JOIN users u ON p.user_id = u.id
-						 JOIN provider_services ps ON ps.provider_id = p.user_id AND ps.is_visible = TRUE
-						 JOIN services s ON s.id = ps.service_id
-						 WHERE COALESCE(p.status, 'approved') = 'approved'
-						 ORDER BY u.id, p.rating DESC
-						 LIMIT 6
-					`;
-					const generalRes = await db.query(generalQuery, generalParams);
-					if (generalRes.rows.length > 0) {
-						providers = generalRes.rows.map(r => ({ ...r, is_recommended_fallback: true }));
-					}
-				}
-			} catch (fbErr) {
-				console.warn("Fallback providers query warning:", fbErr.message);
-			}
-		}
-
-		const avgPrice =
-			providers.length > 0
-				? providers.reduce((acc, p) => acc + (parseFloat(p.price) || 0), 0) /
-					providers.length
-				: 500;
-
-		providers = providers.map((p) => {
-			const pLat = parseFloat(p.lat);
-			const pLng = parseFloat(p.lng);
-			const hasProviderCoords = !isNaN(pLat) && !isNaN(pLng);
-
-			let distanceKm = null;
-			let travelTimeMins = null;
-
-			if (p.postgis_distance_km != null) {
-				distanceKm = parseFloat(p.postgis_distance_km);
-				travelTimeMins = estimateTravelTimeMinutes(distanceKm);
-			} else if (hasUserCoords && hasProviderCoords) {
-				distanceKm = calculateHaversineDistance(userLat, userLng, pLat, pLng);
-				travelTimeMins = estimateTravelTimeMinutes(distanceKm);
-			}
-
-			const matchScore = calculateMatchScore({
-				distanceKm,
-				maxRadiusKm: searchRadiusKm,
-				rating: parseFloat(p.rating) || 4.5,
-				price: parseFloat(p.price) || 0,
-				avgPrice,
-				hasAvailableSlots: true,
-			});
-
-			return {
-				...p,
-				distance_km: distanceKm,
-				travel_time_mins: travelTimeMins,
-				match_score: matchScore,
-				is_nearby: distanceKm != null ? distanceKm <= searchRadiusKm : true,
-			};
-		});
-
-		if (hasUserCoords && radius) {
-			const nearby = providers.filter((p) => p.is_nearby);
-			if (nearby.length > 0) {
-				providers = nearby;
-			}
-		}
-
-		const sortMode = sort_by || (hasUserCoords ? "recommended" : "rating");
-
-		providers.sort((a, b) => {
-			if (sortMode === "distance") {
-				if (a.distance_km == null && b.distance_km == null) return 0;
-				if (a.distance_km == null) return 1;
-				if (b.distance_km == null) return -1;
-				return a.distance_km - b.distance_km;
-			}
-			if (sortMode === "price_asc") {
-				return parseFloat(a.price) - parseFloat(b.price);
-			}
-			if (sortMode === "price_desc") {
-				return parseFloat(b.price) - parseFloat(a.price);
-			}
-			if (sortMode === "rating") {
-				return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
-			}
-			if (b.match_score !== a.match_score) {
-				return b.match_score - a.match_score;
-			}
-			if (a.distance_km != null && b.distance_km != null) {
-				return a.distance_km - b.distance_km;
-			}
-			return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
-		});
-
-		cache.set(cacheKey, providers, 45000);
-		res.json(providers);
-	} catch (err) {
-		console.error("Fetch marketplace providers error:", err.message);
-		next(err);
-	}
+  try {
+    const {
+      error,
+      value
+    } = discoverySchema.validate(req.query);
+    if (error) return res.status(400).json({
+      error: error.details[0].message
+    });
+    const {
+      service,
+      lat,
+      lng,
+      radius,
+      sort_by,
+      min_rating,
+      max_price,
+      date,
+      start_time
+    } = value;
+    const hasUserCoords = validCoordinates(lat, lng);
+    const cacheKey = "providers_" + JSON.stringify({
+      service,
+      lat,
+      lng,
+      radius,
+      sort_by,
+      min_rating,
+      max_price,
+      date,
+      start_time
+    });
+    if (!date) {
+      const cached = cache.get(cacheKey);
+      if (cached) return res.json(cached);
+    }
+    let spatial = hasUserCoords && (await checkPostGisSupport(db));
+    const select = async () => {
+      const params = [],
+        where = ["p.status = 'approved'"];
+      let distanceSelect = "";
+      if (spatial) {
+        params.push(lng, lat, radius * 1000 + 0.01);
+        distanceSelect = ", ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1,$2),4326)::geography, false)/1000 AS postgis_distance_km";
+        // A centimetre tolerance only selects candidates; the shared full-precision distance below decides eligibility.
+        where.push("(ST_DWithin(u.geom,ST_SetSRID(ST_MakePoint($1,$2),4326)::geography,$3,false) OR u.geom IS NULL)");
+      }
+      if (service) {
+        params.push(service);
+        where.push(`(LOWER(s.slug)=LOWER($${params.length}) OR s.id::text=$${params.length})`);
+      }
+      if (min_rating != null) {
+        params.push(min_rating);
+        where.push(`COALESCE(p.rating,0)>=$${params.length}`);
+      }
+      if (max_price != null) {
+        params.push(max_price);
+        where.push(`ps.price<=$${params.length}`);
+      }
+      return db.query(`SELECT DISTINCT ON (u.id) u.name,u.photo,u.phone,u.bio,u.location,u.custom_id,u.lat,u.lng,
+    s.name AS service,s.slug AS service_slug,s.id AS service_id,ps.price,ps.price_unit,
+    p.rating,p.user_id,p.availability,COALESCE(p.is_verified,FALSE) AS is_verified,p.verification_badge,
+    COALESCE(p.kyc_status,'pending') AS kyc_status ${distanceSelect}
+    FROM providers p JOIN users u ON p.user_id=u.id
+    JOIN provider_services ps ON ps.provider_id=p.user_id AND ps.is_visible=TRUE
+    JOIN services s ON s.id=ps.service_id WHERE ${where.join(" AND ")}
+    ORDER BY u.id,ps.created_at ASC,ps.id ASC`, params);
+    };
+    let result;
+    try {
+      result = await select();
+    } catch (err) {
+      if (!spatial || !["42703", "42883", "42704"].includes(err.code)) throw err;
+      spatial = false;
+      spatialCapability = {
+        supported: false,
+        expires: Date.now() + 5000
+      };
+      result = await select();
+    }
+    let providers = result.rows.map(p => {
+      const distance = hasUserCoords ? calculateHaversineDistance(lat, lng, p.lat, p.lng) : null;
+      return {
+        ...p,
+        distance_km: distance,
+        travel_time_mins: distance == null ? null : estimateTravelTimeMinutes(distance),
+        is_nearby: distance == null ? null : distance <= radius,
+        availability_status: "unknown"
+      };
+    });
+    if (hasUserCoords) providers = providers.filter(p => p.is_nearby === true);
+    if (date) {
+      const schedule = require("../services/bookingSchedule");
+      const available = [];
+      for (let offset = 0; offset < providers.length; offset += 4) {
+        const batch = await Promise.all(providers.slice(offset, offset + 4).map(async p => {
+          try {
+            if (start_time) await schedule.validateSchedule(db, {
+              provider_id: p.user_id,
+              service_id: p.service_id,
+              date,
+              start_time,
+              latitude: lat,
+              longitude: lng,
+              radius
+            });else {
+              const days = await schedule.getAvailability(db, {
+                provider_id: p.user_id,
+                service_id: p.service_id,
+                from: date,
+                days: 1,
+                latitude: lat,
+                longitude: lng,
+                radius
+              });
+              if (!days[0]?.free_slots.length) return null;
+            }
+            return {
+              ...p,
+              availability_status: "available"
+            };
+          } catch (err) {
+            if ([400, 409].includes(err.status)) return null;
+            throw err;
+          }
+        }));
+        available.push(...batch.filter(Boolean));
+      }
+      providers = available;
+    }
+    const avgPrice = providers.length ? providers.reduce((sum, p) => sum + Number(p.price), 0) / providers.length : 500;
+    providers = providers.map(p => ({
+      ...p,
+      match_score: calculateMatchScore({
+        distanceKm: p.distance_km,
+        maxRadiusKm: radius,
+        rating: p.rating,
+        price: Number(p.price),
+        avgPrice,
+        hasAvailableSlots: p.availability_status === "available" ? true : null
+      })
+    }));
+    const mode = sort_by || (hasUserCoords ? "recommended" : "rating");
+    providers.sort((a, b) => {
+      if (mode === "distance") return (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity) || String(a.user_id).localeCompare(String(b.user_id));
+      if (mode === "price_asc") return Number(a.price) - Number(b.price) || String(a.user_id).localeCompare(String(b.user_id));
+      if (mode === "price_desc") return Number(b.price) - Number(a.price) || String(a.user_id).localeCompare(String(b.user_id));
+      if (mode === "rating") return Number(b.rating ?? 0) - Number(a.rating ?? 0) || String(a.user_id).localeCompare(String(b.user_id));
+      return b.match_score - a.match_score || (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity) || Number(b.rating ?? 0) - Number(a.rating ?? 0) || String(a.user_id).localeCompare(String(b.user_id));
+    });
+    if (!date) cache.set(cacheKey, providers, 45000);
+    return res.json(providers);
+  } catch (err) {
+    next(err);
+  }
 }
 
 async function matchProviders(req, res, next) {
@@ -666,10 +617,12 @@ async function getProviderById(req, res, next) {
 		if (!providerId)
 			return res.status(404).json({ error: "Provider not found" });
 
+		const selectedService = req.query.service_id || req.query.service;
+		if(selectedService!==undefined && (typeof selectedService!=="string" || selectedService.length>100))return res.status(400).json({error:"Invalid service identifier"});
 		const providerRes = await db.query(
 			`SELECT u.id, u.name, u.role, u.custom_id,
                     u.location, u.lat, u.lng, u.photo, u.bio,
-                    COALESCE(p.rating, 5.0) AS rating, p.availability,
+                    p.rating AS rating, p.availability,
                     ps.price, ps.price_unit, 
                     s.name AS service, s.slug AS service_slug, s.id AS service_id,
                     COALESCE(p.is_verified, FALSE) AS is_verified,
@@ -679,9 +632,9 @@ async function getProviderById(req, res, next) {
              JOIN users u ON u.id = p.user_id
              LEFT JOIN provider_services ps ON ps.provider_id = u.id AND ps.is_visible = TRUE
              LEFT JOIN services s ON s.id=ps.service_id
-             WHERE u.id = $1
-             LIMIT 1`,
-			[providerId],
+             WHERE u.id = $1 ${selectedService ? "AND (s.id::text=$2 OR s.slug=$2)" : ""}
+             ORDER BY ps.created_at,ps.id LIMIT 1`,
+			selectedService ? [providerId,selectedService] : [providerId],
 		);
 		if (!providerRes.rows.length)
 			return res.status(404).json({ error: "Provider not found" });
@@ -832,14 +785,19 @@ async function updateProvider(req, res, next) {
 	try {
 		await client.query("BEGIN");
 
-		const hashed = await hashIfPresent(password);
+		let clearCoordinates=false;
+  if(location !== undefined && !validCoordinates(lat,lng)){
+   const previous=await client.query("SELECT location FROM users WHERE id=$1",[providerId]);
+   clearCoordinates=previous.rows.length>0 && location.trim()!==(previous.rows[0].location||"").trim();
+  }
+  const hashed = await hashIfPresent(password);
 		await client.query(
 			`UPDATE users SET
                 name=COALESCE($1,name), email=COALESCE($2,email), password=COALESCE($3,password),
                 location=COALESCE($4,location), photo=COALESCE($5,photo), bio=COALESCE($6,bio), phone=COALESCE($7,phone),
-                lat=COALESCE($8,lat), lng=COALESCE($9,lng)
+                lat=CASE WHEN $11 THEN NULL ELSE COALESCE($8,lat) END, lng=CASE WHEN $11 THEN NULL ELSE COALESCE($9,lng) END
              WHERE id=$10`,
-			[name, email, hashed, location, photo, bio, phone, lat, lng, providerId],
+			[name, email, hashed, location, photo, bio, phone, lat, lng, providerId, clearCoordinates],
 		);
 
 		let serviceId = bodyServiceId ?? null;
@@ -1062,317 +1020,42 @@ async function toggleServiceVisibility(req, res, next) {
 }
 
 async function getProviderAvailability(req, res, next) {
-	try {
-		const providerIdParam = req.params.id;
-		const providerIdValue = await resolveProviderId(db, providerIdParam);
-		if (!providerIdValue)
-			return res.status(404).json({ error: "Provider not found" });
-
-		const customerLat = parseFloat(req.query.lat);
-		const customerLng = parseFloat(req.query.lng);
-		const hasCoords = !isNaN(customerLat) && !isNaN(customerLng);
-
-		const serviceParam = req.query.service || req.query.service_id;
-
-		const now = new Date();
-		const todayStr = localDateStr(now);
-		const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-		const fromStr = req.query.from || todayStr;
-		const [year, month, day] = fromStr.split("-").map(Number);
-		const from = new Date(year, month - 1, day, 0, 0, 0, 0);
-		const days = Math.min(parseInt(req.query.days || "14", 10), 30);
-
-		const endDate = new Date(from);
-		endDate.setDate(from.getDate() + days - 1);
-		const endDateStr = localDateStr(endDate);
-
-		let serviceQuery = `
-			SELECT s.name, s.slug, ps.price, ps.price_unit 
-			FROM provider_services ps 
-			JOIN services s ON s.id = ps.service_id 
-			WHERE ps.provider_id=$1
-		`;
-		const serviceQueryParams = [providerIdValue];
-
-		if (serviceParam) {
-			serviceQuery += ` AND (s.slug = $2 OR s.id::text = $2) LIMIT 1`;
-			serviceQueryParams.push(serviceParam);
-		} else {
-			serviceQuery += ` LIMIT 1`;
-		}
-
-		const fetchBookings = async () => {
-			try {
-				return await db.query(
-					`SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date_str, 
-                            TO_CHAR(start_time, 'HH24:MI') AS start_time, 
-                            TO_CHAR(end_time, 'HH24:MI') AS end_time,
-                            latitude, longitude, status
-                     FROM bookings
-                     WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
-                     AND (
-                         ${activeBookingPredicate}
-                     )`,
-					[providerIdValue, fromStr, endDateStr],
-				);
-			} catch (bErr) {
-				if (bErr.code === "42703") {
-					// Fallback if latitude/longitude or hold_expires_at columns are missing on legacy tables
-					try {
-						return await db.query(
-							`SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date_str, 
-	                                TO_CHAR(start_time, 'HH24:MI') AS start_time, 
-	                                TO_CHAR(end_time, 'HH24:MI') AS end_time,
-	                                status
-	                         FROM bookings
-	                         WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date 
-	                         AND (status IN ('booked','confirmed','in_progress','pending'))`,
-							[providerIdValue, fromStr, endDateStr],
-						);
-					} catch (fallbackErr) {
-						console.warn("Bookings query fallback warning:", fallbackErr.message);
-						return { rows: [] };
-					}
-				}
-				console.warn("Bookings query warning in availability:", bErr.message);
-				return { rows: [] };
-			}
-		};
-
-		const [masterRes, providerServiceRes, exceptionsRes, bookingsRes] =
-			await Promise.all([
-				db.query(
-					`SELECT day_of_week, 
-                            TO_CHAR(start_time, 'HH24:MI') AS start_time, 
-                            TO_CHAR(end_time, 'HH24:MI') AS end_time 
-                     FROM provider_master_availability 
-                     WHERE provider_id=$1`,
-					[providerIdValue],
-				),
-				db.query(serviceQuery, serviceQueryParams),
-				db.query(
-					`SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date_str, is_available, override_slots
-                     FROM provider_date_exceptions
-                     WHERE provider_id = $1 AND date BETWEEN $2::date AND $3::date`,
-					[providerIdValue, fromStr, endDateStr],
-				),
-				fetchBookings(),
-			]);
-
-		let masterRows = masterRes.rows;
-		if (masterRows.length === 0) {
-			const provRow = await db.query(
-				"SELECT availability FROM providers WHERE user_id = $1",
-				[providerIdValue],
-			);
-			let rawAvail = provRow.rows[0]?.availability;
-			if (typeof rawAvail === "string") {
-				try {
-					rawAvail = JSON.parse(rawAvail);
-				} catch {
-					rawAvail = [];
-				}
-			}
-
-			if (Array.isArray(rawAvail) && rawAvail.length > 0) {
-				masterRows = rawAvail.map((a) => ({
-					day_of_week: parseInt(a.day, 10),
-					start_time: (a.start || a.start_time || "09:00").slice(0, 5),
-					end_time: (a.end || a.end_time || "18:00").slice(0, 5),
-				}));
-			}
-		}
-
-		if (masterRows.length === 0) {
-			masterRows = [
-				{ day_of_week: 1, start_time: "09:00", end_time: "18:00" },
-				{ day_of_week: 2, start_time: "09:00", end_time: "18:00" },
-				{ day_of_week: 3, start_time: "09:00", end_time: "18:00" },
-				{ day_of_week: 4, start_time: "09:00", end_time: "18:00" },
-				{ day_of_week: 5, start_time: "09:00", end_time: "18:00" },
-				{ day_of_week: 6, start_time: "10:00", end_time: "17:00" },
-			];
-		}
-
-		const serviceName = providerServiceRes.rows[0]?.name || "default";
-		const serviceConfig = getPriceDetails(serviceName);
-		const SLOT_DURATION = serviceConfig.slotDuration || 60;
-		const DEFAULT_BUFFER = serviceConfig.buffer != null ? serviceConfig.buffer : 15;
-		const STEP_MINUTES = Math.min(60, SLOT_DURATION);
-		const MIN_LEAD_TIME_MINS = 45;
-
-		const masterMap = {};
-		for (const row of masterRows) {
-			const d = parseInt(row.day_of_week, 10);
-			masterMap[d] = masterMap[d] || [];
-			masterMap[d].push({ start: row.start_time.slice(0, 5), end: row.end_time.slice(0, 5) });
-		}
-
-		const exceptionsMap = {};
-		for (const ex of exceptionsRes.rows) {
-			exceptionsMap[ex.date_str] = ex;
-		}
-
-		const bookingsMap = {};
-		for (const b of bookingsRes.rows) {
-			bookingsMap[b.date_str] = bookingsMap[b.date_str] || [];
-			bookingsMap[b.date_str].push(b);
-		}
-
-		const results = [];
-
-		for (let i = 0; i < days; i++) {
-			const dt = new Date(from);
-			dt.setDate(from.getDate() + i);
-			const dateStr = localDateStr(dt);
-			const dow = dt.getDay();
-
-			if (dateStr < todayStr) {
-				results.push({ date: dateStr, free_slots: [] });
-				continue;
-			}
-
-			const exception = exceptionsMap[dateStr];
-			if (exception && !exception.is_available) {
-				results.push({ date: dateStr, free_slots: [] });
-				continue;
-			}
-
-			let workingIntervals = [];
-			if (exception && exception.is_available && exception.override_slots) {
-				const rawOverrides = Array.isArray(exception.override_slots)
-					? exception.override_slots
-					: [];
-				workingIntervals = rawOverrides.map((s) => ({
-					start: (s.start || s.start_time || "").slice(0, 5),
-					end: (s.end || s.end_time || "").slice(0, 5),
-				}));
-			} else {
-				workingIntervals = masterMap[dow] || [];
-			}
-
-			if (workingIntervals.length === 0) {
-				results.push({ date: dateStr, free_slots: [] });
-				continue;
-			}
-
-			const bookedJobs = bookingsMap[dateStr] || [];
-
-			const travelTimes = new Map();
-			if (hasCoords && bookedJobs.length > 0) {
-				const jobCoords = [];
-				const validIndices = [];
-				for (let j = 0; j < bookedJobs.length; j++) {
-					const job = bookedJobs[j];
-					if (job.latitude && job.longitude) {
-						jobCoords.push([
-							parseFloat(job.longitude),
-							parseFloat(job.latitude),
-						]);
-						validIndices.push(j);
-					}
-				}
-
-				if (jobCoords.length > 0) {
-					const durations = await getBatchedTravelDurations(
-						[customerLng, customerLat],
-						jobCoords,
-					);
-					durations.forEach((dur, idx) => {
-						travelTimes.set(validIndices[idx], dur);
-					});
-				}
-			}
-
-			const freeChunks = [];
-
-			for (const interval of workingIntervals) {
-				let sTime = timeToMinutes(interval.start);
-				const eTime = timeToMinutes(interval.end);
-
-				while (sTime + SLOT_DURATION <= eTime) {
-					const currentSlotStart = sTime;
-					const currentSlotEnd = sTime + SLOT_DURATION;
-
-					// Same-day minimum lead time buffer (e.g. 45 min)
-					if (dateStr === todayStr && currentSlotStart < nowMinutes + MIN_LEAD_TIME_MINS) {
-						sTime += STEP_MINUTES;
-						continue;
-					}
-
-					let slotValid = true;
-
-					for (let j = 0; j < bookedJobs.length; j++) {
-						const job = bookedJobs[j];
-						const jobStart = timeToMinutes(job.start_time);
-						const jobEnd = timeToMinutes(job.end_time);
-
-						if (!(currentSlotEnd <= jobStart || currentSlotStart >= jobEnd)) {
-							slotValid = false;
-							break;
-						}
-
-						let bufferBefore = DEFAULT_BUFFER;
-						let bufferAfter = DEFAULT_BUFFER;
-
-						if (travelTimes.has(j)) {
-							const realTravelTime = travelTimes.get(j);
-							if (
-								jobEnd <= currentSlotStart &&
-								currentSlotStart - jobEnd < 120
-							) {
-								bufferBefore = realTravelTime + 5;
-							}
-							if (
-								currentSlotEnd <= jobStart &&
-								jobStart - currentSlotEnd < 120
-							) {
-								bufferAfter = realTravelTime + 5;
-							}
-						}
-
-						if (
-							jobEnd <= currentSlotStart &&
-							currentSlotStart - jobEnd < bufferBefore
-						) {
-							slotValid = false;
-							break;
-						}
-						if (
-							currentSlotEnd <= jobStart &&
-							jobStart - currentSlotEnd < bufferAfter
-						) {
-							slotValid = false;
-							break;
-						}
-					}
-
-					if (slotValid) {
-						const startFormatted = minutesToTime(currentSlotStart);
-						const endFormatted = minutesToTime(currentSlotEnd);
-						freeChunks.push({
-							start: startFormatted,
-							end: endFormatted,
-							start_time: startFormatted,
-							end_time: endFormatted,
-							isBooked: false,
-							is_booked: false,
-						});
-					}
-
-					sTime += STEP_MINUTES;
-				}
-			}
-
-			results.push({ date: dateStr, free_slots: freeChunks });
-		}
-
-		res.json({ provider_id: providerIdValue, availability: results });
-	} catch (err) {
-		console.error("Get availability error:", err);
-		next(err);
-	}
+  try {
+    const {
+      error,
+      value
+    } = availabilitySchema.validate(req.query);
+    if (error) return res.status(400).json({
+      error: error.details[0].message
+    });
+    const provider = await resolveProviderId(db, req.params.id);
+    if (!provider) return res.status(404).json({
+      error: "Provider not found"
+    });
+    let service = value.service_id || value.service;
+    if (!service) {
+      const result = await db.query("SELECT service_id FROM provider_services WHERE provider_id=$1 AND is_visible=TRUE ORDER BY created_at,id LIMIT 1", [provider]);
+      service = result.rows[0]?.service_id;
+    }
+    if (!service) return res.status(409).json({
+      error: "Provider has no visible services"
+    });
+    const availability = await require("../services/bookingSchedule").getAvailability(db, {
+      provider_id: provider,
+      service_id: service,
+      from: value.from,
+      days: value.days,
+      latitude: value.lat,
+      longitude: value.lng,
+      radius: value.radius
+    });
+    return res.json({
+      provider_id: provider,
+      availability
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
 async function deleteProvider(req, res, next) {

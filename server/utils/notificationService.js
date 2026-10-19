@@ -1,14 +1,30 @@
-﻿const db = require("../config/db");
+const db = require("../config/db");
 const { emitToUser } = require("./socket");
 
-async function sendNotification({ userId, title, message, type = "system", data = {} }) {
+function emitNotification(notification) {
+	if (notification && notification.user_id) {
+		try {
+			emitToUser(notification.user_id, "notification:new", notification);
+		} catch (err) {
+			console.warn("WebSocket notification emit notice:", err.message);
+		}
+	}
+}
+
+async function sendNotification(
+	{ userId, title, message, type = "system", data = {} },
+	clientOrDb = db,
+	options = {},
+) {
 	if (!userId || !title || !message) {
 		console.warn("sendNotification called with missing parameters:", { userId, title });
 		return null;
 	}
 
 	try {
-		const result = await db.query(
+		const targetDb = clientOrDb || db;
+		const isTransactional = Boolean(clientOrDb && clientOrDb !== db);
+		const result = await targetDb.query(
 			`INSERT INTO notifications (user_id, title, message, type, data, is_read)
 			 VALUES ($1, $2, $3, $4, $5, false)
 			 RETURNING id, user_id, title, message, type, data, is_read, created_at`,
@@ -17,7 +33,11 @@ async function sendNotification({ userId, title, message, type = "system", data 
 
 		const notification = result.rows[0];
 
-		emitToUser(userId, "notification:new", notification);
+		// If operating within an uncommitted transaction, do not emit over socket yet.
+		// Caller will emit after COMMIT succeeds to prevent broadcasting phantom notifications.
+		if (!isTransactional && !options.skipSocket) {
+			emitNotification(notification);
+		}
 
 		return notification;
 	} catch (err) {
@@ -28,4 +48,5 @@ async function sendNotification({ userId, title, message, type = "system", data 
 
 module.exports = {
 	sendNotification,
+	emitNotification,
 };

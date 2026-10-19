@@ -1,4 +1,8 @@
 const db = require("../config/db");
+const { validCoordinates } = require("../utils/location");
+function invalidCoordinates(body) {
+ return (body.lat != null || body.lng != null) && !validCoordinates(body.lat,body.lng);
+}
 
 let tablesEnsured = false;
 
@@ -82,6 +86,7 @@ async function getAddresses(req, res, next) {
 }
 
 async function createAddress(req, res, next) {
+	if(invalidCoordinates(req.body))return res.status(400).json({error:"A valid latitude/longitude pair is required"});
 	try {
 		await ensureAccountTables();
 		const userId = req.user.id;
@@ -135,8 +140,8 @@ async function createAddress(req, res, next) {
 				(city || "Bengaluru").trim(),
 				(state || "Karnataka").trim(),
 				postal_code ? postal_code.trim() : null,
-				lat ? parseFloat(lat) : null,
-				lng ? parseFloat(lng) : null,
+				lat != null ? Number(lat) : null,
+				lng != null ? Number(lng) : null,
 				Boolean(makeDefault),
 			],
 		);
@@ -152,6 +157,7 @@ async function createAddress(req, res, next) {
 }
 
 async function updateAddress(req, res, next) {
+	if(invalidCoordinates(req.body))return res.status(400).json({error:"A valid latitude/longitude pair is required"});
 	try {
 		await ensureAccountTables();
 		const userId = req.user.id;
@@ -193,8 +199,8 @@ async function updateAddress(req, res, next) {
 				city = COALESCE($5, city),
 				state = COALESCE($6, state),
 				postal_code = COALESCE($7, postal_code),
-				lat = COALESCE($8, lat),
-				lng = COALESCE($9, lng),
+				lat = CASE WHEN $13 THEN $8 ELSE COALESCE($8, lat) END,
+				lng = CASE WHEN $13 THEN $9 ELSE COALESCE($9, lng) END,
 				is_default = COALESCE($10, is_default),
 				updated_at = NOW()
 			WHERE id = $11 AND user_id = $12
@@ -212,6 +218,7 @@ async function updateAddress(req, res, next) {
 				is_default != null ? Boolean(is_default) : null,
 				id,
 				userId,
+				["full_address","street","city","state","postal_code"].some(key=>req.body[key]!==undefined && String(req.body[key]).trim()!==String(existing.rows[0][key]??"").trim()) || (Object.hasOwn(req.body,"lat") && Object.hasOwn(req.body,"lng")),
 			],
 		);
 

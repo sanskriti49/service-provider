@@ -1,5 +1,5 @@
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	Check,
 	Home,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { FadeLoader } from "react-spinners";
 import api from "../../api/axiosInstance";
+import { addressCandidates, createRequestGuard } from "../../utils/serviceLocation";
 
 const EDIT_WINDOW_MS = 10 * 60 * 1000;
 const WARN_MS = 2 * 60 * 1000;
@@ -42,6 +43,8 @@ export default function BookingSuccess() {
 	const [isSaving, setIsSaving] = useState(false);
 	const [addressMatches, setAddressMatches] = useState([]);
 	const [selectedLocation, setSelectedLocation] = useState(null);
+	const addressRequests = useRef(createRequestGuard());
+	useEffect(()=>()=>addressRequests.current.cancel(),[]);
 	const [errorMsg, setErrorMsg] = useState(null);
 	const [copied, setCopied] = useState(false);
 	const [showConfetti, setShowConfetti] = useState(true);
@@ -100,17 +103,15 @@ export default function BookingSuccess() {
 
 	const handleUpdateAddress = async () => {
 		if (!tempAddress.trim()) return;
+		const request = addressRequests.current.begin();
 		setIsSaving(true);
 		setErrorMsg(null);
 
 		try {
 			if (!selectedLocation) {
-				const lookup = await fetch(
-					`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(tempAddress)}`,
-					{ signal: AbortSignal.timeout(5000) },
-				);
-				if (!lookup.ok) throw new Error("Location lookup unavailable");
-				const matches = await lookup.json();
+				const results = await addressCandidates(tempAddress,request.signal);
+				if(!request.current()) return;
+				const matches = results.map(location=>({...location,lon:location.lng,display_name:location.address}));
 				setAddressMatches(matches);
 				setErrorMsg(
 					matches.length
@@ -123,23 +124,25 @@ export default function BookingSuccess() {
 				latitude: Number(selectedLocation.lat),
 				longitude: Number(selectedLocation.lon),
 				address: tempAddress,
-			});
+			},{signal:request.signal});
+			if(!request.current()) return;
 			setAddress(tempAddress);
 			setIsEditing(false);
 			setAddressMatches([]);
 			setSelectedLocation(null);
 		} catch (err) {
-			console.error(err);
+			if(!request.current()) return;
 			setErrorMsg(
 				err.response?.data?.message ||
 					"We couldn't update the address. Check your connection and try again.",
 			);
 		} finally {
-			setIsSaving(false);
+			if(request.current()) setIsSaving(false);
 		}
 	};
 
 	const cancelEdit = () => {
+		addressRequests.current.cancel();setIsSaving(false);
 		setIsEditing(false);
 		setTempAddress(address);
 		setSelectedLocation(null);
@@ -427,7 +430,7 @@ export default function BookingSuccess() {
 								<textarea
 									value={tempAddress}
 									onChange={(e) => {
-										setTempAddress(e.target.value);
+										addressRequests.current.cancel();setIsSaving(false);setTempAddress(e.target.value);
 										setSelectedLocation(null);
 										setAddressMatches([]);
 										setErrorMsg(null);
@@ -448,15 +451,14 @@ export default function BookingSuccess() {
 											className="space-y-2 max-h-44 overflow-y-auto pr-1"
 										>
 											{addressMatches.map((match) => {
-												const active =
-													selectedLocation?.place_id === match.place_id;
+												const active = selectedLocation?.lat === match.lat && selectedLocation?.lon === match.lon && selectedLocation?.display_name === match.display_name;
 												return (
-													<li key={match.place_id}>
+													<li key={`${match.lat}:${match.lon}:${match.display_name}`}>
 														<button
 															type="button"
 															role="radio"
 															aria-checked={active}
-															onClick={() => setSelectedLocation(match)}
+															onClick={() => {setSelectedLocation(match);setTempAddress(match.display_name);}}
 															className={`cursor-pointer w-full text-left flex items-start gap-2.5 rounded-xl border p-3 text-xs leading-snug transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B3DF5] ${
 																active
 																	? "border-[#5B3DF5] bg-[#5B3DF5]/10"

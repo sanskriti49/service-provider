@@ -4,7 +4,7 @@ const db = require("../config/db");
 const eventQueue = require("../utils/eventQueue");
 const { bookingsTotal } = require("../utils/metrics");
 const { getPriceDetails } = require("../utils/pricing");
-const { sendNotification } = require("../utils/notificationService");
+const { sendNotification, emitNotification } = require("../utils/notificationService");
 const { acquireLock, releaseLock } = require("../utils/distributedLock");
 const { createProtectedBreaker } = require("../utils/circuitBreaker");
 
@@ -62,57 +62,104 @@ async function createBooking(req, res) {
     const Joi = require("joi");
     const schema = Joi.object({
         provider_id: Joi.string().required(), service_id: Joi.string().required(),
-        date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}(?:T.*)?$/).required(),
+        date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}(?:T.*)?$/).custom((value,helpers)=>require("../utils/location").validDate(value.slice(0,10),helpers)).required(),
         start_time: Joi.string().pattern(/^(?:[01]\d|2[0-3]):[0-5]\d(?::00)?$/).required(),
         end_time: Joi.string().optional(), address: Joi.string().trim().min(5).max(1000).required(),
         payment_method: Joi.string().valid("online", "cod", "cash").default("cod"),
-        latitude: Joi.number().min(-90).max(90).allow(null), longitude: Joi.number().min(-180).max(180).allow(null),
-        price: Joi.any().strip(),
-    });
+        latitude: Joi.number().min(-90).max(90).required(), longitude: Joi.number().min(-180).max(180).required(),
+        price: Joi.any().strip(), radius: Joi.number().min(1).max(500).default(require("../utils/location").DEFAULT_RADIUS_KM),
+    }).with("radius","latitude").with("radius","longitude").custom(require("../utils/location").pairedCoordinates);
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
     if (value.payment_method === "online" && (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET === "placeholder_secret")) return res.status(503).json({ message: "Online payments are not configured" });
     const providerId = await resolveProviderId(db, value.provider_id);
     if (!providerId) return res.status(404).json({ message: "Provider not found" });
+
+    // Idempotency Key support for safe network retries (header or body)
+    const rawIdempotencyKey = req.headers?.["idempotency-key"] || req.headers?.["x-idempotency-key"] || req.body?.idempotency_key || req.body?.client_booking_id;
+    let bookingId;
+    if (rawIdempotencyKey && typeof rawIdempotencyKey === "string" && rawIdempotencyKey.trim()) {
+        const trimmed = rawIdempotencyKey.trim();
+        if (UUID_REGEX.test(trimmed)) {
+            bookingId = trimmed.toLowerCase();
+        } else {
+            const hash = crypto.createHash("sha256").update(`${req.user.id}:${trimmed}`).digest("hex");
+            bookingId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+        }
+        const existing = await db.query("SELECT * FROM bookings WHERE booking_id = $1", [bookingId]);
+        if (existing.rows.length) {
+            const existingBooking = existing.rows[0];
+            if (existingBooking.user_id !== req.user.id) {
+                return res.status(403).json({ message: "Access denied to existing booking" });
+            }
+            return res.status(200).json({
+                booking: serializeBooking(existingBooking, req.user),
+                razorpay_order: existingBooking.razorpay_order_id,
+                duplicate: true,
+            });
+        }
+    } else {
+        bookingId = crypto.randomUUID();
+    }
+
     const date = value.date.slice(0, 10);
     const lock = await acquireLock(`booking:provider:${providerId}:${date}`, 15000);
     if (!lock.acquired) return res.status(409).json({ message: "Provider is being reserved. Please retry." });
     let client;
     try {
-        client = await db.connect();
-        await client.query("BEGIN");
-        const { lockSchedule } = require("../utils/bookingLifecycle");
-        await lockSchedule(client, providerId, date);
         const booking = { ...value, provider_id: providerId, date, start_time: value.start_time.slice(0,5) };
-        const selected = await require("../services/bookingSchedule").validateSchedule(client, booking);
+        const selected = await require("../services/bookingSchedule").validateSchedule(db, booking);
         const amount = amountInPaise(selected.price);
-        const id = crypto.randomUUID();
         const arrivalCode = generateOtp();
         let completionCode;
         do { completionCode = generateOtp(); } while (completionCode === arrivalCode);
         let orderId = null;
         if (value.payment_method === "online") {
-            // Never manufacture a successful order when the provider fails.
-            const order = await razorpayOrderBreaker.fire({ amount, currency: "INR", receipt: id });
+            // Create gateway order OUTSIDE the database transaction and WITHOUT holding an idle DB connection
+            const order = await razorpayOrderBreaker.fire({ amount, currency: "INR", receipt: bookingId });
             if (!order.id || order.amount !== amount || order.currency !== "INR") throw new BookingError(502, "Gateway order did not match booking");
             orderId = order.id;
         }
-        const result = await client.query(`INSERT INTO bookings (booking_id,provider_id,user_id,service_id,date,start_time,end_time,status,address,price,payment_method,payment_status,razorpay_order_id,otp,completion_otp,latitude,longitude,hold_expires_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,'pending',$11,$12,$13,$14,$15,CASE WHEN $10::varchar='online' THEN clock_timestamp()+INTERVAL '5 minutes' ELSE NULL END) RETURNING *`,
-            [id,providerId,req.user.id,selected.service_id,date,booking.start_time,booking.end_time,value.address,amount/100,value.payment_method === "cash" ? "cod" : value.payment_method,orderId,arrivalCode,completionCode,value.latitude ?? null,value.longitude ?? null]);
-        await client.query("COMMIT");
-        client.release(); client = null;
+
+        // Check out connection from pool only when ready to execute transaction
+        client = await db.connect();
+        await client.query("BEGIN");
+        const { lockSchedule } = require("../utils/bookingLifecycle");
+        await lockSchedule(client, providerId, date);
+        // Re-verify schedule under the advisory lock to eliminate any race window during the payment order creation
+        await require("../services/bookingSchedule").validateSchedule(client, booking);
+        const result = await client.query(`INSERT INTO bookings (booking_id,provider_id,user_id,service_id,date,start_time,end_time,status,address,price,payment_method,payment_status,razorpay_order_id,otp,completion_otp,latitude,longitude,hold_expires_at,search_radius_km)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,'pending',$11,$12,$13,$14,$15,CASE WHEN $10::varchar='online' THEN clock_timestamp()+INTERVAL '5 minutes' ELSE NULL END,$16) RETURNING *`,
+            [bookingId,providerId,req.user.id,selected.service_id,date,booking.start_time,booking.end_time,value.address,amount/100,value.payment_method === "cash" ? "cod" : value.payment_method,orderId,arrivalCode,completionCode,value.latitude,value.longitude,value.radius]);
+
+        let createdNotifications = [];
         if (value.payment_method !== "online") {
-            await Promise.allSettled([
-                sendNotification({ userId: providerId, title: "New booking request", message: "A customer has requested a service.", type: "booking_created", data: { booking_id: id } }),
-                sendNotification({ userId: req.user.id, title: "Booking placed", message: "Your booking request was placed.", type: "booking_created", data: { booking_id: id } }),
+            // Persist notifications within the transaction for transactional integrity
+            const settled = await Promise.allSettled([
+                sendNotification({ userId: providerId, title: "New booking request", message: "A customer has requested a service.", type: "booking_created", data: { booking_id: bookingId } }, client),
+                sendNotification({ userId: req.user.id, title: "Booking placed", message: "Your booking request was placed.", type: "booking_created", data: { booking_id: bookingId } }, client),
             ]);
+            createdNotifications = settled.filter((s) => s.status === "fulfilled" && s.value).map((s) => s.value);
         }
+        await client.query("COMMIT");
+        client.release();
+        client = null;
+
+        // Emit WebSocket events strictly AFTER successful commit to prevent phantom alerts on rollback
+        for (const notif of createdNotifications) {
+            if (typeof emitNotification === "function") {
+                emitNotification(notif);
+            }
+        }
+
         return res.status(201).json({ booking: serializeBooking(result.rows[0], req.user), razorpay_order: orderId });
     } catch (error) {
         if (client) await client.query("ROLLBACK").catch(() => {});
         return respondError(res, error);
-    } finally { if (client) client.release(); await releaseLock(lock.key, lock.token); }
+    } finally {
+        if (client) client.release();
+        await releaseLock(lock.key, lock.token);
+    }
 }
 
 async function updateBookingStatus(req, res) {
@@ -334,6 +381,91 @@ async function handleRazorpayWebhook(req, res) {
             const refund = payload?.refund?.entity;
             const intents = await db.query("SELECT id FROM booking_refunds WHERE gateway_refund_id=$1 OR id::text=$2", [refund?.id, refund?.receipt || ""]);
             for (const intent of intents.rows) await paymentService.reconcileRefund(intent.id);
+        } else if (event === "payment.dispute.created") {
+            const dispute = payload?.dispute?.entity;
+            const paymentId = dispute?.payment_id || payload?.payment?.entity?.id;
+            if (paymentId) {
+                const bookingRes = await db.query(
+                    "SELECT booking_id, user_id, provider_id FROM bookings WHERE razorpay_payment_id = $1 OR razorpay_order_id = $2",
+                    [paymentId, payload?.payment?.entity?.order_id || ""]
+                );
+                if (bookingRes.rows.length) {
+                    const booking = bookingRes.rows[0];
+                    await db.query(
+                        "UPDATE bookings SET payment_status = 'disputed', updated_at = NOW() WHERE booking_id = $1",
+                        [booking.booking_id]
+                    );
+                    const disputeKey = dispute?.id ? `%${dispute.id}%` : `%${paymentId}%`;
+                    const existing = await db.query(
+                        "SELECT id FROM disputes WHERE booking_id = $1 AND details LIKE $2",
+                        [booking.booking_id, disputeKey]
+                    );
+                    if (!existing.rows.length) {
+                        await db.query(
+                            `INSERT INTO disputes (booking_id, raised_by, provider_id, reason, details, status)
+                             VALUES ($1, $2, $3, $4, $5, 'reviewing')`,
+                            [
+                                booking.booking_id,
+                                booking.user_id,
+                                booking.provider_id,
+                                `Gateway Chargeback: ${dispute?.reason_code || "disputed"}`,
+                                JSON.stringify({
+                                    gateway_dispute_id: dispute?.id,
+                                    payment_id: paymentId,
+                                    amount: dispute?.amount,
+                                    currency: dispute?.currency,
+                                    status: dispute?.status,
+                                }),
+                            ]
+                        );
+                    }
+                }
+            }
+        } else if (event === "payment.dispute.won") {
+            const dispute = payload?.dispute?.entity;
+            const paymentId = dispute?.payment_id || payload?.payment?.entity?.id;
+            if (paymentId) {
+                const bookingRes = await db.query(
+                    "SELECT booking_id FROM bookings WHERE razorpay_payment_id = $1 OR razorpay_order_id = $2",
+                    [paymentId, payload?.payment?.entity?.order_id || ""]
+                );
+                if (bookingRes.rows.length) {
+                    const bookingId = bookingRes.rows[0].booking_id;
+                    await db.query(
+                        "UPDATE bookings SET payment_status = 'paid', updated_at = NOW() WHERE booking_id = $1",
+                        [bookingId]
+                    );
+                    if (dispute?.id) {
+                        await db.query(
+                            "UPDATE disputes SET status = 'rejected', resolution_notes = 'Gateway dispute won. Bank released funds.', updated_at = NOW(), resolved_at = NOW() WHERE booking_id = $1 AND details LIKE $2",
+                            [bookingId, `%${dispute.id}%`]
+                        );
+                    }
+                }
+            }
+        } else if (event === "payment.dispute.lost") {
+            const dispute = payload?.dispute?.entity;
+            const paymentId = dispute?.payment_id || payload?.payment?.entity?.id;
+            if (paymentId) {
+                const bookingRes = await db.query(
+                    "SELECT booking_id FROM bookings WHERE razorpay_payment_id = $1 OR razorpay_order_id = $2",
+                    [paymentId, payload?.payment?.entity?.order_id || ""]
+                );
+                if (bookingRes.rows.length) {
+                    const bookingId = bookingRes.rows[0].booking_id;
+                    await db.query(
+                        "UPDATE bookings SET payment_status = 'refunded', updated_at = NOW() WHERE booking_id = $1",
+                        [bookingId]
+                    );
+                    if (dispute?.id) {
+                        const refundAmount = (dispute?.amount || 0) / 100;
+                        await db.query(
+                            "UPDATE disputes SET status = 'resolved', refund_amount = $2, resolution_notes = 'Gateway dispute lost. Funds debited by issuing bank.', updated_at = NOW(), resolved_at = NOW() WHERE booking_id = $1 AND details LIKE $3",
+                            [bookingId, refundAmount, `%${dispute.id}%`]
+                        );
+                    }
+                }
+            }
         }
         // A failed payment attempt does not release an unexpired hold or overwrite capture.
         return res.json({ status: "ok" });
@@ -348,9 +480,13 @@ async function updateBookingAddress(req, res) {
         await client.query("BEGIN");
         const booking = await lockBooking(client, req.params.booking_id);
         if (booking.user_id !== req.user.id) throw new BookingError(403, "Access denied");
-        if (!["pending", "booked", "confirmed"].includes(booking.status) || Date.now() - new Date(booking.created_at).getTime() > TIME_LIMIT_MINUTES * 60000) throw new BookingError(409, "Address edit window has closed");
-        const service = await client.query("SELECT name FROM services WHERE id=$1", [booking.service_id]);
-        await require("../services/bookingSchedule").assertNoConflicts(client, { ...booking, date: booking.date_string, latitude, longitude }, getPriceDetails(service.rows[0]?.name));
+        const locationRepair = req.body.confirm_location === true && !require("../utils/location").validCoordinates(booking.latitude, booking.longitude) && address.trim() === String(booking.address ?? "").trim();
+        if (!["pending", "booked", "confirmed"].includes(booking.status) || (!locationRepair && Date.now() - new Date(booking.created_at).getTime() > TIME_LIMIT_MINUTES * 60000)) throw new BookingError(409, "Address edit window has closed. A missing location can still be confirmed for the unchanged address.");
+        if (locationRepair) {
+            const future = await client.query("SELECT ($1::date + $2::time) AT TIME ZONE 'Asia/Kolkata' > clock_timestamp() AS valid", [booking.date_string, booking.start_time]);
+            if (!future.rows[0].valid) throw new BookingError(409, "Past service locations cannot be changed");
+        }
+        await require("../services/bookingSchedule").validateLocationChange(client, { ...booking, date: booking.date_string, latitude, longitude });
         await client.query("UPDATE bookings SET address=$1,latitude=$2,longitude=$3,updated_at=NOW() WHERE booking_id=$4", [address.trim(),latitude,longitude,booking.booking_id]);
         await client.query("COMMIT");
         return res.json({ address: address.trim(), message: "Address and travel availability updated" });

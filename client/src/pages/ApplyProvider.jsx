@@ -19,6 +19,8 @@ import {
 import { motion, useReducedMotion } from "framer-motion";
 import api from "../api/axiosInstance";
 import VerifiedBadge from "../ui/VerifiedBadge";
+import ServiceBaseLocation from "../ui/ServiceBaseLocation";
+import { validCoordinates } from "../utils/serviceLocation";
 
 /*
  * Design tokens (Tailwind arbitrary values, no config changes needed)
@@ -336,6 +338,7 @@ export default function ApplyProvider() {
 	});
 	const [successData, setSuccessData] = useState(null);
 	const [errorMsg, setErrorMsg] = useState("");
+	const [baseLocation,setBaseLocation] = useState({lat:null,lng:null,confirmed:false});
 	const [servicesList, setServicesList] = useState(DEFAULT_SERVICES);
 
 	const [formData, setFormData] = useState({
@@ -401,6 +404,7 @@ export default function ApplyProvider() {
 	const handleInputChange = (field, value) => {
 		setErrorMsg("");
 		setFormData((prev) => ({ ...prev, [field]: value }));
+		if(field==="location")setBaseLocation({lat:null,lng:null,confirmed:false});
 	};
 
 	const handleFileUpload = async (side, file) => {
@@ -474,6 +478,7 @@ export default function ApplyProvider() {
 
 	const handleNextStep = () => {
 		if (step === 1) {
+			if(!baseLocation.confirmed || !validCoordinates(baseLocation.lat,baseLocation.lng)){setErrorMsg("Confirm your service base so nearby customers can find you");return;}
 			if (!formData.name || formData.name.length < 3) {
 				setErrorMsg("Please enter your full name (at least 3 letters)");
 				return;
@@ -552,6 +557,7 @@ export default function ApplyProvider() {
 			return;
 		}
 
+		if(!baseLocation.confirmed || !validCoordinates(baseLocation.lat,baseLocation.lng)){setStep(1);setErrorMsg("Confirm your service base before submitting");return;}
 		setLoading(true);
 
 		try {
@@ -561,6 +567,7 @@ export default function ApplyProvider() {
 				phone: formData.phone.trim(),
 				password: formData.password,
 				location: formData.location,
+				lat: Number(baseLocation.lat), lng:Number(baseLocation.lng),
 				bio: formData.bio,
 				service: formData.service,
 				price: Number(formData.price),
@@ -884,6 +891,7 @@ export default function ApplyProvider() {
 												className={inputBase}
 											/>
 										</Field>
+										<ServiceBaseLocation key={formData.location} value={baseLocation} onChange={setBaseLocation} />
 
 										<Field
 											id="bio"

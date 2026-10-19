@@ -162,6 +162,7 @@ async function createReview(req, res, next) {
 
 		cache.delPattern(`reviews_${targetProviderId}`);
 		cache.delPattern(`provider_${targetProviderId}`);
+		cache.delPattern("providers_");
 
 		res.status(201).json({
 			message: "Review submitted successfully",

@@ -24,6 +24,8 @@ import {
 import { FadeLoader } from "react-spinners";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
+import ServiceBaseLocation from "../../ui/ServiceBaseLocation";
+import { validCoordinates } from "../../utils/serviceLocation";
 
 function normalizePhone(raw = "") {
 	const t = raw.trim();
@@ -193,6 +195,7 @@ export default function ProviderSettings() {
 	const [bio, setBio] = useState(authUser?.bio || "");
 	const [state, setState] = useState("");
 	const [city, setCity] = useState("");
+	const [baseLocation,setBaseLocation] = useState({lat:authUser?.lat??null,lng:authUser?.lng??null,confirmed:false});
 	const [photo, setPhoto] = useState(authUser?.photo || "");
 	const [selectedFile, setSelectedFile] = useState(null);
 
@@ -278,6 +281,7 @@ export default function ProviderSettings() {
 		const formattedState = rawState.trim().replace(/\s+/g, "_");
 		setState(formattedState);
 		setCity(rawCity.trim());
+		setBaseLocation({lat:authUser.lat??null,lng:authUser.lng??null,confirmed:false});
 
 		console.log(authUser.location);
 	}, [authUser]);
@@ -389,6 +393,7 @@ export default function ProviderSettings() {
 			return;
 		}
 
+		if(!baseLocation.confirmed || !validCoordinates(baseLocation.lat,baseLocation.lng)){toast.error("Confirm your service base before saving");return;}
 		setProfileLoading(true);
 		try {
 			const formData = new FormData();
@@ -399,7 +404,8 @@ export default function ProviderSettings() {
 
 			const locationVal =
 				city && state ? `${city},${state}` : authUser?.location || null;
-			if (locationVal) formData.append("location", locationVal);
+			if (locationVal) formData.append("location", locationVal.replaceAll("_"," "));
+			formData.append("lat",String(baseLocation.lat));formData.append("lng",String(baseLocation.lng));
 			if (selectedFile) formData.append("photo", selectedFile);
 
 			const response = await api.put(`/api/users/${authUser.id}`, formData, {
@@ -697,6 +703,7 @@ export default function ProviderSettings() {
 									onChange={(e) => {
 										setState(e.target.value);
 										setCity("");
+										setBaseLocation({lat:null,lng:null,confirmed:false});
 									}}
 									className="w-full pl-9 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 appearance-none"
 								>
@@ -721,7 +728,7 @@ export default function ProviderSettings() {
 								<select
 									value={city}
 									disabled={!state}
-									onChange={(e) => setCity(e.target.value)}
+									onChange={(e) => {setCity(e.target.value);setBaseLocation({lat:null,lng:null,confirmed:false});}}
 									className="w-full pl-9 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/20 appearance-none disabled:opacity-50"
 								>
 									<option value="">Select city</option>
@@ -736,6 +743,7 @@ export default function ProviderSettings() {
 						</div>
 					</div>
 
+					<ServiceBaseLocation key={`${city},${state}`} value={baseLocation} onChange={setBaseLocation} />
 					<div>
 						<Label>
 							<FileText size={11} /> Bio

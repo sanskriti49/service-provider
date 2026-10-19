@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const { integritySchema } = require("./migrate_booking_integrity");
 const { chatSchema } = require("./migrate_chat");
+const { locationSchema } = require("./migrate_booking_location");
 
 const queries = [
 	`CREATE TABLE IF NOT EXISTS public.users (
@@ -280,6 +281,7 @@ const queries = [
 	BEFORE INSERT OR UPDATE OF lat, lng ON public.users
 	FOR EACH ROW EXECUTE FUNCTION sync_user_geom();`,
 	integritySchema,
+	locationSchema,
 ];
 
 const runMigration = async () => {
