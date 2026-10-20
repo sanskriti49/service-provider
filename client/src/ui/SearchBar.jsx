@@ -1,5 +1,5 @@
 import { Search, ArrowRight, X, CircleAlert } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFetch } from "../hooks/useFetch";
 
@@ -8,7 +8,6 @@ export const SearchBar = () => {
 	const navigate = useNavigate();
 	const [query, setQuery] = useState("");
 	const [suggestions, setSuggestions] = useState([]);
-	const [allServices, setAllServices] = useState([]);
 	const [activeIndex, setActiveIndex] = useState(-1);
 
 	const [showError, setShowError] = useState(false);
@@ -20,21 +19,14 @@ export const SearchBar = () => {
 		data: apiResponse,
 		loading,
 		error,
+		retry,
 	} = useFetch(`${API_URL}/api/services/v1`);
 
-	useEffect(() => {
-		if (!apiResponse) return;
-		if (apiResponse.services) {
-			setAllServices(apiResponse.services);
-		} else if (Array.isArray(apiResponse)) {
-			setAllServices(apiResponse);
-		} else if (apiResponse.data) {
-			setAllServices(apiResponse.data);
-		}
-	}, [apiResponse]);
+	const allServices = useMemo(() => Array.isArray(apiResponse)
+		? apiResponse : apiResponse?.services || apiResponse?.data || [], [apiResponse]);
 
 	useEffect(() => {
-		if (showError) setShowError(false);
+		setShowError(false);
 
 		if (query.length > 1 && allServices.length > 0) {
 			const filtered = allServices.filter((service) =>
@@ -77,10 +69,10 @@ export const SearchBar = () => {
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
-		if (!query.trim()) return;
+		if (!query.trim() || loading || error) return;
 
 		const exact = allServices.find(
-			(s) => s.name.toLowerCase() === query.toLowerCase(),
+			(s) => s.name.toLowerCase() === query.trim().toLowerCase(),
 		);
 
 		if (exact) return handleSelectService(exact);
@@ -90,7 +82,7 @@ export const SearchBar = () => {
 	};
 
 	const handleKeyDown = (e) => {
-		if (suggestions.length === 0) return;
+		if (loading || error || suggestions.length === 0) return;
 		switch (e.key) {
 			case "ArrowDown":
 				e.preventDefault();
@@ -104,7 +96,7 @@ export const SearchBar = () => {
 				break;
 			case "Enter":
 				e.preventDefault();
-				if (activeIndex >= 0) handleSelectService(suggestions[activeIndex]);
+				if (activeIndex >= 0 && suggestions[activeIndex]) handleSelectService(suggestions[activeIndex]);
 				else handleSubmit(e);
 				break;
 			case "Escape":
@@ -145,14 +137,15 @@ export const SearchBar = () => {
 						setQuery(e.target.value);
 						setActiveIndex(-1);
 					}}
-					placeholder={loading ? "Loading..." : "What service do you need?"}
+					placeholder="What service do you need?"
+					aria-label="Search services"
+					aria-describedby="service-search-status"
 					className={`w-full h-full pl-12 pr-[5.5rem] md:pr-44 py-4 text-base md:text-lg rounded-full border bg-white shadow-xl focus:outline-none transition-all duration-300 placeholder:text-gray-400 text-gray-800
                     ${
 											showError
 												? "border-red-400 ring-4 ring-red-500/10 shadow-red-500/10"
 												: "border-gray-200 shadow-violet-900/5 focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500"
 										}`}
-					disabled={loading || !!error}
 				/>
 
 				<div
@@ -165,9 +158,10 @@ export const SearchBar = () => {
 					<Search className="w-5 h-5" />
 				</div>
 
-				{query && !loading && (
+				{query && (
 					<button
 						type="button"
+						aria-label="Clear search"
 						onClick={clearInput}
 						className="absolute right-[3.5rem] md:right-[10.5rem] p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-all z-20 cursor-pointer"
 					>
@@ -177,7 +171,8 @@ export const SearchBar = () => {
 
 				<button
 					type="submit"
-					disabled={!query.trim()}
+					aria-label="Search"
+					disabled={!query.trim() || loading || !!error}
 					className={`cursor-pointer absolute right-2 top-2 bottom-2 
                     aspect-square md:aspect-auto md:px-6 rounded-full 
                     text-white shadow-lg 
@@ -195,8 +190,12 @@ export const SearchBar = () => {
 					<ArrowRight className="w-5 h-5 md:w-4 md:h-4" />
 				</button>
 			</div>
+			<div id="service-search-status" role="status" className="h-10 mt-2 text-sm leading-5 text-violet-950">
+				{loading && "Connecting to services… You can keep typing."}
+				{error && <span>Services are temporarily unavailable. <button type="button" onClick={retry} className="font-semibold underline underline-offset-4 cursor-pointer">Retry</button></span>}
+			</div>
 
-			{suggestions.length > 0 && (
+			{!loading && !error && suggestions.length > 0 && (
 				<ul className="absolute top-full left-0 right-0 mt-3 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2 duration-200">
 					{suggestions.map((service, i) => (
 						<li

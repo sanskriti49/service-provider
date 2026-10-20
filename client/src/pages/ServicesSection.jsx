@@ -8,7 +8,7 @@ import {
 	AlertTriangle,
 	RefreshCw,
 } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion as Motion, useReducedMotion } from "framer-motion";
 import { useFetch } from "../hooks/useFetch";
 import AuroraBackground from "../ui/AuroraBackground";
 import { API_URL } from "../config";
@@ -201,11 +201,12 @@ const ServicesSection = () => {
 		data: apiResponse,
 		loading,
 		error,
+		retry,
 	} = useFetch(`${API_URL}/api/services/v1`);
 
-	const services = Array.isArray(apiResponse)
+	const services = React.useMemo(() => Array.isArray(apiResponse)
 		? apiResponse
-		: apiResponse?.data || [];
+		: apiResponse?.data || [], [apiResponse]);
 
 	const [category, setCategory] = React.useState("All");
 	const [active, setActive] = React.useState(0);
@@ -323,7 +324,7 @@ const ServicesSection = () => {
 									}`}
 								>
 									{selected && (
-										<motion.span
+										<Motion.span
 											layoutId="service-category-pill"
 											transition={
 												reduce
@@ -365,7 +366,7 @@ const ServicesSection = () => {
 								</p>
 								<button
 									type="button"
-									onClick={() => window.location.reload()}
+									onClick={retry}
 									className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-200"
 								>
 									<RefreshCw className="h-4 w-4" />

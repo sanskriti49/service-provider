@@ -1,12 +1,11 @@
-import React from "react";
 import { Link } from "react-router-dom";
 
 /**
  * Standardized TaskGenie Logo Component
  *
  * Consistent across Landing, Admin Dashboard, Provider Dashboard, Auth, and Footer:
- * - Handcrafted Artisanal Magic Lamp SVG (/images/taskgenie-logo.svg)
- * - Authentic Lobster Two brand typography with anti-clipping padding
+ * - Illustrated floating lamp with reduced-motion-aware animation
+ * - Original Lobster Two wordmark, colors, and spacing
  * - Harmonious theme variants (dark/light/primary)
  * - Optional link wrapping
  */
@@ -60,15 +59,18 @@ export default function Logo({
 
 	const Icon = (
 		<div
-			className={`shrink-0 overflow-hidden drop-shadow-sm transition-transform duration-300 group-hover:scale-105 ${
+			className={`taskgenie-lamp shrink-0 ${
 				resolvedSize.icon || ""
 			}`}
 			style={resolvedSize.customIconStyle}
 		>
 			<img
-				src="/images/taskgenie-logo.svg"
-				alt="TaskGenie Logo"
-				className="h-full w-full object-contain"
+				src="/images/taskgenie-lamp-128.webp?v=5"
+				srcSet="/images/taskgenie-lamp-128.webp?v=5 128w, /images/taskgenie-lamp-256.webp?v=5 256w"
+				sizes={`${resolvedSize.imgSize || size}px`}
+				width="128" height="128"
+				alt={variant === "icon" ? "TaskGenie" : ""}
+				className="taskgenie-lamp-art h-full w-full object-contain"
 				loading="eager"
 			/>
 		</div>
@@ -96,7 +98,7 @@ export default function Logo({
 
 	const content = (
 		<div
-			className={`inline-flex items-center gap-2.5 group select-none ${className}`}
+			className={`taskgenie-brand inline-flex items-center gap-2.5 group select-none ${className}`}
 			onClick={onClick}
 		>
 			{variant !== "wordmark" && Icon}
@@ -106,7 +108,7 @@ export default function Logo({
 
 	if (to) {
 		return (
-			<Link to={to} className="inline-flex items-center">
+			<Link to={to} aria-label="TaskGenie home" className="inline-flex items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-500">
 				{content}
 			</Link>
 		);

@@ -6,6 +6,9 @@ const scenes = {
 	support: "support-desk",
 	search: "curious-search",
 	reviews: "customer-stories",
+	crew: "neighborhood-crew",
+	checkout: "quiet-checkout",
+	paperTrail: "paper-trail",
 };
 
 /** Decorative scenes: the surrounding heading carries the meaning. */

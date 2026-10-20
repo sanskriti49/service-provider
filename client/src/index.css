@@ -1,8 +1,6 @@
 /* ==========================================================================
    Tailwind CSS Engine & Theme Definition
    ========================================================================== */
-/* @import url('https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,100..900;1,100..900&display=swap'); */
-@import url("https://fonts.googleapis.com/css2?family=Valley+Sans:ital,wght@0,100..900;1,100..900&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -28,6 +26,14 @@
 /* ==========================================================================
    Local Font Faces (@font-face)
    ========================================================================== */
+@font-face {
+	font-family: "Lobster Two";
+	src: url("/fonts/LobsterTwo/LobsterTwo-Bold.woff") format("woff");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
 @font-face {
 	font-family: "P22Mackinac";
 	src:
@@ -74,6 +80,32 @@
 			margin-top: 14.5rem;
 		}
 	}
+}
+
+/* ==========================================================================
+   Brand Illustration Motion
+   ========================================================================== */
+/* Animate only the illustration; the wordmark and reserved layout stay still. */
+@media (prefers-reduced-motion: no-preference) {
+	.taskgenie-lamp {
+		transition: transform 240ms ease-out;
+	}
+
+	.taskgenie-lamp-art {
+		transform-origin: 50% 70%;
+		animation: taskgenie-lamp-float 5.5s ease-in-out infinite;
+	}
+
+	.taskgenie-brand:hover .taskgenie-lamp,
+	a:focus-visible .taskgenie-lamp {
+		transform: rotate(-4deg) scale(1.08);
+	}
+}
+
+@keyframes taskgenie-lamp-float {
+	0%, 100% { transform: translateY(2%) rotate(-2deg); }
+	45% { transform: translateY(-5%) rotate(3deg); }
+	75% { transform: translateY(-1%) rotate(-1deg); }
 }
 
 /* ==========================================================================

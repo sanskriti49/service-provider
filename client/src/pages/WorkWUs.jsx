@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
+import ServiceIllustration from "../ui/ServiceIllustration";
 import {
 	CalendarSync,
 	CheckCircle,
@@ -48,8 +49,6 @@ const focusRing =
 	"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
 const WorkWUs = () => {
-	const [imgFailed, setImgFailed] = useState(false);
-
 	return (
 		<section
 			aria-labelledby="work-with-us-heading"
@@ -102,41 +101,14 @@ const WorkWUs = () => {
 				</div>
 
 				{/* Image stage */}
-				<div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden rounded-[2rem] bg-[#EFEAFB] lg:max-w-none">
-					{imgFailed ? (
-						<div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-							<div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#5B2EE0]">
-								<Users size={26} aria-hidden="true" />
-							</div>
-							<p className="text-lg font-semibold">10,000+ active experts</p>
-							<p className="max-w-[16rem] text-sm text-slate-600">
-								Connecting local professionals with clients every day
-							</p>
-						</div>
-					) : (
-						<>
-							<div
-								className="absolute left-1/2 top-1/2 h-[78%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
-								aria-hidden="true"
-							/>
-							<img
-								src="/images/globe.webp"
-								alt="Illustration of a globe connecting service professionals"
-								loading="lazy"
-								decoding="async"
-								onError={() => setImgFailed(true)}
-								className="absolute left-1/2 top-1/2 h-auto w-[62%] -translate-x-1/2 -translate-y-1/2 object-contain"
-							/>
-							<div className="absolute bottom-5 left-5 flex items-center gap-2 rounded-full bg-white py-2 pl-3 pr-4 text-sm font-semibold shadow-sm">
-								<Users
-									size={16}
-									className="text-[#5B2EE0]"
-									aria-hidden="true"
-								/>
-								10,000+ active experts
-							</div>
-						</>
-					)}
+				<div className="relative mx-auto flex aspect-[6/5] w-full max-w-lg flex-col items-center justify-center rounded-[2rem] border border-violet-200/60 bg-[#EFEAFB] px-4 pb-7 pt-6 sm:px-6">
+					<p className="self-start border-b border-violet-300/70 pb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-800">
+						Made for the neighbourhood
+					</p>
+					<ServiceIllustration scene="crew" className="my-auto w-full h-auto" />
+					<p className="max-w-xs text-center text-sm font-medium leading-relaxed text-[#281950]/80">
+						A little know-how. A lot of everyday magic.
+					</p>
 				</div>
 			</div>
 

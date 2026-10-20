@@ -679,6 +679,412 @@ async function cancelUnpaidBooking(req, res) {
     finally { client.release(); }
 }
 
+async function getRecoveryItems(req, res) {
+	try {
+		const userId = req.user.id;
+		const now = Date.now();
+
+		// 1. Fetch interrupted checkouts (online bookings that are pending payment, recent within 7 days)
+		const checkoutsQuery = `
+			SELECT b.booking_id, b.service_id, b.provider_id, b.date, b.start_time, b.end_time,
+			       b.price, b.address, b.status, b.payment_status, b.payment_method,
+			       b.razorpay_order_id, b.hold_expires_at, b.created_at, b.updated_at,
+			       b.latitude, b.longitude,
+			       pu.name AS provider_name, pu.phone AS provider_phone, pu.custom_id AS provider_custom_id,
+			       s.name AS service_name, s.slug AS service_slug
+			FROM bookings b
+			LEFT JOIN users pu ON pu.id = b.provider_id
+			LEFT JOIN services s ON s.id = b.service_id
+			WHERE b.user_id = $1
+			  AND b.payment_method = 'online'
+			  AND b.razorpay_payment_id IS NULL
+			  AND b.status IN ('pending', 'expired')
+			  AND b.created_at >= NOW() - INTERVAL '7 days'
+			ORDER BY b.created_at DESC
+		`;
+		const checkoutsRes = await db.query(checkoutsQuery, [userId]);
+
+		const interruptedCheckouts = checkoutsRes.rows.map((b) => {
+			const holdExpires = b.hold_expires_at ? new Date(b.hold_expires_at).getTime() : 0;
+			const isHoldActive = b.status === "pending" && holdExpires > now;
+			const secondsRemaining = isHoldActive ? Math.max(0, Math.floor((holdExpires - now) / 1000)) : 0;
+
+			return {
+				booking_id: b.booking_id,
+				service_id: b.service_id,
+				service_name: b.service_name || "Home Service",
+				service_slug: b.service_slug,
+				provider_id: b.provider_id,
+				provider_name: b.provider_name || "TaskGenie Provider",
+				provider_phone: b.provider_phone,
+				provider_custom_id: b.provider_custom_id,
+				date: b.date,
+				start_time: b.start_time,
+				end_time: b.end_time,
+				price: Number(b.price),
+				address: b.address,
+				status: b.status,
+				payment_status: b.payment_status,
+				razorpay_order_id: b.razorpay_order_id,
+				hold_expires_at: b.hold_expires_at,
+				is_hold_active: isHoldActive,
+				seconds_remaining: secondsRemaining,
+				created_at: b.created_at,
+			};
+		});
+
+		// 2. Fetch all refunds from booking_refunds
+		const refundsQuery = `
+			SELECT br.id AS refund_id, br.booking_id, br.payment_id, br.amount_paise,
+			       br.request_key, br.state, br.gateway_refund_id, br.last_error,
+			       br.created_at, br.updated_at,
+			       b.price AS booking_price, b.date AS booking_date, b.status AS booking_status,
+			       b.payment_status, b.razorpay_payment_id,
+			       pu.name AS provider_name,
+			       s.name AS service_name
+			FROM booking_refunds br
+			JOIN bookings b ON br.booking_id = b.booking_id
+			LEFT JOIN users pu ON pu.id = b.provider_id
+			LEFT JOIN services s ON s.id = b.service_id
+			WHERE b.user_id = $1
+			ORDER BY br.created_at DESC
+		`;
+		const refundsRes = await db.query(refundsQuery, [userId]);
+
+		// Also check if any bookings have payment_status indicating refund without a booking_refunds row
+		const missingRefundsQuery = `
+			SELECT b.booking_id, b.price, b.date AS booking_date, b.status AS booking_status,
+			       b.payment_status, b.razorpay_payment_id, b.updated_at,
+			       pu.name AS provider_name, s.name AS service_name
+			FROM bookings b
+			LEFT JOIN users pu ON pu.id = b.provider_id
+			LEFT JOIN services s ON s.id = b.service_id
+			WHERE b.user_id = $1
+			  AND b.payment_status IN ('refund_pending', 'refund_failed', 'refunded', 'partially_refunded')
+			  AND NOT EXISTS (SELECT 1 FROM booking_refunds br WHERE br.booking_id = b.booking_id)
+		`;
+		const missingRefundsRes = await db.query(missingRefundsQuery, [userId]);
+
+		const refundItems = refundsRes.rows.map((r) => {
+			const amountInr = Number(r.amount_paise) / 100;
+			const isUncertain = r.state === "unknown" || (r.state === "submitting" && (now - new Date(r.updated_at).getTime() > 15 * 60 * 1000));
+			const isFailed = r.state === "failed" || r.booking_status === "refund_failed";
+			const isPending = ["pending", "submitting", "processing"].includes(r.state) && !isUncertain;
+			const isProcessed = r.state === "processed";
+
+			let reasonLabel = "Booking refund";
+			if (r.request_key === "late-payment") {
+				reasonLabel = "Slot hold expired after late payment";
+			} else if (r.request_key?.includes("cancel")) {
+				reasonLabel = "Booking cancellation";
+			} else if (r.request_key?.includes("dispute")) {
+				reasonLabel = "Dispute resolution compensation";
+			} else if (r.request_key) {
+				reasonLabel = `Refund (${r.request_key})`;
+			}
+
+			let statusLabel = "Processing";
+			if (isProcessed) statusLabel = "Refunded to source";
+			else if (isFailed) statusLabel = "Refund failed at bank";
+			else if (isUncertain) statusLabel = "Under manual review";
+			else if (r.state === "processing") statusLabel = "In clearing (5-7 days)";
+
+			return {
+				refund_id: r.refund_id,
+				booking_id: r.booking_id,
+				service_name: r.service_name || "Home Service",
+				provider_name: r.provider_name || "TaskGenie Provider",
+				booking_date: r.booking_date,
+				booking_status: r.booking_status,
+				payment_id: r.payment_id || r.razorpay_payment_id,
+				gateway_refund_id: r.gateway_refund_id,
+				amount_inr: amountInr,
+				amount_paise: Number(r.amount_paise),
+				state: r.state,
+				request_key: r.request_key,
+				reason_label: reasonLabel,
+				status_label: statusLabel,
+				last_error: r.last_error,
+				is_uncertain: isUncertain,
+				is_failed: isFailed,
+				is_pending: isPending,
+				is_processed: isProcessed,
+				can_reconcile: true,
+				is_synthetic: false,
+				is_amount_unknown: false,
+				created_at: r.created_at,
+				updated_at: r.updated_at,
+			};
+		});
+
+		for (const mb of missingRefundsRes.rows) {
+			const isFailed = mb.payment_status === "refund_failed";
+			const isProcessed = mb.payment_status === "refunded";
+			const isPartial = mb.payment_status === "partially_refunded";
+
+			// If partially refunded or no explicit refund intent row exists, the remaining refund amount is unknown
+			const isAmountUnknown = isPartial || (!isFailed && !isProcessed);
+			const amountInr = isAmountUnknown ? null : Number(mb.price);
+			const amountPaise = isAmountUnknown ? null : Math.round(Number(mb.price) * 100);
+
+			let reasonLabel = "Booking payment adjustment";
+			let statusLabel = isFailed ? "Refund failed" : isProcessed ? "Refunded" : "Under manual review";
+			if (isPartial) {
+				reasonLabel = "Partial refund adjustment (review required)";
+				statusLabel = "Partial refund under review";
+			} else if (isAmountUnknown) {
+				reasonLabel = "Payment adjustment pending review";
+				statusLabel = "Adjustment under review";
+			}
+
+			refundItems.push({
+				refund_id: `synth-${mb.booking_id}`,
+				booking_id: mb.booking_id,
+				service_name: mb.service_name || "Home Service",
+				provider_name: mb.provider_name || "TaskGenie Provider",
+				booking_date: mb.booking_date,
+				booking_status: mb.booking_status,
+				payment_id: mb.razorpay_payment_id,
+				gateway_refund_id: null,
+				amount_inr: amountInr,
+				amount_paise: amountPaise,
+				is_amount_unknown: isAmountUnknown,
+				state: isFailed ? "failed" : isProcessed ? "processed" : "unknown",
+				request_key: "system-recorded",
+				reason_label: reasonLabel,
+				status_label: statusLabel,
+				last_error: isAmountUnknown
+					? "Refund intent not found in records. Manual balance review required before processing."
+					: null,
+				is_uncertain: isAmountUnknown,
+				is_failed: isFailed,
+				is_pending: !isFailed && !isProcessed && !isAmountUnknown,
+				is_processed: isProcessed,
+				can_reconcile: false,
+				is_synthetic: true,
+				created_at: mb.updated_at,
+				updated_at: mb.updated_at,
+			});
+		}
+
+		// 3. Compute Summary Counts
+		const summary = {
+			interrupted_count: interruptedCheckouts.length,
+			active_holds_count: interruptedCheckouts.filter((c) => c.is_hold_active).length,
+			pending_refunds_count: refundItems.filter((r) => r.is_pending).length,
+			failed_refunds_count: refundItems.filter((r) => r.is_failed).length,
+			uncertain_refunds_count: refundItems.filter((r) => r.is_uncertain).length,
+			total_refund_amount_pending: refundItems
+				.filter((r) => (r.is_pending || r.is_uncertain) && typeof r.amount_inr === "number" && !isNaN(r.amount_inr))
+				.reduce((acc, curr) => acc + curr.amount_inr, 0),
+			has_actionable_items:
+				interruptedCheckouts.some((c) => c.is_hold_active) ||
+				refundItems.some((r) => r.is_failed || r.is_uncertain),
+		};
+
+		res.json({
+			success: true,
+			interrupted_checkouts: interruptedCheckouts,
+			refunds: refundItems,
+			summary,
+		});
+	} catch (err) {
+		console.error("Error fetching recovery items:", err);
+		res.status(500).json({ message: "Failed to load recovery details" });
+	}
+}
+
+async function resumeCheckout(req, res) {
+	const { booking_id } = req.params;
+	const client = await db.connect();
+	try {
+		await client.query("BEGIN");
+		const booking = await lockBooking(client, booking_id);
+
+		if (booking.user_id !== req.user.id) {
+			throw new BookingError(403, "Access denied to this booking");
+		}
+		if (booking.status === "cancelled") {
+			throw new BookingError(409, "Cannot resume checkout for a cancelled booking. Please create a new booking.");
+		}
+		if (!["pending", "expired"].includes(booking.status)) {
+			throw new BookingError(409, `Cannot resume booking with status '${booking.status}'`);
+		}
+		if (booking.payment_method !== "online") {
+			throw new BookingError(400, "Only online payment bookings can be resumed");
+		}
+		if (booking.razorpay_payment_id || booking.payment_status === "paid") {
+			throw new BookingError(409, "Payment already completed for this booking");
+		}
+
+		const now = Date.now();
+		const holdExpires = booking.hold_expires_at ? new Date(booking.hold_expires_at).getTime() : 0;
+		const isHoldActive = booking.status === "pending" && holdExpires > now;
+
+		if (isHoldActive && booking.razorpay_order_id) {
+			// Hold is still active! Can proceed immediately with existing order
+			await client.query("COMMIT");
+			return res.json({
+				success: true,
+				can_pay: true,
+				slot_renewed: false,
+				razorpay_order: booking.razorpay_order_id,
+				booking: serializeBooking(booking, req.user),
+			});
+		}
+
+		// Hold expired: Check if slot is still available to re-hold
+		const { lockSchedule, activeBookingPredicate } = require("../utils/bookingLifecycle");
+		const dateStr = booking.date_string || (booking.date instanceof Date ? booking.date.toISOString().slice(0, 10) : String(booking.date).slice(0, 10));
+
+		await lockSchedule(client, booking.provider_id, dateStr);
+
+		const conflict = await client.query(
+			`SELECT booking_id FROM bookings
+			 WHERE provider_id = $1 AND date = $2::date AND booking_id <> $3
+			   AND ${activeBookingPredicate}
+			   AND start_time < $4::time AND end_time > $5::time
+			 LIMIT 1`,
+			[booking.provider_id, dateStr, booking.booking_id, booking.end_time, booking.start_time]
+		);
+
+		if (conflict.rows.length > 0) {
+			await client.query("UPDATE bookings SET status = 'expired', updated_at = NOW() WHERE booking_id = $1", [booking.booking_id]);
+			await client.query("COMMIT");
+			return res.status(409).json({
+				success: false,
+				can_pay: false,
+				reason: "slot_taken",
+				message: "This time slot was booked by another customer while checkout was paused. Please choose an available slot or another provider.",
+			});
+		}
+
+		try {
+			await require("../services/bookingSchedule").validateSchedule(client, {
+				...booking,
+				date: dateStr,
+			});
+		} catch (schedErr) {
+			await client.query("UPDATE bookings SET status = 'expired', updated_at = NOW() WHERE booking_id = $1", [booking.booking_id]);
+			await client.query("COMMIT");
+			return res.status(409).json({
+				success: false,
+				can_pay: false,
+				reason: "schedule_unavailable",
+				message: schedErr.message || "The provider's schedule is no longer available for this slot.",
+			});
+		}
+
+		// Slot is free! Re-hold for 5 minutes and generate or reuse gateway order
+		const amount = amountInPaise(booking.price);
+		let orderId = booking.razorpay_order_id;
+
+		if (!orderId) {
+			const order = await razorpayOrderBreaker.fire({ amount, currency: "INR", receipt: booking.booking_id });
+			if (!order.id) throw new BookingError(502, "Failed to create gateway order");
+			orderId = order.id;
+		}
+
+		const updated = await client.query(
+			`UPDATE bookings
+			 SET status = 'pending',
+			     hold_expires_at = clock_timestamp() + INTERVAL '5 minutes',
+			     razorpay_order_id = $1,
+			     updated_at = NOW()
+			 WHERE booking_id = $2
+			 RETURNING *`,
+			[orderId, booking.booking_id]
+		);
+
+		await client.query("COMMIT");
+
+		return res.json({
+			success: true,
+			can_pay: true,
+			slot_renewed: true,
+			razorpay_order: orderId,
+			booking: serializeBooking(updated.rows[0], req.user),
+			message: "Slot held for 5 minutes. Please complete payment.",
+		});
+	} catch (err) {
+		await client.query("ROLLBACK").catch(() => {});
+		return respondError(res, err);
+	} finally {
+		client.release();
+	}
+}
+
+async function reconcileCustomerRefund(req, res) {
+	const { refund_id } = req.params;
+	try {
+		const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+		if (!UUID_REGEX.test(refund_id)) {
+			return res.status(400).json({
+				success: false,
+				can_reconcile: false,
+				message: "Direct gateway reconciliation is not available for this adjustment record. Please contact support or request a manual review.",
+			});
+		}
+
+		const check = await db.query(
+			`SELECT br.id, b.user_id
+			 FROM booking_refunds br
+			 JOIN bookings b ON br.booking_id = b.booking_id
+			 WHERE br.id = $1`,
+			[refund_id]
+		);
+
+		if (!check.rows.length) {
+			return res.status(404).json({ message: "Refund record not found" });
+		}
+		if (check.rows[0].user_id !== req.user.id) {
+			return res.status(403).json({ message: "Access denied" });
+		}
+
+		// Reconcile status with gateway
+		let gatewaySyncError = null;
+		try {
+			await paymentService.reconcileRefund(refund_id);
+		} catch (reconcileErr) {
+			console.warn("Real-time refund reconcile note:", reconcileErr.message);
+			gatewaySyncError = reconcileErr.message || "Failed to communicate with payment gateway";
+		}
+
+		const updated = await db.query(
+			`SELECT br.*, b.price AS booking_price, b.status AS booking_status, b.payment_status,
+			        s.name AS service_name, pu.name AS provider_name
+			 FROM booking_refunds br
+			 JOIN bookings b ON br.booking_id = b.booking_id
+			 LEFT JOIN services s ON s.id = b.service_id
+			 LEFT JOIN users pu ON pu.id = b.provider_id
+			 WHERE br.id = $1`,
+			[refund_id]
+		);
+
+		const refund = updated.rows[0] || null;
+
+		if (gatewaySyncError) {
+			return res.status(502).json({
+				success: false,
+				synced: false,
+				message: "Could not sync with payment gateway. Displaying last recorded status.",
+				error: gatewaySyncError,
+				refund,
+			});
+		}
+
+		res.json({
+			success: true,
+			synced: true,
+			message: "Refund status successfully verified with payment gateway.",
+			refund,
+		});
+	} catch (err) {
+		console.error("Reconcile customer refund failed:", err);
+		res.status(500).json({ message: "Could not check refund status at this moment. Please try again." });
+	}
+}
+
 module.exports = {
 	paymentService,
 	createBooking,
@@ -692,4 +1098,7 @@ module.exports = {
 	getProviderHistory,
 	regenerateCompletionOtp,
 	cancelUnpaidBooking,
+	getRecoveryItems,
+	resumeCheckout,
+	reconcileCustomerRefund,
 };

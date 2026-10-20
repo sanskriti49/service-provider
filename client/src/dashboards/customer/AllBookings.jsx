@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { Link, useNavigate, useOutletContext } from "react-router-dom";
+import { Link, useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import {
 	CalendarCheck,
 	CheckCircle2,
@@ -20,6 +20,7 @@ import {
 	Zap,
 } from "lucide-react";
 import BookingDetailsSheet from "./BookingDetailsSheet";
+import BookingPaymentRecovery from "./BookingPaymentRecovery";
 import ConfirmModal from "../../ui/ConfirmModal";
 import api from "../../api/axiosInstance";
 import ChatButton from "../../chat/ChatButton";
@@ -51,6 +52,7 @@ const DEFAULT_FILTERS = {
 const TABS = [
 	{ key: "upcoming", label: "Upcoming" },
 	{ key: "history", label: "History" },
+	{ key: "recovery", label: "Recovery & Refunds" },
 ];
 
 const formatINR = (n) =>
@@ -588,7 +590,26 @@ export default function AllBookings() {
 		newStatus: null,
 	});
 
+	const [searchParams, setSearchParams] = useSearchParams();
 	const [activeTab, setActiveTab] = useState("upcoming");
+
+	const initialRecoveryCount = useMemo(() => {
+		if (!outlet.recoverySummary) return 0;
+		return (
+			(outlet.recoverySummary.active_holds_count || 0) +
+			(outlet.recoverySummary.failed_refunds_count || 0) +
+			(outlet.recoverySummary.uncertain_refunds_count || 0)
+		);
+	}, [outlet.recoverySummary]);
+
+	const [recoveryCount, setRecoveryCount] = useState(initialRecoveryCount);
+
+	useEffect(() => {
+		if (initialRecoveryCount > 0) {
+			setRecoveryCount(initialRecoveryCount);
+		}
+	}, [initialRecoveryCount]);
+
 	const [history, setHistory] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [loadError, setLoadError] = useState(false);
@@ -610,6 +631,28 @@ export default function AllBookings() {
 	const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS);
 
 	useEffect(() => {
+		const tabParam = searchParams.get("tab");
+		if (tabParam && ["upcoming", "history", "recovery"].includes(tabParam)) {
+			setActiveTab(tabParam);
+		}
+	}, [searchParams]);
+
+	// Fetch recovery badge count
+	useEffect(() => {
+		api.get("/api/bookings/recovery/items")
+			.then((res) => {
+				if (res.data?.summary) {
+					const count =
+						(res.data.summary.active_holds_count || 0) +
+						(res.data.summary.failed_refunds_count || 0) +
+						(res.data.summary.uncertain_refunds_count || 0);
+					setRecoveryCount(count);
+				}
+			})
+			.catch(() => {});
+	}, []);
+
+	useEffect(() => {
 		const timer = setTimeout(() => {
 			setDebouncedSearch(searchTerm);
 			setMeta((prev) => ({ ...prev, current_page: 1 }));
@@ -618,6 +661,10 @@ export default function AllBookings() {
 	}, [searchTerm]);
 
 	useEffect(() => {
+		if (activeTab === "recovery") {
+			setLoading(false);
+			return;
+		}
 		const controller = new AbortController();
 		const fetchHistory = async () => {
 			setLoading(true);
@@ -722,6 +769,7 @@ export default function AllBookings() {
 		if (tab === activeTab) return;
 		setHistory([]); // don't show the other tab's rows while the new ones load
 		setActiveTab(tab);
+		setSearchParams({ tab });
 		goToFirstPage();
 	};
 
@@ -834,7 +882,7 @@ export default function AllBookings() {
 					<div
 						role="tablist"
 						aria-label="Booking type"
-						className="inline-flex self-start p-1 rounded-xl border border-white/[0.08] bg-white/[0.03]"
+						className="inline-flex w-full max-w-full self-start p-1 rounded-xl border border-white/[0.08] bg-white/[0.03] sm:w-auto"
 					>
 						{TABS.map((t) => {
 							const on = activeTab === t.key;
@@ -845,7 +893,7 @@ export default function AllBookings() {
 									role="tab"
 									aria-selected={on}
 									onClick={() => changeTab(t.key)}
-									className={`relative h-8 px-5 rounded-lg text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300 ${
+									className={`relative h-8 flex-1 whitespace-nowrap px-2 rounded-lg text-[11px] sm:flex-none sm:px-5 sm:text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300 ${
 										on
 											? "text-[#0d0b12] font-semibold"
 											: "text-stone-400 hover:text-white"
@@ -862,13 +910,21 @@ export default function AllBookings() {
 											}}
 										/>
 									)}
-									<span className="relative">{t.label}</span>
+									<span className="relative flex items-center gap-1.5">
+										{t.label}
+										{t.key === "recovery" && recoveryCount > 0 && (
+											<span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-stone-950 animate-pulse">
+												{recoveryCount}
+											</span>
+										)}
+									</span>
 								</button>
 							);
 						})}
 					</div>
 
-					<div ref={filterRef} className="relative flex items-center gap-2">
+					{activeTab !== "recovery" && (
+						<div ref={filterRef} className="relative flex items-center gap-2">
 						<div className="relative flex-1 lg:flex-none">
 							<Search
 								size={15}
@@ -1025,9 +1081,10 @@ export default function AllBookings() {
 							)}
 						</AnimatePresence>
 					</div>
+					)}
 				</div>
 
-				{filterChips.length > 0 && (
+				{activeTab !== "recovery" && filterChips.length > 0 && (
 					<div className="flex flex-wrap items-center gap-2">
 						{filterChips.map((c) => (
 							<span
@@ -1063,63 +1120,90 @@ export default function AllBookings() {
 				role="tabpanel"
 				className="min-h-[280px] scroll-mt-24"
 			>
-				{showSkeleton ? (
-					<ListSkeleton />
-				) : loadError && history.length === 0 ? (
-					<Notice
-						icon={TriangleAlert}
-						tone="rose"
-						title="Couldn't load your bookings"
-						body="Check your connection and try again."
-					>
-						<button
-							type="button"
-							onClick={() => setReloadKey((k) => k + 1)}
-							className="mt-5 h-9 px-4 inline-flex items-center gap-2 rounded-lg border border-white/[0.12] text-sm text-stone-200 hover:bg-white/[0.06] transition-colors"
-						>
-							<RotateCw size={14} />
-							Try again
-						</button>
-					</Notice>
-				) : history.length === 0 ? (
-					<EmptyState
-						tab={activeTab}
-						filtered={isFiltered}
-						onClear={clearEverything}
+				{activeTab === "recovery" ? (
+					<BookingPaymentRecovery
+						initialData={outlet.recoveryData}
+						onRecoveryCountChange={setRecoveryCount}
 					/>
 				) : (
-					<div
-						className={`space-y-7 transition-opacity duration-200 ${
-							loading ? "opacity-50 pointer-events-none" : ""
-						}`}
-					>
-						{groups.map((g) => (
-							<div key={g.label}>
-								<h2 className="mb-3 flex items-center gap-3 text-sm font-medium text-stone-400">
-									{g.label}
-									<span className="min-w-5 h-5 px-1.5 rounded-full bg-white/[0.06] text-[11px] text-stone-400 flex items-center justify-center tabular-nums">
-										{g.items.length}
+					<>
+						{activeTab === "upcoming" && recoveryCount > 0 && (
+							<div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-violet-500/15 to-transparent border border-amber-400/30 flex flex-wrap items-center justify-between gap-3 shadow-lg shadow-black/20">
+								<div className="flex items-center gap-2.5 text-xs text-amber-200">
+									<span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+									<span>
+										You have <strong>{recoveryCount}</strong> interrupted checkout or pending refund item awaiting attention.
 									</span>
-									<span aria-hidden className="h-px flex-1 bg-white/[0.06]" />
-								</h2>
-								<ul className="rounded-2xl border border-white/[0.07] bg-white/[0.02] divide-y divide-white/[0.06] overflow-hidden">
-									{g.items.map((item) => (
-										<BookingRow
-											key={item.booking_id}
-											item={item}
-											busy={actionLoading === item.booking_id}
-											onOpen={setSelectedBooking}
-											onCancel={(id) => handleStatusUpdate(id, "cancelled")}
-											onRebook={handleRebook}
-										/>
-									))}
-								</ul>
+								</div>
+								<button
+									type="button"
+									onClick={() => changeTab("recovery")}
+									className="px-3.5 py-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/30 text-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+								>
+									View Recovery Hub →
+								</button>
 							</div>
-						))}
-					</div>
+						)}
+
+						{showSkeleton ? (
+							<ListSkeleton />
+						) : loadError && history.length === 0 ? (
+							<Notice
+								icon={TriangleAlert}
+								tone="rose"
+								title="Couldn't load your bookings"
+								body="Check your connection and try again."
+							>
+								<button
+									type="button"
+									onClick={() => setReloadKey((k) => k + 1)}
+									className="mt-5 h-9 px-4 inline-flex items-center gap-2 rounded-lg border border-white/[0.12] text-sm text-stone-200 hover:bg-white/[0.06] transition-colors"
+								>
+									<RotateCw size={14} />
+									Try again
+								</button>
+							</Notice>
+						) : history.length === 0 ? (
+							<EmptyState
+								tab={activeTab}
+								filtered={isFiltered}
+								onClear={clearEverything}
+							/>
+						) : (
+							<div
+								className={`space-y-7 transition-opacity duration-200 ${
+									loading ? "opacity-50 pointer-events-none" : ""
+								}`}
+							>
+								{groups.map((g) => (
+									<div key={g.label}>
+										<h2 className="mb-3 flex items-center gap-3 text-sm font-medium text-stone-400">
+											{g.label}
+											<span className="min-w-5 h-5 px-1.5 rounded-full bg-white/[0.06] text-[11px] text-stone-400 flex items-center justify-center tabular-nums">
+												{g.items.length}
+											</span>
+											<span aria-hidden className="h-px flex-1 bg-white/[0.06]" />
+										</h2>
+										<ul className="rounded-2xl border border-white/[0.07] bg-white/[0.02] divide-y divide-white/[0.06] overflow-hidden">
+											{g.items.map((item) => (
+												<BookingRow
+													key={item.booking_id}
+													item={item}
+													busy={actionLoading === item.booking_id}
+													onOpen={setSelectedBooking}
+													onCancel={(id) => handleStatusUpdate(id, "cancelled")}
+													onRebook={handleRebook}
+												/>
+											))}
+										</ul>
+									</div>
+								))}
+							</div>
+						)}
+					</>
 				)}
 
-				{!showSkeleton && meta.total_pages > 1 && (
+				{!showSkeleton && activeTab !== "recovery" && meta.total_pages > 1 && (
 					<nav
 						aria-label="Pagination"
 						className="mt-6 flex items-center justify-between"

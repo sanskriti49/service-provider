@@ -1,43 +1,37 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import api from "../api/axiosInstance";
+import { createPublicResource } from "../utils/publicResource.js";
 
-import axios from "axios";
+// All consumers load the same public catalogue; share requests and a short cache.
+const catalogue = createPublicResource({
+	request: async (url, options) => (await api.get(url, options)).data,
+});
+const empty = { data: null, loading: false, error: null };
+
 export const useFetch = (url) => {
-	const [data, setData] = useState(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState(null);
-
-	useEffect(() => {
-		if (!url) {
-			setLoading(false);
-			return;
-		}
-		const controller = new AbortController();
-
-		const fetchData = async () => {
-			setLoading(true);
-			setError(null);
-			try {
-				const response = await api.get(url, { signal: controller.signal });
-				setData(response.data);
-			} catch (err) {
-				if (axios.isCancel(err)) {
-					console.log("Request canceled:", err.message);
-				} else {
-					console.error("Failed to fetch data", err);
-					setError("Oops! Something went wrong while fetching the data.");
-				}
-			} finally {
-				if (!controller.signal.aborted) {
-					setLoading(false);
-				}
-			}
-		};
-		fetchData();
-		return () => {
-			controller.abort();
-		};
+	const subscribe = useCallback(listener => url ? catalogue.subscribe(url, listener) : () => {}, [url]);
+	const getSnapshot = useCallback(() => url ? catalogue.getSnapshot(url) : empty, [url]);
+	const state = useSyncExternalStore(subscribe, getSnapshot);
+	const retry = useCallback(() => {
+		if (url) catalogue.read(url, { force: true }).catch(() => {});
 	}, [url]);
 
-	return { data, loading, error };
+	useEffect(() => {
+		if (!url) return;
+		const controller = new AbortController();
+		catalogue.read(url, { signal: controller.signal }).catch(() => {});
+		return () => controller.abort();
+	}, [url]);
+
+	useEffect(() => {
+		if (!state.error) return;
+		window.addEventListener("online", retry);
+		return () => window.removeEventListener("online", retry);
+	}, [state.error, retry]);
+
+	return {
+		...state,
+		error: state.error ? "Services are temporarily unavailable. Please try again." : null,
+		retry,
+	};
 };

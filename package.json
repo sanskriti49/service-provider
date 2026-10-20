@@ -3,9 +3,10 @@
 	"private": true,
 	"version": "0.0.0",
 	"scripts": {
-		"dev": "concurrently --raw \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
+		"dev": "node scripts/dev.cjs",
+		"test:dev": "node --test scripts/dev.test.cjs",
 		"build": "npm run build --prefix client",
-		"test": "npm run test --prefix server && npm run test --prefix client",
+		"test": "npm run test:dev && npm run test --prefix server && npm run test --prefix client",
 		"verify:engineering": "node server/scripts/verifyEngineering.js",
 		"lint": "npm run lint --prefix client",
 		"reset-db": "npm --prefix server run reset-db",

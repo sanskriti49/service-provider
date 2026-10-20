@@ -44,6 +44,8 @@ import {
 	Zap,
 	Users,
 	IndianRupee,
+	AlertCircle,
+	RefreshCw,
 } from "lucide-react";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../contexts/AuthContext";
@@ -58,12 +60,17 @@ import ServiceIllustration from "../../ui/ServiceIllustration";
 /*  Constants & helpers                                                       */
 /* -------------------------------------------------------------------------- */
 
-const formatCurrency = (n) =>
-	new Intl.NumberFormat("en-IN", {
+const formatCurrency = (n) => {
+	if (n === null || n === undefined || isNaN(n)) return "–";
+	const num = Number(n);
+	const hasPaise = num % 1 !== 0;
+	return new Intl.NumberFormat("en-IN", {
 		style: "currency",
 		currency: "INR",
-		maximumFractionDigits: 0,
-	}).format(n || 0);
+		minimumFractionDigits: hasPaise ? 2 : 0,
+		maximumFractionDigits: 2,
+	}).format(num);
+};
 
 const ACTIVE_STATUSES = ["pending", "booked", "confirmed", "in_progress"];
 
@@ -440,6 +447,8 @@ export default function CustomerDashboard() {
 	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 	const [notifications, setNotifications] = useState(0);
 	const [bookings, setBookings] = useState([]);
+	const [recoveryData, setRecoveryData] = useState(null);
+	const [recoverySummary, setRecoverySummary] = useState(null);
 
 	const isOverviewPage =
 		location.pathname === "/dashboard" || location.pathname === "/dashboard/";
@@ -458,9 +467,10 @@ export default function CustomerDashboard() {
 		}, 4000);
 		(async () => {
 			try {
-				const [bookingsRes, dashboardRes] = await Promise.allSettled([
+				const [bookingsRes, dashboardRes, recoveryRes] = await Promise.allSettled([
 					api.get("/api/bookings/my-bookings"),
 					api.get("/api/dashboard/customer"),
+					api.get("/api/bookings/recovery/items"),
 				]);
 
 				if (!alive) return;
@@ -474,6 +484,10 @@ export default function CustomerDashboard() {
 				}
 				if (dashboardRes.status === "fulfilled") {
 					setNotifications(dashboardRes.value.data?.pending_notifications || 0);
+				}
+				if (recoveryRes.status === "fulfilled") {
+					setRecoveryData(recoveryRes.value.data || null);
+					setRecoverySummary(recoveryRes.value.data?.summary || null);
 				}
 			} catch (err) {
 				console.warn("Customer dashboard metrics notice:", err?.message);
@@ -601,9 +615,10 @@ export default function CustomerDashboard() {
 									bookings={bookings}
 									totalSpent={totalSpent}
 									notifications={notifications}
+									recoverySummary={recoverySummary}
 								/>
 							) : (
-								<Outlet context={{ user, bookings, totalSpent }} />
+								<Outlet context={{ user, bookings, totalSpent, recoverySummary, recoveryData }} />
 							)}
 						</main>
 					</div>
@@ -822,7 +837,13 @@ function SectionHeader({ title, to, linkLabel }) {
 /*  Overview                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function CustomerOverview({ user, bookings, totalSpent, notifications }) {
+function CustomerOverview({
+	user,
+	bookings,
+	totalSpent,
+	notifications,
+	recoverySummary,
+}) {
 	const navigate = useNavigate();
 	const firstName = user?.name?.split(" ")[0];
 
@@ -903,6 +924,38 @@ function CustomerOverview({ user, bookings, totalSpent, notifications }) {
 			: "–";
 
 	const attention = [];
+	if (recoverySummary?.active_holds_count > 0) {
+		attention.push({
+			key: "interrupted_checkout",
+			icon: Clock,
+			tone: "amber",
+			title: `${recoverySummary.active_holds_count} checkout ${recoverySummary.active_holds_count === 1 ? "hold is" : "holds are"} pending`,
+			hint: "Resume payment before slot expires",
+			to: "/dashboard/bookings?tab=recovery",
+		});
+	}
+	const refundIssues =
+		(recoverySummary?.failed_refunds_count || 0) +
+		(recoverySummary?.uncertain_refunds_count || 0);
+	if (refundIssues > 0) {
+		attention.push({
+			key: "refund_issues",
+			icon: RefreshCw,
+			tone: "rose",
+			title: `${refundIssues} refund ${refundIssues === 1 ? "needs review" : "need review"}`,
+			hint: "View recovery & refund center",
+			to: "/dashboard/bookings?tab=recovery",
+		});
+	} else if ((recoverySummary?.pending_refunds_count || 0) > 0) {
+		attention.push({
+			key: "refund_pending",
+			icon: RefreshCw,
+			tone: "sky",
+			title: `${formatCurrency(recoverySummary.total_refund_amount_pending)} refund processing`,
+			hint: "Track refund status",
+			to: "/dashboard/bookings?tab=recovery",
+		});
+	}
 	if (pendingCount > 0) {
 		attention.push({
 			key: "pending",
@@ -938,6 +991,8 @@ function CustomerOverview({ user, bookings, totalSpent, notifications }) {
 		amber: "text-amber-200 bg-amber-300/10 border-amber-300/20",
 		violet: "text-violet-200 bg-violet-400/10 border-violet-400/20",
 		fuchsia: "text-fuchsia-200 bg-fuchsia-400/10 border-fuchsia-400/20",
+		rose: "text-rose-200 bg-rose-400/10 border-rose-400/20",
+		sky: "text-sky-200 bg-sky-400/10 border-sky-400/20",
 	};
 
 	const otp = nextBooking?.otp || nextBooking?.completion_otp;
@@ -1046,6 +1101,35 @@ function CustomerOverview({ user, bookings, totalSpent, notifications }) {
 						);
 					})}
 				</motion.section>
+			)}
+
+			{/* Active Hold Recovery Banner */}
+			{recoverySummary?.active_holds_count > 0 && (
+				<motion.div
+					variants={itemVariants}
+					className="p-4 sm:p-5 rounded-2xl border border-amber-300/30 bg-gradient-to-r from-amber-400/15 via-amber-400/5 to-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-black/20"
+				>
+					<div className="flex items-start sm:items-center gap-3.5">
+						<span className="w-10 h-10 rounded-xl bg-amber-300/15 border border-amber-300/30 flex items-center justify-center text-amber-300 shrink-0 mt-0.5 sm:mt-0">
+							<Clock size={20} className="animate-pulse" />
+						</span>
+						<div>
+							<p className="text-sm font-semibold text-white">
+								You have an incomplete checkout with a held time slot
+							</p>
+							<p className="text-xs text-amber-200/80 mt-0.5">
+								Your selected provider and time slot are temporarily reserved. Complete checkout now to secure your booking.
+							</p>
+						</div>
+					</div>
+					<Link
+						to="/dashboard/bookings?tab=recovery"
+						className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-amber-300 text-stone-900 text-xs font-bold hover:bg-amber-200 transition-colors shadow-sm"
+					>
+						Resume Checkout
+						<ArrowUpRight size={14} />
+					</Link>
+				</motion.div>
 			)}
 
 			{/* Up next */}

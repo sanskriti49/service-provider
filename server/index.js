@@ -63,6 +63,18 @@ const corsOptions = {
 		"Cache-Control",
 		"Pragma",
 		"x-test-bypass-ratelimit",
+		"Idempotency-Key",
+		"idempotency-key",
+		"X-Idempotency-Key",
+		"x-idempotency-key",
+	],
+	exposedHeaders: [
+		"X-Total-Count",
+		"X-Page",
+		"X-Limit",
+		"X-Total-Pages",
+		"Idempotency-Key",
+		"idempotency-key",
 	],
 	optionsSuccessStatus: 200,
 };

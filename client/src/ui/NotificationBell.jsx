@@ -9,6 +9,7 @@ import {
 	Sparkles,
 	Clock,
 	Check,
+	LifeBuoy,
 } from "lucide-react";
 import { getSocket } from "../utils/socket";
 import { API_URL } from "../config";
@@ -28,6 +29,12 @@ function timeAgo(dateString) {
 }
 
 function getNotificationBadge(type) {
+	if (type?.includes("support") || type?.includes("ticket")) {
+		return {
+			icon: <LifeBuoy size={16} className="text-sky-600" />,
+			bg: "bg-sky-50 border-sky-100",
+		};
+	}
 	if (type?.includes("booking")) {
 		return {
 			icon: <CalendarCheck size={16} className="text-violet-600" />,
@@ -134,7 +141,16 @@ export default function NotificationBell() {
 		}
 		setIsOpen(false);
 
-		if (notif.data?.booking_id) {
+		if (notif.data?.ticket_number) {
+			navigate(`/help?ticket=${encodeURIComponent(notif.data.ticket_number)}`);
+			window.dispatchEvent(
+				new CustomEvent("open:support-ticket", {
+					detail: {
+						ticketNumber: notif.data.ticket_number,
+					},
+				})
+			);
+		} else if (notif.data?.booking_id) {
 			let role = localStorage.getItem("role");
 			if (!role) {
 				try {

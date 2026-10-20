@@ -1,0 +1,12 @@
+Generated with the built-in image-generation tool.
+Visual reference: https://fly.io/ (expressive ink character illustrations).
+Source: taskgenie-lamp-source.png. Runtime assets: taskgenie-lamp-128.webp and taskgenie-lamp-256.webp.
+Original Lobster Two lettering stays separate. Motion is implemented in CSS with a reduced-motion preference.
+
+Use case: logo-brand.
+Asset: a new illustrated genie-lamp brand icon for TaskGenie, a home-services app. One isolated illustration on a genuinely transparent background. No lettering.
+Art direction: the soulful, eccentric hand-inked editorial character illustration sensibility seen on Fly.io. Create an ORIGINAL character, not their server mascots or balloon logo. This must look like an animator's considered character drawing: loose confident plum ink outlines, irregular line weight, a little pencil hatching, matte watercolor and colored-pencil fills, intelligent playful shape design. Strongly two-dimensional.
+Subject: a gently airborne, personality-filled antique genie lamp in three-quarter side view. Rounded lavender enamel belly, small warm ochre brass lid and foot, elegant long upward-curving spout, generous looping handle. Two tiny expressive dark eyes on the lamp belly give it a curious, quietly mischievous character. A single generous lavender smoke curl rises from the spout and leans backward like a jaunty quiff, with a warm apricot touch. The silhouette has a springy, buoyant gesture, like a character caught mid-float. Keep it elegant and compact, with purposeful asymmetry.
+Palette: deep aubergine ink, dusty violet, pale lilac, honey ochre, a small apricot highlight. Broad readable color areas. The drawing should read against both a white page and a very dark plum navbar.
+Composition: centered compact square silhouette, large enough to occupy most of the canvas with a small clean transparent safety margin. Readable as a 32px navbar icon. Keep details sparse and characterful.
+Avoid: photorealism, shiny metal, 3D rendering, polished product photography, generic gradient app icons, emoji clipart, symmetrical stock vectors, anime or Ghibli style, cute baby proportions, floating sparkles, decorative badges, background scenes, text, watermark.

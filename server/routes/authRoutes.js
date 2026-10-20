@@ -150,7 +150,7 @@ router.post("/request-email-change", authLimiter, verifyToken, async (req, res) 
 		const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
 		await db.query(
 			`UPDATE users
-		SET temp_email=$1, temp_email_otp=$2, temp_email_expires=$3
+		SET temp_email=$1, temp_email_otp=$2, temp_email_expires=$3, temp_email_attempts=0
 		WHERE id=$4`,
 			[newEmail, hashedOtp, otpExpires, userId],
 		);
@@ -172,10 +172,14 @@ router.post("/verify-email-change", authLimiter, verifyToken, async (req, res) =
 		const { otp } = req.body;
 		const userId = req.user.id;
 
+		if (!otp || typeof otp !== "string") {
+			return res.status(400).json({ error: "Valid OTP is required" });
+		}
+
 		const result = await db.query("SELECT * FROM users WHERE id=$1", [userId]);
 		const user = result.rows[0];
 
-		if (!user.temp_email || !user.temp_email_otp) {
+		if (!user || !user.temp_email || !user.temp_email_otp) {
 			return res.status(400).json({ error: "No pending email change found" });
 		}
 
@@ -188,7 +192,7 @@ router.post("/verify-email-change", authLimiter, verifyToken, async (req, res) =
 			const attempts = (parseInt(user.temp_email_attempts, 10) || 0) + 1;
 			if (attempts >= 5) {
 				await db.query(
-					"UPDATE users SET temp_email = NULL, temp_email_otp = NULL, temp_email_expires = NULL WHERE id = $1",
+					"UPDATE users SET temp_email = NULL, temp_email_otp = NULL, temp_email_expires = NULL, temp_email_attempts = 0 WHERE id = $1",
 					[userId],
 				);
 				return res.status(400).json({
@@ -196,6 +200,10 @@ router.post("/verify-email-change", authLimiter, verifyToken, async (req, res) =
 						"Too many failed attempts. This OTP has been invalidated for your security.",
 				});
 			}
+			await db.query(
+				"UPDATE users SET temp_email_attempts = $1 WHERE id = $2",
+				[attempts, userId],
+			);
 			return res.status(400).json({
 				error: `Invalid OTP. ${5 - attempts} attempts remaining.`,
 			});
@@ -205,7 +213,8 @@ router.post("/verify-email-change", authLimiter, verifyToken, async (req, res) =
              SET email = temp_email, 
                  temp_email = NULL, 
                  temp_email_otp = NULL, 
-                 temp_email_expires = NULL 
+                 temp_email_expires = NULL,
+                 temp_email_attempts = 0
              WHERE id = $1`,
 			[userId],
 		);

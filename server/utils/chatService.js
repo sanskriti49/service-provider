@@ -157,13 +157,22 @@ async function ensureChatReportsTable(clientOrDb) {
 				details text,
 				status varchar(20) DEFAULT 'pending' NOT NULL,
 				action_taken text,
+				assigned_to uuid REFERENCES public.users(id) ON DELETE SET NULL,
+				resolution_notes text,
+				resolved_at timestamptz,
+				resolved_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
 				created_at timestamptz DEFAULT now() NOT NULL,
 				updated_at timestamptz DEFAULT now() NOT NULL
 			);
+			ALTER TABLE public.chat_reports ADD COLUMN IF NOT EXISTS assigned_to uuid REFERENCES public.users(id) ON DELETE SET NULL;
+			ALTER TABLE public.chat_reports ADD COLUMN IF NOT EXISTS resolution_notes text;
+			ALTER TABLE public.chat_reports ADD COLUMN IF NOT EXISTS resolved_at timestamptz;
+			ALTER TABLE public.chat_reports ADD COLUMN IF NOT EXISTS resolved_by uuid REFERENCES public.users(id) ON DELETE SET NULL;
 			CREATE INDEX IF NOT EXISTS ix_chat_reports_booking ON public.chat_reports(booking_id);
 			CREATE INDEX IF NOT EXISTS ix_chat_reports_reporter ON public.chat_reports(reporter_id);
 			CREATE INDEX IF NOT EXISTS ix_chat_reports_reported ON public.chat_reports(reported_user_id);
 			CREATE INDEX IF NOT EXISTS ix_chat_reports_status ON public.chat_reports(status);
+			CREATE INDEX IF NOT EXISTS ix_chat_reports_assigned ON public.chat_reports(assigned_to);
 		`);
 		reportsTableReady = true;
 	} catch (err) {
@@ -248,5 +257,5 @@ async function report(userId, bookingId, input = {}) {
 	return result;
 }
 
-module.exports = { ChatError, uuid, errorPayload, history, send, markRead, unread, report };
+module.exports = { ChatError, uuid, errorPayload, history, send, markRead, unread, report, ensureChatReportsTable };
 

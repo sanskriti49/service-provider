@@ -51,6 +51,10 @@
 		"streamifier": "^0.1.1"
 	},
 	"devDependencies": {
-		"nodemon": "^3.0.0"
+		"nodemon": "^3.1.9"
+	},
+	"overrides": {
+		"braces": "^3.0.3",
+		"chokidar": "^4.0.3"
 	}
 }

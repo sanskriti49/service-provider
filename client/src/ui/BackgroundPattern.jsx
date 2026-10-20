@@ -27,7 +27,7 @@ const BackgroundPattern = () => (
 				width="1800"
 				height="545"
 				preserveAspectRatio="none"
-				href="/images/background.png"
+				href="/images/hero-pattern.webp"
 			/>
 		</defs>
 	</svg>

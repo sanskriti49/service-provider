@@ -13,6 +13,9 @@ import {
 	User,
 	MessageSquare,
 	ShieldCheck,
+	Key,
+	Copy,
+	Check,
 } from "lucide-react";
 import { FadeLoader } from "react-spinners";
 import api from "../api/axiosInstance";
@@ -43,6 +46,9 @@ export default function SupportTicketModal({
 	onClose,
 	defaultRole = "customer",
 	defaultCategory = null,
+	defaultSubject = "",
+	defaultMessage = "",
+	onViewTicket = null,
 }) {
 	const { user } = useAuth();
 
@@ -52,12 +58,13 @@ export default function SupportTicketModal({
 	const [email, setEmail] = useState("");
 	const [category, setCategory] = useState(defaultCategory || (activeRole === "provider" ? "kyc" : "booking"));
 	const [priority, setPriority] = useState("normal");
-	const [subject, setSubject] = useState("");
-	const [message, setMessage] = useState("");
+	const [subject, setSubject] = useState(defaultSubject || "");
+	const [message, setMessage] = useState(defaultMessage || "");
 
 	const [loading, setLoading] = useState(false);
 	const [errorMsg, setErrorMsg] = useState("");
 	const [ticketResult, setTicketResult] = useState(null);
+	const [copiedToken, setCopiedToken] = useState(false);
 
 	const submitButtonRef = useRef(null);
 
@@ -88,8 +95,14 @@ export default function SupportTicketModal({
 			} else {
 				setCategory(activeRole === "provider" ? "kyc" : "booking");
 			}
+			if (defaultSubject) {
+				setSubject(defaultSubject);
+			}
+			if (defaultMessage) {
+				setMessage(defaultMessage);
+			}
 		}
-	}, [isOpen, user, activeRole, defaultCategory]);
+	}, [isOpen, user, activeRole, defaultCategory, defaultSubject, defaultMessage]);
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
@@ -225,13 +238,72 @@ export default function SupportTicketModal({
 									</div>
 								</div>
 
-								<button
-									type="button"
-									onClick={onClose}
-									className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm shadow-md transition-all cursor-pointer"
-								>
-									Done
-								</button>
+								{ticketResult.ticket_token && (
+									<div className="p-3.5 bg-violet-50/70 rounded-2xl border border-violet-100 text-left space-y-1.5">
+										<div className="flex items-center justify-between">
+											<span className="text-xs font-bold text-violet-900 flex items-center gap-1.5">
+												<Key className="w-3.5 h-3.5 text-violet-600" /> Guest Access Token
+											</span>
+											<button
+												type="button"
+												onClick={() => {
+													navigator.clipboard?.writeText(ticketResult.ticket_token);
+													setCopiedToken(true);
+													setTimeout(() => setCopiedToken(false), 2000);
+												}}
+												className="text-[11px] font-semibold text-violet-700 hover:text-violet-900 flex items-center gap-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-violet-200"
+											>
+												{copiedToken ? (
+													<>
+														<Check className="w-3 h-3 text-emerald-600" /> Copied!
+													</>
+												) : (
+													<>
+														<Copy className="w-3 h-3" /> Copy Token
+													</>
+												)}
+											</button>
+										</div>
+										<p className="font-mono text-[11px] text-slate-600 bg-white p-2 rounded-lg border border-violet-200/60 break-all select-all">
+											{ticketResult.ticket_token}
+										</p>
+										<p className="text-[10px] text-violet-700">
+											Save this token to look up this ticket and post replies if you are signed out.
+										</p>
+									</div>
+								)}
+
+								<div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+									<button
+										type="button"
+										onClick={() => {
+											onClose();
+											if (onViewTicket) {
+												onViewTicket(ticketResult);
+											} else {
+												window.dispatchEvent(
+													new CustomEvent("open:support-ticket", {
+														detail: {
+															ticketNumber: ticketResult.ticket_number,
+															token: ticketResult.ticket_token,
+														},
+													})
+												);
+											}
+										}}
+										className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+									>
+										<MessageSquare className="w-4 h-4" />
+										Track Ticket & View Thread
+									</button>
+									<button
+										type="button"
+										onClick={onClose}
+										className="w-full sm:w-auto px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all cursor-pointer"
+									>
+										Done
+									</button>
+								</div>
 							</div>
 						) : (
 							/* TICKET SUBMISSION FORM */

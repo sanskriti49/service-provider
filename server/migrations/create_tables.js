@@ -2,6 +2,7 @@ const db = require("../config/db");
 const { integritySchema } = require("./migrate_booking_integrity");
 const { chatSchema } = require("./migrate_chat");
 const { locationSchema } = require("./migrate_booking_location");
+const { supportModerationSchema } = require("./migrate_support_moderation");
 
 const queries = [
 	`CREATE TABLE IF NOT EXISTS public.users (
@@ -24,6 +25,7 @@ const queries = [
     temp_email text NULL,
     temp_email_otp text NULL,
     temp_email_expires int8 NULL,
+    temp_email_attempts int DEFAULT 0 NULL,
     CONSTRAINT check_email_lowercase CHECK ((email = lower(email))),
     CONSTRAINT check_indian_ph_no CHECK (((phone)::text ~ '^\\+91 ?[6-9][0-9]{9}$'::text)),
     CONSTRAINT users_check CHECK ((((role IS NULL) AND (custom_id IS NULL)) OR ((role = 'customer'::text) AND (custom_id ~ '^CUS[A-Z0-9]{10,30}$'::text)) OR ((role = 'provider'::text) AND (custom_id ~ '^SRV[A-Z0-9]{10,30}$'::text)))),
@@ -40,6 +42,7 @@ const queries = [
 	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS temp_email text NULL`,
 	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS temp_email_otp text NULL`,
 	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS temp_email_expires int8 NULL`,
+	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS temp_email_attempts int DEFAULT 0`,
 
 	`CREATE TABLE IF NOT EXISTS public.services (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -282,6 +285,7 @@ const queries = [
 	FOR EACH ROW EXECUTE FUNCTION sync_user_geom();`,
 	integritySchema,
 	locationSchema,
+	supportModerationSchema,
 ];
 
 const runMigration = async () => {

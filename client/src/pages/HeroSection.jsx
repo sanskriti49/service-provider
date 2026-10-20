@@ -1,5 +1,3 @@
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
 import BackgroundPattern from "../ui/BackgroundPattern";
 import { SearchBar } from "../ui/SearchBar";
 import { Link } from "react-router-dom";
@@ -7,27 +5,11 @@ import { Link } from "react-router-dom";
 const popularSearches = ["Plumbing", "House Cleaning", "Laundry", "Haircut"];
 
 export const HeroSection = () => {
-	const heroRef = useRef(null);
-
-	useEffect(() => {
-		const ctx = gsap.context(() => {
-			const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-			tl.from(".hero-badge", { y: -8, duration: 0.35 })
-				.from(".hero-title", { y: 14, duration: 0.45 }, "-=0.2")
-				.from(".hero-sub", { y: 10, duration: 0.35 }, "-=0.2")
-				.from(".hero-search", { y: 10, duration: 0.35 }, "-=0.2")
-				.from(".hero-pill", { y: 6, stagger: 0.03, duration: 0.25 }, "-=0.15");
-		}, heroRef);
-
-		return () => ctx.revert();
-	}, []);
-
 	return (
 		<main
-			ref={heroRef}
 			className="relative w-full pt-32 pb-24 md:pt-40 md:pb-32 lg:pt-44 lg:pb-36 overflow-hidden"
 		>
-			<div className="absolute inset-0 w-full h-full pointer-events-none opacity-80 pt-28 md:pt-36 lg:pt-40">
+			<div aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none opacity-80 pt-28 md:pt-36 lg:pt-40">
 				<BackgroundPattern />
 			</div>
 

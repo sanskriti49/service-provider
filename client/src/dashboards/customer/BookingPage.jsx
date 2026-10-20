@@ -455,6 +455,18 @@ export default function BookingPage() {
  const providerRequests = useRef(createRequestGuard());
  const availabilityKey = useRef(null);
  const locationRevision = useRef(0);
+ const idempotencyKeyRef = useRef(null);
+ const getStableIdempotencyKey = () => {
+  if (!idempotencyKeyRef.current) {
+   idempotencyKeyRef.current = (typeof crypto !== "undefined" && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  }
+  return idempotencyKeyRef.current;
+ };
+ const resetIdempotencyKey = () => {
+  idempotencyKeyRef.current = null;
+ };
  const address = serviceLocation.address;
  const tempAddress = draftLocation.address;
  const setTempAddress = (text) => {
@@ -462,6 +474,9 @@ export default function BookingPage() {
   setAddressMatches([]); setDraftLocation(current=>editServiceAddress(current,text));
  };
  useEffect(()=>()=>{addressRequests.current.cancel();availabilityRequests.current.cancel();providerRequests.current.cancel();},[]);
+ useEffect(() => {
+  idempotencyKeyRef.current = null;
+ }, [selectedDate, selectedTime, serviceLocation.lat, serviceLocation.lng, address, paymentMethod, provider?.id, provider?.user_id]);
 
 	const [selectedDate, setSelectedDate] = useState(
 		state?.selectedDateStr || null,
@@ -720,6 +735,7 @@ export default function BookingPage() {
                         return;
                     }
                     if (verifyRes.data?.booking) {
+						resetIdempotencyKey();
 						navigate("/booking-success", {
 							state: {
 								success: true,
@@ -739,6 +755,7 @@ export default function BookingPage() {
 			modal: {
 				ondismiss: async () => {
 					await cleanupUnpaidBooking();
+					resetIdempotencyKey();
 					setIsSubmitting(false);
 					toast("Payment window closed. The slot was released.");
 				},
@@ -783,24 +800,35 @@ export default function BookingPage() {
 		}
 
 		setIsSubmitting(true);
+		const idempotencyKey = getStableIdempotencyKey();
 		try {
-			const res = await api.post("/api/bookings", {
-				provider_id: provider.user_id || provider.id || provider.custom_id,
-				service_id: provider.service_id,
-				price: provider.price,
-				date: selectedDate,
-				start_time: selectedTime.start_time || selectedTime.start,
-				end_time: selectedTime.end_time || selectedTime.end,
-				address,
-				payment_method: paymentMethod === "cash" ? "cod" : paymentMethod,
-				...bookingCoordinates(serviceLocation),
-				radius: searchRadius,
-			});
+			const res = await api.post(
+				"/api/bookings",
+				{
+					provider_id: provider.user_id || provider.id || provider.custom_id,
+					service_id: provider.service_id,
+					price: provider.price,
+					date: selectedDate,
+					start_time: selectedTime.start_time || selectedTime.start,
+					end_time: selectedTime.end_time || selectedTime.end,
+					address,
+					payment_method: paymentMethod === "cash" ? "cod" : paymentMethod,
+					...bookingCoordinates(serviceLocation),
+					radius: searchRadius,
+					idempotency_key: idempotencyKey,
+				},
+				{
+					headers: {
+						"Idempotency-Key": idempotencyKey,
+					},
+				},
+			);
 			const data = res.data;
 
 			if (isOnline && data.razorpay_order) {
 				handleRazorpayPayment(data.booking, data.razorpay_order);
 			} else {
+				resetIdempotencyKey();
 				navigate("/booking-success", {
 					state: { success: true, booking: data.booking, address },
 					replace: true,

@@ -26,6 +26,7 @@ import {
 	ShieldCheck,
 	FileText,
 	ExternalLink,
+	LifeBuoy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -35,6 +36,7 @@ import ConfirmDialog from "../../ui/ConfirmDialog";
 import Logo from "../../ui/Logo";
 import VerifiedBadge from "../../ui/VerifiedBadge";
 import ScrollToTop from "../../ui/ScrollToTop";
+import SupportModerationQueue from "./SupportModerationQueue";
 
 const formatCurrency = (val) =>
 	new Intl.NumberFormat("en-IN", {
@@ -377,6 +379,23 @@ export default function AdminDashboard() {
 								)}
 							</button>
 							<button
+								onClick={() => setActiveTab("support")}
+								className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+									activeTab === "support"
+										? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+										: "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+								}`}
+							>
+								<span>Support &amp; Moderation</span>
+								{((overviewData?.overview?.open_support_tickets || 0) +
+									(overviewData?.overview?.pending_chat_reports || 0)) > 0 && (
+									<span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+										{(overviewData?.overview?.open_support_tickets || 0) +
+											(overviewData?.overview?.pending_chat_reports || 0)}
+									</span>
+								)}
+							</button>
+							<button
 								onClick={() => setActiveTab("settings")}
 								className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
 									activeTab === "settings"
@@ -495,6 +514,36 @@ export default function AdminDashboard() {
 								</p>
 							</div>
 						</div>
+
+						{/* Operations & Work Queue Quick Access */}
+						{((overviewData?.overview?.open_support_tickets || 0) > 0 ||
+							(overviewData?.overview?.pending_chat_reports || 0) > 0 ||
+							(overviewData?.overview?.active_disputes || 0) > 0) && (
+							<div className="p-4 rounded-2xl bg-gradient-to-r from-violet-950/40 via-purple-950/30 to-[#110a22] border border-violet-500/20 flex flex-wrap items-center justify-between gap-4">
+								<div className="flex items-center gap-3">
+									<div className="p-2.5 rounded-xl bg-violet-600/20 border border-violet-500/30 text-violet-300">
+										<LifeBuoy size={20} />
+									</div>
+									<div>
+										<h4 className="font-bold text-white text-sm">
+											Operations Attention Required
+										</h4>
+										<p className="text-xs text-slate-400">
+											{overviewData?.overview?.open_support_tickets || 0} open support tickets,{" "}
+											{overviewData?.overview?.pending_chat_reports || 0} pending safety reports, and{" "}
+											{overviewData?.overview?.active_disputes || 0} active disputes.
+										</p>
+									</div>
+								</div>
+								<button
+									onClick={() => setActiveTab("support")}
+									className="px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs transition cursor-pointer flex items-center gap-1.5"
+								>
+									<span>Open Work Queue</span>
+									<ChevronRight size={13} />
+								</button>
+							</div>
+						)}
 
 						{/* Charts & Breakdown */}
 						<div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1134,6 +1183,14 @@ export default function AdminDashboard() {
 							</p>
 						</div>
 					</div>
+				)}
+
+				{/* -------------------- 5. SUPPORT & MODERATION -------------------- */}
+				{activeTab === "support" && (
+					<SupportModerationQueue
+						user={user}
+						onUpdateOverview={fetchOverview}
+					/>
 				)}
 			</main>
 

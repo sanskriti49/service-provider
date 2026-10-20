@@ -1,6 +1,6 @@
 {
-	"watch": [".", "routes", "controllers", "middleware", "config", "utils"],
-	"ext": "js,json",
-	"ignore": ["node_modules/*", "test/*", "seeds/*"],
-	"legacyWatch": true
+	"watch": ["index.js", "routes", "controllers", "middleware", "config", "utils", "services", ".env"],
+	"ext": "js,json,env",
+	"ignore": ["node_modules/**", "test/**", "seeds/**", "uploads/**", "seed_images/**"],
+	"legacyWatch": false
 }

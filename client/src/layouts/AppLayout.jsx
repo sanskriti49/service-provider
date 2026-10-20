@@ -6,7 +6,6 @@
 
 import { useEffect, useRef, Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import gsap from "gsap";
 import Navbar from "../ui/Navbar";
 import Footer from "../pages/Footer";
 import TaskGenieLoader from "../ui/TaskGenieLoader";
@@ -26,23 +25,17 @@ export default function AppLayout() {
 		nprogress.start();
 		const timer = setTimeout(() => nprogress.done(), 200);
 
-		// GSAP smooth page transition on route change (without blocking initial LCP render with opacity: 0)
-		if (mainRef.current && !isFirstMount.current) {
-			gsap.fromTo(
-				mainRef.current,
-				{ opacity: 0.85, y: 6 },
-				{
-					opacity: 1,
-					y: 0,
-					duration: 0.25,
-					ease: "power2.out",
-					clearProps: "transform,opacity",
-				},
+		let transition;
+		if (mainRef.current && !isFirstMount.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+			transition = mainRef.current.animate?.(
+				[{ opacity: 0.85, transform: "translateY(6px)" }, { opacity: 1, transform: "translateY(0)" }],
+				{ duration: 250, easing: "ease-out" },
 			);
 		}
 		isFirstMount.current = false;
 
 		return () => {
+			transition?.cancel();
 			clearTimeout(timer);
 			nprogress.done();
 		};

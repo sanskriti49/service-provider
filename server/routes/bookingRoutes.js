@@ -13,6 +13,9 @@ const {
 	getProviderHistory,
 	regenerateCompletionOtp,
 	cancelUnpaidBooking,
+	getRecoveryItems,
+	resumeCheckout,
+	reconcileCustomerRefund,
 } = require("../controllers/bookingController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { bookingLimiter } = require("../middleware/rateLimiter");
@@ -30,6 +33,11 @@ router.post("/", bookingLimiter, authMiddleware, allowRoles("customer"), createB
 router.post("/verify-payment", authMiddleware, verifyPayment);
 router.post("/webhook", handleRazorpayWebhook);
 router.delete("/:booking_id/unpaid", authMiddleware, allowRoles("customer"), cancelUnpaidBooking);
+
+// Booking & payment recovery endpoints (customer)
+router.get("/recovery/items", authMiddleware, allowRoles("customer"), getRecoveryItems);
+router.post("/recovery/reconcile-refund/:refund_id", authMiddleware, allowRoles("customer"), reconcileCustomerRefund);
+router.post("/:booking_id/resume-checkout", authMiddleware, allowRoles("customer"), resumeCheckout);
 
 router.get(
 	"/user/history",

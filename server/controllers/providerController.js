@@ -467,9 +467,14 @@ async function getProviders(req, res, next) {
       min_rating,
       max_price,
       date,
-      start_time
+      start_time,
+      page,
+      limit
     } = value;
     const hasUserCoords = validCoordinates(lat, lng);
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const hasPagination = limit != null || req.query.page != null;
+    const limitNum = limit != null ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 20;
     const cacheKey = "providers_" + JSON.stringify({
       service,
       lat,
@@ -479,7 +484,9 @@ async function getProviders(req, res, next) {
       min_rating,
       max_price,
       date,
-      start_time
+      start_time,
+      page: hasPagination ? pageNum : undefined,
+      limit: hasPagination ? limitNum : undefined
     });
     if (!date) {
       const cached = cache.get(cacheKey);
@@ -540,10 +547,34 @@ async function getProviders(req, res, next) {
       };
     });
     if (hasUserCoords) providers = providers.filter(p => p.is_nearby === true);
+
+    const avgPrice = providers.length ? providers.reduce((sum, p) => sum + Number(p.price), 0) / providers.length : 500;
+    providers = providers.map(p => ({
+      ...p,
+      match_score: calculateMatchScore({
+        distanceKm: p.distance_km,
+        maxRadiusKm: radius,
+        rating: p.rating,
+        price: Number(p.price),
+        avgPrice,
+        hasAvailableSlots: null
+      })
+    }));
+    const mode = sort_by || (hasUserCoords ? "recommended" : "rating");
+    providers.sort((a, b) => {
+      if (mode === "distance") return (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity) || String(a.user_id).localeCompare(String(b.user_id));
+      if (mode === "price_asc") return Number(a.price) - Number(b.price) || String(a.user_id).localeCompare(String(b.user_id));
+      if (mode === "price_desc") return Number(b.price) - Number(a.price) || String(a.user_id).localeCompare(String(b.user_id));
+      if (mode === "rating") return Number(b.rating ?? 0) - Number(a.rating ?? 0) || String(a.user_id).localeCompare(String(b.user_id));
+      return b.match_score - a.match_score || (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity) || Number(b.rating ?? 0) - Number(a.rating ?? 0) || String(a.user_id).localeCompare(String(b.user_id));
+    });
+
     if (date) {
       const schedule = require("../services/bookingSchedule");
       const available = [];
+      const targetAvailable = hasPagination ? pageNum * limitNum : null;
       for (let offset = 0; offset < providers.length; offset += 4) {
+        if (targetAvailable && available.length >= targetAvailable) break;
         const batch = await Promise.all(providers.slice(offset, offset + 4).map(async p => {
           try {
             if (start_time) await schedule.validateSchedule(db, {
@@ -568,7 +599,15 @@ async function getProviders(req, res, next) {
             }
             return {
               ...p,
-              availability_status: "available"
+              availability_status: "available",
+              match_score: calculateMatchScore({
+                distanceKm: p.distance_km,
+                maxRadiusKm: radius,
+                rating: p.rating,
+                price: Number(p.price),
+                avgPrice,
+                hasAvailableSlots: true
+              })
             };
           } catch (err) {
             if ([400, 409].includes(err.status)) return null;
@@ -578,29 +617,30 @@ async function getProviders(req, res, next) {
         available.push(...batch.filter(Boolean));
       }
       providers = available;
+      providers.sort((a, b) => {
+        if (mode === "distance") return (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity) || String(a.user_id).localeCompare(String(b.user_id));
+        if (mode === "price_asc") return Number(a.price) - Number(b.price) || String(a.user_id).localeCompare(String(b.user_id));
+        if (mode === "price_desc") return Number(b.price) - Number(a.price) || String(a.user_id).localeCompare(String(b.user_id));
+        if (mode === "rating") return Number(b.rating ?? 0) - Number(a.rating ?? 0) || String(a.user_id).localeCompare(String(b.user_id));
+        return b.match_score - a.match_score || (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity) || Number(b.rating ?? 0) - Number(a.rating ?? 0) || String(a.user_id).localeCompare(String(b.user_id));
+      });
     }
-    const avgPrice = providers.length ? providers.reduce((sum, p) => sum + Number(p.price), 0) / providers.length : 500;
-    providers = providers.map(p => ({
-      ...p,
-      match_score: calculateMatchScore({
-        distanceKm: p.distance_km,
-        maxRadiusKm: radius,
-        rating: p.rating,
-        price: Number(p.price),
-        avgPrice,
-        hasAvailableSlots: p.availability_status === "available" ? true : null
-      })
-    }));
-    const mode = sort_by || (hasUserCoords ? "recommended" : "rating");
-    providers.sort((a, b) => {
-      if (mode === "distance") return (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity) || String(a.user_id).localeCompare(String(b.user_id));
-      if (mode === "price_asc") return Number(a.price) - Number(b.price) || String(a.user_id).localeCompare(String(b.user_id));
-      if (mode === "price_desc") return Number(b.price) - Number(a.price) || String(a.user_id).localeCompare(String(b.user_id));
-      if (mode === "rating") return Number(b.rating ?? 0) - Number(a.rating ?? 0) || String(a.user_id).localeCompare(String(b.user_id));
-      return b.match_score - a.match_score || (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity) || Number(b.rating ?? 0) - Number(a.rating ?? 0) || String(a.user_id).localeCompare(String(b.user_id));
-    });
-    if (!date) cache.set(cacheKey, providers, 45000);
-    return res.json(providers);
+
+    const totalCount = providers.length;
+    let paginated = providers;
+    if (hasPagination) {
+      const startIndex = (pageNum - 1) * limitNum;
+      paginated = providers.slice(startIndex, startIndex + limitNum);
+      if (typeof res.set === "function") {
+        res.set("X-Total-Count", String(totalCount));
+        res.set("X-Page", String(pageNum));
+        res.set("X-Limit", String(limitNum));
+        res.set("X-Total-Pages", String(Math.ceil(totalCount / limitNum) || 1));
+      }
+    }
+
+    if (!date) cache.set(cacheKey, paginated, 45000);
+    return res.json(paginated);
   } catch (err) {
     next(err);
   }
@@ -888,8 +928,10 @@ async function addProviderService(req, res, next) {
 		await client.query("BEGIN");
 
 		const providerId = await resolveProviderId(client, req.params.id);
-		if (!providerId)
+		if (!providerId) {
+			await client.query("ROLLBACK");
 			return res.status(404).json({ error: "Provider not found" });
+		}
 
 		if (req.user && req.user.role !== "admin" && req.user.id !== providerId) {
 			await client.query("ROLLBACK");
@@ -908,8 +950,10 @@ async function addProviderService(req, res, next) {
 		const sRow = await client.query("SELECT id FROM services WHERE slug=$1", [
 			slug,
 		]);
-		if (!sRow.rows.length)
+		if (!sRow.rows.length) {
+			await client.query("ROLLBACK");
 			return res.status(400).json({ error: `Unknown service slug: ${slug}` });
+		}
 		const serviceId = sRow.rows[0].id;
 
 		const result = await client.query(
@@ -1186,8 +1230,8 @@ async function submitKyc(req, res, next) {
 		const sanitizedDocNumber = kyc_doc_number.trim().toUpperCase();
 
 		const updateRes = await db.query(
-			`INSERT INTO providers (user_id, kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back, kyc_status, kyc_submitted_at, rejection_reason, status)
-			 VALUES ($1, $2, $3, $4, $5, 'pending', now(), NULL, 'pending')
+			`INSERT INTO providers (user_id, kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back, kyc_status, kyc_submitted_at, rejection_reason, status, is_verified, verification_badge, verified_at)
+			 VALUES ($1, $2, $3, $4, $5, 'pending', now(), NULL, 'pending', FALSE, NULL, NULL)
 			 ON CONFLICT (user_id) DO UPDATE SET
 			    kyc_doc_type = EXCLUDED.kyc_doc_type,
 			    kyc_doc_number = EXCLUDED.kyc_doc_number,
@@ -1195,7 +1239,10 @@ async function submitKyc(req, res, next) {
 			    kyc_doc_back = EXCLUDED.kyc_doc_back,
 			    kyc_status = 'pending',
 			    kyc_submitted_at = now(),
-			    rejection_reason = NULL
+			    rejection_reason = NULL,
+			    is_verified = FALSE,
+			    verification_badge = NULL,
+			    verified_at = NULL
 			 RETURNING user_id, kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back, kyc_status, kyc_submitted_at, is_verified, verification_badge`,
 			[providerId, kyc_doc_type, sanitizedDocNumber, kyc_doc_front, kyc_doc_back || null],
 		);

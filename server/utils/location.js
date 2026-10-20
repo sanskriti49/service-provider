@@ -29,7 +29,9 @@ const discoverySchema = Joi.object({
   min_rating: Joi.number().min(0).max(5),
   max_price: Joi.number().min(0),
   date: dateField,
-  start_time: timeField
+  start_time: timeField,
+  page: Joi.number().integer().min(1),
+  limit: Joi.number().integer().min(1).max(100)
 }).with("start_time", "date").with("date", "lat").with("date", "lng").custom(pairedCoordinates).unknown(true);
 const availabilitySchema = Joi.object({
   lat: coordinateFields.lat.required(),

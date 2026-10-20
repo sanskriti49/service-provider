@@ -19,11 +19,12 @@ export default function AllServices() {
 		data: apiResponse,
 		loading,
 		error,
+		retry,
 	} = useFetch(`${API_URL}/api/services/v1`);
 
-	const services = Array.isArray(apiResponse)
+	const services = useMemo(() => Array.isArray(apiResponse)
 		? apiResponse
-		: apiResponse?.data || [];
+		: apiResponse?.data || [], [apiResponse]);
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCategory, setSelectedCategory] = useState("All");
@@ -144,6 +145,7 @@ export default function AllServices() {
 							Unable to load services
 						</h3>
 						<p className="text-slate-500">{error}</p>
+						<button type="button" onClick={retry} className="mt-4 rounded-full bg-violet-700 px-5 py-2 font-semibold text-white cursor-pointer">Try again</button>
 					</div>
 				)}
 

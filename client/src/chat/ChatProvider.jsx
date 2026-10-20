@@ -1,9 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { disconnectSocket, getSocket } from "../utils/socket";
 import { chatRequest } from "./chatTransport";
-import ChatPanel from "./ChatPanel";
 import { ChatContext } from "./ChatContext";
+
+const ChatPanel = lazy(() => import("./ChatPanel"));
+
+class ChatPanelBoundary extends Component {
+	state = { failed: false };
+	static getDerivedStateFromError() { return { failed: true }; }
+	render() {
+		if (!this.state.failed) return this.props.children;
+		return <div role="alert" className="fixed bottom-4 right-4 z-[100] max-w-sm rounded-2xl bg-white p-5 text-violet-950 shadow-xl">
+			Chat couldn't load. Check your connection, then reload to try again.
+			<div className="mt-3 flex gap-4"><button type="button" onClick={this.props.onClose} className="underline cursor-pointer">Close</button><button type="button" onClick={() => window.location.reload()} className="underline cursor-pointer">Reload</button></div>
+		</div>;
+	}
+}
 
 export default function ChatProvider({ children }) {
 	const { user } = useAuth();
@@ -89,7 +102,9 @@ function ChatSession({ children, user }) {
 	const value = useMemo(() => ({ openChat, unread }), [openChat, unread]);
 	return <ChatContext.Provider value={value}>
 		{children}
-		{booking && user?.id && <ChatPanel key={booking.booking_id} booking={booking} user={user}
-			socket={socket} connection={connection} cache={cache.current} onClose={closeChat} onRead={refreshUnread} />}
+		{booking && user?.id && <ChatPanelBoundary key={booking.booking_id} onClose={closeChat}><Suspense fallback={<div role="status" className="fixed bottom-4 right-4 z-[100] rounded-2xl bg-white p-5 text-violet-950 shadow-xl">Opening chat… <button type="button" onClick={closeChat} className="ml-3 underline cursor-pointer">Cancel</button></div>}>
+			<ChatPanel key={booking.booking_id} booking={booking} user={user}
+				socket={socket} connection={connection} cache={cache.current} onClose={closeChat} onRead={refreshUnread} />
+		</Suspense></ChatPanelBoundary>}
 	</ChatContext.Provider>;
 }

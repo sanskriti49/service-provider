@@ -8,7 +8,8 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"lint": "eslint .",
-		"test": "node --test test/**/*.test.js"
+		"test": "node --test test/**/*.test.js",
+		"verify:loading": "node scripts/verifyLoading.mjs"
 	},
 	"dependencies": {
 		"@emailjs/browser": "^4.4.1",

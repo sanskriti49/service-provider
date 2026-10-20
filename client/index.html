@@ -3,22 +3,40 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="referrer" content="strict-origin-when-cross-origin" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="alternate icon" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico?v=5" sizes="16x16 32x32 48x48" />
+		<link rel="icon" type="image/png" href="/favicon-32.png?v=5" sizes="32x32" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=5" sizes="any" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=5" sizes="180x180" />
 
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link rel="preload" href="/fonts/LobsterTwo/LobsterTwo-Bold.woff" as="font" type="font/woff" crossorigin />
+		<script>
+			// Keep homepage preloads out of sign-in and dashboard visits.
+			if (location.pathname === "/") {
+				for (const [href, as] of [
+					["/fonts/P22-Mackinac/P22MackinacPro-Medium.woff2", "font"],
+					["/images/background.webp", "image"],
+				]) {
+					const link = document.createElement("link");
+					Object.assign(link, { rel: "preload", href, as });
+					if (as === "font") Object.assign(link, { type: "font/woff2", crossOrigin: "anonymous" });
+					document.head.appendChild(link);
+				}
+			}
+		</script>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Valley+Sans:ital,wght@0,100..900;1,100..900&display=swap" media="print" onload="this.media = 'all'" />
 		<link
 			rel="stylesheet"
-			href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Geist:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lobster+Two:ital,wght@0,400;0,700;1,400;1,700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+			href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Geist:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
 			media="print"
 			onload="this.media = 'all'"
 		/>
 		<noscript
 			><link
 				rel="stylesheet"
-				href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lobster+Two:ital,wght@0,400;0,700;1,400;1,700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+				href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
 		/></noscript>
 		<title>TaskGenie - Expert Services In Just One Wish</title>
 	</head>

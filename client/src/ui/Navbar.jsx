@@ -121,7 +121,7 @@ const Navbar = () => {
 				</div>
 
 				{/* Desktop Navigation Header */}
-				<div className="pointer-events-auto absolute left-1/2 -translate-x-1/2 hidden md:block z-40">
+				<div className="pointer-events-auto absolute left-1/2 -translate-x-1/2 hidden lg:block z-40">
 					<motion.header
 						className={cn(
 							"flex items-center justify-center rounded-full border transition-all duration-500 backdrop-blur-xl",
@@ -204,7 +204,7 @@ const Navbar = () => {
 				{/* Right Side / Auth & Profile Actions */}
 				<div className="bricolage-grotesque pointer-events-auto flex-none flex items-center gap-3 z-50">
 					{!user ? (
-						<div className="hidden md:flex flex-none items-center rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-1.5 py-1 text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
+						<div className="hidden lg:flex flex-none items-center rounded-full bg-white/75 bg-gradient-to-r from-pink-200/40 via-violet-200/40 to-indigo-200/40 border border-white/50 px-1.5 py-1 text-sm font-medium text-gray-800 shadow-lg shadow-gray-800/5 ring-1 ring-gray-800/[.075] backdrop-blur-xl">
 							<Link
 								to="/login"
 								className="flex-none group relative text-sm inline-flex items-center justify-center bg-clip-padding rounded-l-[20px] rounded-r-[10px] border h-9 px-4 bg-white/40 border-white/90 shadow-sm hover:text-violet-600 hover:bg-violet-50/60 transition-colors duration-300"
@@ -236,7 +236,7 @@ const Navbar = () => {
 						type="button"
 						onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
 						aria-label="Toggle Navigation Menu"
-						className="md:hidden flex items-center justify-center w-10 h-10 rounded-full bg-white/80 border border-white/50 backdrop-blur-md shadow-md text-slate-700 focus:outline-none"
+						className="lg:hidden flex items-center justify-center w-10 h-10 rounded-full bg-white/80 border border-white/50 backdrop-blur-md shadow-md text-slate-700 focus:outline-none"
 					>
 						<svg
 							className="w-5 h-5"
@@ -272,7 +272,7 @@ const Navbar = () => {
 						animate={{ opacity: 1, y: 0, scale: 1 }}
 						exit={{ opacity: 0, y: -10, scale: 0.95 }}
 						transition={{ duration: 0.2 }}
-						className="absolute top-[calc(100%+12px)] inset-x-4 md:hidden pointer-events-auto"
+						className="absolute top-[calc(100%+12px)] inset-x-4 lg:hidden pointer-events-auto"
 					>
 						<div className="bg-white/95 backdrop-blur-2xl rounded-[2rem] border border-white/50 shadow-2xl p-6 flex flex-col gap-2 ring-1 ring-black/5">
 							<MobileLink to="/#hero" onClick={() => setMobileMenuOpen(false)}>

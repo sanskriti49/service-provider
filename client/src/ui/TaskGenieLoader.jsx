@@ -334,7 +334,7 @@ export default function TaskGenieLoader({
 
 					<div className="absolute inset-x-0 bottom-px flex justify-center">
 						<motion.img
-							src="/images/taskgenie-logo.svg"
+							src="/images/taskgenie-lamp-256.webp?v=5"
 							alt=""
 							animate={lamp}
 							style={{ transformOrigin: "50% 90%" }}

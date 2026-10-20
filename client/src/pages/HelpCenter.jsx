@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Search, LifeBuoy, ChevronRight } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import KycVerificationModal from "../ui/KycVerificationModal";
 import SupportTicketModal from "../ui/SupportTicketModal";
+import CustomerTicketDrawer from "../ui/CustomerTicketDrawer";
 import SupportBanner from "./SupportBanner";
 import useKeyboardShortcut from "../hooks/useKeyboardShortcut";
 import ServiceIllustration from "../ui/ServiceIllustration";
@@ -257,14 +258,18 @@ const HelpCenter = () => {
 	const navigate = useNavigate();
 	const { user } = useAuth();
 
+	const [searchParams] = useSearchParams();
 	const [activeTab, setActiveTab] = useState("customer");
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedKey, setSelectedKey] = useState(null);
 
-	// Modals
+	// Modals & Drawers
 	const [showKycModal, setShowKycModal] = useState(false);
 	const [showTicketModal, setShowTicketModal] = useState(false);
 	const [ticketCategory, setTicketCategory] = useState("general");
+	const [showTicketDrawer, setShowTicketDrawer] = useState(false);
+	const [drawerTicketNumber, setDrawerTicketNumber] = useState(null);
+	const [drawerToken, setDrawerToken] = useState(null);
 
 	const searchInputRef = useRef(null);
 
@@ -280,6 +285,33 @@ const HelpCenter = () => {
 	useEffect(() => {
 		if (roleKey) setActiveTab(roleKey);
 	}, [roleKey]);
+
+	useEffect(() => {
+		const ticketParam = searchParams.get("ticket");
+		const tokenParam = searchParams.get("token");
+		const viewParam = searchParams.get("view");
+		if (ticketParam) {
+			setDrawerTicketNumber(ticketParam);
+			setDrawerToken(tokenParam || null);
+			setShowTicketDrawer(true);
+		} else if (viewParam === "tickets") {
+			setShowTicketDrawer(true);
+		}
+	}, [searchParams]);
+
+	useEffect(() => {
+		const handleOpenTicketEvent = (e) => {
+			if (e.detail?.ticketNumber) {
+				setDrawerTicketNumber(e.detail.ticketNumber);
+				setDrawerToken(e.detail.token || null);
+			}
+			setShowTicketDrawer(true);
+		};
+		window.addEventListener("open:support-ticket", handleOpenTicketEvent);
+		return () => {
+			window.removeEventListener("open:support-ticket", handleOpenTicketEvent);
+		};
+	}, []);
 
 	const handleKycClick = () => {
 		if (!user) {
@@ -334,6 +366,14 @@ const HelpCenter = () => {
 		{ ignoreWhenModalOpen: true },
 	);
 
+	useKeyboardShortcut(
+		"s",
+		() => {
+			setShowTicketDrawer(true);
+		},
+		{ ignoreWhenModalOpen: true },
+	);
+
 	// Common tasks, tailored to who's signed in
 	const quickLinks = useMemo(() => {
 		if (userRole === "provider") {
@@ -357,14 +397,15 @@ const HelpCenter = () => {
 					onClick: () => handleOpenTicket("kyc"),
 				},
 				{
+					title: "My tickets",
+					sub: "Thread & staff replies",
+					shortcut: "S",
+					onClick: () => setShowTicketDrawer(true),
+				},
+				{
 					title: "Payouts and earnings",
 					sub: "Paid every Wednesday",
 					to: "/provider/dashboard/earnings",
-				},
-				{
-					title: "Service settings",
-					sub: "Rates and working hours",
-					to: "/provider/dashboard/settings",
 				},
 			];
 		}
@@ -383,14 +424,15 @@ const HelpCenter = () => {
 					onClick: () => handleOpenTicket("booking"),
 				},
 				{
+					title: "Support tickets",
+					sub: "View replies & status",
+					shortcut: "S",
+					onClick: () => setShowTicketDrawer(true),
+				},
+				{
 					title: "Account settings",
 					sub: "Profile and addresses",
 					to: "/account/settings",
-				},
-				{
-					title: "Become a provider",
-					sub: "Earn with TaskGenie",
-					to: "/apply-provider",
 				},
 			];
 		}
@@ -403,6 +445,12 @@ const HelpCenter = () => {
 				onClick: () => handleOpenTicket("general"),
 			},
 			{
+				title: "Track ticket",
+				sub: "Look up ticket replies",
+				shortcut: "S",
+				onClick: () => setShowTicketDrawer(true),
+			},
+			{
 				title: "Provider KYC",
 				sub: "Sign in to verify your identity",
 				shortcut: "K",
@@ -412,11 +460,6 @@ const HelpCenter = () => {
 				title: "Join as a provider",
 				sub: "Start earning with TaskGenie",
 				to: "/apply-provider",
-			},
-			{
-				title: "Your bookings",
-				sub: "Sign in to track them",
-				to: "/auth/signin",
 			},
 		];
 	}, [userRole, user]);
@@ -788,6 +831,22 @@ const HelpCenter = () => {
 					onClose={() => setShowTicketModal(false)}
 					defaultRole={roleKey || activeTab}
 					defaultCategory={ticketCategory}
+					onViewTicket={(ticketRes) => {
+						setDrawerTicketNumber(ticketRes.ticket_number);
+						setDrawerToken(ticketRes.ticket_token || null);
+						setShowTicketDrawer(true);
+					}}
+				/>
+
+				<CustomerTicketDrawer
+					isOpen={showTicketDrawer}
+					onClose={() => {
+						setShowTicketDrawer(false);
+						setDrawerTicketNumber(null);
+						setDrawerToken(null);
+					}}
+					initialTicketNumber={drawerTicketNumber}
+					initialToken={drawerToken}
 				/>
 			</div>
 		</MotionConfig>

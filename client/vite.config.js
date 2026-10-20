@@ -1,6 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { env } from "node:process";
+
+const apiTarget = env.TASKGENIE_DEV_API_TARGET || "http://127.0.0.1:3000";
 
 export default defineConfig({
 	plugins: [react(), tailwindcss()],
@@ -39,15 +42,16 @@ export default defineConfig({
 		chunkSizeWarningLimit: 800,
 	},
 	server: {
+		strictPort: true,
 		maxHttpHeaderSize: 16384,
 		proxy: {
 			"/api": {
-				target: "http://localhost:3000",
+				target: apiTarget,
 				changeOrigin: true,
 				secure: false,
 			},
 			"/socket.io": {
-				target: "http://localhost:3000",
+				target: apiTarget,
 				ws: true,
 				changeOrigin: true,
 			},
