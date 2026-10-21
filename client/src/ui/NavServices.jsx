@@ -1,4 +1,4 @@
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
 	Sparkles,
 	ArrowRight,
@@ -79,23 +79,6 @@ const popularServices = [
 ];
 
 const NavServices = ({ onClose }) => {
-	const navigate = useNavigate();
-	const location = useLocation();
-
-	const handleScrollToSection = (e) => {
-		e.preventDefault();
-		onClose?.();
-		if (location.pathname === "/") {
-			const el = document.getElementById("services");
-			if (el) {
-				const y = el.getBoundingClientRect().top + window.pageYOffset - 90;
-				window.scrollTo({ top: y, behavior: "smooth" });
-			}
-		} else {
-			navigate("/#services");
-		}
-	};
-
 	return (
 		<div className="w-[420px] rounded-2xl border border-violet-100/60 bg-white/95 backdrop-blur-2xl p-4 text-slate-800 shadow-2xl ring-1 ring-black/5">
 			{/* Header */}
@@ -147,13 +130,13 @@ const NavServices = ({ onClose }) => {
 
 			{/* Bottom Jump Bar */}
 			<div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between px-1 text-xs">
-				<button
-					type="button"
-					onClick={handleScrollToSection}
+				<Link
+					to="/#services"
+					onClick={() => onClose?.()}
 					className="text-slate-500 hover:text-violet-700 font-medium transition-colors cursor-pointer"
 				>
 					Jump to Featured on Home &darr;
-				</button>
+				</Link>
 				<Link
 					to="/services"
 					onClick={() => onClose?.()}

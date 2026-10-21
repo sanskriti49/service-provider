@@ -18,6 +18,9 @@ export default function ScrollToTop() {
 			window.history.scrollRestoration = "manual";
 		}
 
+		// Home waits for lazy sections and owns their layout-aware anchor scrolling.
+		if (pathname === "/") return;
+
 		if (hash) {
 			const id = hash.replace("#", "");
 			const element = document.getElementById(id);

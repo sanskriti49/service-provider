@@ -217,7 +217,7 @@ const HowItWorksSection = () => {
 	return (
 		<section
 			id="how-it-works"
-			className="relative py-20 sm:py-28 overflow-hidden text-slate-800"
+			className="relative scroll-mt-24 py-20 sm:py-28 overflow-hidden text-slate-800"
 		>
 			{/* soft background blobs, same language as the Contact page */}
 			<div className="pointer-events-none absolute -top-10 -left-20 w-96 h-96 rounded-full bg-purple-300 mix-blend-multiply blur-3xl opacity-25 animate-blob" />

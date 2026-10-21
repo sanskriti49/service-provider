@@ -1,6 +1,11 @@
 import TaskGenieLoader from "./TaskGenieLoader";
 
-export default function PageLoader({ message, submessage }) {
-	return <TaskGenieLoader fullScreen message={message} submessage={submessage} />;
+export default function PageLoader({ message, uploadPct, submessage }) {
+	return (
+		<TaskGenieLoader
+			message={message}
+			progress={uploadPct}
+			submessage={submessage}
+		/>
+	);
 }
-

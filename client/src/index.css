@@ -83,8 +83,45 @@
 }
 
 /* ==========================================================================
-   Brand Illustration Motion
+   Brand Wordmark & Illustration
    ========================================================================== */
+.taskgenie-wordmark-accent {
+	--wordmark-violet: #7334b8;
+	--wordmark-lilac: #9250bb;
+	--wordmark-orchid: #ad4d91;
+	--wordmark-amber: #ad6c28;
+	color: var(--wordmark-violet);
+}
+
+.taskgenie-wordmark-accent--dark {
+	--wordmark-violet: #e0c3ff;
+	--wordmark-lilac: #ccafff;
+	--wordmark-orchid: #edb7d8;
+	--wordmark-amber: #f5ce8c;
+}
+
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+	.taskgenie-wordmark-accent {
+		background-image: linear-gradient(
+			105deg,
+			var(--wordmark-violet) 0%,
+			var(--wordmark-lilac) 34%,
+			var(--wordmark-orchid) 68%,
+			var(--wordmark-amber) 100%
+		);
+		-webkit-background-clip: text;
+		background-clip: text;
+		color: transparent;
+	}
+}
+
+@media (forced-colors: active) {
+	.taskgenie-wordmark-accent {
+		background-image: none;
+		color: CanvasText;
+	}
+}
+
 /* Animate only the illustration; the wordmark and reserved layout stay still. */
 @media (prefers-reduced-motion: no-preference) {
 	.taskgenie-lamp {

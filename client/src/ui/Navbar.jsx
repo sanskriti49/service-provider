@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { HashLink } from "react-router-hash-link";
 import { jwtDecode } from "jwt-decode";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
@@ -376,37 +375,9 @@ const Navbar = () => {
 };
 
 const NavPath = ({ to, label, setHoveredTab, hoveredTab }) => {
-	const location = useLocation();
-	const hashId = to.includes("#") ? to.split("#")[1] : null;
-
-	const handleClick = (e) => {
-		if (location.pathname === "/" && hashId) {
-			e.preventDefault();
-			if (hashId === "hero") {
-				window.scrollTo({ top: 0, behavior: "smooth" });
-			} else {
-				const elem = document.getElementById(hashId);
-				if (elem) {
-					const yOffset = -90;
-					const y =
-						elem.getBoundingClientRect().top + window.pageYOffset + yOffset;
-					window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-				}
-			}
-			window.history.replaceState(null, "", to);
-		}
-	};
-
 	return (
-		<HashLink
-			smooth
+		<Link
 			to={to}
-			onClick={handleClick}
-			scroll={(el) => {
-				const yOffset = -90;
-				const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
-				window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-			}}
 			className="bricolage-grotesque relative px-4 py-2 text-[16px] rounded-full z-10 transition-colors duration-200 text-slate-800 hover:text-violet-700"
 			onMouseEnter={() => setHoveredTab(label)}
 		>
@@ -418,47 +389,19 @@ const NavPath = ({ to, label, setHoveredTab, hoveredTab }) => {
 				/>
 			)}
 			<span className="relative z-20 font-medium">{label}</span>
-		</HashLink>
+		</Link>
 	);
 };
 
 const MobileLink = ({ to, children, onClick }) => {
-	const location = useLocation();
-	const hashId = to.includes("#") ? to.split("#")[1] : null;
-
-	const handleClick = (e) => {
-		onClick?.();
-		if (location.pathname === "/" && hashId) {
-			e.preventDefault();
-			if (hashId === "hero") {
-				window.scrollTo({ top: 0, behavior: "smooth" });
-			} else {
-				const elem = document.getElementById(hashId);
-				if (elem) {
-					const yOffset = -90;
-					const y =
-						elem.getBoundingClientRect().top + window.pageYOffset + yOffset;
-					window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-				}
-			}
-			window.history.replaceState(null, "", to);
-		}
-	};
-
 	return (
-		<HashLink
-			smooth
+		<Link
 			to={to}
-			onClick={handleClick}
-			scroll={(el) => {
-				const yOffset = -90;
-				const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
-				window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-			}}
+			onClick={onClick}
 			className="bricolage-grotesque block w-full p-2.5 rounded-xl text-base font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-all"
 		>
 			{children}
-		</HashLink>
+		</Link>
 	);
 };
 

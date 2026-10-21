@@ -1,149 +1,272 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import {
-	motion,
+	motion as Motion,
 	AnimatePresence,
-	useAnimation,
 	useReducedMotion,
+	useAnimationControls,
 } from "framer-motion";
+import Logo from "./Logo";
 
-const MESSAGES = [
+/**
+ * TaskGenie loader: "rub the lamp"
+ *
+ * One orchestrated moment: every few seconds the lamp gets a little rub,
+ * wiggles, glows, and flares a burst of stardust from its spout. Tapping the
+ * lamp triggers the same moment on demand.
+ *
+ * One line of story copy plus four sparkles that light up as the wish moves
+ * along. The sparkles advance on a timer, or follow `progress` (0-100) when
+ * the caller knows how far along things are. No other text on purpose: a
+ * loader should say one thing.
+ *
+ * Props
+ *  - fullScreen  portal to <body> as a fixed overlay (default) or render inline
+ *  - message     overrides the story copy
+ *  - submessage  optional real context only (e.g. "Uploading photo 2 of 3")
+ *  - progress    optional 0-100, switches the ribbon + wishes to determinate mode
+ */
+
+const STAGES = [
 	"Every great task starts with a little magic.",
 	"Finding the right hands for the job.",
 	"Putting the pieces together.",
 	"Your wish is taking shape.",
 ];
 
-const STAGES = [1600, 1800, 1500, 2300, 650];
+const STAGE_INTERVAL_MS = 3600;
+const RUB_INTERVAL_MS = 4800;
 
-const COLORS = {
-	smoke: "#C4B5FD",
-	smokeSoft: "#DDD6FE",
-	amber: "#FCD34D",
-};
+// Anchor points are percentages of the lamp artwork (spout tip, smoke curl).
+const SPOUT = { left: "92%", top: "38%" };
+const SMOKE_TIP = { left: "60%", top: "14%" };
 
-const PATHS = {
-	// The smoke emerges from the lamp and travels upwards.
-	wisp: "M100 172C83 158 118 148 101 134Q96 130 100 125",
-	// Roof and walls are separate so the home builds naturally.
-	roof: "M51 79L100 40L149 79",
-	walls: "M59 74V118H141V74",
+// A fan of sparkles that leaves the spout, pointing up and away from the lamp.
+const BURST = Array.from({ length: 9 }, (_, i) => {
+	const angle = ((-165 + i * (130 / 8)) * Math.PI) / 180;
+	const distance = 52 + (i % 3) * 16;
+	return {
+		dx: Math.cos(angle) * distance,
+		dy: Math.sin(angle) * distance,
+		size: 9 + (i % 3) * 3,
+		delay: i * 0.035,
+		color: ["text-amber-200", "text-fuchsia-200", "text-violet-200"][i % 3],
+	};
+});
 
-	door: "M89 118V95Q89 86 100 86Q111 86 111 95V118",
-	chimney: "M119 55V38H132V65",
+// Quiet "wish dust" that drifts off the end of the painted smoke.
+const DUST = [
+	{
+		x: -24,
+		drift: -14,
+		size: 6,
+		duration: 3.6,
+		delay: 0,
+		color: "text-amber-200",
+	},
+	{
+		x: 6,
+		drift: 10,
+		size: 8,
+		duration: 4.2,
+		delay: 1.1,
+		color: "text-violet-200",
+	},
+	{
+		x: 30,
+		drift: 22,
+		size: 5,
+		duration: 3.9,
+		delay: 2.2,
+		color: "text-fuchsia-200",
+	},
+	{
+		x: -8,
+		drift: -26,
+		size: 5,
+		duration: 4.5,
+		delay: 2.9,
+		color: "text-amber-100",
+	},
+];
 
-	windowLeft: "M68 85H82V100H68Z M75 85V100 M68 92.5H82",
-	windowRight: "M118 85H132V100H118Z M125 85V100 M118 92.5H132",
-};
+const WAVE =
+	"M4 12 C 24 2, 44 22, 64 12 S 104 2, 124 12 S 164 22, 184 12 S 216 2, 236 12";
 
-const SPARKLE =
-	"M0 -7C1 -2 2 -1 7 0C2 1 1 2 0 7C-1 2 -2 1 -7 0C-2 -1 -1 -2 0 -7Z";
-
-function DrawPath({
-	d,
-	active,
-	delay = 0,
-	duration = 0.8,
-	width = 3,
-	reduced = false,
-	color = COLORS.smoke,
-}) {
+function Sparkle({ className = "" }) {
 	return (
-		<motion.path
-			d={d}
-			fill="none"
-			stroke={color}
-			strokeWidth={width}
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			initial={false}
-			animate={{
-				pathLength: active ? 1 : 0,
-				opacity: active ? 1 : 0,
-			}}
-			transition={
-				reduced
-					? { duration: 0 }
-					: {
-							pathLength: {
-								duration: active ? duration : 0.35,
-								delay: active ? delay : 0,
-								ease: [0.4, 0, 0.2, 1],
-							},
-							opacity: {
-								duration: active ? 0.12 : 0.25,
-								delay: active ? delay : 0,
-							},
-						}
-			}
-		/>
+		<svg
+			viewBox="0 0 24 24"
+			aria-hidden="true"
+			className={className}
+			fill="currentColor"
+		>
+			<path d="M12 0c.9 7 5 11.1 12 12-7 .9-11.1 5-12 12-.9-7-5-11.1-12-12C7 11.1 11.1 7 12 0z" />
+		</svg>
 	);
 }
 
-function Window({ x, active, reduced }) {
+function Burst() {
 	return (
-		<motion.rect
-			x={x}
-			y={85}
-			width={14}
-			height={15}
-			rx={1.5}
-			fill={COLORS.amber}
-			initial={false}
-			animate={{
-				opacity: active ? 0.9 : 0,
-				scale: active ? 1 : 0.7,
-			}}
-			style={{
-				transformBox: "fill-box",
-				transformOrigin: "center",
-			}}
-			transition={
-				reduced
-					? { duration: 0 }
-					: active
-						? {
-								delay: 0.75,
-								type: "spring",
-								stiffness: 240,
-								damping: 18,
-							}
-						: { duration: 0.2 }
-			}
-		/>
-	);
-}
-
-function Sparkle({ x, y, size = 1, active, delay = 0, reduced }) {
-	return (
-		<g transform={`translate(${x} ${y})`}>
-			<motion.path
-				d={SPARKLE}
-				fill={COLORS.amber}
+		<div className="pointer-events-none absolute" style={SPOUT}>
+			<Motion.span
+				className="absolute left-0 top-0 -ml-10 -mt-10 h-20 w-20 rounded-full"
 				style={{
-					transformBox: "fill-box",
-					transformOrigin: "center",
+					background:
+						"radial-gradient(circle, rgba(253,230,138,0.85) 0%, rgba(253,230,138,0) 70%)",
 				}}
-				initial={false}
-				animate={{
-					scale: active ? size : 0,
-					rotate: active ? 25 : 0,
-					opacity: active ? 1 : 0,
-				}}
-				transition={
-					reduced
-						? { duration: 0 }
-						: active
-							? {
-									delay,
-									type: "spring",
-									stiffness: 260,
-									damping: 15,
-								}
-							: { duration: 0.18 }
-				}
+				initial={{ opacity: 0, scale: 0.3 }}
+				animate={{ opacity: [0, 0.9, 0], scale: [0.3, 1.2, 1.8] }}
+				transition={{ duration: 0.9, ease: "easeOut", times: [0, 0.3, 1] }}
 			/>
-		</g>
+			{BURST.map((star, index) => (
+				<Motion.span
+					key={index}
+					className={`absolute left-0 top-0 ${star.color}`}
+					style={{
+						width: star.size,
+						height: star.size,
+						marginLeft: -star.size / 2,
+						marginTop: -star.size / 2,
+					}}
+					initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+					animate={{
+						opacity: [0, 1, 0],
+						scale: [0, 1, 0.3],
+						x: [0, star.dx * 0.7, star.dx],
+						y: [0, star.dy * 0.7, star.dy],
+						rotate: [0, 90, 180],
+					}}
+					transition={{
+						duration: 1.3,
+						delay: star.delay,
+						ease: "easeOut",
+						times: [0, 0.35, 1],
+					}}
+				>
+					<Sparkle className="h-full w-full" />
+				</Motion.span>
+			))}
+		</div>
+	);
+}
+
+function WishDust() {
+	return (
+		<div className="pointer-events-none absolute" style={SMOKE_TIP}>
+			{DUST.map((mote, index) => (
+				<Motion.span
+					key={index}
+					className={`absolute left-0 top-0 ${mote.color}`}
+					style={{
+						width: mote.size,
+						height: mote.size,
+						marginLeft: mote.x,
+						marginTop: -mote.size / 2,
+					}}
+					initial={{ opacity: 0 }}
+					animate={{
+						opacity: [0, 0.9, 0],
+						y: [0, -26, -58],
+						x: [0, mote.drift * 0.5, mote.drift],
+						scale: [0.3, 1, 0.3],
+						rotate: [0, 60, 120],
+					}}
+					transition={{
+						duration: mote.duration,
+						delay: mote.delay,
+						repeat: Infinity,
+						ease: "easeOut",
+						times: [0, 0.4, 1],
+					}}
+				>
+					<Sparkle className="h-full w-full" />
+				</Motion.span>
+			))}
+		</div>
+	);
+}
+
+// A wavy ribbon of smoke. Indeterminate: a comet of smoke travels along it.
+// Determinate: the ribbon fills left to right with `progress`.
+function SmokeRibbon({ progress, reduced }) {
+	const gradientId = `tg-ribbon-${useId().replace(/:/g, "")}`;
+	const determinate = typeof progress === "number";
+
+	let motionProps;
+	if (determinate) {
+		motionProps = {
+			initial: reduced ? false : { pathLength: 0 },
+			animate: { pathLength: progress / 100 },
+			transition: { duration: reduced ? 0 : 0.6, ease: "easeOut" },
+		};
+	} else if (reduced) {
+		motionProps = {
+			initial: false,
+			animate: { pathLength: 0.35, pathOffset: 0.3 },
+			transition: { duration: 0 },
+		};
+	} else {
+		motionProps = {
+			initial: { pathLength: 0.02, pathOffset: 0 },
+			animate: {
+				pathLength: [0.02, 0.3, 0.3, 0.02],
+				pathOffset: [0, 0.35, 0.7, 0.98],
+			},
+			transition: {
+				duration: 2.6,
+				repeat: Infinity,
+				ease: "easeInOut",
+				times: [0, 0.4, 0.7, 1],
+			},
+		};
+	}
+
+	return (
+		<svg
+			viewBox="0 0 240 24"
+			className="h-6 w-60 overflow-visible"
+			aria-hidden="true"
+		>
+			<defs>
+				<linearGradient
+					id={gradientId}
+					gradientUnits="userSpaceOnUse"
+					x1="0"
+					y1="0"
+					x2="240"
+					y2="0"
+				>
+					<stop offset="0%" stopColor="#c4b5fd" />
+					<stop offset="55%" stopColor="#f5d0fe" />
+					<stop offset="100%" stopColor="#fde68a" />
+				</linearGradient>
+			</defs>
+			<path
+				d={WAVE}
+				fill="none"
+				stroke="rgba(196,181,253,0.16)"
+				strokeWidth="2"
+				strokeLinecap="round"
+			/>
+			<Motion.path
+				d={WAVE}
+				fill="none"
+				stroke={`url(#${gradientId})`}
+				strokeWidth="6"
+				strokeLinecap="round"
+				style={{ filter: "blur(4px)", opacity: 0.45 }}
+				{...motionProps}
+			/>
+			<Motion.path
+				d={WAVE}
+				fill="none"
+				stroke={`url(#${gradientId})`}
+				strokeWidth="2.5"
+				strokeLinecap="round"
+				{...motionProps}
+			/>
+		</svg>
 	);
 }
 
@@ -151,248 +274,225 @@ export default function TaskGenieLoader({
 	fullScreen = true,
 	message,
 	submessage,
+	progress,
 	className = "",
 }) {
 	const reduced = useReducedMotion();
-	const lamp = useAnimation();
-	const [stage, setStage] = useState(0);
+	const hasProgress = typeof progress === "number" && Number.isFinite(progress);
+	const pct = hasProgress ? Math.min(100, Math.max(0, progress)) : undefined;
 
+	const [timedStage, setTimedStage] = useState(0);
+	const [rub, setRub] = useState(0);
+	const lampControls = useAnimationControls();
+	const glowControls = useAnimationControls();
+
+	// Which of the four wishes we're on: follows progress if given, otherwise the clock.
+	const stageIndex = hasProgress
+		? Math.min(STAGES.length - 1, Math.floor(pct / (100 / STAGES.length)))
+		: timedStage;
+
+	useEffect(() => {
+		if (reduced || hasProgress) return;
+		const timer = window.setInterval(() => {
+			setTimedStage((previous) => (previous + 1) % STAGES.length);
+		}, STAGE_INTERVAL_MS);
+		return () => window.clearInterval(timer);
+	}, [reduced, hasProgress]);
+
+	// The recurring "rub": first one shortly after mount, then on a steady beat.
 	useEffect(() => {
 		if (reduced) return;
-
-		const timer = window.setTimeout(() => {
-			setStage((previous) => (previous + 1) % STAGES.length);
-		}, STAGES[stage]);
-
-		return () => window.clearTimeout(timer);
-	}, [stage, reduced]);
+		const first = window.setTimeout(() => setRub((count) => count + 1), 1100);
+		const loop = window.setInterval(
+			() => setRub((count) => count + 1),
+			RUB_INTERVAL_MS,
+		);
+		return () => {
+			window.clearTimeout(first);
+			window.clearInterval(loop);
+		};
+	}, [reduced]);
 
 	useEffect(() => {
-		if (reduced) {
-			lamp.set({ rotate: 0, y: 0 });
-			return;
-		}
+		if (reduced || rub === 0) return;
+		lampControls.start({
+			rotate: [0, -6, 5, -4, 3, 0],
+			scaleX: [1, 1.03, 0.98, 1.02, 1, 1],
+			scaleY: [1, 0.96, 1.03, 0.98, 1.01, 1],
+			transition: { duration: 0.9, ease: "easeInOut" },
+		});
+		glowControls.start({
+			opacity: [0.45, 0.95, 0.45],
+			scale: [1, 1.12, 1],
+			transition: { duration: 1.6, ease: "easeOut", times: [0, 0.35, 1] },
+		});
+	}, [rub, reduced, lampControls, glowControls]);
 
-		if (stage === 0) {
-			lamp.start({
-				rotate: [0, -7, 5, -3, 0],
-				y: [0, -2, 0, -1, 0],
-				transition: {
-					duration: 0.7,
-					ease: "easeInOut",
-				},
-			});
-		}
-
-		if (stage === 3) {
-			lamp.start({
-				y: [0, -5, 0],
-				transition: {
-					duration: 0.5,
-					delay: 0.35,
-					ease: "easeOut",
-				},
-			});
-		}
-	}, [stage, reduced, lamp]);
-
-	const currentStage = reduced ? 3 : stage;
-	const visible = currentStage < 4;
-	const finished = currentStage === 3;
-
-	const showWisp = visible;
-	const showHouse = visible && currentStage >= 1;
-	const showDetails = visible && currentStage >= 2;
-	const showWindows = finished;
-
-	const currentMessage = message || MESSAGES[Math.min(stage, 3)];
+	const currentMessage = message || STAGES[stageIndex];
+	const floatTransition = {
+		duration: 4.2,
+		repeat: Infinity,
+		ease: "easeInOut",
+	};
 
 	const content = (
-		<motion.div
+		<Motion.div
 			role="status"
 			aria-label="Loading TaskGenie"
 			initial={reduced ? false : { opacity: 0 }}
 			animate={{ opacity: 1 }}
-			transition={{ duration: reduced ? 0 : 0.25 }}
+			transition={{ duration: reduced ? 0 : 0.2 }}
 			className={
 				fullScreen
 					? "fixed inset-0 z-[99999] flex select-none flex-col items-center justify-center overflow-hidden bg-[#0B0718] px-5"
-					: `relative flex min-h-[55vh] w-full select-none flex-col items-center justify-center overflow-hidden rounded-3xl bg-[#0B0718] px-5 py-16 ${className}`
+					: `relative flex min-h-[55vh] w-full select-none flex-col items-center justify-center overflow-hidden rounded-3xl bg-[#0B0718] px-5 py-12 ${className}`
 			}
 		>
-			{/* Subtle background decoration */}
+			{/* Rotating decorative copy should not repeat live announcements. */}
+			<span className="sr-only">
+				{message || "Getting things ready…"}
+				{hasProgress ? ` ${Math.round(pct)}% complete.` : ""}
+			</span>
+
+			{/* Dot grid that fades out toward the edges, so the lamp sits in a pool of texture. */}
 			<div
 				aria-hidden="true"
 				className="pointer-events-none absolute inset-0 opacity-[0.14]"
 				style={{
 					backgroundImage: "radial-gradient(#C4B5FD 0.7px, transparent 0.7px)",
 					backgroundSize: "26px 26px",
+					WebkitMaskImage:
+						"radial-gradient(ellipse at 50% 42%, #000 15%, transparent 68%)",
+					maskImage:
+						"radial-gradient(ellipse at 50% 42%, #000 15%, transparent 68%)",
 				}}
 			/>
 
 			<div className="relative z-10 flex w-full flex-col items-center">
-				{/* Illustration */}
+				{/* Decorative easter egg: tapping the lamp rubs it. */}
 				<div
-					className="relative h-[250px] w-[210px] shrink-0"
+					className="relative h-48 w-48 shrink-0 cursor-pointer sm:h-60 sm:w-60"
 					aria-hidden="true"
+					onPointerDown={() => {
+						if (!reduced) setRub((count) => count + 1);
+					}}
+					style={{ touchAction: "manipulation" }}
 				>
-					<svg
-						className="absolute inset-0 h-full w-full overflow-visible"
-						viewBox="0 0 200 250"
-						fill="none"
+					<Motion.div
+						className="pointer-events-none absolute inset-4 rounded-full blur-2xl"
+						style={{
+							background:
+								"radial-gradient(circle, rgba(167,139,250,0.55) 0%, rgba(167,139,250,0) 68%)",
+						}}
+						initial={{ opacity: 0.45, scale: 1 }}
+						animate={reduced ? { opacity: 0.45, scale: 1 } : glowControls}
+					/>
+
+					<Motion.div
+						className="pointer-events-none absolute bottom-1 left-1/2 h-2 w-28 rounded-full bg-violet-300/20 blur-md"
+						style={{ x: "-50%" }}
+						initial={reduced ? false : { scaleX: 1, opacity: 0.65 }}
+						animate={
+							reduced
+								? { scaleX: 1, opacity: 0.65 }
+								: { scaleX: [1, 0.8, 1], opacity: [0.65, 0.35, 0.65] }
+						}
+						transition={reduced ? { duration: 0 } : floatTransition}
+					/>
+
+					{/* Slow float lives on the wrapper; the rub lives on the image. */}
+					<Motion.div
+						className="absolute inset-0"
+						initial={reduced ? false : { y: 2, rotate: -2 }}
+						animate={
+							reduced
+								? { y: 0, rotate: 0 }
+								: { y: [2, -6, 2], rotate: [-2, 2, -2] }
+						}
+						transition={reduced ? { duration: 0 } : floatTransition}
 					>
-						{/* Smoke appears first */}
-						<DrawPath
-							d={PATHS.wisp}
-							active={showWisp}
-							duration={1.1}
-							delay={0.15}
-							width={3.5}
-							reduced={reduced}
-						/>
-
-						{/* House outline */}
-						<DrawPath
-							d={PATHS.roof}
-							active={showHouse}
-							duration={0.85}
-							reduced={reduced}
-						/>
-
-						<DrawPath
-							d={PATHS.walls}
-							active={showHouse}
-							delay={0.35}
-							duration={0.85}
-							reduced={reduced}
-						/>
-
-						{/* Door and chimney */}
-						<DrawPath
-							d={PATHS.door}
-							active={showDetails}
-							duration={0.65}
-							reduced={reduced}
-						/>
-
-						<DrawPath
-							d={PATHS.chimney}
-							active={showDetails}
-							delay={0.3}
-							duration={0.5}
-							reduced={reduced}
-						/>
-
-						{/* Window illumination */}
-						<Window x={68} active={showWindows} reduced={reduced} />
-						<Window x={118} active={showWindows} reduced={reduced} />
-
-						<DrawPath
-							d={PATHS.windowLeft}
-							active={showWindows}
-							duration={0.45}
-							reduced={reduced}
-						/>
-
-						<DrawPath
-							d={PATHS.windowRight}
-							active={showWindows}
-							delay={0.12}
-							duration={0.45}
-							reduced={reduced}
-						/>
-
-						{/* Completion sparkles */}
-						<Sparkle
-							x={100}
-							y={21}
-							size={1.2}
-							active={finished}
-							delay={0.85}
-							reduced={reduced}
-						/>
-						<Sparkle
-							x={155}
-							y={52}
-							size={0.8}
-							active={finished}
-							delay={1.05}
-							reduced={reduced}
-						/>
-						<Sparkle
-							x={44}
-							y={58}
-							size={0.7}
-							active={finished}
-							delay={1.2}
-							reduced={reduced}
-						/>
-					</svg>
-
-					{/* Lamp and grounding line */}
-					<div className="absolute bottom-0 left-1/2 h-px w-40 -translate-x-1/2 bg-violet-200/25" />
-
-					<div className="absolute inset-x-0 bottom-px flex justify-center">
-						<motion.img
+						<Motion.img
 							src="/images/taskgenie-lamp-256.webp?v=5"
+							width="256"
+							height="256"
 							alt=""
-							animate={lamp}
-							style={{ transformOrigin: "50% 90%" }}
-							className="h-24 w-24 object-contain"
+							className="relative h-full w-full object-contain"
+							style={{ transformOrigin: "50% 88%" }}
+							animate={reduced ? undefined : lampControls}
 							loading="eager"
 							draggable={false}
 						/>
-					</div>
+						{!reduced && <WishDust />}
+						{!reduced && rub > 0 && <Burst key={rub} />}
+					</Motion.div>
 				</div>
 
-				{/* Brand */}
-				<h2 className="mt-5 flex items-baseline font-lobster text-3xl font-bold leading-normal">
-					<span className="text-white">Task</span>
-					<span className="pl-1 text-amber-300">Genie</span>
-				</h2>
+				<div className="mt-4" aria-hidden="true">
+					<Logo variant="wordmark" size="lg" theme="dark" />
+				</div>
 
-				{/* Animated messages */}
-				<div className="mt-3 flex min-h-[52px] w-full max-w-sm items-center justify-center text-center sm:min-h-[38px]">
+				<div
+					className="mt-3 flex min-h-14 w-full max-w-sm items-center justify-center text-center"
+					aria-hidden="true"
+				>
 					<AnimatePresence mode="wait" initial={false}>
-						<motion.p
-							key={message ? "custom" : Math.min(stage, 3)}
-							initial={reduced ? false : { opacity: 0, y: 9 }}
-							animate={{ opacity: 1, y: 0 }}
-							exit={reduced ? undefined : { opacity: 0, y: -9 }}
-							transition={{
-								duration: reduced ? 0 : 0.24,
-								ease: "easeOut",
-							}}
-							className="text-[16px] leading-relaxed text-violet-100/90 sm:text-[17px]"
+						<Motion.p
+							key={currentMessage}
+							initial={
+								reduced ? false : { opacity: 0, y: 6, filter: "blur(4px)" }
+							}
+							animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+							exit={
+								reduced ? undefined : { opacity: 0, y: -4, filter: "blur(4px)" }
+							}
+							transition={{ duration: reduced ? 0 : 0.3 }}
+							className="text-base italic leading-relaxed text-violet-100/90 sm:text-[17px]"
 							style={{
 								fontFamily: "P22Mackinac, 'P22 Mackinac Pro', Georgia, serif",
-								fontStyle: "italic",
 							}}
 						>
 							{currentMessage}
-						</motion.p>
+						</Motion.p>
 					</AnimatePresence>
 				</div>
 
+				<div className="mt-2" aria-hidden="true">
+					<SmokeRibbon progress={pct} reduced={reduced} />
+				</div>
+
+				{/* Four sparkles: lit = current, soft = done, dim = still to come. */}
+				<ol
+					className="mt-4 flex items-center justify-center gap-5"
+					aria-hidden="true"
+				>
+					{STAGES.map((_, index) => {
+						const active = index === stageIndex;
+						const done = index < stageIndex;
+						return (
+							<li key={index}>
+								<Motion.span
+									className={`block ${active ? "text-amber-200" : done ? "text-violet-300/70" : "text-violet-300/25"}`}
+									animate={{ scale: active ? 1.4 : 1 }}
+									transition={{ duration: reduced ? 0 : 0.35, ease: "easeOut" }}
+								>
+									<Sparkle className="h-3 w-3" />
+								</Motion.span>
+							</li>
+						);
+					})}
+				</ol>
+
 				{submessage && (
-					<p className="mt-2 max-w-xs text-center text-xs leading-relaxed text-slate-400">
+					<p className="mt-3 max-w-xs text-center text-xs leading-relaxed text-slate-400">
 						{submessage}
 					</p>
 				)}
-
-				{/* Footer */}
-				<div className="mt-7 flex items-center gap-2 text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/50">
-					<span>Trusted local services</span>
-					<span className="text-amber-300/60">✦</span>
-					<span>Made effortless</span>
-				</div>
 			</div>
-		</motion.div>
+		</Motion.div>
 	);
 
 	if (fullScreen && typeof document !== "undefined" && document.body) {
 		return createPortal(content, document.body);
 	}
-
 	return content;
 }

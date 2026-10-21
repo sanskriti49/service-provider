@@ -187,6 +187,11 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
+	// Inspect the loader without replacing the application's router.
+	if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("preview") === "loader") {
+		return <PageLoader />;
+	}
+
 	return (
 		<>
 			<Toaster

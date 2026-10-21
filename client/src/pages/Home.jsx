@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 const detailHashes = new Set(["#how-it-works", "#work-with-us", "#contact"]);
 
 export default function Home() {
-	const { hash } = useLocation();
+	const { hash, key } = useLocation();
 	const detailsRef = useRef(null);
 	const [nearDetails, setNearDetails] = useState(false);
 	const [Details, setDetails] = useState(null);
@@ -41,6 +41,7 @@ export default function Home() {
 		const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth";
 		if (hash) {
 			const targetId = hash.replace("#", "");
+			let lastDestination;
 			const scrollWithOffset = () => {
 				const elem = document.getElementById(targetId) || (detailHashes.has(hash) ? detailsRef.current : null);
 				if (elem) {
@@ -49,17 +50,35 @@ export default function Home() {
 					// Layout offsets exclude the decorative entrance transform.
 					for (let node = elem; node; node = node.offsetParent) y += node.offsetTop;
 					y = targetId === "hero" ? 0 : y + yOffset;
-					window.scrollTo({ top: Math.max(0, y), behavior });
+					y = Math.max(0, y);
+					if (y !== lastDestination) {
+						lastDestination = y;
+						window.scrollTo({ top: y, behavior });
+					}
 					return true;
 				}
 				return false;
 			};
 
 			scrollWithOffset();
+			// Catalogue results and fonts can resize content above a deep link.
+			// Track that layout only until the user starts interacting again.
+			const observer = "ResizeObserver" in window ? new ResizeObserver(scrollWithOffset) : null;
+			for (const node of [document.getElementById("hero"), document.getElementById("services"), detailsRef.current]) {
+				if (node) observer?.observe(node);
+			}
+			const stopTracking = () => observer?.disconnect();
+			const inputEvents = ["wheel", "touchstart", "pointerdown", "keydown"];
+			for (const event of inputEvents) window.addEventListener(event, stopTracking, { passive: true });
+			return () => {
+				observer?.disconnect();
+				for (const event of inputEvents) window.removeEventListener(event, stopTracking);
+			};
 		} else {
 			window.scrollTo({ top: 0, behavior });
 		}
-	}, [hash, sectionReady]);
+		// The navigation key also changes when the current section is clicked again.
+	}, [hash, key, sectionReady]);
 
 	return (
 		<div className="relative w-full">

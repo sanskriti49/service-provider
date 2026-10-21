@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
  *
  * Consistent across Landing, Admin Dashboard, Provider Dashboard, Auth, and Footer:
  * - Illustrated floating lamp with reduced-motion-aware animation
- * - Original Lobster Two wordmark, colors, and spacing
+ * - Original Lobster Two lettering with an ink, orchid, and amber palette
  * - Harmonious theme variants (dark/light/primary)
  * - Optional link wrapping
  */
@@ -39,19 +39,16 @@ export default function Logo({
 	// Theme color treatments
 	const themeStyles = {
 		dark: {
-			prefix: "text-white",
-			suffix:
-				"bg-gradient-to-r from-violet-300 via-indigo-200 to-amber-300 bg-clip-text text-transparent",
+			prefix: "text-[#f6f0ff]",
+			suffix: "taskgenie-wordmark-accent--dark",
 		},
 		light: {
-			prefix: "text-slate-900",
-			suffix:
-				"bg-gradient-to-r from-violet-600 via-indigo-600 to-amber-600 bg-clip-text text-transparent",
+			prefix: "text-[#2f184b]",
+			suffix: "taskgenie-wordmark-accent--light",
 		},
 		primary: {
-			prefix: "text-[#1E1B4B]",
-			suffix:
-				"bg-gradient-to-r from-violet-600 via-indigo-600 to-amber-500 bg-clip-text text-transparent",
+			prefix: "text-[#2f184b]",
+			suffix: "taskgenie-wordmark-accent--light",
 		},
 	};
 
@@ -89,7 +86,7 @@ export default function Logo({
 			  of capital 'G' in Lobster Two is never clipped by the CSS background-clip: text box!
 			*/}
 			<span
-				className={`inline-block pl-2 -ml-2 pr-1.5 py-0.5 ${currentTheme.suffix}`}
+				className={`taskgenie-wordmark-accent inline-block pl-2 -ml-2 pr-1.5 py-0.5 ${currentTheme.suffix}`}
 			>
 				Genie
 			</span>

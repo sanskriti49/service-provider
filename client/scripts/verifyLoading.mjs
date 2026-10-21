@@ -134,6 +134,99 @@ try {
 		assert.deepEqual(errors, []);
 		console.log('PASS direct section link and no browser exceptions');
 
+		// Navbar clicks must update the router before their lazy section exists.
+		state.delay = 1500;
+		const navContext = await context({ viewport: { width: 1440, height: 900 } });
+		await navContext.route('**/assets/HomeDetails-*.js', async route => {
+			await new Promise(resolve => setTimeout(resolve, 750));
+			await route.continue();
+		});
+		const navPage = await navContext.newPage();
+		async function atSection(page, id) {
+			await page.waitForFunction(id => {
+				const section = document.getElementById(id);
+				return section && Math.abs(section.getBoundingClientRect().top - 90) < 10;
+			}, id).catch(async error => {
+				console.error('Section position:', await page.evaluate(id => ({ id, hash: location.hash, y: scrollY, top: document.getElementById(id)?.getBoundingClientRect().top }), id));
+				throw error;
+			});
+		}
+		await navPage.goto(origin);
+		assert.equal(await navPage.locator('#contact').count(), 0, 'details should still be deferred');
+		await navPage.getByRole('link', { name: 'Contact', exact: true }).first().click();
+		await navPage.waitForURL('**/#contact');
+		await atSection(navPage, 'contact');
+		await navPage.getByRole('link', { name: 'How It Works', exact: true }).first().click();
+		await atSection(navPage, 'how-it-works');
+		await navPage.getByRole('link', { name: 'How It Works', exact: true }).first().click();
+		await atSection(navPage, 'how-it-works');
+		await navPage.getByRole('link', { name: 'Provider', exact: true }).click();
+		await atSection(navPage, 'work-with-us');
+		await navPage.goBack();
+		await atSection(navPage, 'how-it-works');
+		await navPage.goForward();
+		await atSection(navPage, 'work-with-us');
+		await navPage.getByRole('link', { name: 'Home', exact: true }).click();
+		await navPage.waitForFunction(() => scrollY < 5);
+		await navPage.getByRole('link', { name: 'Browse all services', exact: true }).click();
+		await navPage.waitForURL('**/services');
+		await navPage.getByRole('link', { name: 'Contact', exact: true }).first().click();
+		await atSection(navPage, 'contact');
+		await navContext.close();
+		console.log('PASS desktop navbar: delayed lazy section, every section, repeated click, history and cross-page return');
+
+		state.delay = 20;
+		const mobileNavContext = await context({ reducedMotion: 'reduce' });
+		const mobileNavPage = await mobileNavContext.newPage();
+		await mobileNavPage.goto(origin);
+		for (const [label, id] of [['Contact', 'contact'], ['Become a Provider', 'work-with-us'], ['How It Works', 'how-it-works'], ['Featured on Home', 'services']]) {
+			await mobileNavPage.getByRole('button', { name: 'Toggle Navigation Menu' }).click();
+			await mobileNavPage.getByRole('link', { name: label, exact: true }).filter({ visible: true }).first().click();
+			await atSection(mobileNavPage, id);
+			await mobileNavPage.getByRole('link', { name: 'Become a Provider', exact: true }).waitFor({ state: 'hidden' });
+		}
+		await mobileNavContext.close();
+		assert.deepEqual(errors, []);
+		console.log('PASS mobile navbar: all section links, drawer closes and reduced-motion scrolling');
+
+		for (const reducedMotion of ['no-preference', 'reduce']) {
+			const loaderContext = await context({ reducedMotion });
+			let releaseChunk;
+			const chunkGate = new Promise(resolve => { releaseChunk = resolve; });
+			await loaderContext.route('**/assets/SignIn-*.js', async route => {
+				await chunkGate;
+				await route.continue();
+			});
+			const loaderPage = await loaderContext.newPage();
+			try {
+				await loaderPage.goto(`${origin}/login`, { waitUntil: 'domcontentloaded' });
+				const loader = loaderPage.getByRole('status', { name: 'Loading TaskGenie', exact: true });
+				await loader.waitFor();
+				await loaderPage.waitForFunction(() => {
+					const image = document.querySelector('[role="status"] img');
+					return image?.complete && image.naturalWidth > 0;
+				});
+				assert.equal(await loader.locator('svg').count(), 0, 'the artwork already contains painted smoke');
+				assert.equal(await loader.locator('.taskgenie-wordmark-accent').count(), 1);
+				assert.equal(await loaderPage.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+				const lamp = loader.locator('img');
+				const before = await lamp.evaluate(image => getComputedStyle(image).transform);
+				if (reducedMotion === 'reduce') {
+					await loaderPage.waitForTimeout(500);
+					assert.equal(await lamp.evaluate(image => getComputedStyle(image).transform), before);
+				} else {
+					await loaderPage.waitForFunction(before => getComputedStyle(document.querySelector('[role="status"] img')).transform !== before, before);
+				}
+				await loaderPage.screenshot({ path: path.join(output, `loader-${reducedMotion}.png`) });
+			} finally {
+				releaseChunk();
+			}
+			await loaderPage.getByRole('status', { name: 'Loading TaskGenie', exact: true }).waitFor({ state: 'hidden' });
+			await loaderContext.close();
+		}
+		assert.deepEqual(errors, []);
+		console.log('PASS branded loader: real chunk wait, painted artwork, shared lettering, motion and reduced motion');
+
 		const chat = await chatPage();
 		await chat.trigger.waitFor();
 		assert.equal(await chat.page.locator(homePreloads).count(), 0, 'dashboard must not preload homepage-only assets');
