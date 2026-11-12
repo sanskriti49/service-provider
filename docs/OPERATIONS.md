@@ -24,10 +24,29 @@ administrative access to an approved route. The current local compose file expos
 DB/Redis/LocalStack ports and uses test credentials: it is a local emulator setup,
 not the production security configuration. Do not deploy it unchanged publicly.
 
-The current DB connector disables certificate verification for its cloud SSL mode.
-Do not claim verified database TLS from that setting. Before a public deployment,
-configure the provider's CA verification and test it with that database. Current
-CORS also accepts Vercel subdomains and local/private origins; restrict deployment
+PostgreSQL requires an explicit `DB_SSL_MODE`: `disable` for a trusted local
+PostGIS connection, or `verify-full` for TLS with certificate chain and hostname
+verification. With `verify-full`, Node's default trust store is used unless
+`DB_SSL_CA_FILE` names a readable PEM CA bundle. A custom bundle replaces Node's
+default roots for this connection. Mount the file read-only into the API container
+if needed, and use the database hostname covered by the server certificate.
+
+Migration: before restarting an existing deployment, set `DB_SSL_MODE=verify-full`
+and configure its CA if required. Remove `sslmode=require`, `prefer`, `verify-ca`,
+and other SSL parameters from `DATABASE_URL`; these modes are rejected. A URL may
+instead specify `sslmode=verify-full` or `sslmode=disable`, provided it agrees with
+`DB_SSL_MODE` when both are set. `PGSSLMODE` is rejected. Do not use plaintext for
+a remote connection just to work around a certificate failure. Local Compose sets
+`DB_SSL_MODE=disable` for its internal PostGIS instance. Restart the API only
+after validating settings against the intended database in a sandbox.
+
+For a TLS failure, verify DNS and the database port, the hostname in DATABASE_URL,
+and the CA bundle path and permissions. A certificate can be inspected with
+`openssl s_client -starttls postgres -connect db.example.com:5432 -servername db.example.com -verify_hostname db.example.com -verify_return_error -CAfile postgres-ca.pem`.
+Use the actual hostname and CA file for your environment. Do not print database
+URLs or credentials in logs or screenshots.
+
+Current CORS also accepts Vercel subdomains and local/private origins; restrict deployment
 origins if you require a strict public origin allowlist. JWT authorization remains
 the access boundary; CORS is not authorization.
 

@@ -2,16 +2,12 @@ const path = require("path");
 // Prioritize server/.env regardless of process working directory
 require("dotenv").config({ path: path.join(__dirname, "../.env") });
 require("dotenv").config();
-const { Pool } = require("pg");
+const { Pool, Client } = require("pg");
+const tls = require("node:tls");
+const { databaseConnectionConfig } = require("./dbConnection");
 
-const isProduction = process.env.NODE_ENV === "production";
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
-const isNeonOrCloud = hasDatabaseUrl && (
-	process.env.DATABASE_URL.includes("neon.tech") ||
-	process.env.DATABASE_URL.includes("aws") ||
-	process.env.DATABASE_URL.includes("supabase") ||
-	process.env.DATABASE_URL.includes("sslmode=require")
-);
+const connection = databaseConnectionConfig(process.env);
 const isPgBouncer = process.env.PG_BOUNCER === "true" || (hasDatabaseUrl && process.env.DATABASE_URL.includes("6543"));
 
 // Resilient connection pooling configurations
@@ -28,10 +24,10 @@ const baseConfig = {
 };
 
 // Prioritize DATABASE_URL whenever defined (e.g. Neon Cloud), else fall back to local credentials
-const poolConfig = (hasDatabaseUrl || isProduction)
+const poolConfig = hasDatabaseUrl
 	? {
-			connectionString: process.env.DATABASE_URL,
-			ssl: (isNeonOrCloud || isProduction) ? { rejectUnauthorized: false } : false,
+			connectionString: connection.connectionString,
+			ssl: connection.ssl,
 			...baseConfig,
 		}
 	: {
@@ -40,19 +36,20 @@ const poolConfig = (hasDatabaseUrl || isProduction)
 			password: process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || "",
 			port: parseInt(process.env.DB_PORT || "5432", 10),
 			database: process.env.DB_NAME || process.env.POSTGRES_DB || "service_app",
-			ssl: false,
+			ssl: connection.ssl,
 			...baseConfig,
 		};
-
+// pg wraps an existing socket and omits servername for IP addresses. Explicitly
+// verify the actual connection host for both IP addresses and DNS names.
+if (connection.ssl) {
+	const host = new Client(poolConfig).connectionParameters.host;
+	poolConfig.ssl.checkServerIdentity = (_name, certificate) => tls.checkServerIdentity(host, certificate);
+}
 const pool = new Pool(poolConfig);
 
 pool.on("connect", () => {
 	if (process.env.NODE_ENV !== "test") {
-		console.log(
-			hasDatabaseUrl && isNeonOrCloud
-				? "🚀 LIVE: Connected to NEON DB CLOUD"
-				: (isProduction ? "🚀 LIVE: Connected to PostgreSQL Cloud" : "🏠 LOCAL: Connected to localized machine PostgreSQL"),
-		);
+		console.log("Connected to PostgreSQL");
 	}
 });
 
