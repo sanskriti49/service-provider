@@ -713,7 +713,6 @@ export default function AllBookings() {
 			return;
 		}
 		listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [meta.current_page]);
 
 	// Close the filter popover on outside click or Escape.
