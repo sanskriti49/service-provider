@@ -5,11 +5,11 @@ const express = require("express");
 const { createHealthRouter } = require("../routes/healthRoutes");
 
 test("health distinguishes unavailable DB from live process and volatile queue fallback", async (t) => {
-	let fail = false, engine = "in-memory", query;
+	let fail = false, queueFail = false, engine = "in-memory", query;
 	const app = express();
 	app.use("/health", createHealthRouter({
 		db: { query: async (input) => { query = input; if (fail) throw new Error("secret connection string"); } },
-		eventQueue: { getStats: () => ({ engine }) },
+		eventQueue: { getStats: () => { if (queueFail) throw new Error("secret schema details"); return { engine }; } },
 	}));
 	const server = http.createServer(app);
 	await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -22,6 +22,16 @@ test("health distinguishes unavailable DB from live process and volatile queue f
 	assert.deepEqual(query, { text: "SELECT 1", query_timeout: 2000 });
 	engine = "bullmq"; ready = await get("ready");
 	assert.equal(ready.data.checks.eventQueue.durable, true);
+	engine = "postgres-outbox"; ready = await get("ready");
+	assert.equal(ready.data.checks.eventQueue.status, "waiting-for-redis");
+	assert.equal(ready.data.checks.eventQueue.durable, true);
+	queueFail = true;
+	const missingOutbox = await get("ready");
+	assert.equal(missingOutbox.status, 503);
+	assert.equal(missingOutbox.data.checks.database.status, "connected");
+	assert.equal(missingOutbox.data.checks.eventQueue.status, "outbox-unavailable");
+	assert.equal(JSON.stringify(missingOutbox).includes("secret"), false);
+	queueFail = false;
 	fail = true;
 	const broken = await get("ready");
 	assert.equal(broken.status, 503);

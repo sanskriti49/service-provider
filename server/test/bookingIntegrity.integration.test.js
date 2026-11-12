@@ -15,6 +15,7 @@ function load(filename, stubs) {
 }
 const response = () => ({ statusCode: 200, status(n) { this.statusCode=n; return this; }, json(data) { this.data=data; return this; } });
 const url = process.env.BOOKING_TEST_DATABASE_URL;
+if (process.env.REQUIRE_INTEGRATION_TESTS === "1" && !url) throw new Error("BOOKING_TEST_DATABASE_URL is required");
 test("booking integrity: actual controllers, PostgreSQL constraints, concurrent captures and refund recovery", { skip: !url, timeout: 120000 }, async (t) => {
 	const { Pool } = require("pg");
 	const admin = new Pool({ connectionString: url });
@@ -30,6 +31,10 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 	await pool.query("ALTER TABLE providers ADD COLUMN status text NOT NULL DEFAULT 'pending'");
 	const migration = fs.readFileSync(path.join(__dirname, "../migrations/20261011_booking_integrity.sql"), "utf8").replaceAll("public.", `${schema}.`);
 	await pool.query(migration); await pool.query(migration);
+	const { outboxSchema } = require("../migrations/migrate_notification_outbox");
+	await pool.query(outboxSchema.replaceAll("public.", `${schema}.`));
+	const { EventQueue } = require("../utils/eventQueue");
+	const eventQueue = new EventQueue({ db: stubDb });
 	await pool.query("CREATE FUNCTION fixture_coordinate_sync() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$");
 	await pool.query("CREATE TRIGGER fixture_user_sync BEFORE INSERT OR UPDATE OF lat,lng ON users FOR EACH ROW EXECUTE FUNCTION fixture_coordinate_sync()");
 	await pool.query("CREATE TRIGGER fixture_booking_sync BEFORE UPDATE OF latitude,longitude ON bookings FOR EACH ROW EXECUTE FUNCTION fixture_coordinate_sync()");
@@ -58,10 +63,25 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 	}, refunds: { fetch: async(id)=>refunds.find((r)=>r.id===id) } };
 	const schedule=load("../services/bookingSchedule.js", {"../utils/geoUtils":{...require("../utils/geoUtils"),getDirectionalTravelDurations:async(origin,destinations)=>({to:destinations.map(()=>5),from:destinations.map(()=>7)})}});
 	const payment=load("../services/paymentService.js", {"./bookingSchedule":schedule});
-	const controller=load("../controllers/bookingController.js", { "../services/paymentService":payment,"../services/bookingSchedule":schedule, "../config/db":stubDb, razorpay:class {constructor(){Object.assign(this,gateway);}}, "../utils/eventQueue":{publish:()=>{}}, "../utils/sendEmail":async()=>{}, "../utils/notificationService":{sendNotification:async(input)=>notices.push(input)}, "../utils/distributedLock":{acquireLock:async()=>({acquired:true}),releaseLock:async()=>{}}, "../utils/circuitBreaker":{createProtectedBreaker:(action)=>({fire:action})} });
+	const controller=load("../controllers/bookingController.js", { "../services/paymentService":payment,"../services/bookingSchedule":schedule, "../config/db":stubDb, razorpay:class {constructor(){Object.assign(this,gateway);}}, "../utils/eventQueue":eventQueue, "../utils/sendEmail":async()=>{}, "../utils/notificationService":{sendNotification:async(input)=>notices.push(input)}, "../utils/distributedLock":{acquireLock:async()=>({acquired:true}),releaseLock:async()=>{}}, "../utils/circuitBreaker":{createProtectedBreaker:(action)=>({fire:action})} });
 	const actor = {id:customer,role:"customer"};
 	const book = async (start="10:00", method="online", extra={}) => { const res=response(); await controller.createBooking({user:actor,body:{provider_id:provider,service_id:service,date:"2040-01-02",start_time:start,address:"Test service address",payment_method:method,latitude:12,longitude:77,...extra}},res); return res; };
 	const capture = (booking,id=`pay_${randomUUID().replaceAll("-", "")}`) => {const payment={id,order_id:booking.razorpay_order_id,amount:120000,currency:"INR",status:"captured",captured:true};payments.set(id,payment);return payment;};
+	await t.test("booking status and both email intents commit together; an outbox write failure rolls back the status", async () => {
+		const change = async (id) => { const res=response(); await controller.updateBookingStatus({user:actor,params:{booking_id:id},body:{status:"cancelled"}},res); return res; };
+		const first=(await book("10:00","cod",{date:"2040-05-01"})).data.booking;
+		const changed=await change(first.booking_id); assert.equal(changed.statusCode,200,JSON.stringify(changed.data));
+		const jobs=await pool.query("SELECT * FROM notification_outbox WHERE payload->>'message' LIKE $1",[`%${first.booking_id}%`]);
+		assert.equal(jobs.rows.length,2); assert.ok(jobs.rows.every(row=>row.status==="pending"));
+		const second=(await book("10:00","cod",{date:"2040-05-02"})).data.booking;
+		await pool.query("CREATE FUNCTION reject_outbox() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture outbox failure'; END $$");
+		await pool.query("CREATE TRIGGER reject_outbox BEFORE INSERT ON notification_outbox FOR EACH ROW EXECUTE FUNCTION reject_outbox()");
+		try {
+			const failed=await change(second.booking_id); assert.equal(failed.statusCode,500);
+			assert.equal((await pool.query("SELECT status FROM bookings WHERE booking_id=$1",[second.booking_id])).rows[0].status,second.status);
+			assert.equal((await pool.query("SELECT COUNT(*)::int AS count FROM notification_outbox WHERE payload->>'message' LIKE $1",[`%${second.booking_id}%`])).rows[0].count,0);
+		} finally { await pool.query("DROP TRIGGER reject_outbox ON notification_outbox"); }
+	});
 	await t.test("customer coordinates, default/expanded radius and address edits survive actual PostgreSQL storage",async()=>{
 		const missing=await book("10:00","cod",{date:"2040-04-01",latitude:null,longitude:null});assert.equal(missing.statusCode,400);
 		const far=await book("10:00","cod",{date:"2040-04-01",latitude:12.05,longitude:77.7});assert.equal(far.statusCode,409);assert.match(far.data.message,/50 km/);

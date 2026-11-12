@@ -193,12 +193,12 @@ async function updateBookingStatus(req, res) {
             paymentStatus = "refund_pending";
         } else if (status === "completed" && booking.payment_method === "cod") paymentStatus = "paid";
         const updated = await client.query("UPDATE bookings SET status=$1,payment_status=$2,action_by=$3,updated_at=NOW() WHERE booking_id=$4 RETURNING *", [status,paymentStatus,req.user.role,booking.booking_id]);
+        await queueStatusEmails(client, booking, status, paymentStatus);
         await client.query("COMMIT");
         client.release(); client = null;
         bookingsTotal.inc({ status });
         const recipient = req.user.id === booking.user_id ? booking.provider_id : booking.user_id;
         await sendNotification({ userId: recipient, title: "Booking updated", message: `Booking status: ${status}.${paymentStatus === "refund_pending" ? " Refund awaits gateway confirmation." : ""}`, type: "booking_status", data: { booking_id: booking.booking_id, status, payment_status: paymentStatus } }).catch((error) => console.error("Status notification failed:", error.message));
-        await queueStatusEmails(booking, status, paymentStatus);
         return res.json({ message: "Booking updated", booking: serializeBooking(updated.rows[0], req.user) });
     } catch (error) { if (client) await client.query("ROLLBACK").catch(() => {}); return respondError(res, error); }
     finally { if (client) client.release(); }
@@ -350,14 +350,12 @@ async function getUpcomingBookings(req, res) {
 	}
 }
 
-async function queueStatusEmails(booking, status, paymentStatus) {
-    try {
-        const contacts = await db.query("SELECT email FROM users WHERE id IN ($1,$2)", [booking.user_id,booking.provider_id]);
-        for (const contact of contacts.rows) eventQueue.publish("SEND_EMAIL", {
+async function queueStatusEmails(client, booking, status, paymentStatus) {
+        const contacts = await client.query("SELECT email FROM users WHERE id IN ($1,$2)", [booking.user_id,booking.provider_id]);
+        for (const contact of contacts.rows) await eventQueue.publish("SEND_EMAIL", {
             email: contact.email, subject: `TaskGenie booking ${status}`,
             message: `Booking ${booking.booking_id} is now ${status}. Payment status: ${paymentStatus}. Refunds are complete only after gateway confirmation.`,
-        });
-    } catch (error) { console.error("Status email enqueue failed:", error.message); }
+        }, { client });
 }
 
 async function verifyPayment(req, res) {

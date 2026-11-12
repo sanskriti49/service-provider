@@ -68,11 +68,13 @@ also update the container health check. Never put payment secrets in Vite's publ
 - `/health/live`: process responds; it does not check dependencies.
 - `/health/ready`: PostgreSQL SELECT with a two-second query timeout, plus the
   pool's connection-acquisition timeout. Returns 503 if the DB check fails. Error
-  responses omit driver details. Queue fallback is reported as `volatile-fallback`
-  rather than pretending the queue is durable.
+  responses omit driver details. Notification intent is stored in the PostgreSQL
+  outbox; `waiting-for-redis` means delivery is paused while intent stays durable.
+  An unavailable outbox (including a missing migration) returns 503 and reports
+  `outbox-unavailable` separately from database connectivity.
 - `eventQueue.engine=bullmq`: Redis-backed mode is configured; this is not an
-  end-to-end delivery check. Counts are process counters, not a complete Redis
-  backlog or payment-worker health check.
+  end-to-end delivery check. Counts and `oldestPendingSeconds` come from the shared
+  outbox, not a complete Redis backlog or payment-worker health check.
 - `/health`: compatibility process probe; use `/health/ready` for DB readiness.
 - `/metrics`: HTTP latency/status, booking transitions, pool and queue counters.
   Keep it accessible only to the monitoring network.
@@ -108,10 +110,13 @@ FROM booking_refunds WHERE state IN ('submitting','unknown','failed')
 ORDER BY updated_at;
 ```
 
-If Redis is unavailable, booking DB correctness remains enforced. Notification
-fallback is volatile; restart can lose pending jobs. There is no transactional
-notification outbox and no separate application DLQ. Do not promise lossless
-notifications or re-run external sends without considering duplicates.
+If Redis is unavailable, booking DB correctness remains enforced. Booking-status
+email intents are now written in the booking transaction. Apply
+`npm run migrate:outbox --prefix server` before running this version. Redis outages
+leave email work in the outbox. Exhausted jobs are retained there for inspection
+and explicit replay; see [notification architecture and recovery](NOTIFICATION-QUEUE.md).
+There is no separate Redis DLQ. Do not promise exactly-once SMTP delivery or replay
+external sends without considering duplicates.
 
 ## Backup and restore drill
 

@@ -2,19 +2,25 @@ const nodemailer = require("nodemailer");
 const { createProtectedBreaker } = require("./circuitBreaker");
 
 const executeSmtpSend = async (options) => {
-	const transporter = nodemailer.createTransport({
+	const smtpConfig = process.env.NODE_ENV !== "production" && process.env.SMTP_HOST ? {
+		host: process.env.SMTP_HOST,
+		port: Number(process.env.SMTP_PORT || 1025),
+		secure: false,
+	} : {
 		service: "gmail",
 		auth: {
 			user: process.env.EMAIL_USER,
 			pass: process.env.EMAIL_PASS,
 		},
-	});
+	};
+	const transporter = nodemailer.createTransport(smtpConfig);
 
 	const message = {
 		from: `TaskGenie <${process.env.EMAIL_USER}>`,
 		to: options.email,
 		subject: options.subject,
 		text: options.message,
+		...(options.messageId ? { messageId: options.messageId } : {}),
 	};
 
 	const info = await transporter.sendMail(message);

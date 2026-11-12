@@ -15,6 +15,8 @@
 		"migrate:chat": "node migrations/migrate_chat.js",
 		"migrate:integrity": "node migrations/migrate_booking_integrity.js",
 		"migrate:locations": "node migrations/migrate_booking_location.js",
+		"migrate:outbox": "node migrations/migrate_notification_outbox.js",
+		"notifications": "node scripts/notifications.js",
 		"audit:locations": "node scripts/locationIntegrity.js",
 		"reconcile:payments": "node scripts/reconcilePayments.js",
 		"validate:integrity": "node scripts/validateIntegrity.js",
