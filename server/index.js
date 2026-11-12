@@ -106,6 +106,7 @@ const { register, metricsMiddleware, updatePoolMetrics } = require("./utils/metr
 const { globalLimiter } = require("./middleware/rateLimiter");
 const { getCircuitBreakerStatus } = require("./utils/circuitBreaker");
 const eventQueue = require("./utils/eventQueue");
+eventQueue.start();
 app.use(metricsMiddleware);
 app.use("/api", globalLimiter);
 
@@ -193,6 +194,10 @@ async function gracefulShutdown(signal) {
 	if (isShuttingDown) return;
 	isShuttingDown = true;
 	console.log(`\n🛑 [Server] Received ${signal}. Starting graceful shutdown...`);
+	setTimeout(() => {
+		console.error("⚠️ [Server] Graceful shutdown timed out after 10s. Forcing exit; outbox work remains recoverable.");
+		process.exit(1);
+	}, 10000).unref();
 
 	try {
 		await new Promise((resolve, reject) => {
@@ -223,10 +228,6 @@ async function gracefulShutdown(signal) {
 		process.exit(1);
 	}
 
-	setTimeout(() => {
-		console.error("⚠️ [Server] Graceful shutdown timed out after 10s. Forcing exit.");
-		process.exit(1);
-	}, 10000).unref();
 }
 
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));

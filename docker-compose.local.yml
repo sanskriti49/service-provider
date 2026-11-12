@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: postgis/postgis:15-3.4-alpine
+    environment:
+      POSTGRES_USER: taskgenie_local
+      POSTGRES_PASSWORD: local-fixture-only
+      POSTGRES_DB: taskgenie_local
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U taskgenie_local -d taskgenie_local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mail:
+    image: axllent/mailpit:v1.27.10
+    ports:
+      - "127.0.0.1:18025:8025"
+    networks: [default, edge]
+
+  migrate:
+    image: taskgenie-local-api
+    build: ./server
+    command: ["node", "migrations/create_tables.js"]
+    environment: &api_env
+      NODE_ENV: development
+      PORT: 5000
+      DATABASE_URL: postgresql://taskgenie_local:local-fixture-only@postgres:5432/taskgenie_local
+      DB_SSL_MODE: disable
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: local-fixture-only-do-not-use-in-production
+      CLIENT_URL: http://localhost:18080
+      PAYMENT_RECONCILIATION_ENABLED: "false"
+      SMTP_HOST: mail
+      SMTP_PORT: "1025"
+      EMAIL_USER: taskgenie@example.test
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    image: taskgenie-local-api
+    build: ./server
+    environment: *api_env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5000/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  client:
+    build: ./client
+    ports:
+      - "127.0.0.1:18080:80"
+    volumes:
+      - ./client/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [default, edge]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    internal: true
+  edge:

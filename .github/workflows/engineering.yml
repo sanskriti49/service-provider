@@ -6,34 +6,109 @@ permissions:
   contents: read
 jobs:
   correctness:
+    if: github.event.repository.private == false
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     services:
-      postgres:
-        image: postgres:18
+      postgis:
+        image: postgis/postgis:15-3.4-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: fixture-only
-          POSTGRES_DB: taskgenie_test
+          POSTGRES_DB: taskgenie_migration_test
         ports:
-          - 5432:5432
+          - 5432/tcp
         options: >-
-          --health-cmd "pg_isready -U postgres -d taskgenie_test"
-          --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d taskgenie_migration_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: fixture-only
+          POSTGRES_DB: taskgenie_migration_test
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d taskgenie_migration_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379/tcp
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      BOOKING_TEST_DATABASE_URL: postgresql://postgres:fixture-only@127.0.0.1:5432/taskgenie_test
-      CHAT_TEST_DATABASE_URL: postgresql://postgres:fixture-only@127.0.0.1:5432/taskgenie_test
+      NODE_ENV: test
+      DB_SSL_MODE: disable
+      REQUIRE_INTEGRATION_TESTS: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '22'
-      - run: npm ci --prefix server
-      - run: npm ci --prefix client
-      - run: node client/node_modules/playwright/cli.js install --with-deps chromium
-      - run: npm run verify:engineering -- --browser
-      - uses: actions/upload-artifact@v4
+          package-manager-cache: false
+      - name: Configure fixture connections
+        run: |
+          POSTGIS_URL="postgresql://postgres:fixture-only@127.0.0.1:${{ job.services.postgis.ports['5432'] }}/taskgenie_migration_test"
+          echo "DATABASE_URL=$POSTGIS_URL" >> "$GITHUB_ENV"
+          echo "BOOKING_TEST_DATABASE_URL=$POSTGIS_URL" >> "$GITHUB_ENV"
+          echo "CHAT_TEST_DATABASE_URL=$POSTGIS_URL" >> "$GITHUB_ENV"
+          echo "MIGRATION_TEST_POSTGIS_URL=$POSTGIS_URL" >> "$GITHUB_ENV"
+          echo "OUTBOX_TEST_DATABASE_URL=$POSTGIS_URL" >> "$GITHUB_ENV"
+          echo "MIGRATION_TEST_PLAIN_URL=postgresql://postgres:fixture-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/taskgenie_migration_test" >> "$GITHUB_ENV"
+          echo "OUTBOX_TEST_REDIS_URL=redis://127.0.0.1:${{ job.services.redis.ports['6379'] }}" >> "$GITHUB_ENV"
+      - name: Install locked dependencies without lifecycle scripts
+        run: |
+          npm ci --ignore-scripts
+          npm ci --prefix server --ignore-scripts
+          npm ci --prefix client --ignore-scripts
+      - name: Security audit
+        run: |
+          npm audit --audit-level=high
+          npm audit --prefix server --audit-level=high
+          npm audit --prefix client --audit-level=high
+      - name: Unit tests and frontend build
+        run: |
+          npm run test:dev
+          node --test server/test/authValidation.test.js server/test/dbConnection.test.js server/test/migrationRunner.test.js server/test/seedLogging.test.js server/test/emailTransport.test.js server/test/eventQueue.test.js server/test/health.test.js
+          npm test --prefix client
+          npm run lint --prefix client
+          npm run build --prefix client
+      - name: Start isolated PostgreSQL TLS fixture
+        run: |
+          docker run -d --rm --tmpfs /var/lib/postgresql/data \
+            --name taskgenie-ci-tls --label taskgenie.tls-fixture=true \
+            -e POSTGRES_PASSWORD=fixture-only -e POSTGRES_DB=taskgenie_tls_test \
+            -p 127.0.0.1::5432 postgres:16-alpine
+          for i in $(seq 1 60); do
+            if docker exec taskgenie-ci-tls pg_isready -h 127.0.0.1 -U postgres -d taskgenie_tls_test; then break; fi
+            sleep 1
+          done
+          docker exec taskgenie-ci-tls pg_isready -h 127.0.0.1 -U postgres -d taskgenie_tls_test
+          PORT=$(docker port taskgenie-ci-tls 5432/tcp | sed 's/.*://')
+          echo "TLS_TEST_CONTAINER=taskgenie-ci-tls" >> "$GITHUB_ENV"
+          echo "TLS_TEST_DATABASE_URL=postgresql://postgres:fixture-only@127.0.0.1:${PORT}/taskgenie_tls_test" >> "$GITHUB_ENV"
+      - name: Database TLS, migration and outbox integration
+        run: node --test server/test/postgresTls.integration.test.js server/test/migrationRunner.integration.test.js server/test/notificationOutbox.integration.test.js
+      - name: Browser and booking integration
+        run: |
+          node client/node_modules/playwright/cli.js install --with-deps chromium
+          npm run verify:engineering -- --browser
+      - name: Build container images
+        run: |
+          docker build -t taskgenie-ci-api ./server
+          docker build -t taskgenie-ci-client ./client
+          docker run --rm --network none taskgenie-ci-api node -e "const b=require('bcrypt'); if (!b.compareSync('fixture',b.hashSync('fixture',4))) process.exit(1); require('bullmq'); require('pg')"
+      - name: Stop TLS fixture
+        if: always()
+        run: docker stop taskgenie-ci-tls || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: engineering-evidence
           path: work/engineering-evidence/
+          if-no-files-found: ignore

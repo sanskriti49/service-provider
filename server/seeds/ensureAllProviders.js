@@ -1,5 +1,4 @@
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
-const { Pool } = require("pg");
 const { fakerEN_IN: faker } = require("@faker-js/faker");
 const { customAlphabet } = require("nanoid");
 const { hashIfPresent } = require("../utils/hash");
@@ -268,27 +267,12 @@ async function ensureProvidersForPool(pool, poolName) {
 }
 
 async function run() {
-	// 1. Run on Local DB
+	// Use the same configured database and TLS settings as the application.
 	const localDb = require("../config/db");
 	try {
-		await ensureProvidersForPool(localDb, "LOCAL POSTGRESQL");
+		await ensureProvidersForPool(localDb, "CONFIGURED POSTGRESQL");
 	} catch (err) {
-		console.error("Local DB seeding error:", err);
-	}
-
-	// 2. Run on Neon Cloud DB
-	if (process.env.DATABASE_URL) {
-		const neonPool = new Pool({
-			connectionString: process.env.DATABASE_URL,
-			ssl: { rejectUnauthorized: false },
-		});
-		try {
-			await ensureProvidersForPool(neonPool, "NEON CLOUD DATABASE");
-		} catch (err) {
-			console.error("Neon DB seeding error:", err);
-		} finally {
-			await neonPool.end();
-		}
+		console.error("DB seeding error:", err);
 	}
 
 	await localDb.end();

@@ -121,15 +121,6 @@ const seedData = async () => {
 	const client = await db.connect();
 	try {
 		console.log("✅ Connected to DB...");
-		const debug = await client.query(`
-	SELECT 
-		current_database() AS db,
-		current_schema() AS schema,
-		inet_server_addr() AS host
-`);
-		console.log("DB DEBUG:", debug.rows[0]);
-		console.log("DATABASE_URL:", process.env.DATABASE_URL?.slice(0, 45));
-
 		if (RESET_PROVIDERS_ONLY) {
 			console.log("🔄 Resetting provider tables...");
 			await client.query(`

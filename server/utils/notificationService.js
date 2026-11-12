@@ -42,6 +42,7 @@ async function sendNotification(
 		return notification;
 	} catch (err) {
 		console.error("Failed to send notification:", err);
+		if (options.throwOnError) throw err;
 		return null;
 	}
 }

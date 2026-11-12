@@ -78,7 +78,6 @@ export default function ChatReportModal({
 		}
 	};
 
-	const roleLabel = user.role === "provider" ? "Customer" : "Provider";
 	const peerRoleLabel = user.role === "provider" ? "customer" : "provider";
 
 	return (

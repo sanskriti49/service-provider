@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
 	LayoutDashboard,
@@ -92,7 +92,6 @@ export default function AdminDashboard() {
 		commission_rate: { percentage: 15, min_fee: 50 },
 		cancellation_fee: { customer_fee: 100, provider_penalty: 150 },
 	});
-	const [loadingSettings, setLoadingSettings] = useState(false);
 	const [savingSettings, setSavingSettings] = useState(false);
 
 	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -180,7 +179,6 @@ export default function AdminDashboard() {
 
 	// 4. Fetch Settings
 	const fetchSettings = useCallback(async () => {
-		setLoadingSettings(true);
 		try {
 			const res = await api.get("/api/admin/settings");
 			if (res.data?.success && res.data.settings) {
@@ -188,8 +186,6 @@ export default function AdminDashboard() {
 			}
 		} catch (err) {
 			console.error("Failed to load settings:", err);
-		} finally {
-			setLoadingSettings(false);
 		}
 	}, []);
 

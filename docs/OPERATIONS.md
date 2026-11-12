@@ -24,10 +24,29 @@ administrative access to an approved route. The current local compose file expos
 DB/Redis/LocalStack ports and uses test credentials: it is a local emulator setup,
 not the production security configuration. Do not deploy it unchanged publicly.
 
-The current DB connector disables certificate verification for its cloud SSL mode.
-Do not claim verified database TLS from that setting. Before a public deployment,
-configure the provider's CA verification and test it with that database. Current
-CORS also accepts Vercel subdomains and local/private origins; restrict deployment
+PostgreSQL requires an explicit `DB_SSL_MODE`: `disable` for a trusted local
+PostGIS connection, or `verify-full` for TLS with certificate chain and hostname
+verification. With `verify-full`, Node's default trust store is used unless
+`DB_SSL_CA_FILE` names a readable PEM CA bundle. A custom bundle replaces Node's
+default roots for this connection. Mount the file read-only into the API container
+if needed, and use the database hostname covered by the server certificate.
+
+Migration: before restarting an existing deployment, set `DB_SSL_MODE=verify-full`
+and configure its CA if required. Remove `sslmode=require`, `prefer`, `verify-ca`,
+and other SSL parameters from `DATABASE_URL`; these modes are rejected. A URL may
+instead specify `sslmode=verify-full` or `sslmode=disable`, provided it agrees with
+`DB_SSL_MODE` when both are set. `PGSSLMODE` is rejected. Do not use plaintext for
+a remote connection just to work around a certificate failure. Local Compose sets
+`DB_SSL_MODE=disable` for its internal PostGIS instance. Restart the API only
+after validating settings against the intended database in a sandbox.
+
+For a TLS failure, verify DNS and the database port, the hostname in DATABASE_URL,
+and the CA bundle path and permissions. A certificate can be inspected with
+`openssl s_client -starttls postgres -connect db.example.com:5432 -servername db.example.com -verify_hostname db.example.com -verify_return_error -CAfile postgres-ca.pem`.
+Use the actual hostname and CA file for your environment. Do not print database
+URLs or credentials in logs or screenshots.
+
+Current CORS also accepts Vercel subdomains and local/private origins; restrict deployment
 origins if you require a strict public origin allowlist. JWT authorization remains
 the access boundary; CORS is not authorization.
 
@@ -44,7 +63,22 @@ Fresh DB uses `npm run migrate --prefix server` and `npm run migrate:chat --pref
 server`. The integrity migration requires `btree_gist`; do not delete conflicting
 legacy records to force it through. Resolve overlaps/duplicate payment IDs with
 an explicit audit. Migration success checks new writes but does not validate every
-historical row. After reviewing historical issues:
+historical row.
+
+The main migration runs its current schema steps on one connection in a single
+transaction. PostgreSQL rolls back those steps if a statement fails or the
+connection ends before commit. Locks can therefore remain held for the entire
+migration; stop writers and plan for the lock time. The current extension creation
+and non-concurrent indexes can run inside the transaction. Any future operation
+that PostgreSQL requires outside a transaction, such as `CREATE INDEX CONCURRENTLY`,
+needs a separate explicitly managed step. If connection loss occurs during commit,
+inspect the database before retrying because the commit outcome may be uncertain.
+Earlier partial migrations from older runner versions are not automatically undone.
+The runner skips only its designated spatial setup when PostgreSQL reports PostGIS
+is neither installed nor available; permission errors and failures in an available
+PostGIS installation fail the migration. `btree_gist` remains required.
+
+After reviewing historical issues:
 
 ```powershell
 npm run validate:integrity --prefix server
@@ -68,11 +102,13 @@ also update the container health check. Never put payment secrets in Vite's publ
 - `/health/live`: process responds; it does not check dependencies.
 - `/health/ready`: PostgreSQL SELECT with a two-second query timeout, plus the
   pool's connection-acquisition timeout. Returns 503 if the DB check fails. Error
-  responses omit driver details. Queue fallback is reported as `volatile-fallback`
-  rather than pretending the queue is durable.
+  responses omit driver details. Notification intent is stored in the PostgreSQL
+  outbox; `waiting-for-redis` means delivery is paused while intent stays durable.
+  An unavailable outbox (including a missing migration) returns 503 and reports
+  `outbox-unavailable` separately from database connectivity.
 - `eventQueue.engine=bullmq`: Redis-backed mode is configured; this is not an
-  end-to-end delivery check. Counts are process counters, not a complete Redis
-  backlog or payment-worker health check.
+  end-to-end delivery check. Counts and `oldestPendingSeconds` come from the shared
+  outbox, not a complete Redis backlog or payment-worker health check.
 - `/health`: compatibility process probe; use `/health/ready` for DB readiness.
 - `/metrics`: HTTP latency/status, booking transitions, pool and queue counters.
   Keep it accessible only to the monitoring network.
@@ -108,10 +144,13 @@ FROM booking_refunds WHERE state IN ('submitting','unknown','failed')
 ORDER BY updated_at;
 ```
 
-If Redis is unavailable, booking DB correctness remains enforced. Notification
-fallback is volatile; restart can lose pending jobs. There is no transactional
-notification outbox and no separate application DLQ. Do not promise lossless
-notifications or re-run external sends without considering duplicates.
+If Redis is unavailable, booking DB correctness remains enforced. Booking-status
+email intents are now written in the booking transaction. Apply
+`npm run migrate:outbox --prefix server` before running this version. Redis outages
+leave email work in the outbox. Exhausted jobs are retained there for inspection
+and explicit replay; see [notification architecture and recovery](NOTIFICATION-QUEUE.md).
+There is no separate Redis DLQ. Do not promise exactly-once SMTP delivery or replay
+external sends without considering duplicates.
 
 ## Backup and restore drill
 

@@ -9,7 +9,6 @@ import NavServices from "./NavServices";
 import NotificationBell from "./NotificationBell";
 import Logo from "./Logo";
 
-import { API_URL } from "../config";
 function cn(...inputs) {
 	return twMerge(clsx(inputs));
 }
@@ -58,11 +57,11 @@ const Navbar = () => {
 			try {
 				const decoded = jwtDecode(token);
 				setUser(decoded);
-			} catch (e) {
+			} catch {
 				localStorage.removeItem("token");
 			}
 		}
-	}, [API_URL]);
+	}, []);
 
 	useEffect(() => {
 		setMobileMenuOpen(false);
