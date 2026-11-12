@@ -1,14 +1,14 @@
 # Multi-stage production build for TaskGenie API
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /usr/src/app
 
 # Install dependencies first for optimized layer caching
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev --ignore-scripts
 
 # Production runtime stage (lean, non-root user)
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
