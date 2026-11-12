@@ -63,7 +63,22 @@ Fresh DB uses `npm run migrate --prefix server` and `npm run migrate:chat --pref
 server`. The integrity migration requires `btree_gist`; do not delete conflicting
 legacy records to force it through. Resolve overlaps/duplicate payment IDs with
 an explicit audit. Migration success checks new writes but does not validate every
-historical row. After reviewing historical issues:
+historical row.
+
+The main migration runs its current schema steps on one connection in a single
+transaction. PostgreSQL rolls back those steps if a statement fails or the
+connection ends before commit. Locks can therefore remain held for the entire
+migration; stop writers and plan for the lock time. The current extension creation
+and non-concurrent indexes can run inside the transaction. Any future operation
+that PostgreSQL requires outside a transaction, such as `CREATE INDEX CONCURRENTLY`,
+needs a separate explicitly managed step. If connection loss occurs during commit,
+inspect the database before retrying because the commit outcome may be uncertain.
+Earlier partial migrations from older runner versions are not automatically undone.
+The runner skips only its designated spatial setup when PostgreSQL reports PostGIS
+is neither installed nor available; permission errors and failures in an available
+PostGIS installation fail the migration. `btree_gist` remains required.
+
+After reviewing historical issues:
 
 ```powershell
 npm run validate:integrity --prefix server

@@ -3,6 +3,39 @@ const { integritySchema } = require("./migrate_booking_integrity");
 const { chatSchema } = require("./migrate_chat");
 const { locationSchema } = require("./migrate_booking_location");
 const { supportModerationSchema } = require("./migrate_support_moderation");
+const { outboxSchema } = require("./migrate_notification_outbox");
+
+const spatialQueries = [
+	// PostGIS Spatial Extension & Geography Indexing
+	`CREATE EXTENSION IF NOT EXISTS postgis;`,
+	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS geom geography(Point, 4326);`,
+	`CREATE INDEX IF NOT EXISTS idx_users_geom_gist ON public.users USING GIST (geom);`,
+	`DO $$
+	BEGIN
+	  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
+	    UPDATE public.users
+	    SET geom = ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography
+	    WHERE lat IS NOT NULL AND lng IS NOT NULL AND geom IS NULL;
+	  END IF;
+	END $$;`,
+	`ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS geom geography(Point, 4326);`,
+	`CREATE INDEX IF NOT EXISTS idx_bookings_geom_gist ON public.bookings USING GIST (geom);`,
+	`CREATE OR REPLACE FUNCTION sync_user_geom()
+	RETURNS trigger AS $$
+	BEGIN
+	  IF NEW.lat IS NOT NULL AND NEW.lng IS NOT NULL THEN
+	    NEW.geom = ST_SetSRID(ST_MakePoint(NEW.lng, NEW.lat), 4326)::geography;
+	  ELSE
+	    NEW.geom = NULL;
+	  END IF;
+	  RETURN NEW;
+	END;
+	$$ LANGUAGE plpgsql;`,
+	`DROP TRIGGER IF EXISTS trg_users_geom_sync ON public.users;`,
+	`CREATE TRIGGER trg_users_geom_sync
+	BEFORE INSERT OR UPDATE OF lat, lng ON public.users
+	FOR EACH ROW EXECUTE FUNCTION sync_user_geom();`,
+];
 
 const queries = [
 	`CREATE TABLE IF NOT EXISTS public.users (
@@ -254,70 +287,48 @@ const queries = [
      ('cancellation_fee', '{"customer_fee": 100, "provider_penalty": 150}'::jsonb)
    ON CONFLICT (key) DO NOTHING`,
 
-	// PostGIS Spatial Extension & Geography Indexing
-	`CREATE EXTENSION IF NOT EXISTS postgis;`,
-	`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS geom geography(Point, 4326);`,
-	`CREATE INDEX IF NOT EXISTS idx_users_geom_gist ON public.users USING GIST (geom);`,
-	`DO $$
-	BEGIN
-	  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
-	    UPDATE public.users 
-	    SET geom = ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography 
-	    WHERE lat IS NOT NULL AND lng IS NOT NULL AND geom IS NULL;
-	  END IF;
-	END $$;`,
-	`ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS geom geography(Point, 4326);`,
-	`CREATE INDEX IF NOT EXISTS idx_bookings_geom_gist ON public.bookings USING GIST (geom);`,
-	`CREATE OR REPLACE FUNCTION sync_user_geom() 
-	RETURNS trigger AS $$
-	BEGIN
-	  IF NEW.lat IS NOT NULL AND NEW.lng IS NOT NULL THEN
-	    NEW.geom = ST_SetSRID(ST_MakePoint(NEW.lng, NEW.lat), 4326)::geography;
-	  ELSE
-	    NEW.geom = NULL;
-	  END IF;
-	  RETURN NEW;
-	END;
-	$$ LANGUAGE plpgsql;`,
-	`DROP TRIGGER IF EXISTS trg_users_geom_sync ON public.users;`,
-	`CREATE TRIGGER trg_users_geom_sync
-	BEFORE INSERT OR UPDATE OF lat, lng ON public.users
-	FOR EACH ROW EXECUTE FUNCTION sync_user_geom();`,
+	...spatialQueries,
 	integritySchema,
 	locationSchema,
 	supportModerationSchema,
+	outboxSchema,
 ];
 
 const runMigration = async () => {
+	let client;
+	let step = 0;
 	try {
 		console.log("⏳ Starting migration...");
-		let spatialAvailable = true;
+		client = await db.connect();
+		await client.query("BEGIN");
+		const capability = await client.query(`SELECT EXISTS (
+			SELECT 1 FROM pg_available_extensions WHERE name = 'postgis'
+			UNION ALL SELECT 1 FROM pg_extension WHERE extname = 'postgis'
+		) AS available`);
+		const spatialAvailable = capability.rows[0].available;
+		if (!spatialAvailable) console.warn("PostGIS is not installed or available; skipping optional spatial setup.");
 		for (const [index, query] of queries.entries()) {
-			if (!spatialAvailable && /postgis|geography|geom/i.test(query)) continue;
-			try {
-				console.log(`... Running Step ${index + 1}/${queries.length}`);
-				await db.query(query);
-			} catch (stepErr) {
-				// If postgis extension is not supported on this specific PG server, log and continue
-				if (query.includes("postgis") || query.includes("geography") || query.includes("geom")) {
-					spatialAvailable = false;
-					console.warn(`⚠️ PostGIS step skipped (standard PostgreSQL without spatial module): ${stepErr.message}`);
-				} else {
-					throw stepErr;
-				}
-			}
+			if (!spatialAvailable && spatialQueries.includes(query)) continue;
+			step = index + 1;
+			console.log(`... Running Step ${step}/${queries.length}`);
+			await client.query(query);
 		}
+		await client.query("COMMIT");
 		console.log("✅ All tables created successfully!");
 	} catch (err) {
-		console.error("❌ Migration failed:", err.message);
-		process.exitCode = 1;
+		if (client) {
+			try { await client.query("ROLLBACK"); }
+			catch (rollbackError) { console.error("Migration rollback failed:", rollbackError.message); }
+		}
+		console.error(`❌ Migration failed${step ? ` at step ${step}` : ""}:`, err.message);
+		throw err;
 	} finally {
-		db.end();
+		if (client) client.release();
 	}
 };
 
 if (require.main === module) {
-	runMigration();
+	runMigration().catch(() => { process.exitCode = 1; }).finally(() => db.end());
 }
 
 module.exports = { queries, runMigration };
