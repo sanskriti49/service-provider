@@ -64,3 +64,6 @@ docker compose -p taskgenie-local -f docker-compose.local.yml stop
 Use `up -d` to start it again. Existing volumes retain PostgreSQL and Redis data.
 The fixture passwords and SMTP configuration are separate from any existing
 deployment. The SMTP override is ignored in production mode.
+
+See [dependency and CI practices](DEPENDENCIES-CI.md) for the isolated
+integration tests and controlled dependency installation.
