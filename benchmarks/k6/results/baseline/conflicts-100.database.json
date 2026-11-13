@@ -1,0 +1,30 @@
+{
+  "rows": [
+    {
+      "date": "2038-01-21",
+      "total": 1,
+      "confirmed": 1
+    },
+    {
+      "date": "2038-01-22",
+      "total": 1,
+      "confirmed": 1
+    },
+    {
+      "date": "2038-01-23",
+      "total": 1,
+      "confirmed": 1
+    },
+    {
+      "date": "2038-01-24",
+      "total": 1,
+      "confirmed": 1
+    },
+    {
+      "date": "2038-01-25",
+      "total": 1,
+      "confirmed": 1
+    }
+  ],
+  "activeOverlapPairs": 0
+}

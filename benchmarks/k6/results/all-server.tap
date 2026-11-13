@@ -1,0 +1,1153 @@
+TAP version 13
+# Subtest: accountController: Saved Addresses, Payment Methods & Feedback
+ok 1 - accountController: Saved Addresses, Payment Methods & Feedback # SKIP
+  ---
+  duration_ms: 1.3546
+  type: 'suite'
+  ...
+# Subtest: admin: formatHourLabel accurately converts 24h hours to 12h AM/PM strings
+ok 2 - admin: formatHourLabel accurately converts 24h hours to 12h AM/PM strings
+  ---
+  duration_ms: 1.796
+  type: 'test'
+  ...
+# Subtest: admin: Commission calculation applies configured percentage accurately
+ok 3 - admin: Commission calculation applies configured percentage accurately
+  ---
+  duration_ms: 0.392
+  type: 'test'
+  ...
+# Subtest: admin: Provider status transitions strictly validate allowed statuses
+ok 4 - admin: Provider status transitions strictly validate allowed statuses
+  ---
+  duration_ms: 0.458
+  type: 'test'
+  ...
+# Subtest: admin: Dispute resolution validates statuses and refund constraints
+ok 5 - admin: Dispute resolution validates statuses and refund constraints
+  ---
+  duration_ms: 0.8859
+  type: 'test'
+  ...
+# Subtest: admin: Commission settings bounds enforce valid percentage range
+ok 6 - admin: Commission settings bounds enforce valid percentage range
+  ---
+  duration_ms: 0.4601
+  type: 'test'
+  ...
+# Subtest: authValidation: normalizeEmail trims, downcases, and normalizes gmail addresses
+ok 7 - authValidation: normalizeEmail trims, downcases, and normalizes gmail addresses
+  ---
+  duration_ms: 1.7566
+  type: 'test'
+  ...
+# Subtest: authValidation: formatName capitalizes words and trims properly
+ok 8 - authValidation: formatName capitalizes words and trims properly
+  ---
+  duration_ms: 0.3006
+  type: 'test'
+  ...
+# Subtest: authValidation: hashIfPresent returns bcrypt hash for string
+ok 9 - authValidation: hashIfPresent returns bcrypt hash for string
+  ---
+  duration_ms: 147.7485
+  type: 'test'
+  ...
+# Subtest: codes use four digits and serializers disclose codes only to the owning customer
+ok 10 - codes use four digits and serializers disclose codes only to the owning customer
+  ---
+  duration_ms: 2.936
+  type: 'test'
+  ...
+# Subtest: terminal states cannot be resurrected and completion requires in-progress
+ok 11 - terminal states cannot be resurrected and completion requires in-progress
+  ---
+  duration_ms: 1.0285
+  type: 'test'
+  ...
+# Subtest: production HMAC verifier fails closed for missing secrets, forged prefixes and tampered bodies
+ok 12 - production HMAC verifier fails closed for missing secrets, forged prefixes and tampered bodies
+  ---
+  duration_ms: 6.618
+  type: 'test'
+  ...
+# Subtest: booking idempotency: retried request with identical Idempotency-Key returns existing booking with duplicate flag
+ok 13 - booking idempotency: retried request with identical Idempotency-Key returns existing booking with duplicate flag
+  ---
+  duration_ms: 216.8194
+  type: 'test'
+  ...
+# Subtest: booking idempotency: non-UUID idempotency key is deterministically hashed and accepted
+ok 14 - booking idempotency: non-UUID idempotency key is deterministically hashed and accepted
+  ---
+  duration_ms: 275.1187
+  type: 'test'
+  ...
+# Subtest: booking integrity: actual controllers, PostgreSQL constraints, concurrent captures and refund recovery
+    # Subtest: customer coordinates, default/expanded radius and address edits survive actual PostgreSQL storage
+    ok 1 - customer coordinates, default/expanded radius and address edits survive actual PostgreSQL storage
+      ---
+      duration_ms: 166.7873
+      type: 'test'
+      ...
+    # Subtest: a just-inside-radius customer point retains precision through persistence and payment finalization
+    ok 2 - a just-inside-radius customer point retains precision through persistence and payment finalization
+      ---
+      duration_ms: 78.9075
+      type: 'test'
+      ...
+    # Subtest: legacy missing locations block travel and require owner confirmation of the unchanged address
+    ok 3 - legacy missing locations block travel and require owner confirmation of the unchanged address
+      ---
+      duration_ms: 340.802
+      type: 'test'
+      ...
+    # Subtest: confirmed batch repairs validate all jobs together and roll back stale or unsafe input
+    ok 4 - confirmed batch repairs validate all jobs together and roll back stale or unsafe input
+      ---
+      duration_ms: 188.7248
+      type: 'test'
+      ...
+    # Subtest: captured payment with an unconfirmed legacy location is recorded and refunded rather than activating
+    ok 5 - captured payment with an unconfirmed legacy location is recorded and refunded rather than activating
+      ---
+      duration_ms: 92.376
+      type: 'test'
+      ...
+    # Subtest: location audit is read-only and confirmed saved/provider repairs preserve labels and recheck booked jobs
+    ok 6 - location audit is read-only and confirmed saved/provider repairs preserve labels and recheck booked jobs
+      ---
+      duration_ms: 225.8645
+      type: 'test'
+      ...
+    # Subtest: forged prefixes/signatures and unbound booking IDs cannot mark paid
+    ok 7 - forged prefixes/signatures and unbound booking IDs cannot mark paid
+      ---
+      duration_ms: 82.7298
+      type: 'test'
+      ...
+    # Subtest: expired hold replacement survives concurrent callback/webhook finalization
+    ok 8 - expired hold replacement survives concurrent callback/webhook finalization
+      ---
+      duration_ms: 146.6055
+      type: 'test'
+      ...
+    # Subtest: valid concurrent captures activate once; mismatch cannot change financial state
+    ok 9 - valid concurrent captures activate once; mismatch cannot change financial state
+      ---
+      duration_ms: 125.212
+      type: 'test'
+      ...
+    # Subtest: address IDOR, terminal resurrection, and admin/provider OTP disclosures are rejected
+    ok 10 - address IDOR, terminal resurrection, and admin/provider OTP disclosures are rejected
+      ---
+      duration_ms: 91.3286
+      type: 'test'
+      ...
+    # Subtest: refund submission with lost response reconciles without double refund
+    ok 11 - refund submission with lost response reconciles without double refund
+      ---
+      duration_ms: 51.7764
+      type: 'test'
+      ...
+    # Subtest: database rejects duplicate payment, invalid states/times and overlapping active bookings
+    ok 12 - database rejects duplicate payment, invalid states/times and overlapping active bookings
+      ---
+      duration_ms: 25.2602
+      type: 'test'
+      ...
+    # Subtest: simultaneous COD bookings allocate only one interval
+    ok 13 - simultaneous COD bookings allocate only one interval
+      ---
+      duration_ms: 119.2677
+      type: 'test'
+      ...
+    # Subtest: server rejects unavailable providers, hidden services and out-of-hours slots
+    ok 14 - server rejects unavailable providers, hidden services and out-of-hours slots
+      ---
+      duration_ms: 104.9982
+      type: 'test'
+      ...
+    # Subtest: webhooks require raw-body signatures; replay cannot resurrect refunded booking
+    ok 15 - webhooks require raw-body signatures; replay cannot resurrect refunded booking
+      ---
+      duration_ms: 20.3961
+      type: 'test'
+      ...
+    # Subtest: pending and failed refunds never claim refunded; concurrent workers submit once
+    ok 16 - pending and failed refunds never claim refunded; concurrent workers submit once
+      ---
+      duration_ms: 61.2904
+      type: 'test'
+      ...
+    # Subtest: actual HTTP routes strip codes from every provider/admin response
+    ok 17 - actual HTTP routes strip codes from every provider/admin response
+      ---
+      duration_ms: 791.5818
+      type: 'test'
+      ...
+# Booking operation failed: Error Gateway unavailable
+    # Subtest: periodic reconciliation recovers missed callbacks and order failures create no fake booking
+    ok 18 - periodic reconciliation recovers missed callbacks and order failures create no fake booking
+      ---
+      duration_ms: 256.8432
+      type: 'test'
+      ...
+    # Subtest: signed webhook before browser confirmation and repeated events activate and notify once
+    ok 19 - signed webhook before browser confirmation and repeated events activate and notify once
+      ---
+      duration_ms: 224.3627
+      type: 'test'
+      ...
+    # Subtest: hold expiring while finalization waits for a schedule lock cannot be resurrected
+    ok 20 - hold expiring while finalization waits for a schedule lock cannot be resurrected
+      ---
+      duration_ms: 2498.9408
+      type: 'test'
+      ...
+    # Subtest: hold expiring behind a chat-style booking row lock is checked after acquiring the row
+    ok 21 - hold expiring behind a chat-style booking row lock is checked after acquiring the row
+      ---
+      duration_ms: 2228.9456
+      type: 'test'
+      ...
+    # Subtest: uncertain refund with no discoverable receipt is never blindly submitted again
+    ok 22 - uncertain refund with no discoverable receipt is never blindly submitted again
+      ---
+      duration_ms: 126.0581
+      type: 'test'
+      ...
+# CONTENTION_REPORT {"measuredAt":"2026-10-21T11:05:53.348Z","node":"v22.22.0","postgres":"15.8","poolMax":10,"conditions":"Loopback HTTP; actual JWT middleware, routes, controllers and PostgreSQL. Synthetic provider, 1200 INR service, one slot per round. Redis admission lock, rate limiter, gateway and notification delivery stubbed. This verifies DB contention correctness, not production throughput.","rounds":[{"method":"cod","requests":50,"accepted":1,"rejected":49,"errors":0,"committed":1,"elapsedMs":1416,"p50Ms":1008,"p95Ms":1361},{"method":"online","requests":50,"accepted":1,"rejected":49,"errors":0,"committed":1,"elapsedMs":1240,"p50Ms":885,"p95Ms":1182}]}
+    # Subtest: HTTP contention evidence: 50 COD and 50 online requests each reserve only one slot
+    ok 23 - HTTP contention evidence: 50 COD and 50 online requests each reserve only one slot
+      ---
+      duration_ms: 2671.0847
+      type: 'test'
+      ...
+    1..23
+ok 15 - booking integrity: actual controllers, PostgreSQL constraints, concurrent captures and refund recovery
+  ---
+  duration_ms: 12430.83
+  type: 'test'
+  ...
+# Subtest: booking controller: online booking uses the normalized date before the advisory lock and returns its Razorpay order
+ok 16 - booking controller: online booking uses the normalized date before the advisory lock and returns its Razorpay order
+  ---
+  duration_ms: 410.6299
+  type: 'test'
+  ...
+# Subtest: booking API requires coordinates and enforces the default radius when it is omitted
+ok 17 - booking API requires coordinates and enforces the default radius when it is omitted
+  ---
+  duration_ms: 18.6528
+  type: 'test'
+  ...
+# Subtest: booking controller: cash booking still commits and sends booking notifications without creating an online order
+ok 18 - booking controller: cash booking still commits and sends booking notifications without creating an online order
+  ---
+  duration_ms: 5.1536
+  type: 'test'
+  ...
+# Subtest: booking controller stores the customer's exact coordinates, including zero, and rejects partial pairs
+ok 19 - booking controller stores the customer's exact coordinates, including zero, and rejects partial pairs
+  ---
+  duration_ms: 5.6685
+  type: 'test'
+  ...
+# Real-time refund reconcile note: Razorpay gateway timeout: connection reset
+# Subtest: recovery: getRecoveryItems returns interrupted checkouts with active hold and countdown
+ok 20 - recovery: getRecoveryItems returns interrupted checkouts with active hold and countdown
+  ---
+  duration_ms: 1100.6725
+  type: 'test'
+  ...
+# Subtest: recovery: getRecoveryItems exposes pending, failed, and uncertain refunds transparently
+ok 21 - recovery: getRecoveryItems exposes pending, failed, and uncertain refunds transparently
+  ---
+  duration_ms: 7.0986
+  type: 'test'
+  ...
+# Subtest: recovery: missing refund record with partially_refunded produces unknown amount under review without crashing
+ok 22 - recovery: missing refund record with partially_refunded produces unknown amount under review without crashing
+  ---
+  duration_ms: 5.8115
+  type: 'test'
+  ...
+# Subtest: recovery: resumeCheckout on an ACTIVE hold proceeds immediately with existing order
+ok 23 - recovery: resumeCheckout on an ACTIVE hold proceeds immediately with existing order
+  ---
+  duration_ms: 4.6931
+  type: 'test'
+  ...
+# Subtest: recovery: resumeCheckout on an EXPIRED hold re-verifies slot and re-holds for 5 minutes
+ok 24 - recovery: resumeCheckout on an EXPIRED hold re-verifies slot and re-holds for 5 minutes
+  ---
+  duration_ms: 4.868
+  type: 'test'
+  ...
+# Subtest: recovery: resumeCheckout rejects CANCELLED booking and does NOT resurrect it
+ok 25 - recovery: resumeCheckout rejects CANCELLED booking and does NOT resurrect it
+  ---
+  duration_ms: 4.7027
+  type: 'test'
+  ...
+# Subtest: recovery: resumeCheckout on an expired hold fails safely if slot was taken by another user
+ok 26 - recovery: resumeCheckout on an expired hold fails safely if slot was taken by another user
+  ---
+  duration_ms: 2.983
+  type: 'test'
+  ...
+# Subtest: recovery: resumeCheckout denies unauthorized customer (403)
+ok 27 - recovery: resumeCheckout denies unauthorized customer (403)
+  ---
+  duration_ms: 4.0676
+  type: 'test'
+  ...
+# Subtest: recovery: reconcileCustomerRefund checks gateway and updates refund status
+ok 28 - recovery: reconcileCustomerRefund checks gateway and updates refund status
+  ---
+  duration_ms: 6.0231
+  type: 'test'
+  ...
+# Subtest: recovery: reconcileCustomerRefund rejects synthetic ID or invalid UUID with 400 Bad Request
+ok 29 - recovery: reconcileCustomerRefund rejects synthetic ID or invalid UUID with 400 Bad Request
+  ---
+  duration_ms: 7.6099
+  type: 'test'
+  ...
+# Subtest: recovery: reconcileCustomerRefund returns 502 with synced: false when gateway sync fails
+ok 30 - recovery: reconcileCustomerRefund returns 502 with synced: false when gateway sync fails
+  ---
+  duration_ms: 4.1582
+  type: 'test'
+  ...
+# Subtest: recovery: reconcileCustomerRefund rejects non-owner customer with 403
+ok 31 - recovery: reconcileCustomerRefund rejects non-owner customer with 403
+  ---
+  duration_ms: 5.3942
+  type: 'test'
+  ...
+# Subtest: gaps of 120 minutes still require the actual travel buffer
+ok 32 - gaps of 120 minutes still require the actual travel buffer
+  ---
+  duration_ms: 556.7012
+  type: 'test'
+  ...
+# Subtest: short trips never reduce the minimum service buffer
+ok 33 - short trips never reduce the minimum service buffer
+  ---
+  duration_ms: 2.0936
+  type: 'test'
+  ...
+# Subtest: travel before and after a booking uses the appropriate direction, including zero coordinates
+ok 34 - travel before and after a booking uses the appropriate direction, including zero coordinates
+  ---
+  duration_ms: 3.1171
+  type: 'test'
+  ...
+# Subtest: every advertised slot passes the final validator with identical data and routing
+ok 35 - every advertised slot passes the final validator with identical data and routing
+  ---
+  duration_ms: 5.3944
+  type: 'test'
+  ...
+# Subtest: routing failures fail closed consistently for displayed slots and final bookings
+ok 36 - routing failures fail closed consistently for displayed slots and final bookings
+  ---
+  duration_ms: 3.1154
+  type: 'test'
+  ...
+# Subtest: unpublished schedules and date exceptions never generate default bookable hours
+ok 37 - unpublished schedules and date exceptions never generate default bookable hours
+  ---
+  duration_ms: 3.0893
+  type: 'test'
+  ...
+# Subtest: service durations and existing service buffers are respected
+ok 38 - service durations and existing service buffers are respected
+  ---
+  duration_ms: 2.4424
+  type: 'test'
+  ...
+# Subtest: lead time is calculated in Asia/Kolkata even when the server timezone differs
+ok 39 - lead time is calculated in Asia/Kolkata even when the server timezone differs
+  ---
+  duration_ms: 2.0507
+  type: 'test'
+  ...
+# Subtest: availability batches database reads across all requested dates
+ok 40 - availability batches database reads across all requested dates
+  ---
+  duration_ms: 9.4331
+  type: 'test'
+  ...
+# Subtest: changing the customer address rechecks the selected radius in availability and final validation
+ok 41 - changing the customer address rechecks the selected radius in availability and final validation
+  ---
+  duration_ms: 2.1373
+  type: 'test'
+  ...
+# Subtest: internal scheduling callers cannot bypass location or radius by omitting parameters
+ok 42 - internal scheduling callers cannot bypass location or radius by omitting parameters
+  ---
+  duration_ms: 2.5542
+  type: 'test'
+  ...
+# Subtest: an unpositioned existing booking blocks travel verification consistently
+ok 43 - an unpositioned existing booking blocks travel verification consistently
+  ---
+  duration_ms: 1.9429
+  type: 'test'
+  ...
+# Subtest: cache: set and get returns cached value
+ok 44 - cache: set and get returns cached value
+  ---
+  duration_ms: 197.9014
+  type: 'test'
+  ...
+# Subtest: cache: del removes key
+ok 45 - cache: del removes key
+  ---
+  duration_ms: 0.3517
+  type: 'test'
+  ...
+# Subtest: cache: delPattern removes all keys matching substring pattern
+ok 46 - cache: delPattern removes all keys matching substring pattern
+  ---
+  duration_ms: 0.3276
+  type: 'test'
+  ...
+# Subtest: cache: expired item returns null
+ok 47 - cache: expired item returns null
+  ---
+  duration_ms: 49.3468
+  type: 'test'
+  ...
+# Subtest: chat validates payloads before acquiring a database connection
+ok 48 - chat validates payloads before acquiring a database connection
+  ---
+  duration_ms: 13.9959
+  type: 'test'
+  ...
+# Subtest: chat PostgreSQL, HTTP and real Socket.IO integration
+    # Subtest: authorization denies outsiders on all operations without revealing existence
+    ok 1 - authorization denies outsiders on all operations without revealing existence
+      ---
+      duration_ms: 34.5055
+      type: 'test'
+      ...
+    # Subtest: simultaneous retries persist once and conflicting reuse is rejected
+    ok 2 - simultaneous retries persist once and conflicting reuse is rejected
+      ---
+      duration_ms: 344.2623
+      type: 'test'
+      ...
+    # Subtest: history pagination, bounded receipts and conversation isolation
+    ok 3 - history pagination, bounded receipts and conversation isolation
+      ---
+      duration_ms: 161.7994
+      type: 'test'
+      ...
+    # Subtest: HTTP auth, participant restrictions and safe error responses
+    ok 4 - HTTP auth, participant restrictions and safe error responses
+      ---
+      duration_ms: 129.1806
+      type: 'test'
+      ...
+# Socket auth error: jwt malformed
+# Socket auth error: jwt expired
+    # Subtest: socket auth rejects missing, invalid, expired and deleted-user tokens
+    ok 5 - socket auth rejects missing, invalid, expired and deleted-user tokens
+      ---
+      duration_ms: 142.8435
+      type: 'test'
+      ...
+# 🔌 Socket connected: BxbYlbtqhF4Sp9IQAAAE (User: a998d9d3-87fa-4891-96a6-6e7aa16b7fac, Role: customer)
+# 🔌 Socket connected: yT2zUGSJiDFokvrUAAAF (User: b5abc990-7b8d-4c78-be53-93698ad0e7d6, Role: provider)
+# 🔌 Socket connected: hYubHhWRB-boul5wAAAG (User: be82f9e2-0750-4092-966d-cd4c9109f0e9, Role: customer)
+# 🔌 Socket disconnected: yT2zUGSJiDFokvrUAAAF
+# 🔌 Socket connected: Gi4V-HVqpv9Q81PGAAAH (User: b5abc990-7b8d-4c78-be53-93698ad0e7d6, Role: provider)
+    # Subtest: private socket delivery, acknowledgements, read receipts and reconnect replay
+    ok 6 - private socket delivery, acknowledgements, read receipts and reconnect replay
+      ---
+      duration_ms: 306.7158
+      type: 'test'
+      ...
+# 🔌 Socket connected: Cm1i2ddw3Bv3OBhrAAAI (User: a998d9d3-87fa-4891-96a6-6e7aa16b7fac, Role: customer)
+# 🔌 Socket disconnected: Cm1i2ddw3Bv3OBhrAAAI
+    # Subtest: active sockets disconnect on token expiry
+    ok 7 - active sockets disconnect on token expiry
+      ---
+      duration_ms: 1158.1628
+      type: 'test'
+      ...
+# Chat operation failed: 08006
+    # Subtest: failed database operations do not leak SQL
+    ok 8 - failed database operations do not leak SQL
+      ---
+      duration_ms: 26.3009
+      type: 'test'
+      ...
+    # Subtest: transaction failure rolls back a pending message and allows a safe retry
+    ok 9 - transaction failure rolls back a pending message and allows a safe retry
+      ---
+      duration_ms: 26.4147
+      type: 'test'
+      ...
+# 🔌 Socket connected: pMjBsPezuCNJf2hAAAAJ (User: a998d9d3-87fa-4891-96a6-6e7aa16b7fac, Role: customer)
+    # Subtest: socket request limits and server-owned sender identity
+    ok 10 - socket request limits and server-owned sender identity
+      ---
+      duration_ms: 147.6192
+      type: 'test'
+      ...
+# 🔌 Socket disconnected: BxbYlbtqhF4Sp9IQAAAE
+# 🔌 Socket disconnected: hYubHhWRB-boul5wAAAG
+# 🔌 Socket disconnected: Gi4V-HVqpv9Q81PGAAAH
+# 🔌 Socket disconnected: pMjBsPezuCNJf2hAAAAJ
+    # Subtest: booking deletion cascades messages and prevents future access
+    ok 11 - booking deletion cascades messages and prevents future access
+      ---
+      duration_ms: 22.3836
+      type: 'test'
+      ...
+    1..11
+ok 49 - chat PostgreSQL, HTTP and real Socket.IO integration
+  ---
+  duration_ms: 4029.8488
+  type: 'test'
+  ...
+# Subtest: circuitBreaker: Fault Tolerance & Resilient 3rd-Party Integration
+    # Subtest: executes successfully when downstream service is healthy
+    ok 1 - executes successfully when downstream service is healthy
+      ---
+      duration_ms: 2.9859
+      type: 'test'
+      ...
+    # Subtest: trips circuit to OPEN when failure threshold is reached
+    ok 2 - trips circuit to OPEN when failure threshold is reached
+      ---
+      duration_ms: 3.1428
+      type: 'test'
+      ...
+    # Subtest: getCircuitBreakerStatus returns current state of registered breakers
+    ok 3 - getCircuitBreakerStatus returns current state of registered breakers
+      ---
+      duration_ms: 0.4788
+      type: 'test'
+      ...
+    1..3
+ok 50 - circuitBreaker: Fault Tolerance & Resilient 3rd-Party Integration
+  ---
+  duration_ms: 9.4749
+  type: 'suite'
+  ...
+# Subtest: dbPool: PostgreSQL Connection Pooling Safeguards
+    # Subtest: getPoolStats returns valid structure and limits
+    ok 1 - getPoolStats returns valid structure and limits
+      ---
+      duration_ms: 1.1073
+      type: 'test'
+      ...
+    # Subtest: updatePoolMetrics correctly sets Prometheus gauges
+    ok 2 - updatePoolMetrics correctly sets Prometheus gauges
+      ---
+      duration_ms: 1.0995
+      type: 'test'
+      ...
+    1..2
+ok 51 - dbPool: PostgreSQL Connection Pooling Safeguards
+  ---
+  duration_ms: 3.8802
+  type: 'suite'
+  ...
+# Subtest: distributedLock: Redis / Fallback Distributed Concurrency Control
+    # Subtest: successfully acquires and releases an exclusive lock
+    ok 1 - successfully acquires and releases an exclusive lock
+      ---
+      duration_ms: 5.5258
+      type: 'test'
+      ...
+    # Subtest: rejects release with an invalid token
+    ok 2 - rejects release with an invalid token
+      ---
+      duration_ms: 0.4136
+      type: 'test'
+      ...
+    # Subtest: withDistributedLock executes protected block and releases automatically
+    ok 3 - withDistributedLock executes protected block and releases automatically
+      ---
+      duration_ms: 0.815
+      type: 'test'
+      ...
+    # Subtest: withDistributedLock throws LockAcquisitionError on collision
+    ok 4 - withDistributedLock throws LockAcquisitionError on collision
+      ---
+      duration_ms: 1.2488
+      type: 'test'
+      ...
+    1..4
+ok 52 - distributedLock: Redis / Fallback Distributed Concurrency Control
+  ---
+  duration_ms: 10.2785
+  type: 'suite'
+  ...
+# Subtest: eventQueue: Asynchronous Event-Driven Worker Queue
+    # Subtest: publish queues an event and triggers registered handler asynchronously
+    ok 1 - publish queues an event and triggers registered handler asynchronously
+      ---
+      duration_ms: 57.1507
+      type: 'test'
+      ...
+    # Subtest: retries failed jobs with exponential backoff
+    ok 2 - retries failed jobs with exponential backoff
+      ---
+      duration_ms: 364.1672
+      type: 'test'
+      ...
+    # Subtest: getStats returns pending, active, queued, and processed counts
+    ok 3 - getStats returns pending, active, queued, and processed counts
+      ---
+      duration_ms: 262.8348
+      type: 'test'
+      ...
+    1..3
+ok 53 - eventQueue: Asynchronous Event-Driven Worker Queue
+  ---
+  duration_ms: 687.2684
+  type: 'suite'
+  ...
+# Subtest: geoUtils: calculateHaversineDistance calculates distance accurately
+ok 54 - geoUtils: calculateHaversineDistance calculates distance accurately
+  ---
+  duration_ms: 1.8445
+  type: 'test'
+  ...
+# Subtest: geoUtils: calculateHaversineDistance handles identical coordinates
+ok 55 - geoUtils: calculateHaversineDistance handles identical coordinates
+  ---
+  duration_ms: 0.2929
+  type: 'test'
+  ...
+# Subtest: geoUtils: calculateHaversineDistance handles invalid/null coordinates
+ok 56 - geoUtils: calculateHaversineDistance handles invalid/null coordinates
+  ---
+  duration_ms: 0.2633
+  type: 'test'
+  ...
+# Subtest: geoUtils: calculateHaversineDistance rejects out-of-bounds coordinates
+ok 57 - geoUtils: calculateHaversineDistance rejects out-of-bounds coordinates
+  ---
+  duration_ms: 0.3837
+  type: 'test'
+  ...
+# Subtest: geoUtils: estimateTravelTimeMinutes computes realistic buffer times
+ok 58 - geoUtils: estimateTravelTimeMinutes computes realistic buffer times
+  ---
+  duration_ms: 0.232
+  type: 'test'
+  ...
+# Subtest: geoUtils: calculateMatchScore yields higher score for closer, high-rated providers
+ok 59 - geoUtils: calculateMatchScore yields higher score for closer, high-rated providers
+  ---
+  duration_ms: 0.3561
+  type: 'test'
+  ...
+# Subtest: health distinguishes unavailable DB from live process and volatile queue fallback
+ok 60 - health distinguishes unavailable DB from live process and volatile queue fallback
+  ---
+  duration_ms: 134.2307
+  type: 'test'
+  ...
+# Subtest: availability and dated discovery require a complete customer location and default to 50 km
+ok 61 - availability and dated discovery require a complete customer location and default to 50 km
+  ---
+  duration_ms: 169.4264
+  type: 'test'
+  ...
+# Subtest: legacy repair rejects guessed coordinates, missing confirmation and duplicate targets before connecting
+ok 62 - legacy repair rejects guessed coordinates, missing confirmation and duplicate targets before connecting
+  ---
+  duration_ms: 209.3603
+  type: 'test'
+  ...
+# Subtest: changed profile locations clear stale coordinates, never geocode a city automatically, and invalidate discovery
+ok 63 - changed profile locations clear stale coordinates, never geocode a city automatically, and invalidate discovery
+  ---
+  duration_ms: 434.0879
+  type: 'test'
+  ...
+# Subtest: saved address changes clear old coordinates while label-only edits preserve them
+ok 64 - saved address changes clear old coordinates while label-only edits preserve them
+  ---
+  duration_ms: 4.9967
+  type: 'test'
+  ...
+# Subtest: saved addresses store zero coordinates and reject malformed or partial pairs
+ok 65 - saved addresses store zero coordinates and reject malformed or partial pairs
+  ---
+  duration_ms: 2.636
+  type: 'test'
+  ...
+# Subtest: metrics: Prometheus Cloud Observability
+    # Subtest: register renders Prometheus metrics format string
+    ok 1 - register renders Prometheus metrics format string
+      ---
+      duration_ms: 8.1425
+      type: 'test'
+      ...
+    # Subtest: bookingsTotal increment properly tracks status label
+    ok 2 - bookingsTotal increment properly tracks status label
+      ---
+      duration_ms: 1.8194
+      type: 'test'
+      ...
+    # Subtest: eventQueueJobsTotal increment tracks event_type and status labels
+    ok 3 - eventQueueJobsTotal increment tracks event_type and status labels
+      ---
+      duration_ms: 1.6794
+      type: 'test'
+      ...
+    # Subtest: metricsMiddleware calls next() for bypassed and active routes
+    ok 4 - metricsMiddleware calls next() for bypassed and active routes
+      ---
+      duration_ms: 0.2946
+      type: 'test'
+      ...
+    1..4
+ok 66 - metrics: Prometheus Cloud Observability
+  ---
+  duration_ms: 14.2451
+  type: 'suite'
+  ...
+# Subtest: providerController: addProviderService rolls back transaction before returning 400 for unknown service slug
+ok 67 - providerController: addProviderService rolls back transaction before returning 400 for unknown service slug
+  ---
+  duration_ms: 949.933
+  type: 'test'
+  ...
+# Subtest: providerController: addProviderService rolls back transaction before returning 404 for unknown provider
+ok 68 - providerController: addProviderService rolls back transaction before returning 404 for unknown provider
+  ---
+  duration_ms: 5.3975
+  type: 'test'
+  ...
+# Subtest: providerController: submitKyc clears verification flags and badges on replacement KYC resubmission
+ok 69 - providerController: submitKyc clears verification flags and badges on replacement KYC resubmission
+  ---
+  duration_ms: 11.0728
+  type: 'test'
+  ...
+# Subtest: authRoutes: verify-email-change persists attempts and decrements remaining count correctly
+ok 70 - authRoutes: verify-email-change persists attempts and decrements remaining count correctly
+  ---
+  duration_ms: 1093.8258
+  type: 'test'
+  ...
+# Subtest: providerController: getProviders paginates results and provides standard pagination headers
+ok 71 - providerController: getProviders paginates results and provides standard pagination headers
+  ---
+  duration_ms: 53.2883
+  type: 'test'
+  ...
+# Subtest: providerController: dated discovery with pagination stops schedule checking once page target is fulfilled
+ok 72 - providerController: dated discovery with pagination stops schedule checking once page target is fulfilled
+  ---
+  duration_ms: 9.5637
+  type: 'test'
+  ...
+# Subtest: pricing: getPriceDetails returns accurate details for House Cleaning
+ok 73 - pricing: getPriceDetails returns accurate details for House Cleaning
+  ---
+  duration_ms: 1.7158
+  type: 'test'
+  ...
+# Subtest: pricing: getPriceDetails returns accurate details for Laundry (per cloth)
+ok 74 - pricing: getPriceDetails returns accurate details for Laundry (per cloth)
+  ---
+  duration_ms: 0.2306
+  type: 'test'
+  ...
+# Subtest: pricing: getPriceDetails returns accurate details for Plumbing (visiting)
+ok 75 - pricing: getPriceDetails returns accurate details for Plumbing (visiting)
+  ---
+  duration_ms: 0.1846
+  type: 'test'
+  ...
+# Subtest: pricing: getPriceDetails falls back to default for unknown service
+ok 76 - pricing: getPriceDetails falls back to default for unknown service
+  ---
+  duration_ms: 0.1816
+  type: 'test'
+  ...
+# Subtest: auth: revoked token in cache is rejected by verifyToken middleware
+ok 77 - auth: revoked token in cache is rejected by verifyToken middleware
+  ---
+  duration_ms: 161.4633
+  type: 'test'
+  ...
+# Subtest: auth: cached user authentication bypasses redundant database query
+ok 78 - auth: cached user authentication bypasses redundant database query
+  ---
+  duration_ms: 4.445
+  type: 'test'
+  ...
+# Subtest: kyc: Document type validation allows only authorized identification types
+ok 79 - kyc: Document type validation allows only authorized identification types
+  ---
+  duration_ms: 1.3265
+  type: 'test'
+  ...
+# Subtest: kyc: Status transitions enforce verified, rejected, or pending states
+ok 80 - kyc: Status transitions enforce verified, rejected, or pending states
+  ---
+  duration_ms: 0.2714
+  type: 'test'
+  ...
+# Subtest: kyc: Verified Pro badge is awarded upon verification and revoked upon rejection or suspension
+ok 81 - kyc: Verified Pro badge is awarded upon verification and revoked upon rejection or suspension
+  ---
+  duration_ms: 1.3431
+  type: 'test'
+  ...
+# Subtest: kyc: Document number sanitization trims and strips invalid special characters
+ok 82 - kyc: Document number sanitization trims and strips invalid special characters
+  ---
+  duration_ms: 0.2489
+  type: 'test'
+  ...
+# Subtest: s3: generatePresignedUploadUrl returns valid upload URL and scoped fileKey
+ok 83 - s3: generatePresignedUploadUrl returns valid upload URL and scoped fileKey
+  ---
+  duration_ms: 341.7318
+  type: 'test'
+  ...
+# Subtest: s3: generatePresignedDownloadUrl returns signed URL for private documents
+ok 84 - s3: generatePresignedDownloadUrl returns signed URL for private documents
+  ---
+  duration_ms: 1.3201
+  type: 'test'
+  ...
+# Subtest: s3: uploadBufferToS3 correctly processes file buffer and returns URL
+ok 85 - s3: uploadBufferToS3 correctly processes file buffer and returns URL
+  ---
+  duration_ms: 57.2379
+  type: 'test'
+  ...
+# Subtest: real SQL spatial/fallback discovery and advertised slots agree
+ok 86 - real SQL spatial/fallback discovery and advertised slots agree
+  ---
+  duration_ms: 2446.4261
+  type: 'test'
+  ...
+# Subtest: identical concurrent undated searches share one database fill
+ok 87 - identical concurrent undated searches share one database fill
+  ---
+  duration_ms: 834.9996
+  type: 'test'
+  ...
+# Subtest: a failed shared fill reaches all waiters and the next request can retry
+ok 88 - a failed shared fill reaches all waiters and the next request can retry
+  ---
+  duration_ms: 15.1147
+  type: 'test'
+  ...
+# Subtest: dated availability searches and different locations retain independent reads
+ok 89 - dated availability searches and different locations retain independent reads
+  ---
+  duration_ms: 16.7042
+  type: 'test'
+  ...
+# Subtest: default radius excludes distant and unknown providers without any fallback
+ok 90 - default radius excludes distant and unknown providers without any fallback
+  ---
+  duration_ms: 15.3421
+  type: 'test'
+  ...
+# Subtest: radius and service/price/rating filters stay in the sole SQL query
+ok 91 - radius and service/price/rating filters stay in the sole SQL query
+  ---
+  duration_ms: 7.8947
+  type: 'test'
+  ...
+# Subtest: invalid, partial coordinates, malformed dates and unsupported parameters return 400
+ok 92 - invalid, partial coordinates, malformed dates and unsupported parameters return 400
+  ---
+  duration_ms: 111.7532
+  type: 'test'
+  ...
+# Subtest: both spatial and fallback paths use full precision at the radius boundary
+ok 93 - both spatial and fallback paths use full precision at the radius boundary
+  ---
+  duration_ms: 24.4932
+  type: 'test'
+  ...
+# Subtest: unknown distance stays unknown and does not receive proximity or guaranteed availability credit
+ok 94 - unknown distance stays unknown and does not receive proximity or guaranteed availability credit
+  ---
+  duration_ms: 11.1649
+  type: 'test'
+  ...
+# Subtest: partial spatial migrations gracefully use the same strict fallback
+ok 95 - partial spatial migrations gracefully use the same strict fallback
+  ---
+  duration_ms: 11.239
+  type: 'test'
+  ...
+# Subtest: dated discovery checks actual schedule availability
+ok 96 - dated discovery checks actual schedule availability
+  ---
+  duration_ms: 43.0156
+  type: 'test'
+  ...
+# Subtest: onboarding accepts the UI password contract and requires a password
+ok 97 - onboarding accepts the UI password contract and requires a password
+  ---
+  duration_ms: 1168.0529
+  type: 'test'
+  ...
+# Subtest: unknown onboarding service rolls back before releasing the transaction
+ok 98 - unknown onboarding service rolls back before releasing the transaction
+  ---
+  duration_ms: 6.041
+  type: 'test'
+  ...
+# Subtest: onboarding preserves zero service-base coordinates and validates their pair and range
+ok 99 - onboarding preserves zero service-base coordinates and validates their pair and range
+  ---
+  duration_ms: 126.0276
+  type: 'test'
+  ...
+# Subtest: rateLimiter: API Abuse & DDoS Prevention
+    # Subtest: allows requests under the rate limit threshold
+    ok 1 - allows requests under the rate limit threshold
+      ---
+      duration_ms: 9.6555
+      type: 'test'
+      ...
+    # Subtest: blocks requests when rate limit threshold is exceeded
+    ok 2 - blocks requests when rate limit threshold is exceeded
+      ---
+      duration_ms: 26.1425
+      type: 'test'
+      ...
+    1..2
+ok 100 - rateLimiter: API Abuse & DDoS Prevention
+  ---
+  duration_ms: 38.4571
+  type: 'suite'
+  ...
+# Subtest: reviews: Customer & Provider Review Validation
+    # Subtest: calculates star rating distribution and averages accurately
+    ok 1 - calculates star rating distribution and averages accurately
+      ---
+      duration_ms: 2.0903
+      type: 'test'
+      ...
+    # Subtest: validates rating bounds between 1 and 5
+    ok 2 - validates rating bounds between 1 and 5
+      ---
+      duration_ms: 1.0866
+      type: 'test'
+      ...
+    # Subtest: sanitizes review comment strings
+    ok 3 - sanitizes review comment strings
+      ---
+      duration_ms: 0.4236
+      type: 'test'
+      ...
+    1..3
+ok 101 - reviews: Customer & Provider Review Validation
+  ---
+  duration_ms: 6.5103
+  type: 'suite'
+  ...
+# Subtest: OSRM matrix yields distinct outgoing and incoming travel durations and caches the confirmed pair
+ok 102 - OSRM matrix yields distinct outgoing and incoming travel durations and caches the confirmed pair
+  ---
+  duration_ms: 165.4053
+  type: 'test'
+  ...
+# Subtest: offline, malformed and unreachable routes cannot manufacture verified travel times
+ok 103 - offline, malformed and unreachable routes cannot manufacture verified travel times
+  ---
+  duration_ms: 2.9384
+  type: 'test'
+  ...
+# Subtest: adminController: getSupportTickets returns ticket list, count badges, and assignee details
+ok 104 - adminController: getSupportTickets returns ticket list, count badges, and assignee details
+  ---
+  duration_ms: 501.0669
+  type: 'test'
+  ...
+# Subtest: adminController: getSupportTicketById returns ticket details and all replies (public & internal)
+ok 105 - adminController: getSupportTicketById returns ticket details and all replies (public & internal)
+  ---
+  duration_ms: 2.7493
+  type: 'test'
+  ...
+# Subtest: adminController: assignSupportTicket sets ownership and advances 'open' ticket to 'in_progress'
+ok 106 - adminController: assignSupportTicket sets ownership and advances 'open' ticket to 'in_progress'
+  ---
+  duration_ms: 3.4147
+  type: 'test'
+  ...
+# Subtest: adminController: assignSupportTicket rejects non-admin assignee with 400 Bad Request
+ok 107 - adminController: assignSupportTicket rejects non-admin assignee with 400 Bad Request
+  ---
+  duration_ms: 1.9768
+  type: 'test'
+  ...
+# Subtest: adminController: replySupportTicket records customer reply and notifies customer
+ok 108 - adminController: replySupportTicket records customer reply and notifies customer
+  ---
+  duration_ms: 4.4067
+  type: 'test'
+  ...
+# Subtest: adminController: replySupportTicket with internal note does NOT notify customer
+ok 109 - adminController: replySupportTicket with internal note does NOT notify customer
+  ---
+  duration_ms: 1.9554
+  type: 'test'
+  ...
+# Subtest: adminController: resolveSupportTicket tracks resolution notes, resolver user, and timestamp
+ok 110 - adminController: resolveSupportTicket tracks resolution notes, resolver user, and timestamp
+  ---
+  duration_ms: 2.4707
+  type: 'test'
+  ...
+# Subtest: adminController: getModerationReports surfaces reports with reporter and reported subjects
+ok 111 - adminController: getModerationReports surfaces reports with reporter and reported subjects
+  ---
+  duration_ms: 2.5445
+  type: 'test'
+  ...
+# Subtest: adminController: getModerationReportById includes surrounding chat messages context and centers on flagged message
+ok 112 - adminController: getModerationReportById includes surrounding chat messages context and centers on flagged message
+  ---
+  duration_ms: 3.1107
+  type: 'test'
+  ...
+# Subtest: adminController: assignModerationReport sets investigator, updates pending to investigating, and returns full joined dossier
+ok 113 - adminController: assignModerationReport sets investigator, updates pending to investigating, and returns full joined dossier
+  ---
+  duration_ms: 3.938
+  type: 'test'
+  ...
+# Subtest: adminController: assignModerationReport rejects non-admin assignee with 400 Bad Request
+ok 114 - adminController: assignModerationReport rejects non-admin assignee with 400 Bad Request
+  ---
+  duration_ms: 3.1567
+  type: 'test'
+  ...
+# Subtest: adminController: actionModerationReport rejects invalid action values with 400 Bad Request
+ok 115 - adminController: actionModerationReport rejects invalid action values with 400 Bad Request
+  ---
+  duration_ms: 2.1414
+  type: 'test'
+  ...
+# Subtest: adminController: actionModerationReport prevents duplicate actions on already actioned report (409 Conflict)
+ok 116 - adminController: actionModerationReport prevents duplicate actions on already actioned report (409 Conflict)
+  ---
+  duration_ms: 3.0236
+  type: 'test'
+  ...
+# Subtest: adminController: actionModerationReport with 'warn' dispatches safety warning to reported user
+ok 117 - adminController: actionModerationReport with 'warn' dispatches safety warning to reported user
+  ---
+  duration_ms: 2.3065
+  type: 'test'
+  ...
+# Subtest: adminController: actionModerationReport with 'suspend' sets provider status to suspended and purges cache
+ok 118 - adminController: actionModerationReport with 'suspend' sets provider status to suspended and purges cache
+  ---
+  duration_ms: 4.2172
+  type: 'test'
+  ...
+# Subtest: adminController: actionModerationReport rejecting suspension of non-provider user returns 400 Bad Request
+ok 119 - adminController: actionModerationReport rejecting suspension of non-provider user returns 400 Bad Request
+  ---
+  duration_ms: 4.0088
+  type: 'test'
+  ...
+# Subtest: adminController: actionModerationReport rolls back entire transaction if notification fails
+ok 120 - adminController: actionModerationReport rolls back entire transaction if notification fails
+  ---
+  duration_ms: 2.2727
+  type: 'test'
+  ...
+# Subtest: supportRoutes: unauthenticated request to /tickets/TK1001 returns 403 Forbidden
+ok 121 - supportRoutes: unauthenticated request to /tickets/TK1001 returns 403 Forbidden
+  ---
+  duration_ms: 18.6231
+  type: 'test'
+  ...
+# Subtest: supportRoutes: request to /tickets/TK1001 with invalid guest token returns 403 Forbidden
+ok 122 - supportRoutes: request to /tickets/TK1001 with invalid guest token returns 403 Forbidden
+  ---
+  duration_ms: 3.8628
+  type: 'test'
+  ...
+# Subtest: supportRoutes: guest request to /tickets/TK1003 with valid HMAC signed token returns 200 and replies
+ok 123 - supportRoutes: guest request to /tickets/TK1003 with valid HMAC signed token returns 200 and replies
+  ---
+  duration_ms: 2.5749
+  type: 'test'
+  ...
+# Subtest: supportRoutes: authenticated customer owning ticket accesses /tickets/TK1001 without token
+ok 124 - supportRoutes: authenticated customer owning ticket accesses /tickets/TK1001 without token
+  ---
+  duration_ms: 6.33
+  type: 'test'
+  ...
+# Subtest: supportRoutes: authenticated customer NOT owning ticket receives 403 Forbidden
+ok 125 - supportRoutes: authenticated customer NOT owning ticket receives 403 Forbidden
+  ---
+  duration_ms: 2.7441
+  type: 'test'
+  ...
+# Subtest: supportRoutes: reply to ticket without auth or token returns 403 Forbidden
+ok 126 - supportRoutes: reply to ticket without auth or token returns 403 Forbidden
+  ---
+  duration_ms: 3.1199
+  type: 'test'
+  ...
+# Subtest: supportRoutes: guest reply with valid token succeeds and derives identity from ticket, ignoring client spoofing
+ok 127 - supportRoutes: guest reply with valid token succeeds and derives identity from ticket, ignoring client spoofing
+  ---
+  duration_ms: 2.5551
+  type: 'test'
+  ...
+# Subtest: timeUtils: timeToMinutes converts HH:MM correctly
+ok 128 - timeUtils: timeToMinutes converts HH:MM correctly
+  ---
+  duration_ms: 1.3469
+  type: 'test'
+  ...
+# Subtest: timeUtils: minutesToTime formats numbers to HH:MM correctly
+ok 129 - timeUtils: minutesToTime formats numbers to HH:MM correctly
+  ---
+  duration_ms: 0.2489
+  type: 'test'
+  ...
+# Subtest: timeUtils: splitIntoChunks generates uniform intervals
+ok 130 - timeUtils: splitIntoChunks generates uniform intervals
+  ---
+  duration_ms: 1.2462
+  type: 'test'
+  ...
+# Subtest: timeUtils: generateRealSlots produces valid future date slots without crashing
+ok 131 - timeUtils: generateRealSlots produces valid future date slots without crashing
+  ---
+  duration_ms: 2.5621
+  type: 'test'
+  ...
+1..131
+# tests 178
+# suites 8
+# pass 178
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 21699.8454

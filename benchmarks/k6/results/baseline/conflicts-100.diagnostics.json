@@ -1,0 +1,222 @@
+{
+  "begin": "2026-10-21T10:54:09.352Z",
+  "end": "2026-10-21T10:54:22.133Z",
+  "exitCode": 0,
+  "sql": [
+    {
+      "calls": "500",
+      "total_exec_time": 36.038261,
+      "mean_exec_time": 0.07207652199999998,
+      "rows": "500",
+      "query": "SELECT id FROM users WHERE id = $1::uuid AND role = $2"
+    },
+    {
+      "calls": "5",
+      "total_exec_time": 4.0200689999999994,
+      "mean_exec_time": 0.8040138,
+      "rows": "5",
+      "query": "INSERT INTO bookings (booking_id,provider_id,user_id,service_id,date,start_time,end_time,status,address,price,payment_method,payment_status,razorpay_order_id,otp,completion_otp,latitude,longitude,hold_expires_at,search_radius_km)\n            VALUES ($1,$2,$3,$4,$5,$6,$7,$17,$8,$9,$10,$18,$11,$12,$13,$14,$15,CASE WHEN $10::varchar=$19 THEN clock_timestamp()+INTERVAL $20 ELSE $21 END,$16) RETURNING *"
+    },
+    {
+      "calls": "15",
+      "total_exec_time": 3.5560680000000007,
+      "mean_exec_time": 0.2370712,
+      "rows": "15",
+      "query": "INSERT INTO notifications (user_id, title, message, type, data, is_read)\n\t\t\t VALUES ($1, $2, $3, $4, $5, $6)\n\t\t\t RETURNING id, user_id, title, message, type, data, is_read, created_at"
+    },
+    {
+      "calls": "5",
+      "total_exec_time": 2.8312869999999997,
+      "mean_exec_time": 0.5662574,
+      "rows": "5",
+      "query": "UPDATE bookings SET status=$1,payment_status=$2,action_by=$3,updated_at=NOW() WHERE booking_id=$4 RETURNING *"
+    },
+    {
+      "calls": "10",
+      "total_exec_time": 1.499763,
+      "mean_exec_time": 0.1499763,
+      "rows": "10",
+      "query": "SELECT ps.price,s.name,s.id AS service_id,u.lat AS provider_lat,u.lng AS provider_lng FROM provider_services ps\n JOIN services s ON s.id=ps.service_id JOIN providers p ON p.user_id=ps.provider_id\n JOIN users u ON u.id=p.user_id\n WHERE ps.provider_id=$1 AND (s.id::text=$2 OR s.slug=$2) AND ps.is_visible=$3 AND p.status=$4"
+    },
+    {
+      "calls": "25",
+      "total_exec_time": 1.3436050000000004,
+      "mean_exec_time": 0.0537442,
+      "rows": "25",
+      "query": "SELECT 1 FROM ONLY \"public\".\"users\" x WHERE \"id\" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x"
+    },
+    {
+      "calls": "10",
+      "total_exec_time": 0.869004,
+      "mean_exec_time": 0.0869004,
+      "rows": "10",
+      "query": "SELECT start_time,end_time FROM provider_master_availability WHERE provider_id=$1 AND day_of_week=EXTRACT($3 FROM $2::date)"
+    },
+    {
+      "calls": "5",
+      "total_exec_time": 0.605449,
+      "mean_exec_time": 0.1210898,
+      "rows": "5",
+      "query": "SELECT provider_id, TO_CHAR(date, $2) AS date FROM bookings WHERE booking_id=$1"
+    },
+    {
+      "calls": "10",
+      "total_exec_time": 0.518762,
+      "mean_exec_time": 0.0518762,
+      "rows": "0",
+      "query": "SELECT start_time,end_time,latitude,longitude,\n (SELECT name FROM services WHERE id=bookings.service_id) AS service_name FROM bookings WHERE provider_id=$1 AND date=$2::date\n AND ($3::uuid IS NULL OR booking_id<>$3) AND (status IN ($4,$5,$6) OR (status = $7 AND (payment_method = $8 OR (payment_method = $9 AND hold_expires_at > clock_timestamp())))) ORDER BY start_time,booking_id"
+    },
+    {
+      "calls": "5",
+      "total_exec_time": 0.504945,
+      "mean_exec_time": 0.100989,
+      "rows": "5",
+      "query": "SELECT *, TO_CHAR(date, $2) AS date_string FROM bookings WHERE booking_id=$1 FOR UPDATE"
+    },
+    {
+      "calls": "5",
+      "total_exec_time": 0.476182,
+      "mean_exec_time": 0.0952364,
+      "rows": "10",
+      "query": "SELECT email FROM users WHERE id IN ($1,$2)"
+    },
+    {
+      "calls": "5",
+      "total_exec_time": 0.264049,
+      "mean_exec_time": 0.0528098,
+      "rows": "5",
+      "query": "SELECT (hold_expires_at > clock_timestamp()) AS hold_valid FROM bookings WHERE booking_id=$1"
+    },
+    {
+      "calls": "1",
+      "total_exec_time": 0.222441,
+      "mean_exec_time": 0.222441,
+      "rows": "1",
+      "query": "SELECT pg_stat_statements_reset()"
+    },
+    {
+      "calls": "10",
+      "total_exec_time": 0.09972699999999998,
+      "mean_exec_time": 0.009972700000000001,
+      "rows": "10",
+      "query": "SELECT pg_advisory_xact_lock(hashtextextended($3 || $1::text || $4 || $2::text, $5))"
+    },
+    {
+      "calls": "5",
+      "total_exec_time": 0.063008,
+      "mean_exec_time": 0.0126016,
+      "rows": "5",
+      "query": "SELECT 1 FROM ONLY \"public\".\"services\" x WHERE \"id\" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x"
+    }
+  ],
+  "poolSamples": [
+    {
+      "at": "2026-10-21T10:54:10.411Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0025326",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:11.437Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0025211",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:12.780Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0023941",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:13.439Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.149444",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:14.914Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.010605",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:15.449Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0028712",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:16.446Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.002474",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:17.455Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0025017",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:18.466Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0018502",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:19.520Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0017687",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:20.493Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0109989",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:54:21.507Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0018296",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    }
+  ]
+}

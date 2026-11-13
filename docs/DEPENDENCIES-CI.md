@@ -49,8 +49,9 @@ PostgreSQL/PostGIS, Redis/outbox, TLS, booking and browser checks. It also build
 both Docker images without npm lifecycle scripts. Required integration fixture
 variables are checked with `REQUIRE_INTEGRATION_TESTS=1`; absent required
 fixtures cause failure. The migration test creates and removes uniquely named
-test databases, and the outbox test removes its own test schema and queue. Use
-only dedicated disposable fixture servers with no real data.
+test databases, and the outbox test removes its own test schema and queue. The
+startup test creates uniquely named databases and leaves them in its disposable
+fixture. Use only dedicated disposable fixture servers with no real data.
 
 To run the key tests locally, provide dedicated loopback fixture URLs for
 `MIGRATION_TEST_POSTGIS_URL`, `MIGRATION_TEST_PLAIN_URL`,
@@ -72,7 +73,7 @@ container holding application data. Docker, OpenSSL and a Playwright Chromium
 installation are required for the complete set of tests.
 
 ```powershell
-docker run -d --rm --name tg-test-postgis --tmpfs /var/lib/postgresql/data -e POSTGRES_PASSWORD=fixture-only -e POSTGRES_DB=taskgenie_migration_test -p 127.0.0.1::5432 postgis/postgis:15-3.4-alpine
+docker run -d --rm --name tg-test-postgis --label taskgenie.outbox-startup-fixture=true --tmpfs /var/lib/postgresql/data -e POSTGRES_PASSWORD=fixture-only -e POSTGRES_DB=taskgenie_migration_test -p 127.0.0.1::5432 postgis/postgis:15-3.4-alpine
 docker run -d --rm --name tg-test-plain --tmpfs /var/lib/postgresql/data -e POSTGRES_PASSWORD=fixture-only -e POSTGRES_DB=taskgenie_migration_test -p 127.0.0.1::5432 postgres:16-alpine
 docker run -d --rm --name tg-test-redis --tmpfs /data -p 127.0.0.1::6379 redis:7-alpine
 docker run -d --rm --name tg-test-tls --label taskgenie.tls-fixture=true --tmpfs /var/lib/postgresql/data -e POSTGRES_PASSWORD=fixture-only -e POSTGRES_DB=taskgenie_tls_test -p 127.0.0.1::5432 postgres:16-alpine
@@ -91,13 +92,15 @@ $env:BOOKING_TEST_DATABASE_URL = $postgisUrl
 $env:CHAT_TEST_DATABASE_URL = $postgisUrl
 $env:MIGRATION_TEST_POSTGIS_URL = $postgisUrl
 $env:OUTBOX_TEST_DATABASE_URL = $postgisUrl
+$env:OUTBOX_STARTUP_TEST_DATABASE_URL = $postgisUrl
+$env:OUTBOX_STARTUP_TEST_CONTAINER = 'tg-test-postgis'
 $env:MIGRATION_TEST_PLAIN_URL = "postgresql://postgres:fixture-only@127.0.0.1:${plainPort}/taskgenie_migration_test"
 $env:OUTBOX_TEST_REDIS_URL = "redis://127.0.0.1:${redisPort}"
 $env:TLS_TEST_CONTAINER = 'tg-test-tls'
 $env:TLS_TEST_DATABASE_URL = "postgresql://postgres:fixture-only@127.0.0.1:${tlsPort}/taskgenie_tls_test"
 $env:DB_SSL_MODE = 'disable'; $env:NODE_ENV = 'test'; $env:REQUIRE_INTEGRATION_TESTS = '1'
 node client/node_modules/playwright/cli.js install chromium
-node --test server/test/postgresTls.integration.test.js server/test/migrationRunner.integration.test.js server/test/notificationOutbox.integration.test.js
+node --test server/test/postgresTls.integration.test.js server/test/migrationRunner.integration.test.js server/test/notificationOutbox.integration.test.js server/test/outboxStartup.integration.test.js
 npm run verify:engineering -- --browser
 ```
 

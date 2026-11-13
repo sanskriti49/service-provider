@@ -1,0 +1,255 @@
+{
+  "begin": "2026-10-21T10:49:08.649Z",
+  "end": "2026-10-21T10:49:34.553Z",
+  "exitCode": 99,
+  "sql": [
+    {
+      "calls": "91",
+      "total_exec_time": 46447.26767999999,
+      "mean_exec_time": 510.40953494505516,
+      "rows": "182000",
+      "query": "SELECT DISTINCT ON (u.id) u.name,u.photo,u.phone,u.bio,u.location,u.custom_id,u.lat,u.lng,\n    s.name AS service,s.slug AS service_slug,s.id AS service_id,ps.price,ps.price_unit,\n    p.rating,p.user_id,p.availability,COALESCE(p.is_verified,$5) AS is_verified,p.verification_badge,\n    COALESCE(p.kyc_status,$6) AS kyc_status , ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1,$2),$7)::geography, $8)/$9 AS postgis_distance_km\n    FROM providers p JOIN users u ON p.user_id=u.id\n    JOIN provider_services ps ON ps.provider_id=p.user_id AND ps.is_visible=$10\n    JOIN services s ON s.id=ps.service_id WHERE p.status = $11 AND (ST_DWithin(u.geom,ST_SetSRID(ST_MakePoint($1,$2),$12)::geography,$3,$13) OR u.geom IS NULL) AND (LOWER(s.slug)=LOWER($4) OR s.id::text=$4)\n    ORDER BY u.id,ps.created_at ASC,ps.id ASC"
+    },
+    {
+      "calls": "40",
+      "total_exec_time": 87.957789,
+      "mean_exec_time": 2.198944725,
+      "rows": "40",
+      "query": "SELECT proj4text, auth_name, auth_srid, srtext FROM public.spatial_ref_sys WHERE srid = $1 LIMIT $2"
+    },
+    {
+      "calls": "1",
+      "total_exec_time": 0.17410599999999998,
+      "mean_exec_time": 0.17410599999999998,
+      "rows": "1",
+      "query": "SELECT pg_stat_statements_reset()"
+    }
+  ],
+  "poolSamples": [
+    {
+      "at": "2026-10-21T10:49:11.070Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0038033",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:14.898Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.1558265",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:14.900Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0759346",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:15.477Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0759346",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:15.478Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.00367",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:17.000Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0069555",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:17.811Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0045632",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:18.472Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.3394737",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:19.502Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.1343547",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:19.912Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.3339037",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:20.982Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0768268",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:21.857Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.094706",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:22.645Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.1995718",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:23.692Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.1247016",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:24.666Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.032673",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:25.804Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.1223459",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:26.866Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0657887",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:27.408Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.1802751",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:27.995Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0773142",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:29.032Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0028796",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:30.628Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0132105",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:33.102Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.1704301",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:33.791Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.1760899",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:34.055Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0028395",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:49:34.439Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0020849",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    }
+  ]
+}

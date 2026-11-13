@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const Module = require("node:module");
 const geo = require("../utils/geoUtils");
-function fixture(rows, supported = false, schemaError = false) {
+function fixture(rows, supported = false, schemaError = false, onQuery) {
   const queries = [],
     filename = path.resolve(__dirname, "../controllers/providerController.js"),
     instance = new Module(filename, module);
@@ -18,6 +18,7 @@ function fixture(rows, supported = false, schemaError = false) {
           sql,
           params
         });
+        if (onQuery) await onQuery(sql, params);
         if (sql.includes("pg_extension")) return {
           rows: [{
             supported
@@ -86,6 +87,33 @@ const provider = (id, lat, lng, extra = {}) => ({
   service_id: 'service',
   availability: [],
   ...extra
+});
+test('identical concurrent undated searches share one database fill', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const f = fixture([provider('near', 0, 0)], true, false, sql => sql.startsWith('SELECT DISTINCT ON') ? gate : undefined);
+  const requests = Array.from({length:100}, () => f.request({service:'cleaning',lat:0,lng:0}));
+  release();
+  const results = await Promise.all(requests);
+  assert.equal(f.queries.filter(q => q.sql.startsWith('SELECT DISTINCT ON')).length, 1);
+  assert.ok(results.every(r => r.data[0].user_id === 'near'));
+});
+test('a failed shared fill reaches all waiters and the next request can retry', async () => {
+  let fail = true;
+  const f = fixture([provider('near', 0, 0)], true, false, sql => {
+    if (fail && sql.startsWith('SELECT DISTINCT ON')) throw new Error('Database unavailable');
+  });
+  const results = await Promise.allSettled([f.request({lat:0,lng:0}),f.request({lat:0,lng:0})]);
+  assert.ok(results.every(r => r.status === 'rejected' && r.reason.message === 'Database unavailable'));
+  fail = false;
+  assert.equal((await f.request({lat:0,lng:0})).data[0].user_id, 'near');
+  assert.equal(f.queries.filter(q => q.sql.startsWith('SELECT DISTINCT ON')).length, 2);
+});
+test('dated availability searches and different locations retain independent reads', async () => {
+  const f = fixture([provider('near', 0, 0)], true);
+  await Promise.all(Array.from({length:4}, () => f.request({lat:0,lng:0,date:'2035-01-03',start_time:'10:00'})));
+  await Promise.all([f.request({lat:0,lng:0}),f.request({lat:0.01,lng:0})]);
+  assert.equal(f.queries.filter(q => q.sql.startsWith('SELECT DISTINCT ON')).length, 6);
 });
 test("default radius excludes distant and unknown providers without any fallback", async () => {
   const f = fixture([provider('near', 0, 0), provider('far', 0, 1), provider('unknown', null, null)]);
@@ -171,7 +199,7 @@ test("both spatial and fallback paths use full precision at the radius boundary"
 test("unknown distance stays unknown and does not receive proximity or guaranteed availability credit", async () => {
   const res = await fixture([provider('unknown', null, null, {
     is_verified: false
-  })]).request({});
+  })]).request({mode: 'all'});
   assert.equal(res.data[0].is_nearby, null);
   assert.equal(res.data[0].availability_status, 'unknown');
   assert.equal(res.data[0].is_verified, false);

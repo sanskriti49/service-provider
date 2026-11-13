@@ -1,0 +1,357 @@
+{
+  "begin": "2026-10-21T10:53:14.658Z",
+  "end": "2026-10-21T10:53:42.024Z",
+  "exitCode": 0,
+  "sql": [
+    {
+      "calls": "1437",
+      "total_exec_time": 1990.395185,
+      "mean_exec_time": 1.3851045128740433,
+      "rows": "1437",
+      "query": "INSERT INTO bookings (booking_id,provider_id,user_id,service_id,date,start_time,end_time,status,address,price,payment_method,payment_status,razorpay_order_id,otp,completion_otp,latitude,longitude,hold_expires_at,search_radius_km)\n            VALUES ($1,$2,$3,$4,$5,$6,$7,$17,$8,$9,$10,$18,$11,$12,$13,$14,$15,CASE WHEN $10::varchar=$19 THEN clock_timestamp()+INTERVAL $20 ELSE $21 END,$16) RETURNING *"
+    },
+    {
+      "calls": "2874",
+      "total_exec_time": 911.3654809999982,
+      "mean_exec_time": 0.31710698712595575,
+      "rows": "2874",
+      "query": "INSERT INTO notifications (user_id, title, message, type, data, is_read)\n\t\t\t VALUES ($1, $2, $3, $4, $5, $6)\n\t\t\t RETURNING id, user_id, title, message, type, data, is_read, created_at"
+    },
+    {
+      "calls": "2874",
+      "total_exec_time": 566.825771999999,
+      "mean_exec_time": 0.19722539039665926,
+      "rows": "2874",
+      "query": "SELECT ps.price,s.name,s.id AS service_id,u.lat AS provider_lat,u.lng AS provider_lng FROM provider_services ps\n JOIN services s ON s.id=ps.service_id JOIN providers p ON p.user_id=ps.provider_id\n JOIN users u ON u.id=p.user_id\n WHERE ps.provider_id=$1 AND (s.id::text=$2 OR s.slug=$2) AND ps.is_visible=$3 AND p.status=$4"
+    },
+    {
+      "calls": "5748",
+      "total_exec_time": 377.7134310000023,
+      "mean_exec_time": 0.06571214874739036,
+      "rows": "5748",
+      "query": "SELECT 1 FROM ONLY \"public\".\"users\" x WHERE \"id\" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x"
+    },
+    {
+      "calls": "2874",
+      "total_exec_time": 322.7494309999993,
+      "mean_exec_time": 0.11229973242867071,
+      "rows": "0",
+      "query": "SELECT start_time,end_time,latitude,longitude,\n (SELECT name FROM services WHERE id=bookings.service_id) AS service_name FROM bookings WHERE provider_id=$1 AND date=$2::date\n AND ($3::uuid IS NULL OR booking_id<>$3) AND (status IN ($4,$5,$6) OR (status = $7 AND (payment_method = $8 OR (payment_method = $9 AND hold_expires_at > clock_timestamp())))) ORDER BY start_time,booking_id"
+    },
+    {
+      "calls": "2874",
+      "total_exec_time": 284.6316350000004,
+      "mean_exec_time": 0.09903675539318016,
+      "rows": "2874",
+      "query": "SELECT start_time,end_time FROM provider_master_availability WHERE provider_id=$1 AND day_of_week=EXTRACT($3 FROM $2::date)"
+    },
+    {
+      "calls": "1",
+      "total_exec_time": 151.27890299999999,
+      "mean_exec_time": 151.27890299999999,
+      "rows": "2000",
+      "query": "SELECT DISTINCT ON (u.id) u.name,u.photo,u.phone,u.bio,u.location,u.custom_id,u.lat,u.lng,\n    s.name AS service,s.slug AS service_slug,s.id AS service_id,ps.price,ps.price_unit,\n    p.rating,p.user_id,p.availability,COALESCE(p.is_verified,$5) AS is_verified,p.verification_badge,\n    COALESCE(p.kyc_status,$6) AS kyc_status , ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1,$2),$7)::geography, $8)/$9 AS postgis_distance_km\n    FROM providers p JOIN users u ON p.user_id=u.id\n    JOIN provider_services ps ON ps.provider_id=p.user_id AND ps.is_visible=$10\n    JOIN services s ON s.id=ps.service_id WHERE p.status = $11 AND (ST_DWithin(u.geom,ST_SetSRID(ST_MakePoint($1,$2),$12)::geography,$3,$13) OR u.geom IS NULL) AND (LOWER(s.slug)=LOWER($4) OR s.id::text=$4)\n    ORDER BY u.id,ps.created_at ASC,ps.id ASC"
+    },
+    {
+      "calls": "2",
+      "total_exec_time": 146.628183,
+      "mean_exec_time": 73.3140915,
+      "rows": "0",
+      "query": "EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT DISTINCT ON (u.id) u.name,u.photo,u.phone,u.bio,u.location,u.custom_id,u.lat,u.lng,\n    s.name AS service,s.slug AS service_slug,s.id AS service_id,ps.price,ps.price_unit,\n    p.rating,p.user_id,p.availability,COALESCE(p.is_verified,FALSE) AS is_verified,p.verification_badge,\n    COALESCE(p.kyc_status,'pending') AS kyc_status , ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1,$2),4326)::geography, false)/1000 AS postgis_distance_km\n    FROM providers p JOIN users u ON p.user_id=u.id\n    JOIN provider_services ps ON ps.provider_id=p.user_id AND ps.is_visible=TRUE\n    JOIN services s ON s.id=ps.service_id WHERE p.status = 'approved' AND (ST_DWithin(u.geom,ST_SetSRID(ST_MakePoint($1,$2),4326)::geography,$3,false) OR u.geom IS NULL) AND (LOWER(s.slug)=LOWER($4) OR s.id::text=$4)\n    ORDER BY u.id,ps.created_at ASC,ps.id ASC"
+    },
+    {
+      "calls": "1437",
+      "total_exec_time": 128.21185799999998,
+      "mean_exec_time": 0.08922189144050117,
+      "rows": "1437",
+      "query": "SELECT id FROM users WHERE id = $1::uuid AND role = $2"
+    },
+    {
+      "calls": "2",
+      "total_exec_time": 126.171322,
+      "mean_exec_time": 63.085661,
+      "rows": "4000",
+      "query": "EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT DISTINCT ON (u.id) u.name,u.photo,u.phone,u.bio,u.location,u.custom_id,u.lat,u.lng,\n    s.name AS service,s.slug AS service_slug,s.id AS service_id,ps.price,ps.price_unit,\n    p.rating,p.user_id,p.availability,COALESCE(p.is_verified,$5) AS is_verified,p.verification_badge,\n    COALESCE(p.kyc_status,$6) AS kyc_status , ST_Distance(u.geom, ST_SetSRID(ST_MakePoint($1,$2),$7)::geography, $8)/$9 AS postgis_distance_km\n    FROM providers p JOIN users u ON p.user_id=u.id\n    JOIN provider_services ps ON ps.provider_id=p.user_id AND ps.is_visible=$10\n    JOIN services s ON s.id=ps.service_id WHERE p.status = $11 AND (ST_DWithin(u.geom,ST_SetSRID(ST_MakePoint($1,$2),$12)::geography,$3,$13) OR u.geom IS NULL) AND (LOWER(s.slug)=LOWER($4) OR s.id::text=$4)\n    ORDER BY u.id,ps.created_at ASC,ps.id ASC"
+    },
+    {
+      "calls": "1437",
+      "total_exec_time": 50.904531,
+      "mean_exec_time": 0.03542416910229651,
+      "rows": "1437",
+      "query": "SELECT 1 FROM ONLY \"public\".\"services\" x WHERE \"id\" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x"
+    },
+    {
+      "calls": "2874",
+      "total_exec_time": 27.165451000000022,
+      "mean_exec_time": 0.00945214022268616,
+      "rows": "0",
+      "query": "SELECT is_available,override_slots FROM provider_date_exceptions WHERE provider_id=$1 AND date=$2::date"
+    },
+    {
+      "calls": "1437",
+      "total_exec_time": 16.02743599999999,
+      "mean_exec_time": 0.011153400139178848,
+      "rows": "1437",
+      "query": "SELECT pg_advisory_xact_lock(hashtextextended($3 || $1::text || $4 || $2::text, $5))"
+    },
+    {
+      "calls": "2874",
+      "total_exec_time": 13.476642000000005,
+      "mean_exec_time": 0.004689158663883079,
+      "rows": "2874",
+      "query": "SELECT ($1::date + $2::time) AT TIME ZONE $3 >= clock_timestamp() + INTERVAL $4 AS valid"
+    },
+    {
+      "calls": "1437",
+      "total_exec_time": 3.0256990000000004,
+      "mean_exec_time": 0.002105566457898397,
+      "rows": "0",
+      "query": "BEGIN"
+    }
+  ],
+  "poolSamples": [
+    {
+      "at": "2026-10-21T10:53:16.443Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0050085",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:16.995Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.1552848",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:17.763Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.005032",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:18.751Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0063941",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:19.799Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0027311",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:21.002Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0097297",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:21.999Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0215886",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:22.906Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0527385",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:23.963Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0130517",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:24.837Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0081857",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:25.887Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0043685",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:26.899Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.013587",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:27.879Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0056318",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:28.874Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0041835",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:29.886Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0024256",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:30.923Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0033565",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:31.899Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0073364",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:32.939Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0040377",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:33.968Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0077436",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:35.086Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0043093",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:35.992Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0378474",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:37.013Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0047992",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:38.039Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0042671",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:39.057Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0183295",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:40.029Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0028802",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:41.028Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0072786",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    },
+    {
+      "at": "2026-10-21T10:53:42.018Z",
+      "metrics": [
+        "taskgenie_nodejs_eventloop_lag_seconds 0.0053575",
+        "taskgenie_db_pool_total 10",
+        "taskgenie_db_pool_idle 10",
+        "taskgenie_db_pool_waiting 0"
+      ]
+    }
+  ]
+}

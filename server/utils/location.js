@@ -23,6 +23,7 @@ const configuredRadius = Number(process.env.PROVIDER_SEARCH_RADIUS_KM ?? 50);
 const DEFAULT_RADIUS_KM = Number.isFinite(configuredRadius) && configuredRadius >= 1 && configuredRadius <= 500 ? configuredRadius : 50;
 const discoverySchema = Joi.object({
   service: Joi.string().trim().max(100),
+  mode: Joi.string().valid("all"),
   ...coordinateFields,
   radius: Joi.number().min(1).max(500).default(DEFAULT_RADIUS_KM),
   sort_by: Joi.string().valid("recommended", "distance", "rating", "price_asc", "price_desc"),
@@ -32,7 +33,11 @@ const discoverySchema = Joi.object({
   start_time: timeField,
   page: Joi.number().integer().min(1),
   limit: Joi.number().integer().min(1).max(100)
-}).with("start_time", "date").with("date", "lat").with("date", "lng").custom(pairedCoordinates).unknown(true);
+}).with("start_time", "date").with("date", "lat").with("date", "lng").custom(pairedCoordinates).custom((value, helpers) => {
+  if (value.mode === "all" && (value.lat != null || value.lng != null)) return helpers.message("Unfiltered mode cannot include coordinates");
+  if (value.lat == null && value.lng == null && value.mode !== "all") return helpers.message("Provide coordinates for nearby search, or set mode=all for unfiltered discovery");
+  return value;
+}).unknown(true);
 const availabilitySchema = Joi.object({
   lat: coordinateFields.lat.required(),
   lng: coordinateFields.lng.required(),

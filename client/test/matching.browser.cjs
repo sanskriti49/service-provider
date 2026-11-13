@@ -189,9 +189,10 @@ test('discovery to booking keeps customer coordinates isolated', {
   await page.getByText(provider.name, {
     exact: true
   }).waitFor();
+  await page.locator('.sd-location-picker summary').filter({ hasText: 'Customer GPS address, Mumbai' }).waitFor();
   assert.ok(discovery.some(q => q.radius === '100' && q.service === provider.service_slug));
   await page.getByRole('button', {
-    name: 'Check Availability',
+    name: 'Check availability',
     exact: true
   }).click();
   await page.getByRole('button', {
@@ -283,7 +284,7 @@ test('discovery to booking keeps customer coordinates isolated', {
     name: 'Expand to 100 km'
   }).click();
   await page.getByRole('button', {
-    name: 'Check Availability',
+    name: 'Check availability',
     exact: true
   }).click();
   await page.getByText('Routing temporarily unavailable').first().waitFor();

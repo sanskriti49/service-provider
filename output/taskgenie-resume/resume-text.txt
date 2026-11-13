@@ -1,0 +1,74 @@
+SANSKRITI GUPTA
++91 6306642481
+|
+sanskriti0409@gmail.com
+|
+linkedin.com/in/sanskriti49
+|
+github.com/sanskriti49
+|
+leetcode.com/sanskriti49
+EDUCATION
+VIT Bhopal University
+Sep. 2023 – May 2027
+Bachelor of Technology (B.Tech) in Computer Science and Engineering | CGPA: 8.54/10
+Bhopal, India
+Dr. Virendra Swarup Education Centre
+2021 – 2023
+ISC (Class XII): 89.6% (2023) | ICSE (Class X): 87.67% (2021)
+Kanpur, India
+TECHNICAL SKILLS
+Languages: Java, JavaScript, TypeScript, Python, SQL, HTML, CSS
+Frameworks & Technologies: Spring Boot, React.js, Node.js, Express.js, Socket.IO, BullMQ, Tailwind CSS
+Databases: PostgreSQL (PostGIS), MongoDB, Redis
+Cloud & Tools: AWS (EC2, S3, IAM), Docker, Git, GitHub Actions, Postman, Playwright, Linux
+CS Fundamentals: Data Structures & Algorithms, OOP, DBMS, Operating Systems, Computer Networks
+EXPERIENCE
+GeekyAnts
+Jun. 2026 – Aug. 2026
+Software Engineer Intern
+Remote
+• Built real-time messaging with Socket.IO and React, implementing optimistic UI updates and message reconciliation to
+handle connection drops and failed deliveries.
+• Developed backend credit ledger APIs in Node.js and PostgreSQL, using row-level locking and transactions to prevent race
+conditions during checkout.
+• Implemented product search with multi-parameter filtering and URL-synced state; wrote Jest unit tests covering ledger
+balance calculations and CSV exports.
+PROJECTS
+TaskGenie – Service Discovery and Booking Platform
+Nov. 2025
+React.js, Node.js, PostgreSQL, Redis, Docker, AWS
+Live Demo | GitHub
+• Prevented overlapping bookings with 64-bit PostgreSQL advisory locks and GiST exclusion constraints; verified zero
+overlaps in five 200-user k6 contention waves.
+• Coalesced concurrent PostGIS searches to prevent cache stampedes; served 856 cached requests/s at 289 ms p95 with 200
+local k6 users over 10,000 synthetic providers.
+• Secured Razorpay checkout with HMAC-SHA256 verification, captured-payment validation, and idempotent finalization;
+added durable refund intents and reconciliation.
+• Built persistent, booking-scoped Socket.IO chat with participant authorization, client message deduplication, and
+cursor-based replay to recover messages after reconnects.
+Udaan – Scholarship Intelligence Platform
+Jun. 2026
+React.js, Node.js, MongoDB, Redis, BullMQ, Playwright
+Live Demo | GitHub
+• Built an automated scholarship ingestion pipeline using Playwright for JavaScript-rendered pages and Cheerio for HTML
+parsing, with SHA-256 hashing for source change detection.
+• Developed a rule-based eligibility engine to match student profiles against scholarship criteria, with explanations linked to
+official sources.
+• Implemented Redis caching for scholarship APIs and automated deadline reminders using BullMQ, with database-level
+deduplication to prevent duplicate notifications.
+• Developed a privacy-first client-side certificate scanner using PDF.js and Tesseract.js (WebAssembly), extracting text
+without uploading sensitive documents.
+CERTIFICATIONS & ACHIEVEMENTS
+• AWS Certified Cloud Practitioner – Official AWS Certification demonstrating proficiency in cloud architecture, IAM
+security, compute (EC2), and storage (S3) services (Score: 827/1000).
+• TCS CodeVita Season 12 – Ranked in the Top 2% globally (Global Rank: 10,298 out of 669,000+ registered
+participants), solving complex algorithmic challenges under timed contest constraints.
+• Competitive Programming – Solved 400+ problems in Java across LeetCode, GFG and Codeforces, with
+demonstrated consistency in Graph Theory, Dynamic Programming, and Tree data structures.
+EXTRACURRICULAR ACTIVITIES
+Google Developer Groups on Campus (GDG)
+Nov. 2024 – Jul. 2025
+Core Technical Member
+Bhopal, India
+• Conducted hands-on web development workshops and collaborated in multi-functional development teams.

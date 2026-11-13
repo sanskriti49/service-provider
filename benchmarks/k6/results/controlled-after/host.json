@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-21T10:58:49.163Z",
+  "platform": "win32",
+  "release": "10.0.26300",
+  "cpu": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+  "logicalCpus": 8,
+  "ramBytes": 16952647680,
+  "node": "v22.22.0",
+  "k6": "k6.exe v2.3.0 (commit/e088784614, go1.26.8, windows/amd64)",
+  "git": "e7c61501b3dae93077d46e4d9c5ed090b74b7024",
+  "conditions": {
+    "poolMax": 20,
+    "postgresCpuLimit": 2,
+    "postgresRam": "2GiB",
+    "redisCpuLimit": 1,
+    "redisRam": "256MiB",
+    "apiProcesses": 1,
+    "nodeEnv": "test",
+    "rateLimitBypass": true,
+    "apiNativeWindows": true,
+    "k6NativeWindows": true,
+    "postgresDocker": true,
+    "redisDocker": true,
+    "warmupSeconds": 5,
+    "measuredSeconds": 20,
+    "closedLoop": true,
+    "thinkTime": 0
+  }
+}

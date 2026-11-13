@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: identical concurrent undated searches share one database fill
+ok 1 - identical concurrent undated searches share one database fill
+  ---
+  duration_ms: 713.4346
+  type: 'test'
+  ...
+# Subtest: a failed shared fill reaches all waiters and the next request can retry
+ok 2 - a failed shared fill reaches all waiters and the next request can retry
+  ---
+  duration_ms: 9.494
+  type: 'test'
+  ...
+# Subtest: dated availability searches and different locations retain independent reads
+ok 3 - dated availability searches and different locations retain independent reads
+  ---
+  duration_ms: 15.0907
+  type: 'test'
+  ...
+# Subtest: default radius excludes distant and unknown providers without any fallback
+ok 4 - default radius excludes distant and unknown providers without any fallback
+  ---
+  duration_ms: 19.8488
+  type: 'test'
+  ...
+# Subtest: radius and service/price/rating filters stay in the sole SQL query
+ok 5 - radius and service/price/rating filters stay in the sole SQL query
+  ---
+  duration_ms: 9.2729
+  type: 'test'
+  ...
+# Subtest: invalid, partial coordinates, malformed dates and unsupported parameters return 400
+ok 6 - invalid, partial coordinates, malformed dates and unsupported parameters return 400
+  ---
+  duration_ms: 109.0032
+  type: 'test'
+  ...
+# Subtest: both spatial and fallback paths use full precision at the radius boundary
+ok 7 - both spatial and fallback paths use full precision at the radius boundary
+  ---
+  duration_ms: 19.9027
+  type: 'test'
+  ...
+# Subtest: unknown distance stays unknown and does not receive proximity or guaranteed availability credit
+ok 8 - unknown distance stays unknown and does not receive proximity or guaranteed availability credit
+  ---
+  duration_ms: 8.0789
+  type: 'test'
+  ...
+# Subtest: partial spatial migrations gracefully use the same strict fallback
+ok 9 - partial spatial migrations gracefully use the same strict fallback
+  ---
+  duration_ms: 7.9586
+  type: 'test'
+  ...
+# Subtest: dated discovery checks actual schedule availability
+ok 10 - dated discovery checks actual schedule availability
+  ---
+  duration_ms: 66.3995
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1667.5792

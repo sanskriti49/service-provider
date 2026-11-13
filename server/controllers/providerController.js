@@ -449,7 +449,11 @@ async function getKycPresignedUrl(req, res, next) {
 	}
 }
 
+// Share a cache fill across identical undated searches. Without this, a hot
+// 45-second expiry can send every waiting HTTP request to the database at once.
+const discoveryFlights = new Map();
 async function getProviders(req, res, next) {
+  let flight, flightKey;
   try {
     const {
       error,
@@ -491,6 +495,15 @@ async function getProviders(req, res, next) {
     if (!date) {
       const cached = cache.get(cacheKey);
       if (cached) return res.json(cached);
+      const pending = discoveryFlights.get(cacheKey);
+      if (pending) return res.json(await pending.promise);
+      let resolve, reject;
+      const promise = new Promise((ok, fail) => { resolve = ok; reject = fail; });
+      // The owner also handles its error through Express; a fill may have no waiters.
+      promise.catch(() => {});
+      flight = { promise, resolve, reject };
+      flightKey = cacheKey;
+      discoveryFlights.set(cacheKey, flight);
     }
     let spatial = hasUserCoords && (await checkPostGisSupport(db));
     const select = async () => {
@@ -640,9 +653,13 @@ async function getProviders(req, res, next) {
     }
 
     if (!date) cache.set(cacheKey, paginated, 45000);
+    flight?.resolve(paginated);
     return res.json(paginated);
   } catch (err) {
+    flight?.reject(err);
     next(err);
+  } finally {
+    if (flight) discoveryFlights.delete(flightKey);
   }
 }
 

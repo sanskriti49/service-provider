@@ -88,8 +88,18 @@ npm run migrate:outbox --prefix server
 ```
 
 The normal `npm run migrate --prefix server` also includes this schema. The
-worker starts with `server/index.js`; Redis availability determines when dispatch
-can proceed. There is no in-memory delivery fallback.
+API checks the configured database before listening or starting its dispatcher.
+It requires `public.notification_outbox` to resolve through the connection's
+`search_path`, checks the columns the worker uses, and verifies SELECT, INSERT and
+UPDATE privileges. If that check fails, the process exits nonzero with a safe
+diagnostic; it does not run migrations or change schema during startup. A hosting
+platform may restart the failed process until the configuration is corrected.
+The check does not prove every constraint or index is correct.
+
+Review the database target, migration permissions and backups before applying any
+migration to an existing database. After an approved migration, restart the API.
+Redis availability determines when dispatch can proceed. There is no in-memory
+delivery fallback.
 
 The new transport queue is `taskgenie-events-v2` because its payload format uses
 outbox references. Before upgrading an existing deployment, stop new requests

@@ -79,8 +79,6 @@ const corsOptions = {
 	optionsSuccessStatus: 200,
 };
 
-initSocket(httpServer, corsOptions);
-
 const helmet = require("helmet");
 app.use(
 	helmet({
@@ -106,7 +104,7 @@ const { register, metricsMiddleware, updatePoolMetrics } = require("./utils/metr
 const { globalLimiter } = require("./middleware/rateLimiter");
 const { getCircuitBreakerStatus } = require("./utils/circuitBreaker");
 const eventQueue = require("./utils/eventQueue");
-eventQueue.start();
+const { requireOutboxSchema } = require("./utils/outboxStartup");
 app.use(metricsMiddleware);
 app.use("/api", globalLimiter);
 
@@ -171,22 +169,36 @@ app.use("/health", require("./routes/healthRoutes").createHealthRouter({
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => {
-	console.log(`🚀 Server listening with WebSocket on port ${PORT}`);
-});
+async function startServer() {
+	// Migrations are an explicit operator action; do not make schema changes at startup.
+	try { await requireOutboxSchema(db); }
+	catch (error) {
+		console.error(`Startup failed: ${error.message}`);
+		process.exit(1);
+	}
+	initSocket(httpServer, corsOptions);
+	eventQueue.start();
+	httpServer.listen(PORT, () => {
+		console.log(`🚀 Server listening with WebSocket on port ${PORT}`);
+	});
 
-// Reconcile missed callbacks and durable refund intents without relying on Redis.
-if (process.env.NODE_ENV !== "test" && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && process.env.PAYMENT_RECONCILIATION_ENABLED !== "false") {
-    const { paymentService } = require("./controllers/bookingController");
-    let reconciling = false;
-    const timer = setInterval(async () => {
-        if (reconciling) return;
-        reconciling = true;
-        try { await paymentService.reconcile(); } catch (error) { console.error("Payment reconciliation failed:", error.message); }
-        finally { reconciling = false; }
-    }, 30000);
-    timer.unref();
+	// Reconcile missed callbacks and durable refund intents without relying on Redis.
+	if (process.env.NODE_ENV !== "test" && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && process.env.PAYMENT_RECONCILIATION_ENABLED !== "false") {
+		const { paymentService } = require("./controllers/bookingController");
+		let reconciling = false;
+		const timer = setInterval(async () => {
+			if (reconciling) return;
+			reconciling = true;
+			try { await paymentService.reconcile(); } catch (error) { console.error("Payment reconciliation failed:", error.message); }
+			finally { reconciling = false; }
+		}, 30000);
+		timer.unref();
+	}
 }
+startServer().catch(() => {
+	console.error("Startup failed: unexpected initialization error.");
+	process.exit(1);
+});
 
 // Graceful Shutdown: Handle container stops cleanly (Kubernetes / Docker / ECS)
 let isShuttingDown = false;

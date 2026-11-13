@@ -29,6 +29,12 @@ CI runs the same checks and uploads their results.
 
 Booking creation and payment finalization share provider/date PostgreSQL locks. Captured payments must match the stored order, amount and currency; expired/cancelled intents remain stored and enter refund reconciliation. Refund completion is reported only after gateway confirmation. Independent arrival/completion codes are visible only to the owning customer.
 
+Provider discovery uses `GET /api/providers/v1`. Nearby searches must include both
+`lat` and `lng` (and may specify `radius` in kilometres). Location-free discovery
+is available explicitly with `mode=all`; requests without coordinates or that mode
+return HTTP 400. Clients that previously omitted coordinates must add `mode=all`.
+The service-details page only requests nearby results after a location is selected.
+
 See [booking integrity and migration runbook](docs/BOOKING_INTEGRITY.md) for invariants, deployment commands, uncertain-refund handling and isolated PostgreSQL tests. Apply the integrity migration before running the updated API. The runtime queue uses BullMQ; Terraform's SQS resources are optional infrastructure and are not wired into application dispatch. Discovery caching currently uses process memory.
 
 ## 🏛️ System Architecture

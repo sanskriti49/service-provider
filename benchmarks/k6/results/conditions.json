@@ -1,0 +1,89 @@
+{
+  "seededAt": "2026-10-21T10:43:12.950Z",
+  "node": "v22.22.0",
+  "counts": {
+    "providers": 10000,
+    "customers": 200,
+    "provider_services": 10000,
+    "availability_rules": 70000,
+    "bookings": 50000
+  },
+  "database": {
+    "version": "PostgreSQL 15.8 on x86_64-pc-linux-musl, compiled by gcc (Alpine 13.2.1_git20240309) 13.2.1 20240309, 64-bit",
+    "postgis": "POSTGIS=\"3.4.3 0\" [EXTENSION] PGSQL=\"150\" GEOS=\"3.12.2-CAPI-1.18.2\" PROJ=\"9.4.0 NETWORK_ENABLED=OFF URL_ENDPOINT=https://cdn.proj.org USER_WRITABLE_DIRECTORY=/var/lib/postgresql/.local/share/proj DATABASE_PATH=/usr/share/proj/proj.db\" LIBXML=\"2.12.7\" LIBJSON=\"0.17\" LIBPROTOBUF=\"1.5.0\" WAGYU=\"0.5.0 (Internal)\" TOPOLOGY"
+  },
+  "indexes": [
+    {
+      "indexname": "booking_active_overlap",
+      "indexdef": "CREATE INDEX booking_active_overlap ON public.bookings USING gist (provider_id, tsrange((date + start_time), (date + end_time), '[)'::text)) WHERE (((status)::text = ANY ((ARRAY['booked'::character varying, 'confirmed'::character varying, 'in_progress'::character varying])::text[])) OR (((status)::text = 'pending'::text) AND ((payment_method)::text = 'cod'::text)))"
+    },
+    {
+      "indexname": "bookings_pkey",
+      "indexdef": "CREATE UNIQUE INDEX bookings_pkey ON public.bookings USING btree (booking_id)"
+    },
+    {
+      "indexname": "idx_bookings_geom_gist",
+      "indexdef": "CREATE INDEX idx_bookings_geom_gist ON public.bookings USING gist (geom)"
+    },
+    {
+      "indexname": "idx_users_geom_gist",
+      "indexdef": "CREATE INDEX idx_users_geom_gist ON public.users USING gist (geom)"
+    },
+    {
+      "indexname": "ix_bookings_booking_id",
+      "indexdef": "CREATE INDEX ix_bookings_booking_id ON public.bookings USING btree (booking_id)"
+    },
+    {
+      "indexname": "ix_bookings_provider_active_slots",
+      "indexdef": "CREATE INDEX ix_bookings_provider_active_slots ON public.bookings USING btree (provider_id, date, start_time) WHERE ((status)::text <> ALL ((ARRAY['cancelled'::character varying, 'expired'::character varying])::text[]))"
+    },
+    {
+      "indexname": "ix_bookings_provider_date",
+      "indexdef": "CREATE INDEX ix_bookings_provider_date ON public.bookings USING btree (provider_id, date)"
+    },
+    {
+      "indexname": "ix_bookings_razorpay_order_id",
+      "indexdef": "CREATE INDEX ix_bookings_razorpay_order_id ON public.bookings USING btree (razorpay_order_id)"
+    },
+    {
+      "indexname": "ix_bookings_status",
+      "indexdef": "CREATE INDEX ix_bookings_status ON public.bookings USING btree (status)"
+    },
+    {
+      "indexname": "ix_bookings_user_id",
+      "indexdef": "CREATE INDEX ix_bookings_user_id ON public.bookings USING btree (user_id)"
+    },
+    {
+      "indexname": "ix_users_custom_id",
+      "indexdef": "CREATE INDEX ix_users_custom_id ON public.users USING btree (custom_id)"
+    },
+    {
+      "indexname": "ix_users_lat_lng",
+      "indexdef": "CREATE INDEX ix_users_lat_lng ON public.users USING btree (lat, lng)"
+    },
+    {
+      "indexname": "ix_users_role",
+      "indexdef": "CREATE INDEX ix_users_role ON public.users USING btree (role)"
+    },
+    {
+      "indexname": "users_custom_id_key1",
+      "indexdef": "CREATE UNIQUE INDEX users_custom_id_key1 ON public.users USING btree (custom_id)"
+    },
+    {
+      "indexname": "users_email_key1",
+      "indexdef": "CREATE UNIQUE INDEX users_email_key1 ON public.users USING btree (email)"
+    },
+    {
+      "indexname": "users_pkey1",
+      "indexdef": "CREATE UNIQUE INDEX users_pkey1 ON public.users USING btree (id)"
+    },
+    {
+      "indexname": "ux_booking_order",
+      "indexdef": "CREATE UNIQUE INDEX ux_booking_order ON public.bookings USING btree (razorpay_order_id) WHERE (razorpay_order_id IS NOT NULL)"
+    },
+    {
+      "indexname": "ux_booking_payment",
+      "indexdef": "CREATE UNIQUE INDEX ux_booking_payment ON public.bookings USING btree (razorpay_payment_id) WHERE (razorpay_payment_id IS NOT NULL)"
+    }
+  ]
+}

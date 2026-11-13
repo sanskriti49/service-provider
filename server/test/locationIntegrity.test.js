@@ -30,7 +30,9 @@ test('availability and dated discovery require a complete customer location and 
   for(const query of [{},{lat:0},{lat:null,lng:null},{lat:0,lng:181}]) assert.ok(availabilitySchema.validate(query).error);
   assert.equal(availabilitySchema.validate({lat:0,lng:0}).value.radius,50);
   assert.ok(discoverySchema.validate({date:'2030-01-01'}).error);
-  assert.ok(!discoverySchema.validate({}).error,'Undated location-free browsing remains available with unknown distance');
+  assert.ok(discoverySchema.validate({}).error,'Location-free browsing must be explicit');
+  assert.ok(!discoverySchema.validate({mode:'all'}).error,'Explicit location-free browsing remains available');
+  assert.ok(discoverySchema.validate({mode:'all',lat:0,lng:0}).error,'Unfiltered mode cannot include coordinates');
 });
 test('legacy repair rejects guessed coordinates, missing confirmation and duplicate targets before connecting',async()=>{
   const {repairLocations}=require('../scripts/locationIntegrity');
