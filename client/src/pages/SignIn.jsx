@@ -10,6 +10,10 @@ import Logo from "../ui/Logo";
 import { loadGoogleIdentity } from "../utils/googleIdentity";
 import { useAuth } from "../contexts/AuthContext";
 
+function hasProviderApplicationDraft() {
+	try { return Boolean(sessionStorage.getItem('taskgenie:provider-application')); } catch { return false; }
+}
+
 const SignIn = () => {
 	const navigate = useNavigate();
 	const { login } = useAuth();
@@ -129,7 +133,7 @@ const SignIn = () => {
 			if (!decoded.role) {
 				navigate("/choose-role");
 			} else if (decoded.role === "provider") {
-				navigate("/provider/dashboard");
+				navigate(hasProviderApplicationDraft() ? "/apply-now" : "/provider/dashboard");
 			} else {
 				navigate("/dashboard");
 			}
@@ -163,7 +167,7 @@ const SignIn = () => {
 			if (decoded.role === "admin") {
 				navigate("/admin");
 			} else if (decoded.role === "provider") {
-				navigate("/provider/dashboard");
+				navigate(hasProviderApplicationDraft() ? "/apply-now" : "/provider/dashboard");
 			} else {
 				navigate("/dashboard");
 			}
@@ -191,7 +195,7 @@ const SignIn = () => {
 								Welcome Back
 							</h1>
 							<p className="auth-subtext text-slate-600 text-center mb-8" style={{ color: "#475569" }}>
-								Sign in to continue to your dashboard
+								{hasProviderApplicationDraft() ? 'Sign in with a provider account to resume your application. You will need to select your document again.' : 'Sign in to continue to your dashboard'}
 							</p>
 
 							<div className="space-y-4">

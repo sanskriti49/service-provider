@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
 	X,
@@ -47,6 +47,9 @@ export default function CustomerTicketDrawer({
 	const [loadingThread, setLoadingThread] = useState(false);
 	const [replyText, setReplyText] = useState("");
 	const [sendingReply, setSendingReply] = useState(false);
+	const replyInFlight = useRef(false);
+	const pendingReply = useRef(null);
+	const threadRevision = useRef(0);
 
 	// Guest Lookup Form state
 	const [lookupNumber, setLookupNumber] = useState("");
@@ -62,8 +65,8 @@ export default function CustomerTicketDrawer({
 			if (res.data?.success) {
 				setMyTickets(res.data.tickets || []);
 			}
-		} catch (err) {
-			console.warn("Could not load customer tickets:", err);
+		} catch {
+			toast.error("Could not load your tickets. Please try again.");
 		} finally {
 			setLoadingList(false);
 		}
@@ -73,7 +76,12 @@ export default function CustomerTicketDrawer({
 	const loadTicketThread = useCallback(
 		async (ticketNum, token = null) => {
 			if (!ticketNum) return;
+			const revision = ++threadRevision.current;
+			if (!token) { try { token = sessionStorage.getItem(`support-ticket:${ticketNum}`); } catch { /* Manual token entry remains available. */ } }
 			setLoadingThread(true);
+			setTicketDetail(null);
+			setReplies([]);
+			setCurrentToken(null);
 			setReplyText("");
 			try {
 				const config = {};
@@ -81,21 +89,22 @@ export default function CustomerTicketDrawer({
 					config.headers = { "x-ticket-token": token };
 				}
 				const res = await api.get(`/api/support/tickets/${ticketNum}`, config);
+				if (revision !== threadRevision.current) return;
 				if (res.data?.success) {
 					setTicketDetail(res.data.ticket);
 					setReplies(res.data.replies || []);
 					setCurrentTicketNumber(ticketNum);
-					if (token) setCurrentToken(token);
+					setCurrentToken(token || null);
 					setActiveView("thread");
 				}
 			} catch (err) {
-				console.error("Failed to load ticket thread:", err);
+				if (revision !== threadRevision.current) return;
 				toast.error(
 					err.response?.data?.error ||
 						"Unable to access ticket. Please check credentials or sign in."
 				);
 			} finally {
-				setLoadingThread(false);
+				if (revision === threadRevision.current) setLoadingThread(false);
 			}
 		},
 		[]
@@ -103,6 +112,7 @@ export default function CustomerTicketDrawer({
 
 	// Initial load behavior
 	useEffect(() => {
+		const revisions = threadRevision;
 		if (isOpen) {
 			if (initialTicketNumber) {
 				loadTicketThread(initialTicketNumber, initialToken);
@@ -113,6 +123,7 @@ export default function CustomerTicketDrawer({
 				setActiveView("lookup");
 			}
 		}
+		return () => { revisions.current++; };
 	}, [isOpen, initialTicketNumber, initialToken, user, fetchMyTickets, loadTicketThread]);
 
 	// Listen for global custom events to open specific ticket
@@ -131,19 +142,29 @@ export default function CustomerTicketDrawer({
 	// Submit customer reply
 	const handleSendReply = async (e) => {
 		e.preventDefault();
-		if (!replyText.trim() || sendingReply || !currentTicketNumber) return;
+		if (!replyText.trim() || replyInFlight.current || !currentTicketNumber) return;
+		replyInFlight.current = true;
 		setSendingReply(true);
 		try {
-			const config = {};
+			const payload = { message: replyText.trim() };
+			const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([currentTicketNumber, payload.message])));
+			const fingerprint = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+			const storageKey = `support-ticket:reply:${currentTicketNumber}`;
+			if (!pendingReply.current) { try { pendingReply.current = JSON.parse(sessionStorage.getItem(storageKey) || 'null'); } catch { /* Keep retry state in memory. */ } }
+			if (!pendingReply.current || pendingReply.current.fingerprint !== fingerprint) pendingReply.current = { fingerprint, id: crypto.randomUUID() };
+			try { sessionStorage.setItem(storageKey, JSON.stringify(pendingReply.current)); } catch { /* Keep retry state in memory. */ }
+			const config = { headers: { 'Idempotency-Key': pendingReply.current.id } };
 			if (currentToken) {
-				config.headers = { "x-ticket-token": currentToken };
+				config.headers["x-ticket-token"] = currentToken;
 			}
 			const res = await api.post(
 				`/api/support/tickets/${currentTicketNumber}/reply`,
-				{ message: replyText.trim(), token: currentToken },
+				payload,
 				config
 			);
 			if (res.data?.success) {
+				pendingReply.current = null;
+				try { sessionStorage.removeItem(storageKey); } catch { /* Nothing stored to clear. */ }
 				toast.success("Reply sent to support team");
 				setReplyText("");
 				loadTicketThread(currentTicketNumber, currentToken);
@@ -151,6 +172,7 @@ export default function CustomerTicketDrawer({
 		} catch (err) {
 			toast.error(err.response?.data?.error || "Failed to submit reply");
 		} finally {
+			replyInFlight.current = false;
 			setSendingReply(false);
 		}
 	};

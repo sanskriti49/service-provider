@@ -53,7 +53,13 @@ services:
   api:
     image: taskgenie-local-api
     build: ./server
-    environment: *api_env
+    environment:
+      <<: *api_env
+      KYC_STORAGE_DRIVER: local
+      KYC_PRIVATE_DIRECTORY: /tmp/taskgenie-kyc
+    # Synthetic documents only; a tmpfs intentionally does not survive container restarts.
+    tmpfs:
+      - /tmp/taskgenie-kyc:uid=1000,gid=1000,mode=0700
     depends_on:
       postgres:
         condition: service_healthy

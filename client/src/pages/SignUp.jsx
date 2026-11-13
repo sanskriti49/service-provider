@@ -9,6 +9,10 @@ import Logo from "../ui/Logo";
 import { loadGoogleIdentity } from "../utils/googleIdentity";
 import { useAuth } from "../contexts/AuthContext";
 
+function hasProviderApplicationDraft() {
+	try { return Boolean(sessionStorage.getItem('taskgenie:provider-application')); } catch { return false; }
+}
+
 const SignUp = () => {
 	const navigate = useNavigate();
 	const { login } = useAuth();
@@ -147,7 +151,7 @@ const SignUp = () => {
 			if (!user.role) {
 				navigate("/choose-role");
 			} else if (user.role === "provider") {
-				navigate("/provider/dashboard");
+				navigate(hasProviderApplicationDraft() ? "/apply-now" : "/provider/dashboard");
 			} else {
 				navigate("/dashboard");
 			}
@@ -179,7 +183,7 @@ const SignUp = () => {
 
 			alert("Account created!");
 			if (form.role === "provider") {
-				navigate("/provider/dashboard");
+				navigate(hasProviderApplicationDraft() ? "/apply-now" : "/provider/dashboard");
 			} else {
 				navigate("/dashboard");
 			}

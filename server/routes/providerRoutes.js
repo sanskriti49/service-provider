@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const c = require("../controllers/providerController");
 const authenticate = require("../middleware/authMiddleware");
+const verifyToken = require("../middleware/verifyToken");
 const upload = require("../middleware/upload");
 const db = require("../config/db");
 
@@ -53,16 +54,23 @@ async function requireProviderOwnerOrAdmin(req, res, next) {
 	}
 }
 
-// Authenticated upload with size limits & MIME checking (Multipart Ingestion)
-router.post("/v1/upload-kyc", authenticate, upload.single("document"), c.uploadKycDocument);
-router.post("/upload-kyc", authenticate, upload.single("document"), c.uploadKycDocument);
+// Convert upload errors to safe client diagnostics without logging file metadata.
+function kycUpload(req, res, next) {
+	upload.single("document")(req, res, error => {
+		if (error?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Document must be at most 5 MB' });
+		if (error) return res.status(400).json({ error: 'Invalid document upload' });
+		return next();
+	});
+}
+router.post("/v1/upload-kyc", verifyToken, kycUpload, c.uploadKycDocument);
+router.post("/upload-kyc", verifyToken, kycUpload, c.uploadKycDocument);
 
 // Direct-to-S3 Presigned Ingestion (Zero Server Egress)
 router.post("/v1/kyc-presign", authenticate, c.getKycPresignedUrl);
 router.post("/kyc-presign", authenticate, c.getKycPresignedUrl);
 
 // Public discovery endpoints
-router.post("/v1", c.createProvider);
+router.post("/v1", verifyToken, c.createProvider);
 router.get("/v1", c.getProviders);
 router.get("/v1/match", c.matchProviders);
 router.get("/v1/:id/availability", c.getProviderAvailability);
@@ -70,9 +78,10 @@ router.get("/v1/:custom_id", c.getProviderById);
 
 // Provider profile management (Strict ownership / RBAC protected)
 router.put("/v1/:id", authenticate, requireProviderOwnerOrAdmin, c.updateProvider);
-router.get("/v1/:id/kyc", authenticate, c.getKycStatus);
-router.put("/v1/:id/kyc", authenticate, c.submitKyc);
-router.post("/v1/:id/kyc", authenticate, c.submitKyc);
+router.get("/v1/:id/kyc", verifyToken, c.getKycStatus);
+router.get("/v1/:id/kyc/documents/:side", verifyToken, c.viewKycDocument);
+router.put("/v1/:id/kyc", verifyToken, c.submitKyc);
+router.post("/v1/:id/kyc", verifyToken, c.submitKyc);
 router.delete("/v1/:id", authenticate, requireProviderOwnerOrAdmin, c.deleteProvider);
 
 // Provider services catalog (Strict ownership / RBAC protected)

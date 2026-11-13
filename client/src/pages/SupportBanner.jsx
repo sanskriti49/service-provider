@@ -36,7 +36,7 @@ const HANDY = {
 const focusRing =
 	"focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300";
 
-const SupportBanner = ({ isSupportOnline, userRole, onOpenTicket }) => {
+const SupportBanner = ({ userRole, onOpenTicket }) => {
 	const [copied, setCopied] = useState(false);
 	const timer = useRef(null);
 
@@ -65,15 +65,7 @@ const SupportBanner = ({ isSupportOnline, userRole, onOpenTicket }) => {
 			<div className="p-8 md:p-12">
 				<div className="mb-6 flex items-center justify-between gap-4">
 					<p className="flex items-center gap-2.5 text-sm font-medium text-slate-300">
-						<span
-							aria-hidden="true"
-							className={`w-2 h-2 rounded-full shrink-0 ${
-								isSupportOnline ? "bg-emerald-400" : "bg-slate-500"
-							}`}
-						/>
-						{isSupportOnline
-							? "Support desk is open until 11 PM"
-							: "Support desk is closed. It opens at 9 AM"}
+						Ticket support
 					</p>
 					<ServiceIllustration scene="support" className="w-28 sm:w-36 h-auto shrink-0" />
 				</div>
@@ -87,8 +79,7 @@ const SupportBanner = ({ isSupportOnline, userRole, onOpenTicket }) => {
 				</h3>
 
 				<p className="bricolage-grotesque text-slate-300 text-base sm:text-lg leading-relaxed max-w-md mb-8">
-					Our team replies every day from 9 AM to 11 PM. Messages sent after
-					hours are queued and answered first thing in the morning.
+					Send us the details in a ticket and check the ticket for replies.
 				</p>
 
 				<div className="mb-8">
@@ -138,25 +129,24 @@ const SupportBanner = ({ isSupportOnline, userRole, onOpenTicket }) => {
 			<div className="bg-white/[0.04] border-t lg:border-t-0 lg:border-l border-white/10 p-8 md:p-10 flex flex-col gap-8">
 				<div>
 					<h4 className="text-sm font-semibold text-slate-200 mb-3">
-						When you'll hear back
+						What to expect
 					</h4>
 					<dl className="divide-y divide-white/10 border-y border-white/10 text-sm">
 						<div className="flex items-baseline justify-between gap-4 py-3">
 							<dt className="text-slate-300">WhatsApp</dt>
 							<dd className="font-semibold text-white">
-								{isSupportOnline ? "Under 1 hour" : "After 9 AM"}
+								Availability varies
 							</dd>
 						</div>
 						<div className="flex items-baseline justify-between gap-4 py-3">
 							<dt className="text-slate-300">Support ticket</dt>
 							<dd className="font-semibold text-white text-right">
-								{isSupportOnline ? "2 to 4 hours" : "2 to 4 hours after 9 AM"}
+								Check for replies
 							</dd>
 						</div>
 					</dl>
 					<p className="bricolage-grotesque text-xs text-slate-400 leading-relaxed mt-3">
-						Every ticket gets a tracking number, and you're notified each time
-						its status changes.
+						Every ticket gets a tracking number. Open it to check its status and replies.
 					</p>
 				</div>
 

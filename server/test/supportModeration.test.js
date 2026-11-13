@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const Module = require("node:module");
 const path = require("node:path");
+process.env.JWT_SECRET = 'isolated-support-test-secret';
 
 function mockResponse() {
 	let resolveDone;

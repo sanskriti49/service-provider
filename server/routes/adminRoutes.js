@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
+const verifyToken = require("../middleware/verifyToken");
 const adminController = require("../controllers/adminController");
 
 // Require user to be authenticated and have role === 'admin'
@@ -20,7 +21,7 @@ router.get("/overview", adminController.getOverviewStats);
 // Provider Approval Pipeline
 router.get("/providers", adminController.getProviders);
 router.put("/providers/:id/status", adminController.updateProviderStatus);
-router.put("/providers/:id/kyc", adminController.updateProviderKyc);
+router.put("/providers/:id/kyc", verifyToken, requireAdmin, adminController.updateProviderKyc);
 
 // Dispute Management & Refunds
 router.get("/disputes", adminController.getDisputes);

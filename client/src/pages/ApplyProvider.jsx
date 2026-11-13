@@ -19,6 +19,8 @@ import api from "../api/axiosInstance";
 import VerifiedBadge from "../ui/VerifiedBadge";
 import ServiceBaseLocation from "../ui/ServiceBaseLocation";
 import { validCoordinates } from "../utils/serviceLocation";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 /*
  * Design: The Live Provider Slip & Master Sheet.
@@ -140,7 +142,7 @@ const KYC_DOCS = [
 	},
 ];
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const DEFAULT_HOURS = { start: "09:00", end: "18:00" };
 
 // Hours bar shows 6 am to 10 pm
@@ -294,7 +296,7 @@ function UploadSlot({
 	onSelect,
 	onRemove,
 }) {
-	const isPdf = /\.pdf(\?|#|$)/i.test(url || "");
+
 	return (
 		<div>
 			<div className="mb-1.5 text-xs font-semibold text-slate-700 flex items-center justify-between">
@@ -308,18 +310,7 @@ function UploadSlot({
 			{url ? (
 				<div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-xs">
 					<div className="flex aspect-[16/10] items-center justify-center bg-violet-50/40 p-2">
-						{isPdf ? (
-							<div className="flex flex-col items-center gap-2 text-violet-700">
-								<FileText size={32} strokeWidth={1.5} />
-								<span className="text-xs font-semibold">PDF uploaded</span>
-							</div>
-						) : (
-							<img
-								src={url}
-								alt={`${label} preview`}
-								className="h-full w-full object-contain rounded-lg"
-							/>
-						)}
+						<div className="flex flex-col items-center gap-2 text-violet-700"><FileText size={32} /><span className="text-sm font-semibold">Document uploaded privately</span></div>
 					</div>
 					<div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-white px-3 py-2">
 						<span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
@@ -374,7 +365,7 @@ function UploadSlot({
 							</div>
 							<span className="text-xs font-bold text-slate-800">Choose a file</span>
 							<span className="text-[11px] text-slate-400">
-								PNG, JPG or PDF up to 10 MB
+								PNG, JPG, WEBP or PDF up to 5 MB
 							</span>
 						</>
 					)}
@@ -604,7 +595,10 @@ function Tally({ current, successData, onGo, reduceMotion }) {
 /* ---------- page ---------- */
 
 export default function ApplyProvider() {
-	const [step, setStep] = useState(1);
+	const { user } = useAuth();
+	const navigate = useNavigate();
+	const [draft] = useState(() => { try { return JSON.parse(sessionStorage.getItem('taskgenie:provider-application') || 'null'); } catch { return null; } });
+	const [step, setStep] = useState(draft ? 4 : 1);
 	const [loading, setLoading] = useState(false);
 	const [uploadingDoc, setUploadingDoc] = useState({
 		front: false,
@@ -612,7 +606,7 @@ export default function ApplyProvider() {
 	});
 	const [successData, setSuccessData] = useState(null);
 	const [errorMsg, setErrorMsg] = useState("");
-	const [baseLocation, setBaseLocation] = useState({
+	const [baseLocation, setBaseLocation] = useState(draft?.baseLocation || {
 		lat: null,
 		lng: null,
 		confirmed: false,
@@ -635,12 +629,14 @@ export default function ApplyProvider() {
 		kyc_doc_front: "",
 		kyc_doc_back: "",
 		kyc_declaration: false,
+		...(draft?.form || {}),
 	});
 
 	const reduceMotion = useReducedMotion();
 	const headingRef = useRef(null);
 	const errorRef = useRef(null);
 	const mounted = useRef(false);
+	const applicationInFlight = useRef(false);
 
 	useEffect(() => {
 		async function fetchServices() {
@@ -648,14 +644,14 @@ export default function ApplyProvider() {
 				const res = await api.get("/api/services/v1");
 				if (Array.isArray(res.data) && res.data.length > 0) {
 					setServicesList(res.data);
-					setFormData((prev) => ({ ...prev, service: res.data[0].slug }));
+					setFormData((prev) => ({ ...prev, service: draft?.form?.service || res.data[0].slug }));
 				}
 			} catch (err) {
 				console.log("Using default services list", err);
 			}
 		}
 		fetchServices();
-	}, []);
+	}, [draft?.form?.service]);
 
 	// Move focus to the new step heading (keyboard and screen-reader friendly)
 	useEffect(() => {
@@ -684,9 +680,16 @@ export default function ApplyProvider() {
 
 	const handleFileUpload = async (side, file) => {
 		if (!file) return;
+		if (!user || user.role !== 'provider') {
+			const form = { ...formData, password: '', kyc_doc_number: '', kyc_doc_front: '', kyc_doc_back: '', kyc_declaration: false };
+			try { sessionStorage.setItem('taskgenie:provider-application', JSON.stringify({ form, baseLocation })); } catch { setErrorMsg('Your browser could not save the draft. Sign in and re-enter your application.'); return; }
+			setErrorMsg('Sign in with a provider account, then select the document again.');
+			if (!user) navigate('/login?returnTo=application');
+			return;
+		}
 		if (file.size > MAX_UPLOAD_BYTES) {
 			setErrorMsg(
-				"That file is larger than 10 MB. Please choose a smaller one.",
+				"That file is larger than 5 MB. Please choose a smaller one.",
 			);
 			return;
 		}
@@ -705,7 +708,6 @@ export default function ApplyProvider() {
 				);
 			}
 		} catch (err) {
-			console.error("KYC upload error:", err);
 			setErrorMsg(
 				err.response?.data?.error ||
 					"Failed to upload verification document. Please try again.",
@@ -777,10 +779,6 @@ export default function ApplyProvider() {
 				);
 				return;
 			}
-			if (!formData.password || formData.password.length < 8) {
-				setErrorMsg("Password must be at least 8 characters");
-				return;
-			}
 		} else if (step === 2) {
 			if (!formData.service) {
 				setErrorMsg("Please select a primary service");
@@ -815,6 +813,7 @@ export default function ApplyProvider() {
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
+		if (applicationInFlight.current) return;
 
 		// Pressing Enter on steps 1-3 should move forward, not submit
 		if (step < 4) {
@@ -823,6 +822,8 @@ export default function ApplyProvider() {
 		}
 
 		setErrorMsg("");
+		if (!user || user.role !== 'provider') { setErrorMsg('Sign in with a provider account and upload your document before submitting.'); return; }
+		if (user.email && formData.email.trim().toLowerCase() !== user.email.trim().toLowerCase()) { setErrorMsg('Use the email address on your provider account.'); setStep(1); return; }
 
 		if (!formData.kyc_doc_type) {
 			setErrorMsg(
@@ -834,6 +835,9 @@ export default function ApplyProvider() {
 			setErrorMsg("Please enter your valid identification document number.");
 			return;
 		}
+		if (!formData.kyc_doc_front) { setErrorMsg('Upload the front of your document before submitting.'); return; }
+		if (['aadhaar', 'driving_license'].includes(formData.kyc_doc_type) && !formData.kyc_doc_back) { setErrorMsg('Upload the back of your document before submitting.'); return; }
+		if (uploadingDoc.front || uploadingDoc.back) { setErrorMsg('Please wait for uploads to finish.'); return; }
 		if (!formData.kyc_declaration) {
 			setErrorMsg(
 				"Please accept the background verification consent declaration.",
@@ -849,6 +853,7 @@ export default function ApplyProvider() {
 			setErrorMsg("Confirm your service base before submitting");
 			return;
 		}
+		applicationInFlight.current = true;
 		setLoading(true);
 
 		try {
@@ -856,7 +861,6 @@ export default function ApplyProvider() {
 				name: formData.name,
 				email: formData.email.toLowerCase(),
 				phone: formData.phone.trim(),
-				password: formData.password,
 				location: formData.location,
 				lat: Number(baseLocation.lat),
 				lng: Number(baseLocation.lng),
@@ -869,9 +873,11 @@ export default function ApplyProvider() {
 				kyc_doc_number: formData.kyc_doc_number.trim(),
 				kyc_doc_front: formData.kyc_doc_front || null,
 				kyc_doc_back: formData.kyc_doc_back || null,
+				kyc_declaration: true,
 			};
 
 			const res = await api.post("/api/providers/v1", payload);
+			try { sessionStorage.removeItem('taskgenie:provider-application'); } catch { /* Nothing else to clear. */ }
 			setSuccessData(res.data);
 		} catch (err) {
 			const errorText =
@@ -881,6 +887,7 @@ export default function ApplyProvider() {
 				"Failed to submit provider application";
 			setErrorMsg(errorText);
 		} finally {
+			applicationInFlight.current = false;
 			setLoading(false);
 		}
 	};
@@ -1116,20 +1123,6 @@ export default function ApplyProvider() {
 																handleInputChange("phone", e.target.value)
 															}
 															className={`${inputBase} font-mono`}
-														/>
-													</Field>
-													<Field
-														id="password"
-														label="Password"
-														hint="Use at least 8 characters"
-													>
-														<PasswordInput
-															id="password"
-															describedBy="password-hint"
-															value={formData.password}
-															onChange={(e) =>
-																handleInputChange("password", e.target.value)
-															}
 														/>
 													</Field>
 												</div>
@@ -1410,7 +1403,7 @@ export default function ApplyProvider() {
 										<>
 											<div className="flex items-start gap-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
 												<span className="text-3xl font-extrabold leading-none tracking-tight text-amber-700">
-													3.8x
+																			ID
 												</span>
 												<p className="flex items-start gap-2 text-xs leading-relaxed text-amber-950">
 													<ShieldCheck
@@ -1419,9 +1412,7 @@ export default function ApplyProvider() {
 														aria-hidden="true"
 													/>
 													<span>
-														more bookings for Verified Pros, plus priority
-														dispatch. Our security team checks every provider to
-														keep homeowners safe.
+																			Your documents are submitted for an administrator to review.
 													</span>
 												</p>
 											</div>
@@ -1487,7 +1478,7 @@ export default function ApplyProvider() {
 													<UploadSlot
 														id="kyc-back"
 														label="Back"
-														optional
+																						optional={!['aadhaar', 'driving_license'].includes(formData.kyc_doc_type)}
 														url={formData.kyc_doc_back}
 														uploading={uploadingDoc.back}
 														onSelect={(file) => handleFileUpload("back", file)}
@@ -1520,8 +1511,7 @@ export default function ApplyProvider() {
 												/>
 												<span className="text-xs leading-relaxed text-slate-700">
 													I confirm these details and documents are mine and
-													authentic. I consent to TaskGenie verifying them with
-													authorized databases to issue my{" "}
+																					authentic. I consent to TaskGenie reviewing them for my{" "}
 													<strong className="font-bold text-slate-900">Verified Pro</strong>{" "}
 													badge.
 												</span>

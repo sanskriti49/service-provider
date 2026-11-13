@@ -31,6 +31,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import api from "../../api/axiosInstance";
+import { downloadKycDocument } from "../../utils/kycDocument";
 import { useAuth } from "../../contexts/AuthContext";
 import ConfirmDialog from "../../ui/ConfirmDialog";
 import Logo from "../../ui/Logo";
@@ -233,10 +234,15 @@ export default function AdminDashboard() {
 		newKycStatus,
 		reason = null,
 	) => {
+		if (newKycStatus === "rejected" && !reason) {
+			reason = window.prompt("Explain what the provider should correct before resubmitting:");
+			if (!reason?.trim()) return;
+		}
 		setActionInProgress(providerId);
 		try {
 			const res = await api.put(`/api/admin/providers/${providerId}/kyc`, {
 				kyc_status: newKycStatus,
+				kyc_version: inspectingProvider?.kyc_version,
 				rejection_reason: reason,
 			});
 			if (res.data?.success) {
@@ -1346,21 +1352,9 @@ export default function AdminDashboard() {
 									</span>
 									<div className="grid grid-cols-2 gap-2.5">
 										{inspectingProvider.kyc_doc_front ? (
-											<a
-												href={inspectingProvider.kyc_doc_front}
-												target="_blank"
-												rel="noreferrer"
-												className="group relative rounded-xl border border-white/10 overflow-hidden bg-black/40 aspect-[4/3] flex items-center justify-center cursor-pointer hover:border-violet-400 transition"
-											>
-												<img
-													src={inspectingProvider.kyc_doc_front}
-													alt="Front ID Document"
-													className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
-												/>
-												<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 text-white font-semibold text-[11px]">
-													<ExternalLink size={13} /> View Front
-												</div>
-											</a>
+											<button type="button" className="rounded-xl border border-white/10 p-4 text-white hover:bg-white/10" onClick={() => downloadKycDocument(inspectingProvider.user_id, "front").catch(() => toast.error("Document unavailable. Ask the provider to resubmit or try again."))}>
+                                                Download front document
+                                            </button>
 										) : (
 											<div className="rounded-xl border border-dashed border-white/10 p-3 text-center text-slate-500 text-[11px] flex flex-col items-center justify-center aspect-[4/3]">
 												<FileText size={20} className="mb-1 text-slate-600" />
@@ -1369,21 +1363,9 @@ export default function AdminDashboard() {
 										)}
 
 										{inspectingProvider.kyc_doc_back ? (
-											<a
-												href={inspectingProvider.kyc_doc_back}
-												target="_blank"
-												rel="noreferrer"
-												className="group relative rounded-xl border border-white/10 overflow-hidden bg-black/40 aspect-[4/3] flex items-center justify-center cursor-pointer hover:border-violet-400 transition"
-											>
-												<img
-													src={inspectingProvider.kyc_doc_back}
-													alt="Back ID Document"
-													className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
-												/>
-												<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 text-white font-semibold text-[11px]">
-													<ExternalLink size={13} /> View Back
-												</div>
-											</a>
+											<button type="button" className="rounded-xl border border-white/10 p-4 text-white hover:bg-white/10" onClick={() => downloadKycDocument(inspectingProvider.user_id, "back").catch(() => toast.error("Document unavailable. Ask the provider to resubmit or try again."))}>
+                                                Download back document
+                                            </button>
 										) : (
 											<div className="rounded-xl border border-dashed border-white/10 p-3 text-center text-slate-500 text-[11px] flex flex-col items-center justify-center aspect-[4/3]">
 												<FileText size={20} className="mb-1 text-slate-600" />

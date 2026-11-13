@@ -103,7 +103,7 @@ const allFaqs = {
 			questions: [
 				{
 					q: "How long does KYC verification take?",
-					a: "Our compliance desk reviews submitted government documents within 24 to 48 business hours. Once verified, the gold 'Verified Pro' badge is awarded and you can receive client bookings.",
+					a: "Submitted documents require review before a provider can be marked verified. Check your KYC status for updates.",
 				},
 				{
 					q: "Which identification documents are accepted?",
@@ -155,7 +155,7 @@ const allFaqs = {
 				},
 				{
 					q: "What should I do if a dispute arises on-site?",
-					a: "Open a Support Ticket selecting 'Booking Dispute'. Our mediation team will inspect the booking notes, photos, and timestamps to ensure a fair resolution within 24 hours.",
+					a: "Open a Support Ticket selecting 'Booking Dispute' and include the booking details so the support team can review it.",
 				},
 			],
 		},
@@ -165,15 +165,15 @@ const allFaqs = {
 const HERO = {
 	guest: {
 		title: "What do you need help with?",
-		sub: "Search the answers below or pick a common task. If you can't find it, support replies every day from 9 AM to 11 PM.",
+		sub: "Search the answers below or open a support ticket for help.",
 	},
 	customer: {
 		title: "Help with your bookings, payments and account",
-		sub: "Search the answers below or pick a common task. If you can't find it, support replies every day from 9 AM to 11 PM.",
+		sub: "Search the answers below or open a support ticket for help.",
 	},
 	provider: {
 		title: "Help with KYC, payouts and your jobs",
-		sub: "Search the answers below or pick a common task. Partner queries are answered by the same team, every day from 9 AM to 11 PM.",
+		sub: "Search the answers below or open a ticket about your provider account.",
 	},
 };
 
@@ -273,8 +273,6 @@ const HelpCenter = () => {
 
 	const searchInputRef = useRef(null);
 
-	const currentHour = new Date().getHours();
-	const isSupportOnline = currentHour >= 9 && currentHour < 23;
 
 	const userRole = user?.role || null;
 	// Anything that isn't a customer or provider (e.g. admin) is treated as a guest for FAQ purposes
@@ -288,11 +286,10 @@ const HelpCenter = () => {
 
 	useEffect(() => {
 		const ticketParam = searchParams.get("ticket");
-		const tokenParam = searchParams.get("token");
 		const viewParam = searchParams.get("view");
 		if (ticketParam) {
 			setDrawerTicketNumber(ticketParam);
-			setDrawerToken(tokenParam || null);
+			setDrawerToken(null);
 			setShowTicketDrawer(true);
 		} else if (viewParam === "tickets") {
 			setShowTicketDrawer(true);
@@ -618,17 +615,7 @@ const HelpCenter = () => {
 								))}
 							</ul>
 							<div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 text-xs sm:text-sm font-semibold text-slate-700 flex items-center gap-2.5">
-								<span className="relative flex h-2.5 w-2.5">
-									{isSupportOnline && (
-										<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-									)}
-									<span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isSupportOnline ? "bg-emerald-500" : "bg-slate-400"}`}></span>
-								</span>
-								<span>
-									{isSupportOnline
-										? "Live support is online now"
-										: "Support desk is offline, back at 9 AM"}
-								</span>
+								<span>Submit a ticket any time. Live agent availability is not shown.</span>
 							</div>
 						</section>
 					</div>
@@ -814,7 +801,6 @@ const HelpCenter = () => {
 
 					<div id="contact" className="scroll-mt-28">
 						<SupportBanner
-							isSupportOnline={isSupportOnline}
 							userRole={userRole}
 							onOpenTicket={handleOpenTicket}
 						/>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,7 +18,9 @@ import {
 	Check,
 } from "lucide-react";
 import { FadeLoader } from "react-spinners";
+import { toast } from "sonner";
 import api from "../api/axiosInstance";
+import { downloadKycDocument } from "../utils/kycDocument";
 import { useAuth } from "../contexts/AuthContext";
 import useModal from "../hooks/useModal";
 import VerifiedBadge from "./VerifiedBadge";
@@ -75,26 +77,13 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 	const [declaration, setDeclaration] = useState(false);
 	const [uploadingSide, setUploadingSide] = useState({ front: false, back: false });
 
-	const [kycData, setKycData] = useState(() =>
-		user
-			? {
-					kyc_status: user.kyc_status,
-					is_verified: user.is_verified,
-					verification_badge: user.verification_badge,
-					kyc_doc_type: user.kyc_doc_type,
-					kyc_doc_number: user.kyc_doc_number,
-					kyc_doc_front: user.kyc_doc_front,
-					kyc_doc_back: user.kyc_doc_back,
-					rejection_reason: user.rejection_reason,
-					verified_at: user.verified_at,
-					kyc_submitted_at: user.kyc_submitted_at,
-				}
-			: null
-	);
+	const [kycData, setKycData] = useState(null);
+	const statusRevision = useRef(0);
 
 	const frontInputRef = useRef(null);
 	const backInputRef = useRef(null);
 	const submitButtonRef = useRef(null);
+	const submitInFlight = useRef(false);
 
 	// Centralized modal stack & Escape handling
 	useModal({
@@ -110,49 +99,40 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 		},
 	});
 
-	// Fetch current provider KYC status whenever modal opens
-	useEffect(() => {
-		if (isOpen && user?.id) {
-			setErrorMsg("");
-			setSuccessMsg("");
-			setIsReuploading(false);
-			fetchStatus();
-		}
-	}, [isOpen, user?.id]);
-
-	const fetchStatus = async () => {
+	const fetchStatus = useCallback(async (revision) => {
 		if (!user?.id) return;
 		setFetchingKyc(true);
 		try {
 			const res = await api.get(`/api/providers/v1/${user.id}/kyc`);
+			if (revision !== statusRevision.current) return;
 			if (res.data?.kyc) {
 				const k = res.data.kyc;
 				setKycData(k);
 				if (k.kyc_doc_type) setDocType(k.kyc_doc_type);
 				if (k.kyc_doc_number) setDocNumber(k.kyc_doc_number);
-				if (k.kyc_doc_front) setDocFront(k.kyc_doc_front);
-				if (k.kyc_doc_back) setDocBack(k.kyc_doc_back || "");
+				setDocFront(k.kyc_doc_front || "");
+				setDocBack(k.kyc_doc_back || "");
 			}
-		} catch (err) {
-			console.warn("Could not fetch KYC status details:", err.message);
-			if (user) {
-				setKycData({
-					kyc_status: user.kyc_status || "pending",
-					is_verified: user.is_verified || false,
-					verification_badge: user.verification_badge,
-					kyc_doc_type: user.kyc_doc_type,
-					kyc_doc_number: user.kyc_doc_number,
-					kyc_doc_front: user.kyc_doc_front,
-					kyc_doc_back: user.kyc_doc_back,
-					rejection_reason: user.rejection_reason,
-					verified_at: user.verified_at,
-					kyc_submitted_at: user.kyc_submitted_at,
-				});
-			}
+		} catch {
+			if (revision === statusRevision.current) setErrorMsg("Could not load your verification status. Close this window and try again.");
 		} finally {
-			setFetchingKyc(false);
+			if (revision === statusRevision.current) setFetchingKyc(false);
 		}
-	};
+	}, [user?.id]);
+
+	// Ignore responses from a closed modal or a previous user.
+	useEffect(() => {
+		if (isOpen && user?.id) {
+			const revisionRef = statusRevision;
+			const revision = ++revisionRef.current;
+			setErrorMsg("");
+			setSuccessMsg("");
+			setIsReuploading(false);
+			setKycData(null);
+			fetchStatus(revision);
+			return () => { revisionRef.current++; };
+		}
+	}, [isOpen, user?.id, fetchStatus]);
 
 	const handleFileUpload = async (e, side) => {
 		const file = e.target.files?.[0];
@@ -178,7 +158,6 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 				else setDocBack(res.data.url);
 			}
 		} catch (err) {
-			console.error("KYC doc upload error:", err);
 			setErrorMsg(err.response?.data?.error || "Failed to upload document. Please try a different photo.");
 		} finally {
 			setUploadingSide((prev) => ({ ...prev, [side]: false }));
@@ -187,6 +166,7 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
+		if (submitInFlight.current) return;
 		setErrorMsg("");
 		setSuccessMsg("");
 
@@ -211,7 +191,9 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 			setErrorMsg("You must confirm the legal accuracy declaration before submitting.");
 			return;
 		}
+		if (uploadingSide.front || uploadingSide.back) { setErrorMsg('Please wait for uploads to finish.'); return; }
 
+		submitInFlight.current = true;
 		setLoading(true);
 		try {
 			const payload = {
@@ -234,14 +216,14 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 				kyc_doc_back: docBack,
 			};
 			setKycData(updatedKyc);
-			syncUser({ ...updatedKyc });
+			syncUser({ kyc_status: updatedKyc.kyc_status, is_verified: updatedKyc.is_verified, verification_badge: updatedKyc.verification_badge });
 			setIsReuploading(false);
 
 			if (onKycUpdated) onKycUpdated(updatedKyc);
 		} catch (err) {
-			console.error("KYC submission error:", err);
 			setErrorMsg(err.response?.data?.error || "Submission failed. Please check the fields and try again.");
 		} finally {
+			submitInFlight.current = false;
 			setLoading(false);
 		}
 	};
@@ -249,7 +231,7 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 	const isVerified = Boolean(kycData?.is_verified || kycData?.kyc_status === "verified");
 	const isPending = Boolean(!isVerified && kycData?.kyc_status === "pending" && !isReuploading);
 	const isRejected = Boolean(!isVerified && kycData?.kyc_status === "rejected" && !isReuploading);
-	const showForm = !isVerified && (!isPending || isReuploading);
+	const showForm = Boolean(kycData) && !isVerified && (!isPending || isReuploading);
 
 	const maskNumber = (num) => {
 		if (!num) return "";
@@ -306,6 +288,7 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 
 					{/* Modal Body */}
 					<div className="px-6 sm:px-8 py-6 max-h-[70vh] overflow-y-auto space-y-6">
+						{fetchingKyc && <p role="status">Loading verification status…</p>}
 						{/* Alerts */}
 						{errorMsg && (
 							<motion.div
@@ -449,10 +432,7 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 									</h4>
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 										{kycData?.kyc_doc_front && (
-											<a
-												href={kycData.kyc_doc_front}
-												target="_blank"
-												rel="noreferrer"
+											<button type="button" onClick={() => downloadKycDocument(user.id, 'front').catch(() => toast.error('Document unavailable. Please try again or resubmit it.'))}
 												className="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between text-xs font-semibold text-slate-700 hover:border-violet-300 hover:text-violet-700 transition-colors"
 											>
 												<span className="flex items-center gap-2">
@@ -460,13 +440,10 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 													Front Side Photo
 												</span>
 												<ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-											</a>
+											</button>
 										)}
 										{kycData?.kyc_doc_back && (
-											<a
-												href={kycData.kyc_doc_back}
-												target="_blank"
-												rel="noreferrer"
+											<button type="button" onClick={() => downloadKycDocument(user.id, 'back').catch(() => toast.error('Document unavailable. Please try again or resubmit it.'))}
 												className="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between text-xs font-semibold text-slate-700 hover:border-violet-300 hover:text-violet-700 transition-colors"
 											>
 												<span className="flex items-center gap-2">
@@ -474,7 +451,7 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 													Back Side Photo
 												</span>
 												<ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-											</a>
+											</button>
 										)}
 									</div>
 
@@ -639,11 +616,7 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 
 										{docFront ? (
 											<div className="relative rounded-2xl border border-emerald-200 overflow-hidden bg-slate-50 aspect-[4/3] flex items-center justify-center shadow-inner group">
-												<img
-													src={docFront}
-													alt="Front ID"
-													className="w-full h-full object-cover"
-												/>
+												<div className="text-sm font-semibold text-emerald-700">Document uploaded privately</div>
 												<div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
 													<button
 														type="button"
@@ -702,11 +675,7 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 
 										{docBack ? (
 											<div className="relative rounded-2xl border border-emerald-200 overflow-hidden bg-slate-50 aspect-[4/3] flex items-center justify-center shadow-inner group">
-												<img
-													src={docBack}
-													alt="Back ID"
-													className="w-full h-full object-cover"
-												/>
+												<div className="text-sm font-semibold text-emerald-700">Document uploaded privately</div>
 												<div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
 													<button
 														type="button"
@@ -815,7 +784,7 @@ export default function KycVerificationModal({ isOpen, onClose, onKycUpdated }) 
 							<Lock className="w-3.5 h-3.5 text-slate-400" />
 							256-bit encrypted. Confidential &amp; protected.
 						</span>
-						<span>SLA: 24–48 Business Hours</span>
+						<span>Review timing varies</span>
 					</div>
 				</motion.div>
 			</div>

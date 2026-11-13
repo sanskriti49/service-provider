@@ -1,37 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
+const crypto = require("node:crypto");
 const db = require("../config/db");
 const { customAlphabet } = require("nanoid");
 const verifyToken = require("../middleware/verifyToken");
 
 const genTicketId = customAlphabet("1234567890ABCDEFGHJKLMNPQRSTUVWXYZ", 6);
-const TICKET_SECRET = process.env.JWT_SECRET || "taskgenie_support_ticket_signature_salt_2026";
-
-/**
- * Generate a cryptographically signed HMAC token for guest ticket access
- */
-function generateTicketToken(ticketNumber, email) {
-	return crypto
-		.createHmac("sha256", TICKET_SECRET)
-		.update(`${String(ticketNumber).toUpperCase()}:${String(email).trim().toLowerCase()}`)
-		.digest("hex");
-}
-
-/**
- * Timing-safe token verification to prevent timing attacks
- */
-function isValidTicketToken(token, ticketNumber, email) {
-	if (!token || typeof token !== "string") return false;
-	try {
-		const expected = generateTicketToken(ticketNumber, email);
-		if (token.length !== expected.length) return false;
-		return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
-	} catch {
-		return false;
-	}
-}
+const { requireSecret, generateTicketToken, isValidTicketToken } = require("../utils/ticketAccess");
 
 /**
  * Optional authentication extractor: parses user if Bearer token present,
@@ -39,16 +14,9 @@ function isValidTicketToken(token, ticketNumber, email) {
  */
 function optionalAuth(req, res, next) {
 	const authHeader = req.headers.authorization;
-	if (authHeader && authHeader.startsWith("Bearer ")) {
-		const token = authHeader.split(" ")[1];
-		try {
-			const decoded = jwt.verify(token, process.env.JWT_SECRET);
-			req.user = decoded;
-		} catch {
-			// Token expired or invalid: continue as unauthenticated guest
-		}
-	}
-	next();
+	if (!authHeader) return next();
+	if (!authHeader.startsWith("Bearer ")) return res.status(401).json({ error: "Invalid authorization header" });
+	return verifyToken(req, res, next);
 }
 
 /**
@@ -115,11 +83,10 @@ function authorizeTicketAccess(req, ticket) {
 		return { authorized: true, isStaff: true, senderName: req.user.name || "Support Staff", senderRole: "admin", senderId: req.user.id };
 	}
 
-	// 2. Authenticated user who owns the ticket (by user_id or matching email)
+	// Ownership is based on the user ID; email is not proof of ownership.
 	if (req.user) {
 		const isOwnerId = ticket.user_id && req.user.id === ticket.user_id;
-		const isOwnerEmail = req.user.email && ticket.email && req.user.email.toLowerCase() === ticket.email.toLowerCase();
-		if (isOwnerId || isOwnerEmail) {
+		if (isOwnerId) {
 			return {
 				authorized: true,
 				isStaff: false,
@@ -131,7 +98,7 @@ function authorizeTicketAccess(req, ticket) {
 	}
 
 	// 3. Guest with valid signed access token
-	const providedToken = req.headers["x-ticket-token"] || req.query.token || req.body?.token;
+	const providedToken = req.headers["x-ticket-token"] || req.body?.token;
 	if (isValidTicketToken(providedToken, ticket.ticket_number, ticket.email)) {
 		return {
 			authorized: true,
@@ -152,6 +119,9 @@ function authorizeTicketAccess(req, ticket) {
  */
 router.post("/tickets", optionalAuth, async (req, res, next) => {
 	try {
+		if (!req.user) {
+			try { requireSecret(); } catch { return res.status(503).json({ error: "Guest ticket access is temporarily unavailable. Please try again later." }); }
+		}
 		await ensureSupportTable();
 
 		const { name, email, role = "customer", category, priority = "normal", subject, message } = req.body;
@@ -178,10 +148,14 @@ router.post("/tickets", optionalAuth, async (req, res, next) => {
 		const ticketNumber = `TKT-${genTicketId()}`;
 		const cleanCategory = (category || "general").toLowerCase();
 		const cleanPriority = ["urgent", "high"].includes(String(priority).toLowerCase()) ? "urgent" : "normal";
+		const requestId = req.headers['idempotency-key'] || null;
+		if (requestId && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) return res.status(400).json({ error: 'Invalid request identifier' });
+		const requestHash = requestId ? crypto.createHash('sha256').update(JSON.stringify([userId, cleanName, cleanEmail, cleanRole, cleanCategory, cleanPriority, subject.trim(), message.trim()])).digest('hex') : null;
 
 		const insertResult = await db.query(
-			`INSERT INTO support_tickets (ticket_number, user_id, name, email, role, category, priority, subject, message)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			`INSERT INTO support_tickets (ticket_number, user_id, name, email, role, category, priority, subject, message, client_request_id, client_request_hash)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			 ON CONFLICT (client_request_id) DO NOTHING
 			 RETURNING id, ticket_number, created_at, status`,
 			[
 				ticketNumber,
@@ -193,23 +167,33 @@ router.post("/tickets", optionalAuth, async (req, res, next) => {
 				cleanPriority,
 				subject.trim(),
 				message.trim(),
+				requestId,
+				requestHash,
 			]
 		);
 
-		const created = insertResult.rows[0];
-		const ticketToken = generateTicketToken(ticketNumber, cleanEmail);
+		let created = insertResult.rows[0];
+		const inserted = Boolean(created);
+		if (!created && requestId) {
+			const prior = await db.query('SELECT id, ticket_number, created_at, status, client_request_hash FROM support_tickets WHERE client_request_id=$1', [requestId]);
+			if (!prior.rows.length || prior.rows[0].client_request_hash !== requestHash) return res.status(409).json({ error: 'This request identifier was used for different ticket details.' });
+			const { id, ticket_number, created_at, status } = prior.rows[0];
+			created = { id, ticket_number, created_at, status };
+		}
+		if (!created) return res.status(500).json({ error: 'Unable to create ticket' });
+		const ticketToken = userId ? null : generateTicketToken(created.ticket_number, cleanEmail);
 
 		// If user is authenticated, dispatch in-app notification
-		if (userId) {
+		if (userId && inserted) {
 			try {
 				await db.query(
 					`INSERT INTO notifications (user_id, title, message, type, data)
 					 VALUES ($1, $2, $3, 'support', $4)`,
 					[
 						userId,
-						`🎫 Support Ticket #${ticketNumber}`,
-						`We received your inquiry regarding "${subject.trim()}". Our support team typically replies within 2–4 hours.`,
-						JSON.stringify({ ticket_number: ticketNumber, category: cleanCategory, priority: cleanPriority }),
+						`🎫 Support Ticket #${created.ticket_number}`,
+						`We received your inquiry regarding "${subject.trim()}". Check your ticket for updates.`,
+						JSON.stringify({ ticket_number: created.ticket_number, category: cleanCategory, priority: cleanPriority }),
 					]
 				);
 			} catch (notifErr) {
@@ -219,10 +203,9 @@ router.post("/tickets", optionalAuth, async (req, res, next) => {
 
 		res.status(201).json({
 			success: true,
-			ticket_number: ticketNumber,
+			ticket_number: created.ticket_number,
 			ticket_token: ticketToken,
-			ticket_url: `/help?ticket=${ticketNumber}&token=${ticketToken}`,
-			message: `Ticket #${ticketNumber} created successfully. Our team will review and reply within 2–4 hours.`,
+			message: `Ticket #${created.ticket_number} created successfully. Check your ticket for updates.`,
 			ticket: created,
 		});
 	} catch (err) {
@@ -242,9 +225,9 @@ router.get("/my-tickets", verifyToken, async (req, res, next) => {
 			`SELECT t.id, t.ticket_number, t.category, t.priority, t.subject, t.status, t.created_at, t.updated_at,
 			        (SELECT COUNT(*) FROM support_ticket_replies r WHERE r.ticket_id = t.id AND r.is_internal = false) AS reply_count
 			 FROM support_tickets t
-			 WHERE t.user_id = $1 OR (t.user_id IS NULL AND LOWER(t.email) = LOWER($2))
+			 WHERE t.user_id = $1
 			 ORDER BY t.created_at DESC`,
-			[req.user.id, req.user.email || ""]
+			[req.user.id]
 		);
 		res.json({ success: true, tickets: result.rows });
 	} catch (err) {
@@ -351,23 +334,34 @@ router.post("/tickets/:ticketNumber/reply", optionalAuth, async (req, res, next)
 			});
 		}
 
+		const requestId = req.headers['idempotency-key'] || null;
+		if (requestId && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) return res.status(400).json({ error: 'Invalid request identifier' });
+		const requestHash = requestId ? crypto.createHash('sha256').update(JSON.stringify([ticket.id, auth.senderId, auth.senderRole, message.trim()])).digest('hex') : null;
 		// Derive sender identity strictly from authorization (ignore any forged client sender_name)
 		const replyInsert = await db.query(
-			`INSERT INTO support_ticket_replies (ticket_id, sender_id, sender_name, sender_role, message, is_internal)
-			 VALUES ($1, $2, $3, $4, $5, false)
-			 RETURNING id, ticket_id, sender_name, sender_role, message, created_at`,
-			[ticket.id, auth.senderId, auth.senderName, auth.senderRole, message.trim()]
+			`WITH added AS (
+			 INSERT INTO support_ticket_replies (ticket_id, sender_id, sender_name, sender_role, message, is_internal, client_request_id, client_request_hash)
+			 VALUES ($1, $2, $3, $4, $5, false, $6, $7)
+			 ON CONFLICT (client_request_id) DO NOTHING
+			 RETURNING id, ticket_id, sender_name, sender_role, message, created_at
+			), touched AS (
+			 UPDATE support_tickets SET status = CASE WHEN status IN ('resolved','closed') THEN 'open' ELSE status END, updated_at=NOW()
+			 WHERE id=$1 AND EXISTS (SELECT 1 FROM added)
+			) SELECT * FROM added`,
+			[ticket.id, auth.senderId, auth.senderName, auth.senderRole, message.trim(), requestId, requestHash]
 		);
-
-		// Reopen ticket if closed/resolved
-		if (["resolved", "closed"].includes(ticket.status)) {
-			await db.query("UPDATE support_tickets SET status = 'open', updated_at = NOW() WHERE id = $1", [ticket.id]);
-		} else {
-			await db.query("UPDATE support_tickets SET updated_at = NOW() WHERE id = $1", [ticket.id]);
+		let reply = replyInsert.rows[0];
+		const inserted = Boolean(reply);
+		if (!reply && requestId) {
+			const prior = await db.query('SELECT id, ticket_id, sender_name, sender_role, message, created_at, client_request_hash FROM support_ticket_replies WHERE client_request_id=$1', [requestId]);
+			if (!prior.rows.length || prior.rows[0].ticket_id !== ticket.id || prior.rows[0].client_request_hash !== requestHash) return res.status(409).json({ error: 'This request identifier was used for a different reply.' });
+			const { id, ticket_id, sender_name, sender_role, message, created_at } = prior.rows[0];
+			reply = { id, ticket_id, sender_name, sender_role, message, created_at };
 		}
+		if (!reply) return res.status(500).json({ error: 'Unable to submit reply' });
 
 		// Notify assigned staff
-		if (ticket.assigned_to) {
+		if (ticket.assigned_to && inserted) {
 			try {
 				await db.query(
 					`INSERT INTO notifications (user_id, title, message, type, data)
@@ -384,7 +378,7 @@ router.post("/tickets/:ticketNumber/reply", optionalAuth, async (req, res, next)
 
 		res.status(201).json({
 			success: true,
-			reply: replyInsert.rows[0],
+			reply,
 			message: "Reply submitted successfully",
 		});
 	} catch (err) {

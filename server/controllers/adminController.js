@@ -2,6 +2,7 @@ const db = require("../config/db");
 const { ensureSupportTable } = require("../routes/supportRoutes");
 const { ensureChatReportsTable } = require("../utils/chatService");
 const cache = require("../utils/cache");
+const kycStorage = require("../services/kycStorage");
 
 /**
  * Format 24h hour number to readable AM/PM label
@@ -282,6 +283,8 @@ async function getProviders(req, res, next) {
 				p.verification_badge,
 				p.verified_at,
 				p.kyc_submitted_at,
+				p.kyc_version,
+				p.kyc_rejection_reason,
 				(
 					SELECT json_agg(json_build_object(
 						'service_id', s.id,
@@ -307,7 +310,14 @@ async function getProviders(req, res, next) {
 
 		res.json({
 			success: true,
-			data: result.rows,
+			data: result.rows.map(row => {
+				for (const side of ['front', 'back']) {
+					const field = `kyc_doc_${side}`;
+					try { if (row[field]) kycStorage.assertKey(row[field], row.user_id); }
+					catch { row[field] = null; }
+				}
+				return row;
+			}),
 			meta: {
 				total,
 				page: parseInt(page, 10),
@@ -350,10 +360,8 @@ async function updateProviderStatus(req, res, next) {
 			 SET status = $1::varchar,
 			     rejection_reason = $2,
 			     approved_at = (CASE WHEN $1::text = 'approved' THEN now() ELSE approved_at END),
-			     kyc_status = (CASE WHEN $1::text = 'approved' THEN 'verified' WHEN $1::text = 'rejected' THEN 'rejected' ELSE kyc_status END),
-			     is_verified = (CASE WHEN $1::text = 'approved' THEN TRUE WHEN $1::text IN ('rejected', 'suspended') THEN FALSE ELSE is_verified END),
-			     verification_badge = (CASE WHEN $1::text = 'approved' THEN 'verified_pro' ELSE verification_badge END),
-			     verified_at = (CASE WHEN $1::text = 'approved' THEN now() ELSE verified_at END)
+			     is_verified = (CASE WHEN $1::text IN ('rejected', 'suspended') THEN FALSE ELSE is_verified END),
+			     verification_badge = (CASE WHEN $1::text IN ('rejected', 'suspended') THEN NULL ELSE verification_badge END)
 			 WHERE user_id = $3`,
 			[status, rejection_reason, user.id],
 		);
@@ -361,14 +369,14 @@ async function updateProviderStatus(req, res, next) {
 		// Send in-app notification to provider
 		const notificationTitle =
 			status === "approved"
-				? "🎉 Application Approved & Verified!"
+				? "Application Approved"
 				: status === "rejected"
 					? "Application Update"
 					: "Account Status Update";
 
 		const notificationMsg =
 			status === "approved"
-				? "Congratulations! Your service provider profile and identity documents have been approved. You now hold the Gold 'Verified Pro' badge and can receive bookings."
+				? "Your provider application was approved. Identity verification is reviewed separately."
 				: status === "rejected"
 					? `Your application was not approved at this time. Reason: ${rejection_reason || "Requirements not met."}`
 					: `Your provider account status has been updated to: ${status}.`;
@@ -409,12 +417,14 @@ async function updateProviderStatus(req, res, next) {
 async function updateProviderKyc(req, res, next) {
 	try {
 		const providerId = req.params.id;
-		const { kyc_status, rejection_reason = null } = req.body;
+		const { kyc_status, rejection_reason = null, kyc_version } = req.body;
 
-		const validKycStatuses = ["verified", "rejected", "pending"];
+		const validKycStatuses = ["verified", "rejected"];
 		if (!validKycStatuses.includes(kyc_status)) {
 			return res.status(400).json({ error: `Invalid kyc_status. Allowed: ${validKycStatuses.join(", ")}` });
 		}
+		if (!Number.isInteger(kyc_version) || kyc_version < 1) return res.status(400).json({ error: "A submitted document version is required" });
+		if (kyc_status === "rejected" && (typeof rejection_reason !== "string" || !rejection_reason.trim() || rejection_reason.length > 1000)) return res.status(400).json({ error: "Provide a rejection reason (up to 1000 characters)" });
 
 		const userRes = await db.query(
 			"SELECT id, name, email FROM users WHERE (id::text = $1 OR custom_id = $1) AND role = 'provider'",
@@ -424,20 +434,35 @@ async function updateProviderKyc(req, res, next) {
 			return res.status(404).json({ error: "Provider not found" });
 		}
 		const user = userRes.rows[0];
+		const current = await db.query("SELECT kyc_doc_front, kyc_doc_back, kyc_version, kyc_status FROM providers WHERE user_id=$1", [user.id]);
+		if (!current.rows.length || current.rows[0].kyc_version !== kyc_version || current.rows[0].kyc_status !== 'pending') return res.status(409).json({ error: "The submission changed. Refresh before reviewing." });
+		try {
+			if (!(await kycStorage.documentExists(current.rows[0].kyc_doc_front, user.id)) || (current.rows[0].kyc_doc_back && !(await kycStorage.documentExists(current.rows[0].kyc_doc_back, user.id)))) return res.status(409).json({ error: "The submitted documents are unavailable. Ask the provider to resubmit." });
+		} catch { return res.status(503).json({ error: "Private document storage is unavailable. Please try again later." }); }
 
 		const isVerified = kyc_status === "verified";
 		const badge = isVerified ? "verified_pro" : null;
 
-		await db.query(
+		const client = await db.connect();
+		let review;
+		try {
+			await client.query('BEGIN');
+			review = await client.query(
 			`UPDATE providers
 			 SET kyc_status = $1::varchar,
 			     is_verified = $2::boolean,
 			     verification_badge = $3,
 			     verified_at = (CASE WHEN $2::boolean THEN now() ELSE NULL END),
-			     rejection_reason = (CASE WHEN $1::text = 'rejected' THEN $4 ELSE rejection_reason END)
-			 WHERE user_id = $5`,
-			[kyc_status, isVerified, badge, rejection_reason, user.id],
-		);
+			     kyc_rejection_reason = (CASE WHEN $1::text = 'rejected' THEN $4 ELSE NULL END),
+			     kyc_reviewed_by = $7, kyc_reviewed_at = now()
+			 WHERE user_id = $5 AND kyc_version = $6 AND kyc_status = 'pending' RETURNING user_id`,
+			[kyc_status, isVerified, badge, rejection_reason, user.id, kyc_version, req.user.id],
+			);
+			if (!review.rows.length) { await client.query('ROLLBACK'); return res.status(409).json({ error: "The submission changed. Refresh before reviewing." }); }
+			await client.query('INSERT INTO kyc_review_events(provider_id, submission_version, reviewer_id, decision, reason) VALUES ($1,$2,$3,$4,$5)', [user.id, kyc_version, req.user.id, kyc_status, isVerified ? null : rejection_reason.trim()]);
+			await client.query('COMMIT');
+		} catch (error) { await client.query('ROLLBACK'); throw error; }
+		finally { client.release(); }
 
 		const title = isVerified ? "🎖️ Verified Pro Badge Awarded!" : "KYC Document Verification Update";
 		const msg = isVerified

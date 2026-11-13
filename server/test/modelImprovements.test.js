@@ -86,6 +86,7 @@ function providerFixture({ knownService = true, knownProvider = true } = {}) {
 	const stubs = {
 		"../config/db": dbMock,
 		"../utils/cache": { delPattern: () => {} },
+		"../services/kycStorage": { documentExists: async () => true },
 	};
 	instance.require = (id) => (Object.hasOwn(stubs, id) ? stubs[id] : original(id));
 	instance._compile(fs.readFileSync(filename, "utf8"), filename);

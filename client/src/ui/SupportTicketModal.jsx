@@ -67,6 +67,8 @@ export default function SupportTicketModal({
 	const [copiedToken, setCopiedToken] = useState(false);
 
 	const submitButtonRef = useRef(null);
+	const submittingRef = useRef(false);
+	const pendingRequest = useRef(null);
 
 	// Centralized modal stack & Escape handling
 	useModal({
@@ -89,6 +91,9 @@ export default function SupportTicketModal({
 			if (user) {
 				setName(user.name || "");
 				setEmail(user.email || "");
+			} else {
+				setName("");
+				setEmail("");
 			}
 			if (defaultCategory) {
 				setCategory(defaultCategory);
@@ -106,6 +111,7 @@ export default function SupportTicketModal({
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
+		if (submittingRef.current) return;
 		setErrorMsg("");
 
 		if (!name.trim()) {
@@ -125,9 +131,10 @@ export default function SupportTicketModal({
 			return;
 		}
 
+		submittingRef.current = true;
 		setLoading(true);
 		try {
-			const res = await api.post("/api/support/tickets", {
+			const payload = {
 				user_id: user?.id || null,
 				name: name.trim(),
 				email: email.trim(),
@@ -136,13 +143,24 @@ export default function SupportTicketModal({
 				priority,
 				subject: subject.trim(),
 				message: message.trim(),
-			});
+			};
+			const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(payload)));
+			const fingerprint = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+			if (!pendingRequest.current) { try { pendingRequest.current = JSON.parse(sessionStorage.getItem('support-ticket:pending') || 'null'); } catch { /* In-memory retries remain available. */ } }
+			if (!pendingRequest.current || pendingRequest.current.fingerprint !== fingerprint) pendingRequest.current = { fingerprint, id: crypto.randomUUID() };
+			try { sessionStorage.setItem('support-ticket:pending', JSON.stringify(pendingRequest.current)); } catch { /* In-memory retries remain available. */ }
+			const res = await api.post("/api/support/tickets", payload, { headers: { 'Idempotency-Key': pendingRequest.current.id } });
 
+			if (res.data?.ticket_number && res.data?.ticket_token) {
+				try { sessionStorage.setItem(`support-ticket:${res.data.ticket_number}`, res.data.ticket_token); } catch { /* User can copy the token below. */ }
+			}
 			setTicketResult(res.data);
+			pendingRequest.current = null;
+			try { sessionStorage.removeItem('support-ticket:pending'); } catch { /* No stored request to clear. */ }
 		} catch (err) {
-			console.error("Support ticket submission failed:", err);
 			setErrorMsg(err.response?.data?.error || "Failed to submit ticket. Please try again or reach out on WhatsApp.");
 		} finally {
+			submittingRef.current = false;
 			setLoading(false);
 		}
 	};
@@ -215,17 +233,17 @@ export default function SupportTicketModal({
 										#{ticketResult.ticket_number}
 									</div>
 									<p className="bricolage-grotesque text-sm text-slate-600 max-w-md mx-auto pt-1">
-										Your request has been routed to our priority operations queue. You will receive an email update at <strong>{email}</strong>.
+										Your request was received. Open your ticket to check for replies; email updates are not available.
 									</p>
 								</div>
 
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100 text-left">
 									<div>
 										<span className="text-[10px] font-bold uppercase text-slate-400 block">
-											Response SLA
+													Next step
 										</span>
 										<span className="text-xs font-bold text-slate-800 flex items-center gap-1 mt-0.5">
-											<Clock className="w-3.5 h-3.5 text-violet-600" /> Under 2 to 4 Hours
+													<Clock className="w-3.5 h-3.5 text-violet-600" /> Check for replies
 										</span>
 									</div>
 									<div>
@@ -233,7 +251,7 @@ export default function SupportTicketModal({
 											Notification
 										</span>
 										<span className="text-xs font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
-											<ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> In-App Alert Dispatched
+													<ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> View updates in your ticket
 										</span>
 									</div>
 								</div>
@@ -268,7 +286,7 @@ export default function SupportTicketModal({
 											{ticketResult.ticket_token}
 										</p>
 										<p className="text-[10px] text-violet-700">
-											Save this token to look up this ticket and post replies if you are signed out.
+													Save this token and your ticket number privately. The token expires after 30 days; this browser tab also remembers it until the tab is closed.
 										</p>
 									</div>
 								)}

@@ -1,37 +1,11 @@
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
-const crypto = require("crypto");
 const { activeBookingPredicate } = require("../utils/bookingLifecycle");
-const { customAlphabet } = require("nanoid");
 const Joi = require("joi");
 const db = require("../config/db");
 const cache = require("../utils/cache");
 const { hashIfPresent } = require("../utils/hash");
-const { normalizeEmail } = require("../utils/normalizeEmail");
 const { getPriceDetails } = require("../utils/pricing");
-const {
-	s3Client,
-	generatePresignedUploadUrl,
-	generatePresignedDownloadUrl,
-	uploadBufferToS3,
-	isConfigured: isS3Configured,
-} = require("../config/s3");
-const cloudinary = require("cloudinary").v2;
-const streamifier = require("streamifier");
-
-function extractS3Key(docUrlOrKey) {
-	if (!docUrlOrKey || typeof docUrlOrKey !== "string") return null;
-	if (docUrlOrKey.startsWith("kyc-documents/")) return docUrlOrKey;
-	if (docUrlOrKey.includes(".amazonaws.com/")) {
-		return docUrlOrKey.split(".amazonaws.com/")[1];
-	}
-	return null;
-}
-
-cloudinary.config({
-	cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-	api_key: process.env.CLOUDINARY_API_KEY,
-	api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const kycStorage = require("../services/kycStorage");
 const {
 	calculateHaversineDistance,
 	estimateTravelTimeMinutes,
@@ -93,7 +67,7 @@ async function checkPostGisSupport(clientOrPool) {
 }
 
 const providerSchema = Joi.object({
-	password: Joi.string().min(8).max(72).required(),
+	password: Joi.string().min(8).max(72).optional(),
 	name: Joi.string().min(3).max(100).required(),
 	email: Joi.string().email().lowercase().required(),
 	phone: Joi.string()
@@ -128,11 +102,11 @@ const providerSchema = Joi.object({
 		.optional(),
 	kyc_doc_type: Joi.string()
 		.valid("aadhaar", "driving_license", "certificate")
-		.allow("")
-		.optional(),
-	kyc_doc_number: Joi.string().max(100).allow("").optional(),
-	kyc_doc_front: Joi.string().allow("", null).optional(),
-	kyc_doc_back: Joi.string().allow("", null).optional(),
+		.required(),
+	kyc_doc_number: Joi.string().min(4).max(100).required(),
+	kyc_doc_front: Joi.string().required(),
+	kyc_doc_back: Joi.when('kyc_doc_type', { is: Joi.valid('aadhaar', 'driving_license'), then: Joi.string().required(), otherwise: Joi.string().allow('', null).optional() }),
+	kyc_declaration: Joi.boolean().valid(true).required(),
 }).custom(pairedCoordinates);
 
 const providerUpdateSchema = Joi.object({
@@ -211,14 +185,21 @@ async function insertSlots(client, userId, schedule) {
 }
 
 async function createProvider(req, res, next) {
+	if (!req.user || req.user.role !== "provider") return res.status(403).json({ error: "Sign in with a provider account to apply" });
 	const { error, value } = providerSchema.validate(req.body);
 	if (error) return res.status(400).json({ error: error.details[0].message });
+	if (req.user.email && value.email.toLowerCase() !== req.user.email.toLowerCase()) return res.status(400).json({ error: "Use the email address on your provider account" });
+	if (value.kyc_doc_back && value.kyc_doc_back === value.kyc_doc_front) return res.status(400).json({ error: "Upload separate front and back documents" });
+	try {
+		if (!(await kycStorage.documentExists(value.kyc_doc_front, req.user.id)) || (value.kyc_doc_back && !(await kycStorage.documentExists(value.kyc_doc_back, req.user.id)))) return res.status(400).json({ error: "Upload the required documents again before submitting." });
+	} catch (err) {
+		if (err.message === "Invalid document reference") return res.status(400).json({ error: "Upload the required documents again before submitting." });
+		return res.status(503).json({ error: "Private document storage is unavailable. Please try again later." });
+	}
 
 	const {
 		name,
-		email,
 		phone,
-		password,
 		service,
 		services: extraServices,
 		price,
@@ -251,35 +232,21 @@ async function createProvider(req, res, next) {
 		}
 		const serviceId = sRow.rows[0].id;
 
-		const hashed = await hashIfPresent(password);
-		const nano = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 20);
-		const customId = "SRV" + nano();
-
 		const userInsert = await client.query(
-			`INSERT INTO users (name, email, phone, role, custom_id, password, location, lat, lng, photo, bio)
-             VALUES ($1,$2,$3,'provider',$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-			[
-				name,
-				normalizeEmail(email),
-				phone,
-				customId,
-				hashed,
-				location,
-				lat ?? null,
-				lng ?? null,
-				photo,
-				bio,
-			],
+			`UPDATE users SET name=$2, phone=$3, location=$4, lat=$5, lng=$6, photo=COALESCE($7,photo), bio=$8 WHERE id=$1 AND role='provider' RETURNING id,custom_id`,
+			[req.user.id, name, phone || null, location || null, lat, lng, photo || null, bio || null],
 		);
+		if (!userInsert.rows.length) { await client.query("ROLLBACK"); return res.status(403).json({ error: "Provider account not found" }); }
 		const userId = userInsert.rows[0].id;
+		const customId = userInsert.rows[0].custom_id;
 
 		await client.query(
 			`INSERT INTO providers (
                 user_id, rating, availability, status,
                 kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back,
-                kyc_status, is_verified, kyc_submitted_at
+                kyc_status, is_verified, kyc_submitted_at, kyc_version
             )
-            VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,'pending',FALSE,NOW())`,
+            VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,'pending',FALSE,NOW(),1)`,
 			[
 				userId,
 				rating ?? null,
@@ -324,129 +291,28 @@ async function createProvider(req, res, next) {
 		});
 	} catch (err) {
 		await client.query("ROLLBACK");
-		next(err);
+		if (err.code === "23505") return res.status(409).json({ error: "An application already exists for this account" });
+		return res.status(500).json({ error: "Unable to submit the application. Please try again." });
 	} finally {
 		client.release();
 	}
 }
 
-async function uploadKycDocument(req, res, next) {
+async function uploadKycDocument(req, res) {
+	if (req.user?.role !== "provider") return res.status(403).json({ error: "A provider account is required" });
+	if (!req.file) return res.status(400).json({ error: "Select a document to upload" });
+	try { kycStorage.validateDocument(req.file.buffer, req.file.mimetype); }
+	catch (error) { return res.status(400).json({ error: error.message }); }
 	try {
-		if (!req.file) {
-			return res.status(400).json({ error: "No document file provided" });
-		}
-
-		let documentUrl;
-		let storageEngine = "fallback";
-		const uniqueSuffix = crypto.randomBytes(6).toString("hex");
-		const sanitizedFileName = (req.file.originalname || "document").replace(
-			/[^a-zA-Z0-9._-]/g,
-			"_",
-		);
-		const userId = req.user?.id || "unassigned";
-		const fileKey = `kyc-documents/${userId}/${Date.now()}-${uniqueSuffix}-${sanitizedFileName}`;
-
-		// 1. Primary AWS S3 Encrypted Storage (SSE-S3)
-		if (isS3Configured) {
-			try {
-				const s3Res = await uploadBufferToS3({
-					buffer: req.file.buffer,
-					key: fileKey,
-					contentType: req.file.mimetype,
-				});
-				documentUrl = s3Res.fileUrl;
-				storageEngine = s3Res.isMock ? "s3-mock" : "s3";
-			} catch (s3Err) {
-				console.warn(
-					"AWS S3 upload failed, checking fallbacks:",
-					s3Err.message,
-				);
-			}
-		}
-
-		// 2. Secondary Cloudinary Fallback (if S3 is unconfigured or failed)
-		if (
-			!documentUrl &&
-			process.env.CLOUDINARY_CLOUD_NAME &&
-			process.env.CLOUDINARY_API_KEY &&
-			process.env.CLOUDINARY_API_SECRET
-		) {
-			try {
-				const result = await new Promise((resolve, reject) => {
-					const stream = cloudinary.uploader.upload_stream(
-						{ folder: "kyc_documents", resource_type: "auto" },
-						(err, res) => {
-							if (err) reject(err);
-							else resolve(res);
-						},
-					);
-					streamifier.createReadStream(req.file.buffer).pipe(stream);
-				});
-				documentUrl = result.secure_url;
-				storageEngine = "cloudinary";
-			} catch (uploadErr) {
-				console.warn(
-					"Cloudinary upload failed, using data URI fallback:",
-					uploadErr.message,
-				);
-			}
-		}
-
-		// 3. Final In-Memory Data URI Fallback (Zero Downtime / Local Dev)
-		if (!documentUrl) {
-			documentUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-			storageEngine = "data-uri";
-		}
-
-		res.json({
-			success: true,
-			url: documentUrl,
-			fileKey,
-			filename: req.file.originalname,
-			mimetype: req.file.mimetype,
-			size: req.file.size,
-			storage: storageEngine,
-		});
-	} catch (err) {
-		next(err);
+		const reference = await kycStorage.storeDocument(req.user.id, req.file.buffer, req.file.mimetype);
+		return res.json({ success: true, url: reference, storage: "private" });
+	} catch (error) {
+		return res.status(503).json({ error: error.code === "KYC_STORAGE_DISABLED" ? "Identity document uploads are currently unavailable. Please contact support or try again later." : "Private document storage is unavailable. Please try again later." });
 	}
 }
 
-/**
- * Generate a presigned S3 upload URL for direct browser-to-S3 ingestion (Zero Server Egress)
- */
-async function getKycPresignedUrl(req, res, next) {
-	try {
-		const { fileName, fileType, fileSize } = req.body;
-		if (!fileName) {
-			return res.status(400).json({ error: "fileName is required" });
-		}
-		if (fileSize && fileSize > 5 * 1024 * 1024) {
-			return res.status(400).json({ error: "Document photo must be under 5MB" });
-		}
-
-		const uniqueSuffix = crypto.randomBytes(6).toString("hex");
-		const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-		const userId = req.user?.id || "unassigned";
-		const fileKey = `kyc-documents/${userId}/${Date.now()}-${uniqueSuffix}-${sanitizedFileName}`;
-
-		const { uploadUrl, fileUrl, isMock } = await generatePresignedUploadUrl({
-			key: fileKey,
-			contentType: fileType || "application/octet-stream",
-			expiresIn: 300,
-		});
-
-		res.json({
-			success: true,
-			uploadUrl,
-			fileUrl,
-			fileKey,
-			fileName: sanitizedFileName,
-			isMock,
-		});
-	} catch (err) {
-		next(err);
-	}
+async function getKycPresignedUrl(_req, res) {
+	return res.status(410).json({ error: "Direct KYC uploads are unavailable; use authenticated document upload." });
 }
 
 async function getProviders(req, res, next) {
@@ -1141,7 +1007,7 @@ const kycSubmitSchema = Joi.object({
 	kyc_doc_front: Joi.string().required().messages({
 		"any.required": "Front photo of your document is required",
 	}),
-	kyc_doc_back: Joi.string().allow("", null).optional(),
+	kyc_doc_back: Joi.when('kyc_doc_type', { is: Joi.valid('aadhaar', 'driving_license', 'voter_id'), then: Joi.string().required(), otherwise: Joi.string().allow('', null).optional() }),
 	kyc_declaration: Joi.boolean().valid(true).required().messages({
 		"any.only": "You must accept the truthfulness and verification declaration",
 		"any.required": "Verification declaration is required",
@@ -1162,16 +1028,16 @@ async function getKycStatus(req, res, next) {
 
 		const result = await db.query(
 			`SELECT u.id, u.name, u.email, u.phone,
-			        COALESCE(p.kyc_status, 'pending') AS kyc_status,
+			        CASE WHEN p.user_id IS NULL THEN 'not_submitted' ELSE p.kyc_status END AS kyc_status,
 			        COALESCE(p.is_verified, FALSE) AS is_verified,
 			        p.verification_badge,
 			        p.kyc_doc_type,
 			        p.kyc_doc_number,
 			        p.kyc_doc_front,
 			        p.kyc_doc_back,
-			        p.rejection_reason,
+			        CASE WHEN p.kyc_version > 0 THEN p.kyc_rejection_reason ELSE p.rejection_reason END AS rejection_reason,
 			        p.verified_at,
-			        p.kyc_submitted_at
+			        p.kyc_submitted_at, p.kyc_version
 			 FROM users u
 			 LEFT JOIN providers p ON p.user_id = u.id
 			 WHERE u.id = $1`,
@@ -1183,21 +1049,10 @@ async function getKycStatus(req, res, next) {
 		}
 
 		const kyc = { ...result.rows[0] };
-		if (isS3Configured) {
-			const frontKey = extractS3Key(kyc.kyc_doc_front);
-			if (frontKey) {
-				try {
-					const { downloadUrl } = await generatePresignedDownloadUrl({ key: frontKey });
-					kyc.kyc_doc_front_view = downloadUrl;
-				} catch (_) {}
-			}
-			const backKey = extractS3Key(kyc.kyc_doc_back);
-			if (backKey) {
-				try {
-					const { downloadUrl } = await generatePresignedDownloadUrl({ key: backKey });
-					kyc.kyc_doc_back_view = downloadUrl;
-				} catch (_) {}
-			}
+		for (const side of ['front', 'back']) {
+			const field = `kyc_doc_${side}`;
+			try { if (kyc[field]) kycStorage.assertKey(kyc[field], providerId); }
+			catch { kyc[field] = null; }
 		}
 
 		res.json({
@@ -1227,11 +1082,21 @@ async function submitKyc(req, res, next) {
 		}
 
 		const { kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back } = value;
+		if (kyc_doc_back && kyc_doc_back === kyc_doc_front) return res.status(400).json({ error: "Upload separate front and back documents" });
+		try {
+			if (!(await kycStorage.documentExists(kyc_doc_front, providerId)) ||
+				(kyc_doc_back && !(await kycStorage.documentExists(kyc_doc_back, providerId)))) {
+				return res.status(400).json({ error: "Upload the required documents again before submitting." });
+			}
+		} catch (error) {
+			if (error.message === "Invalid document reference") return res.status(400).json({ error: "Upload the required documents again before submitting." });
+			return res.status(503).json({ error: "Private document storage is unavailable. Please try again later." });
+		}
 		const sanitizedDocNumber = kyc_doc_number.trim().toUpperCase();
 
 		const updateRes = await db.query(
-			`INSERT INTO providers (user_id, kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back, kyc_status, kyc_submitted_at, rejection_reason, status, is_verified, verification_badge, verified_at)
-			 VALUES ($1, $2, $3, $4, $5, 'pending', now(), NULL, 'pending', FALSE, NULL, NULL)
+			`INSERT INTO providers (user_id, kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back, kyc_status, kyc_submitted_at, rejection_reason, status, is_verified, verification_badge, verified_at, kyc_version)
+			 VALUES ($1, $2, $3, $4, $5, 'pending', now(), NULL, 'pending', FALSE, NULL, NULL, 1)
 			 ON CONFLICT (user_id) DO UPDATE SET
 			    kyc_doc_type = EXCLUDED.kyc_doc_type,
 			    kyc_doc_number = EXCLUDED.kyc_doc_number,
@@ -1239,13 +1104,24 @@ async function submitKyc(req, res, next) {
 			    kyc_doc_back = EXCLUDED.kyc_doc_back,
 			    kyc_status = 'pending',
 			    kyc_submitted_at = now(),
-			    rejection_reason = NULL,
+			    kyc_version = providers.kyc_version + 1,
+			    kyc_reviewed_by = NULL,
+			    kyc_reviewed_at = NULL,
+			    kyc_rejection_reason = NULL,
 			    is_verified = FALSE,
 			    verification_badge = NULL,
 			    verified_at = NULL
-			 RETURNING user_id, kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back, kyc_status, kyc_submitted_at, is_verified, verification_badge`,
+			 WHERE providers.kyc_status <> 'pending'
+			    OR providers.kyc_doc_type IS DISTINCT FROM EXCLUDED.kyc_doc_type
+			    OR providers.kyc_doc_number IS DISTINCT FROM EXCLUDED.kyc_doc_number
+			    OR providers.kyc_doc_front IS DISTINCT FROM EXCLUDED.kyc_doc_front
+			    OR providers.kyc_doc_back IS DISTINCT FROM EXCLUDED.kyc_doc_back
+			 RETURNING user_id, kyc_doc_type, kyc_doc_number, kyc_doc_front, kyc_doc_back, kyc_status, kyc_submitted_at, is_verified, verification_badge, kyc_version`,
 			[providerId, kyc_doc_type, sanitizedDocNumber, kyc_doc_front, kyc_doc_back || null],
 		);
+		if (!updateRes.rows.length) {
+			return res.json({ success: true, message: "These documents are already awaiting review.", kyc: { user_id: providerId, kyc_status: 'pending', is_verified: false, verification_badge: null } });
+		}
 
 		try {
 			await db.query(
@@ -1254,7 +1130,7 @@ async function submitKyc(req, res, next) {
 				[
 					providerId,
 					"📋 KYC Documents Received",
-					"Your identity verification documents have been submitted. Our security team verifies submissions within 24–48 hours.",
+					"Your identity verification documents have been submitted for review.",
 					JSON.stringify({ kyc_status: "pending", submitted_at: new Date().toISOString() }),
 				],
 			);
@@ -1266,13 +1142,33 @@ async function submitKyc(req, res, next) {
 
 		res.json({
 			success: true,
-			message: "KYC documents submitted successfully. Verification takes 24–48 business hours.",
+			message: "KYC documents submitted for review.",
 			kyc: updateRes.rows[0],
 		});
 	} catch (err) {
-		console.error("submitKyc error:", err);
-		next(err);
+		return res.status(500).json({ error: "Unable to submit the documents. Please try again." });
 	}
+}
+
+async function viewKycDocument(req, res, next) {
+	try {
+		const providerId = await resolveProviderId(db, req.params.id);
+		if (!providerId) return res.status(404).json({ error: "Document not found" });
+		if (!req.user || (req.user.role !== 'admin' && req.user.id !== providerId)) return res.status(403).json({ error: "Access denied" });
+		if (!['front', 'back'].includes(req.params.side)) return res.status(404).json({ error: "Document not found" });
+		const result = await db.query('SELECT kyc_doc_front, kyc_doc_back FROM providers WHERE user_id=$1', [providerId]);
+		const key = result.rows[0]?.[`kyc_doc_${req.params.side}`];
+		if (!key) return res.status(404).json({ error: "Document not found" });
+		let bytes, mime;
+		try { bytes = await kycStorage.readDocument(key, providerId); mime = kycStorage.detectDocumentType(bytes); }
+		catch { return res.status(503).json({ error: "Document unavailable. Please try again or resubmit it." }); }
+		const extension = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[mime];
+		res.set('Cache-Control', 'no-store');
+		res.set('Content-Type', mime);
+		res.set('Content-Disposition', `attachment; filename="verification-${req.params.side}.${extension}"`);
+		res.set('X-Content-Type-Options', 'nosniff');
+		return res.send(bytes);
+	} catch (error) { next(error); }
 }
 
 module.exports = {
@@ -1292,4 +1188,5 @@ module.exports = {
 	getProviderAvailability,
 	getKycStatus,
 	submitKyc,
+	viewKycDocument,
 };

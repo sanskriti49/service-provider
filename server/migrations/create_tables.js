@@ -4,6 +4,8 @@ const { chatSchema } = require("./migrate_chat");
 const { locationSchema } = require("./migrate_booking_location");
 const { supportModerationSchema } = require("./migrate_support_moderation");
 const { outboxSchema } = require("./migrate_notification_outbox");
+const { kycReviewSchema } = require("./migrate_kyc_review");
+const { supportIdempotencySchema } = require("./migrate_support_idempotency");
 
 const spatialQueries = [
 	// PostGIS Spatial Extension & Geography Indexing
@@ -292,6 +294,8 @@ const queries = [
 	locationSchema,
 	supportModerationSchema,
 	outboxSchema,
+	kycReviewSchema,
+	supportIdempotencySchema,
 ];
 
 const runMigration = async () => {

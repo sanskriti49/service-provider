@@ -100,6 +100,8 @@ app.use(
 		},
 	}),
 );
+// Legacy KYC uploads must never be served by the public static file handler.
+app.use("/uploads", require("./middleware/blockLegacyKyc"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const { register, metricsMiddleware, updatePoolMetrics } = require("./utils/metrics");
