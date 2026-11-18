@@ -23,6 +23,7 @@ import BookingHeader from "./BookingHeader";
 import SavedAddressesModal from "./SavedAddressesModal";
 import { toast } from "sonner";
 import api from "../../api/axiosInstance";
+import { getBookingAttempt, clearBookingAttempt } from "../../utils/bookingAttempt";
 import { useAuth } from "../../contexts/AuthContext";
 import { initialCustomerLocation, serviceLocation as normalizeLocation, editServiceAddress, validCoordinates, locationParams, bookingCoordinates, addressCandidates, reverseLocation, createRequestGuard, indiaDate } from "../../utils/serviceLocation";
 
@@ -455,18 +456,7 @@ export default function BookingPage() {
  const providerRequests = useRef(createRequestGuard());
  const availabilityKey = useRef(null);
  const locationRevision = useRef(0);
- const idempotencyKeyRef = useRef(null);
- const getStableIdempotencyKey = () => {
-  if (!idempotencyKeyRef.current) {
-   idempotencyKeyRef.current = (typeof crypto !== "undefined" && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-  }
-  return idempotencyKeyRef.current;
- };
- const resetIdempotencyKey = () => {
-  idempotencyKeyRef.current = null;
- };
+ const submittingRef = useRef(false);
  const address = serviceLocation.address;
  const tempAddress = draftLocation.address;
  const setTempAddress = (text) => {
@@ -474,9 +464,6 @@ export default function BookingPage() {
   setAddressMatches([]); setDraftLocation(current=>editServiceAddress(current,text));
  };
  useEffect(()=>()=>{addressRequests.current.cancel();availabilityRequests.current.cancel();providerRequests.current.cancel();},[]);
- useEffect(() => {
-  idempotencyKeyRef.current = null;
- }, [selectedDate, selectedTime, serviceLocation.lat, serviceLocation.lng, address, paymentMethod, provider?.id, provider?.user_id]);
 
 	const [selectedDate, setSelectedDate] = useState(
 		state?.selectedDateStr || null,
@@ -687,7 +674,7 @@ export default function BookingPage() {
 			document.body.appendChild(script);
 		});
 
-	const handleRazorpayPayment = async (booking, orderId) => {
+	const handleRazorpayPayment = async (booking, orderId, attemptKey) => {
 		const ok = await loadRazorpayScript();
 		if (!ok) {
 			setAlert({
@@ -697,17 +684,12 @@ export default function BookingPage() {
 			return;
 		}
 
-		let isPaymentHandled = false;
-
-		const cleanupUnpaidBooking = async () => {
-			if (isPaymentHandled) return;
-			try {
-				await api.delete(`/api/bookings/${booking.booking_id}/unpaid`);
-			} catch (cleanupErr) {
-				console.warn("Failed to release unpaid booking slot:", cleanupErr);
-			}
-			await refreshAvailability();
+		const openRecovery = () => navigate(`/dashboard/bookings?tab=recovery&booking=${booking.booking_id}`);
+		const finish = () => {
+			submittingRef.current = false;
+			setIsSubmitting(false);
 		};
+		let checking = false;
 
 		const rzpKey =
 			import.meta.env.VITE_RAZORPAY_KEY_ID;
@@ -717,25 +699,26 @@ export default function BookingPage() {
 
 		const rzpOptions = {
 			key: rzpKey,
+			retry: { enabled: false },
 			amount: rzpAmount,
 			currency: "INR",
 			name: "TaskGenie",
 			description: `Booking for ${booking.service_name || serviceName || "Home Service"}`,
 			handler: async (response) => {
-				isPaymentHandled = true;
+				checking = true;
 				try {
 					const verifyRes = await api.post("/api/bookings/verify-payment", {
 						...response,
 						razorpay_order_id: response.razorpay_order_id || orderId,
 						booking_id: booking?.booking_id,
-					});
+					}, { timeout: 20000 });
 					if (verifyRes.data?.refund_pending) {
-                        toast.error("The slot hold expired. Your payment is being refunded; check your booking history.");
-                        setIsSubmitting(false);
+                        toast.error("Payment received. Check your refund status in Recovery & Refunds.");
+                        openRecovery();
                         return;
                     }
                     if (verifyRes.data?.booking) {
-						resetIdempotencyKey();
+						clearBookingAttempt(user?.id, attemptKey);
 						navigate("/booking-success", {
 							state: {
 								success: true,
@@ -745,19 +728,21 @@ export default function BookingPage() {
 							replace: true,
 						});
 					} else {
-						toast.error("Payment verification failed. Contact support.");
+						toast.warning("We’re checking your payment. Please do not pay again.");
+						openRecovery();
 					}
 				} catch (err) {
 					console.error("Verification Error:", err);
-					toast.error("Payment verification failed. Contact support.");
-				}
+					toast.warning("We’re checking your payment. Please do not pay again.");
+						openRecovery();
+				} finally { finish(); }
 			},
 			modal: {
-				ondismiss: async () => {
-					await cleanupUnpaidBooking();
-					resetIdempotencyKey();
-					setIsSubmitting(false);
-					toast("Payment window closed. The slot was released.");
+				ondismiss: () => {
+					if (checking) return;
+					finish();
+					toast("Checkout paused. Check your payment status before retrying.");
+					openRecovery();
 				},
 			},
 			prefill: {
@@ -773,23 +758,15 @@ export default function BookingPage() {
 		}
 
 		const rzp = new window.Razorpay(rzpOptions);
-		rzp.on("payment.failed", (response) => {
-			// Do NOT delete the booking here! Razorpay leaves the modal open for retries via UPI or Netbanking.
-			setIsSubmitting(false);
-			const desc = response.error?.description || "Transaction declined";
-			if (desc.toLowerCase().includes("international")) {
-				toast.error(
-					"International card rejected by Razorpay. Please retry using UPI (QR Code / GPay) or Netbanking.",
-					{ duration: 7000 },
-				);
-			} else {
-				toast.error(`Payment failed: ${desc}. You can retry with UPI or Netbanking in the modal.`);
-			}
+		rzp.on("payment.failed", () => {
+			toast.warning("Payment wasn’t confirmed. Check its status before trying again.");
 		});
 		rzp.open();
+		return true;
 	};
 
 	async function handleConfirm() {
+		if (submittingRef.current) return;
 		if(isEditingAddress || addressSearching || isLocating)return flashNudge("address",addressRef);
 		if (!hasSchedule) return flashNudge("when", whenRef);
 		if (!hasAddress || !validCoordinates(serviceLocation.lat,serviceLocation.lng)) { setIsEditingAddress(true); return flashNudge("address",addressRef); }
@@ -799,36 +776,33 @@ export default function BookingPage() {
 			return;
 		}
 
+		submittingRef.current = true;
 		setIsSubmitting(true);
-		const idempotencyKey = getStableIdempotencyKey();
+		let checkoutOpen = false;
 		try {
-			const res = await api.post(
-				"/api/bookings",
-				{
-					provider_id: provider.user_id || provider.id || provider.custom_id,
-					service_id: provider.service_id,
-					price: provider.price,
-					date: selectedDate,
-					start_time: selectedTime.start_time || selectedTime.start,
-					end_time: selectedTime.end_time || selectedTime.end,
-					address,
-					payment_method: paymentMethod === "cash" ? "cod" : paymentMethod,
-					...bookingCoordinates(serviceLocation),
-					radius: searchRadius,
-					idempotency_key: idempotencyKey,
-				},
-				{
-					headers: {
-						"Idempotency-Key": idempotencyKey,
-					},
-				},
-			);
-			const data = res.data;
+			const payload = {
+				provider_id: provider.user_id || provider.id || provider.custom_id,
+				service_id: provider.service_id,
+				date: selectedDate,
+				start_time: selectedTime.start_time || selectedTime.start,
+				address,
+				payment_method: paymentMethod === "cash" ? "cod" : paymentMethod,
+				...bookingCoordinates(serviceLocation),
+				radius: searchRadius,
+			};
+			const attemptKey = await getBookingAttempt(user?.id, payload);
+			const { data } = await api.post("/api/bookings", payload, {
+				headers: { "Idempotency-Key": attemptKey },
+				timeout: 30000,
+			});
 
-			if (isOnline && data.razorpay_order) {
-				handleRazorpayPayment(data.booking, data.razorpay_order);
+			if (isOnline) {
+				if (data.razorpay_order && !data.duplicate) {
+					checkoutOpen = await handleRazorpayPayment(data.booking, data.razorpay_order, attemptKey);
+				}
+				if (!checkoutOpen) navigate(`/dashboard/bookings?tab=recovery&booking=${data.booking.booking_id}`);
 			} else {
-				resetIdempotencyKey();
+				clearBookingAttempt(user?.id, attemptKey);
 				navigate("/booking-success", {
 					state: { success: true, booking: data.booking, address },
 					replace: true,
@@ -844,7 +818,10 @@ export default function BookingPage() {
 				type: "error",
 			});
 		} finally {
-			setIsSubmitting(false);
+			if (!checkoutOpen) {
+				submittingRef.current = false;
+				setIsSubmitting(false);
+			}
 		}
 	}
 
@@ -876,6 +853,11 @@ export default function BookingPage() {
 			)}
 
 			<BookingHeader steps={steps} onBack={goBack} />
+			{alert && (
+				<Link className="relative block px-4 pt-4 text-center text-sm text-violet-300" to="/dashboard/bookings?tab=recovery">
+					Check an interrupted booking
+				</Link>
+			)}
 
 			<main className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
 				<div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
@@ -1323,7 +1305,7 @@ export default function BookingPage() {
 									/>
 								</div>
 
-								{paymentMethod === "online" && (
+								{paymentMethod === "online" && import.meta.env.VITE_RAZORPAY_KEY_ID?.startsWith("rzp_test_") && (
 									<div className="mt-3.5 p-3.5 rounded-xl bg-violet-950/40 border border-violet-500/20 text-xs space-y-2.5">
 										<div className="flex items-center justify-between">
 											<span className="font-semibold text-violet-300 flex items-center gap-1.5">

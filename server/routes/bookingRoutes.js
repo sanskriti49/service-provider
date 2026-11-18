@@ -32,12 +32,32 @@ function allowRoles(...roles) {
 router.post("/", bookingLimiter, authMiddleware, allowRoles("customer"), createBooking);
 router.post("/verify-payment", authMiddleware, verifyPayment);
 router.post("/webhook", handleRazorpayWebhook);
-router.delete("/:booking_id/unpaid", authMiddleware, allowRoles("customer"), cancelUnpaidBooking);
+router.delete("/:booking_id/unpaid", bookingLimiter, authMiddleware, allowRoles("customer"), cancelUnpaidBooking);
 
 // Booking & payment recovery endpoints (customer)
 router.get("/recovery/items", authMiddleware, allowRoles("customer"), getRecoveryItems);
-router.post("/recovery/reconcile-refund/:refund_id", authMiddleware, allowRoles("customer"), reconcileCustomerRefund);
-router.post("/:booking_id/resume-checkout", authMiddleware, allowRoles("customer"), resumeCheckout);
+router.post("/recovery/reconcile-refund/:refund_id", bookingLimiter, authMiddleware, allowRoles("customer"), reconcileCustomerRefund);
+router.post("/:booking_id/resume-checkout", bookingLimiter, authMiddleware, allowRoles("customer"), resumeCheckout);
+router.get("/recovery/health", authMiddleware, allowRoles("admin"), async (_req, res) => {
+	try {
+		const [health, refunds, intents, review] = await Promise.all([
+			db.query(`SELECT last_success_at,last_failure_at,payment_checks,captures_recovered,holds_expired,gateway_failures
+				FROM booking_reconciliation_health`),
+			db.query(`SELECT state, count(*) AS count, min(created_at) AS oldest FROM booking_refunds
+				WHERE state<>'processed' GROUP BY state`),
+			db.query(`SELECT count(*) AS count, min(i.created_at) AS oldest
+				FROM booking_order_intents i LEFT JOIN bookings b USING (booking_id)
+				WHERE b.booking_id IS NULL AND i.payment_method='online'`),
+			db.query(`SELECT id, booking_id, state, created_at, updated_at FROM booking_refunds
+				WHERE state IN ('failed','unknown') OR (state<>'processed' AND created_at < NOW()-INTERVAL '1 day')
+				ORDER BY created_at LIMIT 50`),
+		]);
+		res.json({ reconciliation: health.rows[0] || null, outstanding_refunds: refunds.rows,
+			incomplete_orders: intents.rows[0], refunds_for_review: review.rows });
+	} catch {
+		res.status(503).json({ message: "Payment reconciliation health is unavailable" });
+	}
+});
 
 router.get(
 	"/user/history",

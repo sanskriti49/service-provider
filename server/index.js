@@ -178,13 +178,15 @@ httpServer.listen(PORT, () => {
 });
 
 // Reconcile missed callbacks and durable refund intents without relying on Redis.
-if (process.env.NODE_ENV !== "test" && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && process.env.PAYMENT_RECONCILIATION_ENABLED !== "false") {
+if (process.env.NODE_ENV !== "test" && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET &&
+    process.env.RAZORPAY_KEY_SECRET !== "placeholder_secret" && process.env.PAYMENT_RECONCILIATION_ENABLED !== "false") {
     const { paymentService } = require("./controllers/bookingController");
     let reconciling = false;
     const timer = setInterval(async () => {
         if (reconciling) return;
         reconciling = true;
-        try { await paymentService.reconcile(); } catch (error) { console.error("Payment reconciliation failed:", error.message); }
+        try { await paymentService.reconcile(); }
+        catch { console.error(JSON.stringify({ event: "booking_reconciliation_failed" })); }
         finally { reconciling = false; }
     }, 30000);
     timer.unref();

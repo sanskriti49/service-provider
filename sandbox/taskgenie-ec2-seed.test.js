@@ -41,7 +41,7 @@ test("sandbox seed: actual migrated PostgreSQL/PostGIS schema, repeatability, ro
   const original = instance.require.bind(instance);
   instance.require = (name) => {
     if (name === "../config/db") return pool;
-    if (name === "./migrate_booking_integrity") return { integritySchema: fs.readFileSync(path.resolve(__dirname, "../server/migrations/20261011_booking_integrity.sql"), "utf8") };
+    if (name === "./migrate_booking_integrity") return { integritySchema: fs.readFileSync(path.resolve(__dirname, "../server/migrations/20261011_booking_integrity.sql"), "utf8"), recoverySchema: fs.readFileSync(path.resolve(__dirname, "../server/migrations/20261118_booking_recovery.sql"), "utf8") };
     if (name === "./migrate_chat") return { chatSchema: fs.readFileSync(path.resolve(__dirname, "../server/migrations/20261010_booking_chat.sql"), "utf8") };
     return original(name);
   };
@@ -68,7 +68,8 @@ test("sandbox seed: actual migrated PostgreSQL/PostGIS schema, repeatability, ro
   });
   await t.test("actual booking schedule accepts the fixture with the configured two-hour duration", async () => {
     const { validateSchedule } = requireApp("./services/bookingSchedule");
-    const booking = { provider_id: IDS.provider, service_id: "house-cleaning", date: "2040-01-02", start_time: "10:00" };
+    const booking = { provider_id: IDS.provider, service_id: "house-cleaning", date: "2040-01-02",
+      start_time: "10:00", latitude: 23.2599, longitude: 77.4126 };
     const selected = await validateSchedule(pool, booking);
     assert.equal(Number(selected.price), 1200); assert.equal(booking.end_time, "12:00");
   });

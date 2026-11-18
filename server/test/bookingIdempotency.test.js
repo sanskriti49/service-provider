@@ -18,6 +18,7 @@ function loadControllerWithExisting(existingRow = null) {
 			if (sql.includes("AS valid")) return { rows: [{ valid: true }] };
 			if (sql.includes("SELECT start_time,end_time FROM provider_master")) return { rows: [{ start_time: "08:00", end_time: "20:00" }] };
 			if (sql.includes("SELECT start_time")) return { rows: [] };
+			if (sql.includes("INSERT INTO booking_order_intents")) return { rows: [{ booking_id: params[0], user_id: params[1], request_hash: params[2], amount_paise: params[3] }] };
 			if (sql.includes("INSERT INTO bookings")) return { rows: [{
 				booking_id: params[0], provider_id: providerId,
 				user_id: customerId, service_id: serviceId, date: params[4], start_time: params[5],
@@ -32,7 +33,7 @@ function loadControllerWithExisting(existingRow = null) {
 	const dbMock = {
 		query: async (sql, params = []) => {
 			queries.push({ sql, params });
-			if (sql.includes("SELECT * FROM bookings WHERE booking_id")) {
+			if (sql.includes("FROM bookings WHERE booking_id = $1 AND user_id = $2")) {
 				return { rows: existingRow ? [existingRow] : [] };
 			}
 			if (sql.includes("SELECT id") && !sql.includes("SELECT ps.price")) {
@@ -80,6 +81,7 @@ test("booking idempotency: retried request with identical Idempotency-Key return
 		payment_method: "cod",
 		payment_status: "pending",
 		razorpay_order_id: null,
+		address: "Test address", latitude: 0, longitude: 72, search_radius_km: 50,
 	};
 	const { controller } = loadControllerWithExisting(existingBooking);
 	const req = {

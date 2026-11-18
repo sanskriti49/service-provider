@@ -33,7 +33,7 @@ function createRecoveryHarness() {
 	const bookings = [
 		// 1. Interrupted checkout with ACTIVE hold (expires in 4 minutes)
 		{
-			booking_id: "active-hold-booking-1",
+			booking_id: "11111111-1111-4111-8111-000000000001",
 			user_id: customerId,
 			provider_id: providerId,
 			service_id: serviceId,
@@ -53,7 +53,7 @@ function createRecoveryHarness() {
 		},
 		// 2. Interrupted checkout with EXPIRED hold
 		{
-			booking_id: "expired-hold-booking-2",
+			booking_id: "11111111-1111-4111-8111-000000000002",
 			user_id: customerId,
 			provider_id: providerId,
 			service_id: serviceId,
@@ -73,7 +73,7 @@ function createRecoveryHarness() {
 		},
 		// 3. Paid booking that had late payment / slot expired -> refund pending
 		{
-			booking_id: "late-paid-booking-3",
+			booking_id: "11111111-1111-4111-8111-000000000003",
 			user_id: customerId,
 			provider_id: providerId,
 			service_id: serviceId,
@@ -93,7 +93,7 @@ function createRecoveryHarness() {
 		},
 		// 4. Booking owned by someone else
 		{
-			booking_id: "other-user-booking-4",
+			booking_id: "11111111-1111-4111-8111-000000000004",
 			user_id: otherCustomerId,
 			provider_id: providerId,
 			service_id: serviceId,
@@ -113,7 +113,7 @@ function createRecoveryHarness() {
 		},
 		// 5. Cancelled unpaid booking
 		{
-			booking_id: "cancelled-booking-5",
+			booking_id: "11111111-1111-4111-8111-000000000005",
 			user_id: customerId,
 			provider_id: providerId,
 			service_id: serviceId,
@@ -137,7 +137,7 @@ function createRecoveryHarness() {
 		// In-flight processing refund
 		{
 			id: refundUuid1,
-			booking_id: "late-paid-booking-3",
+			booking_id: "11111111-1111-4111-8111-000000000003",
 			payment_id: "pay_late_789",
 			amount_paise: "59900",
 			request_key: "late-payment",
@@ -150,7 +150,7 @@ function createRecoveryHarness() {
 		// Failed refund
 		{
 			id: refundUuid2,
-			booking_id: "late-paid-booking-3",
+			booking_id: "11111111-1111-4111-8111-000000000003",
 			payment_id: "pay_failed_456",
 			amount_paise: "20000",
 			request_key: "dispute-compensation",
@@ -163,7 +163,7 @@ function createRecoveryHarness() {
 		// Uncertain refund
 		{
 			id: refundUuid3,
-			booking_id: "late-paid-booking-3",
+			booking_id: "11111111-1111-4111-8111-000000000003",
 			payment_id: "pay_uncertain_789",
 			amount_paise: "15000",
 			request_key: "cancellation",
@@ -253,7 +253,7 @@ function createRecoveryHarness() {
 				return {
 					rows: [
 						{
-							booking_id: "partially-refunded-booking-6",
+							booking_id: "11111111-1111-4111-8111-000000000006",
 							price: "1000.00",
 							booking_status: "cancelled",
 							payment_status: "partially_refunded",
@@ -331,7 +331,7 @@ function createRecoveryHarness() {
 				if (sql.includes("SET status = 'pending'") || sql.includes("hold_expires_at = clock_timestamp()")) {
 					b.status = "pending";
 					b.hold_expires_at = new Date(Date.now() + 5 * 60 * 1000);
-					if (params[0]) b.razorpay_order_id = params[0];
+					b.renewed_hold_at = new Date();
 				} else if (sql.includes("SET status = 'expired'")) {
 					b.status = "expired";
 				} else if (sql.includes("SET status='cancelled'")) {
@@ -358,6 +358,12 @@ function createRecoveryHarness() {
 
 	const razorpayMock = {
 		orders: {
+			fetch: async (id) => {
+				const booking = bookings.find((row) => row.razorpay_order_id === id);
+				return { id, currency: "INR", amount: Math.round(Number(booking.price) * 100),
+					status: "created", amount_paid: 0, attempts: 0 };
+			},
+			fetchPayments: async () => ({ items: [] }),
 			create: async (opts) => ({
 				id: `order_renewed_${Date.now()}`,
 				amount: opts.amount,
@@ -436,14 +442,14 @@ test("recovery: getRecoveryItems returns interrupted checkouts with active hold 
 	assert.equal(res.data.success, true);
 	assert.equal(res.data.interrupted_checkouts.length, 2);
 
-	const active = res.data.interrupted_checkouts.find((c) => c.booking_id === "active-hold-booking-1");
+	const active = res.data.interrupted_checkouts.find((c) => c.booking_id === "11111111-1111-4111-8111-000000000001");
 	assert.ok(active, "Active hold booking must be present");
 	assert.equal(active.is_hold_active, true);
 	assert.ok(active.seconds_remaining > 0, "Seconds remaining should be positive");
 	assert.equal(active.price, 499);
 	assert.equal(active.service_name, "Plumbing Repair");
 
-	const expired = res.data.interrupted_checkouts.find((c) => c.booking_id === "expired-hold-booking-2");
+	const expired = res.data.interrupted_checkouts.find((c) => c.booking_id === "11111111-1111-4111-8111-000000000002");
 	assert.ok(expired, "Expired hold booking must be present");
 	assert.equal(expired.is_hold_active, false);
 	assert.equal(expired.seconds_remaining, 0);
@@ -467,7 +473,7 @@ test("recovery: getRecoveryItems exposes pending, failed, and uncertain refunds 
 	assert.equal(inFlight.amount_inr, 599);
 	assert.equal(inFlight.gateway_refund_id, "rfnd_gateway_12345");
 	assert.equal(inFlight.can_reconcile, true);
-	assert.match(inFlight.reason_label, /Slot hold expired/);
+	assert.match(inFlight.reason_label, /slot could no longer be reserved/);
 
 	// Failed refund
 	const failed = res.data.refunds.find((r) => r.refund_id === harness.refundUuid2);
@@ -476,7 +482,7 @@ test("recovery: getRecoveryItems exposes pending, failed, and uncertain refunds 
 	assert.equal(failed.is_failed, true);
 	assert.equal(failed.amount_inr, 200);
 	assert.equal(failed.can_reconcile, true);
-	assert.match(failed.last_error, /Card issuer bank declined/);
+	assert.match(failed.last_error, /status check or support review/);
 
 	// Uncertain refund
 	const uncertain = res.data.refunds.find((r) => r.refund_id === harness.refundUuid3);
@@ -503,7 +509,7 @@ test("recovery: missing refund record with partially_refunded produces unknown a
 	await harness.controller.getRecoveryItems(req, res);
 
 	assert.equal(res.statusCode, 200);
-	const partial = res.data.refunds.find((r) => r.booking_id === "partially-refunded-booking-6");
+	const partial = res.data.refunds.find((r) => r.booking_id === "11111111-1111-4111-8111-000000000006");
 	assert.ok(partial, "Synthetic refund entry must be synthesized");
 	assert.equal(partial.is_synthetic, true);
 	assert.equal(partial.is_amount_unknown, true);
@@ -516,7 +522,7 @@ test("recovery: missing refund record with partially_refunded produces unknown a
 test("recovery: resumeCheckout on an ACTIVE hold proceeds immediately with existing order", async () => {
 	const harness = createRecoveryHarness();
 	const req = {
-		params: { booking_id: "active-hold-booking-1" },
+		params: { booking_id: "11111111-1111-4111-8111-000000000001" },
 		user: { id: harness.customerId, role: "customer" },
 	};
 	const res = mockResponse();
@@ -533,7 +539,7 @@ test("recovery: resumeCheckout on an ACTIVE hold proceeds immediately with exist
 test("recovery: resumeCheckout on an EXPIRED hold re-verifies slot and re-holds for 5 minutes", async () => {
 	const harness = createRecoveryHarness();
 	const req = {
-		params: { booking_id: "expired-hold-booking-2" },
+		params: { booking_id: "11111111-1111-4111-8111-000000000002" },
 		user: { id: harness.customerId, role: "customer" },
 	};
 	const res = mockResponse();
@@ -547,26 +553,26 @@ test("recovery: resumeCheckout on an EXPIRED hold re-verifies slot and re-holds 
 	assert.ok(res.data.razorpay_order);
 
 	// Booking status updated back to pending
-	const b = harness.bookings.find((x) => x.booking_id === "expired-hold-booking-2");
+	const b = harness.bookings.find((x) => x.booking_id === "11111111-1111-4111-8111-000000000002");
 	assert.equal(b.status, "pending");
 	assert.ok(new Date(b.hold_expires_at).getTime() > Date.now());
 });
 
-test("recovery: resumeCheckout rejects CANCELLED booking and does NOT resurrect it", async () => {
+test("recovery: resumeCheckout reports CANCELLED booking and does NOT resurrect it", async () => {
 	const harness = createRecoveryHarness();
 	const req = {
-		params: { booking_id: "cancelled-booking-5" },
+		params: { booking_id: "11111111-1111-4111-8111-000000000005" },
 		user: { id: harness.customerId, role: "customer" },
 	};
 	const res = mockResponse();
 
 	await harness.controller.resumeCheckout(req, res);
 
-	assert.equal(res.statusCode, 409);
-	assert.match(res.data.message, /Cannot resume checkout for a cancelled booking/);
+	assert.equal(res.statusCode, 200);
+	assert.equal(res.data.code, "BOOKING_CANCELLED");
 
 	// Ensure booking remained cancelled in database
-	const b = harness.bookings.find((x) => x.booking_id === "cancelled-booking-5");
+	const b = harness.bookings.find((x) => x.booking_id === "11111111-1111-4111-8111-000000000005");
 	assert.equal(b.status, "cancelled", "Cancelled booking must NOT be resurrected to pending");
 });
 
@@ -575,7 +581,7 @@ test("recovery: resumeCheckout on an expired hold fails safely if slot was taken
 	harness.setSlotConflict(true); // Simulate slot conflict
 
 	const req = {
-		params: { booking_id: "expired-hold-booking-2" },
+		params: { booking_id: "11111111-1111-4111-8111-000000000002" },
 		user: { id: harness.customerId, role: "customer" },
 	};
 	const res = mockResponse();
@@ -591,7 +597,7 @@ test("recovery: resumeCheckout on an expired hold fails safely if slot was taken
 test("recovery: resumeCheckout denies unauthorized customer (403)", async () => {
 	const harness = createRecoveryHarness();
 	const req = {
-		params: { booking_id: "other-user-booking-4" },
+		params: { booking_id: "11111111-1111-4111-8111-000000000004" },
 		user: { id: harness.customerId, role: "customer" }, // Jane trying to access Dave's booking
 	};
 	const res = mockResponse();
@@ -621,7 +627,7 @@ test("recovery: reconcileCustomerRefund checks gateway and updates refund status
 test("recovery: reconcileCustomerRefund rejects synthetic ID or invalid UUID with 400 Bad Request", async () => {
 	const harness = createRecoveryHarness();
 	const req = {
-		params: { refund_id: "synth-partially-refunded-booking-6" },
+		params: { refund_id: "synth-11111111-1111-4111-8111-000000000006" },
 		user: { id: harness.customerId, role: "customer" },
 	};
 	const res = mockResponse();

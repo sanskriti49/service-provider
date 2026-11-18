@@ -31,6 +31,8 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 	await pool.query("ALTER TABLE providers ADD COLUMN status text NOT NULL DEFAULT 'pending'");
 	const migration = fs.readFileSync(path.join(__dirname, "../migrations/20261011_booking_integrity.sql"), "utf8").replaceAll("public.", `${schema}.`);
 	await pool.query(migration); await pool.query(migration);
+	const recoveryMigration = require("../migrations/migrate_booking_integrity").recoverySchema.replaceAll("public.", `${schema}.`);
+	await pool.query(recoveryMigration); await pool.query(recoveryMigration);
 	const { outboxSchema } = require("../migrations/migrate_notification_outbox");
 	await pool.query(outboxSchema.replaceAll("public.", `${schema}.`));
 	const { EventQueue } = require("../utils/eventQueue");
@@ -52,9 +54,20 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 	await pool.query("INSERT INTO provider_services(provider_id,service_id,price) VALUES($1,$2,1200)", [provider,service]);
 	for(let day=0;day<7;day++) await pool.query("INSERT INTO provider_master_availability(provider_id,day_of_week,start_time,end_time) VALUES($1,$2,'08:00','20:00')", [provider,day]);
 	process.env.RAZORPAY_KEY_ID="rzp_live_testfixture"; process.env.RAZORPAY_KEY_SECRET="isolated-secret"; process.env.RAZORPAY_WEBHOOK_SECRET="isolated-webhook";
-	const payments=new Map(), refunds=[], notices=[]; let orderSequence=0, refundCalls=0, loseRefundResponse=false;
+	const orders=new Map(), payments=new Map(), refunds=[], notices=[]; let orderSequence=0, refundCalls=0, loseRefundResponse=false;
 	const gateway = { orders: {
-		create: async (options) => ({...options,id:`order_${++orderSequence}`}),
+		create: async (options) => {
+			const order = { ...options, id: `order_${++orderSequence}` };
+			orders.set(order.id, order);
+			return order;
+		},
+		all: async ({ receipt }) => ({ items: [...orders.values()].filter((order) => order.receipt === receipt) }),
+		fetch: async (id) => {
+			const attempts = [...payments.values()].filter((payment) => payment.order_id === id);
+			const paid = attempts.some((payment) => payment.status === "captured");
+			return { ...orders.get(id), attempts: attempts.length, amount_paid: paid ? 120000 : 0,
+				status: paid ? "paid" : attempts.length ? "attempted" : "created" };
+		},
 		fetchPayments: async (id) => ({items:[...payments.values()].filter((p)=>p.order_id===id)}),
 	}, payments: {
 		fetch: async(id) => { if(!payments.has(id)) throw new Error("Unknown fixture payment"); return payments.get(id); },
@@ -65,7 +78,7 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 	const payment=load("../services/paymentService.js", {"./bookingSchedule":schedule});
 	const controller=load("../controllers/bookingController.js", { "../services/paymentService":payment,"../services/bookingSchedule":schedule, "../config/db":stubDb, razorpay:class {constructor(){Object.assign(this,gateway);}}, "../utils/eventQueue":eventQueue, "../utils/sendEmail":async()=>{}, "../utils/notificationService":{sendNotification:async(input)=>notices.push(input)}, "../utils/distributedLock":{acquireLock:async()=>({acquired:true}),releaseLock:async()=>{}}, "../utils/circuitBreaker":{createProtectedBreaker:(action)=>({fire:action})} });
 	const actor = {id:customer,role:"customer"};
-	const book = async (start="10:00", method="online", extra={}) => { const res=response(); await controller.createBooking({user:actor,body:{provider_id:provider,service_id:service,date:"2040-01-02",start_time:start,address:"Test service address",payment_method:method,latitude:12,longitude:77,...extra}},res); return res; };
+	const book = async (start="10:00", method="online", extra={}, key) => { const res=response(); await controller.createBooking({user:actor,headers:key ? {"idempotency-key":key} : {},body:{provider_id:provider,service_id:service,date:"2040-01-02",start_time:start,address:"Test service address",payment_method:method,latitude:12,longitude:77,...extra}},res); return res; };
 	const capture = (booking,id=`pay_${randomUUID().replaceAll("-", "")}`) => {const payment={id,order_id:booking.razorpay_order_id,amount:120000,currency:"INR",status:"captured",captured:true};payments.set(id,payment);return payment;};
 	await t.test("booking status and both email intents commit together; an outbox write failure rolls back the status", async () => {
 		const change = async (id) => { const res=response(); await controller.updateBookingStatus({user:actor,params:{booking_id:id},body:{status:"cancelled"}},res); return res; };
@@ -141,7 +154,7 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 		assert.equal((await pool.query("SELECT location FROM users WHERE id=$1",[provider])).rows[0].location,base.expected_address);
 	});
 	await t.test("forged prefixes/signatures and unbound booking IDs cannot mark paid", async()=>{
-		const created=await book(); assert.equal(created.statusCode,201,JSON.stringify(created.data)); const b=created.data.booking;
+		const created=await book("10:00","online",{date:"2040-05-01"}); assert.equal(created.statusCode,201,JSON.stringify(created.data)); const b=created.data.booking;
 		const res=response(); await controller.verifyPayment({user:actor,body:{razorpay_order_id:"test_order_fake",razorpay_payment_id:"pay_fake",razorpay_signature:"fake",booking_id:b.booking_id}},res); assert.equal(res.statusCode,400);
 		const payment=capture(b);const sig=createHmac("sha256",process.env.RAZORPAY_KEY_SECRET).update(`${payment.order_id}|${payment.id}`).digest("hex");
 		const denied=response(); await controller.verifyPayment({user:{id:other,role:"customer"},body:{razorpay_order_id:payment.order_id,razorpay_payment_id:payment.id,razorpay_signature:sig}},denied);assert.equal(denied.statusCode,403);
@@ -340,6 +353,117 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 			assert.equal((await pool.query("SELECT state FROM booking_refunds WHERE id=$1", [intent.id])).rows[0].state, "unknown");
 		} finally { gateway.payments.refund = original; }
 	});
+	const recover = async (booking) => {
+		const res = response();
+		await controller.resumeCheckout({ user: actor, params: { booking_id: booking.booking_id } }, res);
+		return res;
+	};
+	const release = async (booking) => {
+		const res = response();
+		await controller.cancelUnpaidBooking({ user: actor, params: { booking_id: booking.booking_id } }, res);
+		return res;
+	};
+	await t.test("same key concurrent create, lost HTTP response and conflicting payload", async () => {
+		for (const method of ["online", "cod"]) {
+			const key = randomUUID(), details = { date: method === "online" ? "2040-05-10" : "2040-05-11" };
+			const before = orderSequence;
+			const results = await Promise.all([book("10:00", method, details, key), book("10:00", method, details, key)]);
+			const created = results.find((result) => result.statusCode === 201);
+			assert.ok(created, JSON.stringify(results));
+			const replayed = await book("10:00", method, details, key);
+			assert.equal(replayed.statusCode, 200);
+			assert.equal(replayed.data.booking.booking_id, created.data.booking.booking_id);
+			assert.equal(replayed.data.razorpay_order, null);
+			assert.equal((await book("10:00", method, { ...details, address: "Different booking address" }, key)).statusCode, 409);
+			assert.equal(orderSequence - before, method === "online" ? 1 : 0);
+		}
+		const details = { date: "2040-05-12" };
+		assert.equal((await book("10:00", "online", { ...details, idempotency_key: "wrong-channel" }, randomUUID())).statusCode, 400);
+		assert.equal((await book("10:00", "cod", details, "bad key")).statusCode, 400);
+	});
+	await t.test("lost Razorpay order response recovers by the original receipt", async () => {
+		const original = gateway.orders.create, key = randomUUID(), details = { date: "2040-05-13" };
+		const before = orderSequence;
+		gateway.orders.create = async (options) => { await original(options); throw new Error("Response lost"); };
+		try { assert.equal((await book("10:00", "online", details, key)).statusCode, 503); }
+		finally { gateway.orders.create = original; }
+		const resumed = await book("10:00", "online", details, key);
+		assert.equal(resumed.statusCode, 201);
+		assert.equal(resumed.data.razorpay_order, null);
+		assert.equal((await recover(resumed.data.booking)).data.can_pay, true);
+		assert.equal(orderSequence - before, 1);
+	});
+	await t.test("gateway-aware recovery and cancellation distinguish capture, failure and uncertainty", async () => {
+		const created = await book("10:00", "online", { date: "2040-05-14" });
+		const booking = created.data.booking;
+		const attempt = { ...capture(booking), status: "authorized", captured: false };
+		payments.set(attempt.id, attempt);
+		assert.equal((await recover(booking)).data.code, "PAYMENT_CHECK_PENDING");
+		assert.equal((await release(booking)).data.code, "PAYMENT_CHECK_PENDING");
+		payments.set(attempt.id, { ...attempt, status: "failed" });
+		assert.equal((await recover(booking)).data.razorpay_order, booking.razorpay_order_id);
+		const original = gateway.orders.fetch;
+		gateway.orders.fetch = async () => { throw new Error("Gateway unavailable"); };
+		try {
+			assert.equal((await recover(booking)).data.code, "PAYMENT_CHECK_PENDING");
+			assert.equal((await release(booking)).data.code, "PAYMENT_CHECK_PENDING");
+		} finally { gateway.orders.fetch = original; }
+		const payment = capture(booking);
+		const results = await Promise.all([recover(booking), controller.paymentService.finalize(payment.order_id, payment)]);
+		assert.equal(results[0].data.code, "PAYMENT_CONFIRMED");
+		assert.equal((await recover(booking)).data.code, "PAYMENT_CONFIRMED");
+		assert.equal((await release(booking)).statusCode, 409);
+		const extra = capture(booking);
+		await Promise.all([controller.paymentService.finalize(extra.order_id, extra), controller.paymentService.finalize(extra.order_id, extra)]);
+		const refund = (await pool.query("SELECT * FROM booking_refunds WHERE payment_id=$1", [extra.id])).rows;
+		assert.equal(refund.length, 1);
+		await controller.paymentService.reconcileRefund(refund[0].id);
+		const saved = (await pool.query("SELECT * FROM bookings WHERE booking_id=$1", [booking.booking_id])).rows[0];
+		assert.equal(saved.payment_status, "paid");
+		assert.equal(saved.razorpay_payment_id, payment.id);
+	});
+	await t.test("release commits cancellation, and previous-hold captures cannot activate a renewed hold", async () => {
+		const cancelled = (await book("10:00", "online", { date: "2040-05-15" })).data.booking;
+		assert.equal((await release(cancelled)).data.booking.status, "cancelled");
+		const late = await controller.paymentService.finalize(cancelled.razorpay_order_id, capture(cancelled));
+		assert.equal(late.booking.payment_status, "refund_pending");
+		assert.equal(late.booking.status, "cancelled");
+
+		const expired = (await book("10:00", "online", { date: "2040-05-16" })).data.booking;
+		await pool.query("UPDATE bookings SET hold_expires_at=NOW()-INTERVAL '1 minute' WHERE booking_id=$1", [expired.booking_id]);
+		const renewed = await recover(expired);
+		assert.equal(renewed.data.slot_renewed, true, JSON.stringify(renewed.data));
+		assert.equal(renewed.data.razorpay_order, expired.razorpay_order_id);
+		const old = { ...capture(expired), created_at: Math.floor(Date.now() / 1000) - 60 };
+		assert.equal((await controller.paymentService.finalize(old.order_id, old)).late, true);
+	});
+	await t.test("reconciliation lease excludes a second worker and failed checks preserve last successful check", async () => {
+		const booking = (await book("10:00", "online", { date: "2040-05-17" })).data.booking;
+		const original = gateway.orders.fetch;
+		let entered, unblock;
+		const ready = new Promise((resolve) => { entered = resolve; });
+		const blocked = new Promise((resolve) => { unblock = resolve; });
+		gateway.orders.fetch = async (id) => {
+			if (id !== booking.razorpay_order_id) return original(id);
+			entered();
+			await blocked;
+			throw new Error("Gateway timeout");
+		};
+		const first = controller.paymentService.reconcile();
+		try {
+			await ready;
+			assert.deepEqual(await controller.paymentService.reconcile(), { skipped: true });
+		} finally {
+			unblock();
+			await first;
+			gateway.orders.fetch = original;
+		}
+		const saved = (await pool.query("SELECT * FROM bookings WHERE booking_id=$1", [booking.booking_id])).rows[0];
+		assert.equal(saved.last_payment_check_at, null);
+		assert.equal(saved.payment_check_failures, 1);
+		assert.ok(saved.next_payment_check_at > new Date());
+	});
+
 	await t.test("HTTP contention evidence: 50 COD and 50 online requests each reserve only one slot", async () => {
 		const express = require("express"), http = require("node:http"), jwt = require("jsonwebtoken");
 		process.env.JWT_SECRET = "isolated-evidence-secret";

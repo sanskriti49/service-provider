@@ -805,6 +805,10 @@ export default function AllBookings() {
 		setActionLoading(bookingId);
 		try {
 			const response = await api.put(`/api/bookings/${bookingId}/status`, { status: newStatus });
+			if (response.data.code === "PAYMENT_CHECK_PENDING") {
+				toast.warning(response.data.message);
+				return;
+			}
 			setHistory((prev) =>
 				prev.map((item) =>
 					item.booking_id === bookingId ? { ...item, ...response.data.booking } : item,

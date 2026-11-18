@@ -49,6 +49,8 @@ function assertTransition(booking, actor, target) {
 }
 function serializeBooking(booking, actor) {
 	const safe = { ...booking };
+	delete safe.request_hash;
+	delete safe.hold_valid;
 	if (actor?.role !== "customer" || actor.id !== booking.user_id) {
 		delete safe.otp;
 		delete safe.completion_otp;

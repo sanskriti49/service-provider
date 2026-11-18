@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
 	AlertTriangle,
@@ -62,6 +62,9 @@ export default function BookingPaymentRecovery({
 	onRecoveryCountChange = null,
 }) {
 	const navigate = useNavigate();
+	const [searchParams] = useSearchParams();
+	const referencedBooking = searchParams.get("booking");
+	const activeAction = useRef(false);
 	const { user } = useAuth();
 
 	const [loading, setLoading] = useState(!initialData);
@@ -147,7 +150,7 @@ export default function BookingPaymentRecovery({
 					const expiryMs = new Date(item.hold_expires_at).getTime();
 					if (isNaN(expiryMs)) return item;
 					const remaining = Math.max(0, Math.floor((expiryMs - now) / 1000));
-					const isActive = remaining > 0 && item.booking_status === "pending";
+					const isActive = remaining > 0 && item.status === "pending";
 					if (remaining !== item.seconds_remaining || isActive !== item.is_hold_active) {
 						changed = true;
 						return {
@@ -184,11 +187,31 @@ export default function BookingPaymentRecovery({
 
 	// 2. Resume Checkout Handler
 	const handleResumeCheckout = async (checkout) => {
+		if (activeAction.current) return;
+		activeAction.current = true;
 		setResumingBookingId(checkout.booking_id);
+		let modalOpen = false;
+		let verifying = false;
+		const finish = () => {
+			activeAction.current = false;
+			setResumingBookingId(null);
+		};
 		try {
-			const res = await api.post(`/api/bookings/${checkout.booking_id}/resume-checkout`);
+			const res = await api.post(`/api/bookings/${checkout.booking_id}/resume-checkout`, null, { timeout: 30000 });
 			if (!res.data?.can_pay) {
-				toast.error(res.data?.message || "Slot is no longer available. Please choose another time slot.");
+				const { code, booking, message } = res.data;
+				if (code === "PAYMENT_CONFIRMED") {
+					navigate("/booking-success", { state: { success: true, booking, address: booking.address }, replace: true });
+					return;
+				}
+				if (code === "REFUND_STATUS") {
+					toast.info("Payment was received. See the current refund status below.");
+					setActiveSection("refunds");
+				} else if (code === "BOOKING_CANCELLED") {
+					toast.info("This booking was cancelled.");
+				} else {
+					toast.warning(message || "Checkout cannot be resumed yet.");
+				}
 				fetchRecoveryData(true);
 				return;
 			}
@@ -201,27 +224,29 @@ export default function BookingPaymentRecovery({
 			}
 
 			const rzpKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-			const rzpAmount = Math.round(Number(checkout.price) * 100);
+			const rzpAmount = Math.round(Number(res.data.booking.price) * 100);
 
 			const rzpOptions = {
 				key: rzpKey,
+				retry: { enabled: false },
 				amount: rzpAmount,
 				currency: "INR",
 				name: "TaskGenie",
 				description: `Payment for ${checkout.service_name || "Home Service"}`,
 				order_id: orderId,
 				handler: async (response) => {
+					verifying = true;
 					try {
 						toast.loading("Verifying transaction...");
 						const verifyRes = await api.post("/api/bookings/verify-payment", {
 							...response,
 							razorpay_order_id: response.razorpay_order_id || orderId,
 							booking_id: checkout.booking_id,
-						});
+						}, { timeout: 20000 });
 
 						toast.dismiss();
 						if (verifyRes.data?.refund_pending) {
-							toast.error("Payment received, but slot hold had expired. Your refund is being processed.");
+							toast.error("Payment received. Check your refund status below.");
 							fetchRecoveryData(true);
 							return;
 						}
@@ -232,7 +257,7 @@ export default function BookingPaymentRecovery({
 								state: {
 									success: true,
 									booking: verifyRes.data.booking,
-									address: checkout.address,
+									address: res.data.booking.address,
 								},
 								replace: true,
 							});
@@ -245,11 +270,13 @@ export default function BookingPaymentRecovery({
 						console.error("Verification error:", verErr);
 						toast.warning("Payment confirmation pending. Please do not re-pay. We are reconciling status with the payment gateway.");
 						fetchRecoveryData(true);
-					}
+					} finally { finish(); }
 				},
 				modal: {
 					ondismiss: () => {
-						toast("Payment paused. You can resume checkout anytime while your hold is active.");
+						if (verifying) return;
+						finish();
+						toast("Payment paused. Check its status before retrying.");
 						fetchRecoveryData(true);
 					},
 				},
@@ -262,32 +289,39 @@ export default function BookingPaymentRecovery({
 			};
 
 			const rzp = new window.Razorpay(rzpOptions);
-			rzp.on("payment.failed", (failedRes) => {
-				const desc = failedRes.error?.description || "Payment declined";
-				toast.error(`Payment failed: ${desc}. Try UPI or another card.`);
+			rzp.on("payment.failed", () => {
+				toast.warning("Payment wasn’t confirmed. Check its status before trying again.");
 			});
 			rzp.open();
+			modalOpen = true;
 		} catch (err) {
 			console.error("Resume checkout error:", err);
 			const msg = err.response?.data?.message || "Failed to resume checkout.";
 			toast.error(msg);
 			fetchRecoveryData(true);
 		} finally {
-			setResumingBookingId(null);
+			if (!modalOpen) finish();
 		}
 	};
 
 	// 3. Cancel & Release Unpaid Booking Slot
 	const handleReleaseSlot = async (bookingId) => {
+		if (activeAction.current) return;
+		activeAction.current = true;
 		setReleasingBookingId(bookingId);
 		try {
-			await api.delete(`/api/bookings/${bookingId}/unpaid`);
+			const { data } = await api.delete(`/api/bookings/${bookingId}/unpaid`, { timeout: 30000 });
+			if (!data.success) {
+				toast.warning(data.message || "We could not confirm that the slot was released.");
+				return;
+			}
 			toast.success("Held slot released successfully.");
 			fetchRecoveryData(true);
 		} catch (err) {
 			console.error("Failed to release slot:", err);
 			toast.error(err.response?.data?.message || "Could not release slot.");
 		} finally {
+			activeAction.current = false;
 			setReleasingBookingId(null);
 		}
 	};
@@ -403,7 +437,7 @@ export default function BookingPaymentRecovery({
 						<div className="font-mackinac text-2xl font-bold text-white">
 							{recoveryData.summary.pending_refunds_count}
 						</div>
-						<span className="text-xs text-stone-400">Processing in 5–7 days</span>
+						<span className="text-xs text-stone-400">Awaiting gateway confirmation</span>
 					</div>
 				</div>
 
@@ -524,6 +558,13 @@ export default function BookingPaymentRecovery({
 						</span>
 					</div>
 
+					{referencedBooking && !recoveryData.interrupted_checkouts.some((item) => item.booking_id === referencedBooking) && (
+						<button type="button" disabled={!!resumingBookingId || !!releasingBookingId}
+							onClick={() => handleResumeCheckout({ booking_id: referencedBooking })}
+							className="mb-4 rounded-lg border border-violet-400/30 px-3 py-2 text-sm text-violet-200">
+							Check this booking
+						</button>
+					)}
 					{recoveryData.interrupted_checkouts.length === 0 ? (
 						<div className="flex flex-col items-center gap-4 rounded-2xl border border-white/[0.06] bg-[#120a22]/50 p-5 text-center sm:flex-row sm:gap-6 sm:px-7 sm:text-left">
 							<ServiceIllustration scene="checkout" className="w-36 h-auto shrink-0 sm:w-44" />
@@ -601,7 +642,7 @@ export default function BookingPaymentRecovery({
 										<button
 											type="button"
 											onClick={() => handleReleaseSlot(checkout.booking_id)}
-											disabled={releasingBookingId === checkout.booking_id}
+											disabled={!!releasingBookingId || !!resumingBookingId}
 											className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-semibold text-stone-400 hover:text-white hover:bg-white/[0.04] transition-colors cursor-pointer"
 										>
 											{releasingBookingId === checkout.booking_id ? "Releasing..." : "Release Slot"}
@@ -610,7 +651,7 @@ export default function BookingPaymentRecovery({
 										<button
 											type="button"
 											onClick={() => handleResumeCheckout(checkout)}
-											disabled={resumingBookingId === checkout.booking_id}
+											disabled={!!releasingBookingId || !!resumingBookingId}
 											className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-xs font-bold shadow-md shadow-violet-950/50 flex items-center gap-1.5 transition-all cursor-pointer"
 										>
 											{resumingBookingId === checkout.booking_id ? (
@@ -621,7 +662,7 @@ export default function BookingPaymentRecovery({
 											) : (
 												<>
 													<CreditCard size={13} />
-													{checkout.is_hold_active ? "Complete Payment" : "Re-check Slot & Pay"}
+													{checkout.is_hold_active ? "Check payment & resume" : "Check payment & slot"}
 												</>
 											)}
 										</button>

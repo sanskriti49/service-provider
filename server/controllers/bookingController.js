@@ -71,42 +71,57 @@ async function createBooking(req, res) {
     }).with("radius","latitude").with("radius","longitude").custom(require("../utils/location").pairedCoordinates);
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
-    if (value.payment_method === "online" && (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET === "placeholder_secret")) return res.status(503).json({ message: "Online payments are not configured" });
+    const rawKey = req.headers?.["idempotency-key"];
+    if (rawKey !== undefined && (typeof rawKey !== "string" || !/^[a-zA-Z0-9._:-]{1,128}$/.test(rawKey))) {
+        return res.status(400).json({ message: "Invalid Idempotency-Key header" });
+    }
     const providerId = await resolveProviderId(db, value.provider_id);
     if (!providerId) return res.status(404).json({ message: "Provider not found" });
-
-    // Idempotency Key support for safe network retries (header or body)
-    const rawIdempotencyKey = req.headers?.["idempotency-key"] || req.headers?.["x-idempotency-key"] || req.body?.idempotency_key || req.body?.client_booking_id;
-    let bookingId;
-    if (rawIdempotencyKey && typeof rawIdempotencyKey === "string" && rawIdempotencyKey.trim()) {
-        const trimmed = rawIdempotencyKey.trim();
-        if (UUID_REGEX.test(trimmed)) {
-            bookingId = trimmed.toLowerCase();
-        } else {
-            const hash = crypto.createHash("sha256").update(`${req.user.id}:${trimmed}`).digest("hex");
-            bookingId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
-        }
-        const existing = await db.query("SELECT * FROM bookings WHERE booking_id = $1", [bookingId]);
-        if (existing.rows.length) {
-            const existingBooking = existing.rows[0];
-            if (existingBooking.user_id !== req.user.id) {
-                return res.status(403).json({ message: "Access denied to existing booking" });
-            }
-            return res.status(200).json({
-                booking: serializeBooking(existingBooking, req.user),
-                razorpay_order: existingBooking.razorpay_order_id,
-                duplicate: true,
-            });
-        }
-    } else {
-        bookingId = crypto.randomUUID();
-    }
-
     const date = value.date.slice(0, 10);
-    const lock = await acquireLock(`booking:provider:${providerId}:${date}`, 15000);
-    if (!lock.acquired) return res.status(409).json({ message: "Provider is being reserved. Please retry." });
+    const method = value.payment_method === "cash" ? "cod" : value.payment_method;
+    const hashRequest = (service, day, time, address, paymentMethod, latitude, longitude, radius) =>
+        crypto.createHash("sha256").update(JSON.stringify([
+            providerId, String(service), day, String(time).slice(0, 5), address,
+            paymentMethod, Number(latitude), Number(longitude), Number(radius),
+        ])).digest("hex");
+    const requestHash = hashRequest(value.service_id, date, value.start_time, value.address, method, value.latitude, value.longitude, value.radius);
+    const keyHash = rawKey && crypto.createHash("sha256").update(`${req.user.id}:${rawKey}`).digest("hex");
+    const bookingId = keyHash
+        ? `${keyHash.slice(0, 8)}-${keyHash.slice(8, 12)}-4${keyHash.slice(13, 16)}-a${keyHash.slice(17, 20)}-${keyHash.slice(20, 32)}`
+        : crypto.randomUUID();
+    async function findReplay(connection, legacy = false) {
+        if (!rawKey) return null;
+        const { rows } = await connection.query(
+            "SELECT *, TO_CHAR(date, 'YYYY-MM-DD') AS date_string FROM bookings WHERE booking_id = $1 AND user_id = $2",
+            [legacy ? rawKey : bookingId, req.user.id],
+        );
+        const existing = rows[0];
+        if (!existing) return null;
+        const storedHash = existing.request_hash || hashRequest(existing.service_id, existing.date_string || String(existing.date).slice(0, 10),
+            existing.start_time, existing.address, existing.payment_method, existing.latitude, existing.longitude, existing.search_radius_km);
+        if (existing.provider_id !== providerId || storedHash !== requestHash) {
+            throw new BookingError(409, "This booking attempt key was already used with different details");
+        }
+        return existing;
+    }
+    function sendReplay(existing) {
+        // An online replay must go through the gateway-aware resume operation.
+        const booking = serializeBooking(existing, req.user);
+        delete booking.razorpay_order_id;
+        return res.status(200).json({ booking, duplicate: true, razorpay_order: null });
+    }
+    let lock;
     let client;
     try {
+        const existing = await findReplay(db) || (UUID_REGEX.test(rawKey || "") && await findReplay(db, true));
+        if (existing) return sendReplay(existing);
+        if (method === "online" && (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET === "placeholder_secret")) {
+            throw new BookingError(503, "Online payments are not configured");
+        }
+        lock = await acquireLock(`booking:provider:${providerId}:${date}`, 15000);
+        const afterAdmission = await findReplay(db);
+        if (afterAdmission) return sendReplay(afterAdmission);
+        if (!lock.acquired) throw new BookingError(409, "Provider is being reserved. Please retry this booking attempt.");
         const booking = { ...value, provider_id: providerId, date, start_time: value.start_time.slice(0,5) };
         const selected = await require("../services/bookingSchedule").validateSchedule(db, booking);
         const amount = amountInPaise(selected.price);
@@ -114,11 +129,10 @@ async function createBooking(req, res) {
         let completionCode;
         do { completionCode = generateOtp(); } while (completionCode === arrivalCode);
         let orderId = null;
-        if (value.payment_method === "online") {
-            // Create gateway order OUTSIDE the database transaction and WITHOUT holding an idle DB connection
-            const order = await razorpayOrderBreaker.fire({ amount, currency: "INR", receipt: bookingId });
-            if (!order.id || order.amount !== amount || order.currency !== "INR") throw new BookingError(502, "Gateway order did not match booking");
-            orderId = order.id;
+        let requiresCheck = false;
+        if (rawKey || method === "online") {
+            ({ orderId, requiresCheck } = await paymentService.initializeOrder({ bookingId, userId: req.user.id, requestHash, amount,
+                createOrder: method === "online" ? (options) => razorpayOrderBreaker.fire(options) : null }));
         }
 
         // Check out connection from pool only when ready to execute transaction
@@ -126,11 +140,23 @@ async function createBooking(req, res) {
         await client.query("BEGIN");
         const { lockSchedule } = require("../utils/bookingLifecycle");
         await lockSchedule(client, providerId, date);
+        const underLock = await findReplay(client);
+        if (underLock) {
+            await client.query("COMMIT");
+            return sendReplay(underLock);
+        }
         // Re-verify schedule under the advisory lock to eliminate any race window during the payment order creation
         await require("../services/bookingSchedule").validateSchedule(client, booking);
-        const result = await client.query(`INSERT INTO bookings (booking_id,provider_id,user_id,service_id,date,start_time,end_time,status,address,price,payment_method,payment_status,razorpay_order_id,otp,completion_otp,latitude,longitude,hold_expires_at,search_radius_km)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,'pending',$11,$12,$13,$14,$15,CASE WHEN $10::varchar='online' THEN clock_timestamp()+INTERVAL '5 minutes' ELSE NULL END,$16) RETURNING *`,
-            [bookingId,providerId,req.user.id,selected.service_id,date,booking.start_time,booking.end_time,value.address,amount/100,value.payment_method === "cash" ? "cod" : value.payment_method,orderId,arrivalCode,completionCode,value.latitude,value.longitude,value.radius]);
+        const result = await client.query(`INSERT INTO bookings (booking_id,provider_id,user_id,service_id,date,start_time,end_time,status,address,price,payment_method,payment_status,razorpay_order_id,otp,completion_otp,latitude,longitude,hold_expires_at,search_radius_km,request_hash)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10,'pending',$11,$12,$13,$14,$15,CASE WHEN $10::varchar='online' THEN clock_timestamp()+INTERVAL '5 minutes' ELSE NULL END,$16,$17)
+            ON CONFLICT (booking_id) DO NOTHING RETURNING *`,
+            [bookingId,providerId,req.user.id,selected.service_id,date,booking.start_time,booking.end_time,value.address,amount/100,method,orderId,arrivalCode,completionCode,value.latitude,value.longitude,value.radius,requestHash]);
+        if (!result.rows.length) {
+            await client.query("ROLLBACK");
+            const committed = await findReplay(client);
+            if (committed) return sendReplay(committed);
+            throw new BookingError(409, "Booking attempt already exists");
+        }
 
         let createdNotifications = [];
         if (value.payment_method !== "online") {
@@ -152,18 +178,36 @@ async function createBooking(req, res) {
             }
         }
 
-        return res.status(201).json({ booking: serializeBooking(result.rows[0], req.user), razorpay_order: orderId });
+        const created = serializeBooking(result.rows[0], req.user);
+        if (requiresCheck) delete created.razorpay_order_id;
+        return res.status(201).json({ booking: created, razorpay_order: requiresCheck ? null : orderId });
     } catch (error) {
         if (client) await client.query("ROLLBACK").catch(() => {});
+        if (rawKey && !res.headersSent) {
+            try {
+                const committed = await findReplay(client || db);
+                if (committed) return sendReplay(committed);
+            }
+            catch (replayError) { if (replayError.status) return respondError(res, replayError); }
+        }
         return respondError(res, error);
     } finally {
         if (client) client.release();
-        await releaseLock(lock.key, lock.token);
+        if (lock?.acquired) await releaseLock(lock.key, lock.token);
     }
 }
 
 async function updateBookingStatus(req, res) {
     const { status, otp_provided } = req.body;
+    if (status === "cancelled") {
+        try {
+            const snapshot = await readCheckout(req.params.booking_id);
+            assertTransition(snapshot, req.user, status);
+            if (snapshot.payment_method === "online" && !snapshot.razorpay_payment_id) {
+                return releaseUnpaidBooking(req, res, snapshot);
+            }
+        } catch (error) { return respondError(res, error); }
+    }
     let client = await db.connect();
     try {
         await client.query("BEGIN");
@@ -662,19 +706,62 @@ async function regenerateCompletionOtp(req, res) {
 	}
 }
 
-async function cancelUnpaidBooking(req, res) {
-    const client = await db.connect();
+async function readCheckout(id) {
+    if (!UUID_REGEX.test(id)) throw new BookingError(404, "Booking not found");
+    const { rows } = await db.query("SELECT * FROM bookings WHERE booking_id=$1", [id]);
+    if (!rows[0]) throw new BookingError(404, "Booking not found");
+    return rows[0];
+}
+
+function paymentCheckPending(res) {
+    return res.status(202).json({ success: false, can_pay: false, code: "PAYMENT_CHECK_PENDING",
+        message: "We’re still checking your payment. Please do not pay again. Check again shortly." });
+}
+
+async function checkGateway(booking) {
     try {
+        return await paymentService.inspectOrder(booking);
+    } catch {
+        console.warn(JSON.stringify({ event: "booking_gateway_check_failed" }));
+        return { canRetry: false };
+    }
+}
+
+function sameCheckout(left, right) {
+    return left.razorpay_order_id === right.razorpay_order_id &&
+        Number(new Date(left.hold_expires_at)) === Number(new Date(right.hold_expires_at));
+}
+
+function cancelUnpaidBooking(req, res) {
+    return releaseUnpaidBooking(req, res);
+}
+
+async function releaseUnpaidBooking(req, res, authorizedSnapshot) {
+    let client;
+    try {
+        const snapshot = authorizedSnapshot || await readCheckout(req.params.booking_id);
+        if (!authorizedSnapshot && snapshot.user_id !== req.user.id) throw new BookingError(403, "Access denied");
+        if (snapshot.payment_method !== "online" || snapshot.razorpay_payment_id) throw new BookingError(409, "Payment already processed; use cancellation instead");
+        if (snapshot.status === "cancelled") return res.json({ success: true, booking: serializeBooking(snapshot, req.user) });
+        if (!["pending", "expired"].includes(snapshot.status)) throw new BookingError(409, "Cannot release this booking");
+        const gateway = await checkGateway(snapshot);
+        client = await db.connect();
         await client.query("BEGIN");
         const booking = await lockBooking(client, req.params.booking_id);
-        if (booking.user_id !== req.user.id) throw new BookingError(403, "Access denied");
+        if (authorizedSnapshot) assertTransition(booking, req.user, "cancelled");
+        else if (booking.user_id !== req.user.id) throw new BookingError(403, "Access denied");
         if (booking.payment_method !== "online" || booking.razorpay_payment_id) throw new BookingError(409, "Payment already processed; use cancellation instead");
         if (!["pending", "expired", "cancelled"].includes(booking.status)) throw new BookingError(409, "Cannot release this booking");
+        if (!gateway.canRetry || !sameCheckout(snapshot, booking)) {
+            await client.query("ROLLBACK");
+            return paymentCheckPending(res);
+        }
         const result = await client.query("UPDATE bookings SET status='cancelled', hold_expires_at=NOW(), updated_at=NOW() WHERE booking_id=$1 RETURNING *", [booking.booking_id]);
+        if (authorizedSnapshot) await queueStatusEmails(client, booking, "cancelled", booking.payment_status);
         await client.query("COMMIT");
         return res.json({ success: true, message: "Slot released; payment intent retained for reconciliation", booking: serializeBooking(result.rows[0], req.user) });
-    } catch (error) { await client.query("ROLLBACK").catch(() => {}); return respondError(res, error); }
-    finally { client.release(); }
+    } catch (error) { if (client) await client.query("ROLLBACK").catch(() => {}); return respondError(res, error); }
+    finally { client?.release(); }
 }
 
 async function getRecoveryItems(req, res) {
@@ -723,7 +810,6 @@ async function getRecoveryItems(req, res) {
 				address: b.address,
 				status: b.status,
 				payment_status: b.payment_status,
-				razorpay_order_id: b.razorpay_order_id,
 				hold_expires_at: b.hold_expires_at,
 				is_hold_active: isHoldActive,
 				seconds_remaining: secondsRemaining,
@@ -766,13 +852,15 @@ async function getRecoveryItems(req, res) {
 		const refundItems = refundsRes.rows.map((r) => {
 			const amountInr = Number(r.amount_paise) / 100;
 			const isUncertain = r.state === "unknown" || (r.state === "submitting" && (now - new Date(r.updated_at).getTime() > 15 * 60 * 1000));
-			const isFailed = r.state === "failed" || r.booking_status === "refund_failed";
+			const isFailed = r.state === "failed";
 			const isPending = ["pending", "submitting", "processing"].includes(r.state) && !isUncertain;
 			const isProcessed = r.state === "processed";
 
 			let reasonLabel = "Booking refund";
 			if (r.request_key === "late-payment") {
-				reasonLabel = "Slot hold expired after late payment";
+				reasonLabel = "Payment received after the slot could no longer be reserved";
+			} else if (r.request_key?.startsWith("extra-payment:")) {
+				reasonLabel = "Additional payment on the same order";
 			} else if (r.request_key?.includes("cancel")) {
 				reasonLabel = "Booking cancellation";
 			} else if (r.request_key?.includes("dispute")) {
@@ -781,11 +869,11 @@ async function getRecoveryItems(req, res) {
 				reasonLabel = `Refund (${r.request_key})`;
 			}
 
-			let statusLabel = "Processing";
+			let statusLabel = "Refund requested";
 			if (isProcessed) statusLabel = "Refunded to source";
-			else if (isFailed) statusLabel = "Refund failed at bank";
+			else if (isFailed) statusLabel = "Refund failed";
 			else if (isUncertain) statusLabel = "Under manual review";
-			else if (r.state === "processing") statusLabel = "In clearing (5-7 days)";
+			else if (r.state === "processing") statusLabel = "Processing at payment gateway";
 
 			return {
 				refund_id: r.refund_id,
@@ -802,7 +890,7 @@ async function getRecoveryItems(req, res) {
 				request_key: r.request_key,
 				reason_label: reasonLabel,
 				status_label: statusLabel,
-				last_error: r.last_error,
+				last_error: r.last_error ? "This refund needs another status check or support review." : null,
 				is_uncertain: isUncertain,
 				is_failed: isFailed,
 				is_pending: isPending,
@@ -817,11 +905,11 @@ async function getRecoveryItems(req, res) {
 
 		for (const mb of missingRefundsRes.rows) {
 			const isFailed = mb.payment_status === "refund_failed";
-			const isProcessed = mb.payment_status === "refunded";
+			const isProcessed = false;
 			const isPartial = mb.payment_status === "partially_refunded";
 
 			// If partially refunded or no explicit refund intent row exists, the remaining refund amount is unknown
-			const isAmountUnknown = isPartial || (!isFailed && !isProcessed);
+			const isAmountUnknown = true;
 			const amountInr = isAmountUnknown ? null : Number(mb.price);
 			const amountPaise = isAmountUnknown ? null : Math.round(Number(mb.price) * 100);
 
@@ -894,16 +982,28 @@ async function getRecoveryItems(req, res) {
 
 async function resumeCheckout(req, res) {
 	const { booking_id } = req.params;
-	const client = await db.connect();
+	let client;
 	try {
+		const snapshot = await readCheckout(booking_id);
+		if (snapshot.user_id !== req.user.id) throw new BookingError(403, "Access denied to this booking");
+		if (snapshot.payment_method !== "online") throw new BookingError(400, "Only online payment bookings can be resumed");
+		const gateway = snapshot.razorpay_payment_id || snapshot.status === "cancelled"
+			? { canRetry: false }
+			: await checkGateway(snapshot);
+		client = await db.connect();
 		await client.query("BEGIN");
 		const booking = await lockBooking(client, booking_id);
 
 		if (booking.user_id !== req.user.id) {
 			throw new BookingError(403, "Access denied to this booking");
 		}
-		if (booking.status === "cancelled") {
-			throw new BookingError(409, "Cannot resume checkout for a cancelled booking. Please create a new booking.");
+		if (booking.razorpay_payment_id || booking.status === "cancelled") {
+			await client.query("COMMIT");
+			return res.json({
+				success: true, can_pay: false, booking: serializeBooking(booking, req.user),
+				code: booking.payment_status.startsWith("refund") || booking.payment_status === "partially_refunded"
+					? "REFUND_STATUS" : booking.status === "cancelled" ? "BOOKING_CANCELLED" : "PAYMENT_CONFIRMED",
+			});
 		}
 		if (!["pending", "expired"].includes(booking.status)) {
 			throw new BookingError(409, `Cannot resume booking with status '${booking.status}'`);
@@ -911,13 +1011,11 @@ async function resumeCheckout(req, res) {
 		if (booking.payment_method !== "online") {
 			throw new BookingError(400, "Only online payment bookings can be resumed");
 		}
-		if (booking.razorpay_payment_id || booking.payment_status === "paid") {
-			throw new BookingError(409, "Payment already completed for this booking");
+		if (!gateway.canRetry || !sameCheckout(snapshot, booking)) {
+			await client.query("ROLLBACK");
+			return paymentCheckPending(res);
 		}
-
-		const now = Date.now();
-		const holdExpires = booking.hold_expires_at ? new Date(booking.hold_expires_at).getTime() : 0;
-		const isHoldActive = booking.status === "pending" && holdExpires > now;
+		const isHoldActive = booking.status === "pending" && booking.hold_valid === true;
 
 		if (isHoldActive && booking.razorpay_order_id) {
 			// Hold is still active! Can proceed immediately with existing order
@@ -932,10 +1030,8 @@ async function resumeCheckout(req, res) {
 		}
 
 		// Hold expired: Check if slot is still available to re-hold
-		const { lockSchedule, activeBookingPredicate } = require("../utils/bookingLifecycle");
+		const { activeBookingPredicate } = require("../utils/bookingLifecycle");
 		const dateStr = booking.date_string || (booking.date instanceof Date ? booking.date.toISOString().slice(0, 10) : String(booking.date).slice(0, 10));
-
-		await lockSchedule(client, booking.provider_id, dateStr);
 
 		const conflict = await client.query(
 			`SELECT booking_id FROM bookings
@@ -958,11 +1054,16 @@ async function resumeCheckout(req, res) {
 		}
 
 		try {
-			await require("../services/bookingSchedule").validateSchedule(client, {
+			const candidate = {
 				...booking,
 				date: dateStr,
-			});
+			};
+			await require("../services/bookingSchedule").validateSchedule(client, candidate);
+			if (String(candidate.end_time).slice(0, 5) !== String(booking.end_time).slice(0, 5)) {
+				throw new BookingError(409, "Service duration changed. Please choose an available slot.");
+			}
 		} catch (schedErr) {
+			if (![400, 409].includes(schedErr.status)) throw schedErr;
 			await client.query("UPDATE bookings SET status = 'expired', updated_at = NOW() WHERE booking_id = $1", [booking.booking_id]);
 			await client.query("COMMIT");
 			return res.status(409).json({
@@ -973,25 +1074,15 @@ async function resumeCheckout(req, res) {
 			});
 		}
 
-		// Slot is free! Re-hold for 5 minutes and generate or reuse gateway order
-		const amount = amountInPaise(booking.price);
-		let orderId = booking.razorpay_order_id;
-
-		if (!orderId) {
-			const order = await razorpayOrderBreaker.fire({ amount, currency: "INR", receipt: booking.booking_id });
-			if (!order.id) throw new BookingError(502, "Failed to create gateway order");
-			orderId = order.id;
-		}
-
 		const updated = await client.query(
 			`UPDATE bookings
 			 SET status = 'pending',
 			     hold_expires_at = clock_timestamp() + INTERVAL '5 minutes',
-			     razorpay_order_id = $1,
+			     renewed_hold_at = clock_timestamp(),
 			     updated_at = NOW()
-			 WHERE booking_id = $2
+			 WHERE booking_id = $1
 			 RETURNING *`,
-			[orderId, booking.booking_id]
+			[booking.booking_id]
 		);
 
 		await client.query("COMMIT");
@@ -1000,15 +1091,15 @@ async function resumeCheckout(req, res) {
 			success: true,
 			can_pay: true,
 			slot_renewed: true,
-			razorpay_order: orderId,
+			razorpay_order: booking.razorpay_order_id,
 			booking: serializeBooking(updated.rows[0], req.user),
 			message: "Slot held for 5 minutes. Please complete payment.",
 		});
 	} catch (err) {
-		await client.query("ROLLBACK").catch(() => {});
+		if (client) await client.query("ROLLBACK").catch(() => {});
 		return respondError(res, err);
 	} finally {
-		client.release();
+		client?.release();
 	}
 }
 
@@ -1040,12 +1131,11 @@ async function reconcileCustomerRefund(req, res) {
 		}
 
 		// Reconcile status with gateway
-		let gatewaySyncError = null;
+		let gatewaySynced = false;
 		try {
-			await paymentService.reconcileRefund(refund_id);
-		} catch (reconcileErr) {
-			console.warn("Real-time refund reconcile note:", reconcileErr.message);
-			gatewaySyncError = reconcileErr.message || "Failed to communicate with payment gateway";
+			gatewaySynced = await paymentService.reconcileRefund(refund_id) !== false;
+		} catch {
+			console.warn(JSON.stringify({ event: "booking_refund_check_failed" }));
 		}
 
 		const updated = await db.query(
@@ -1060,13 +1150,13 @@ async function reconcileCustomerRefund(req, res) {
 		);
 
 		const refund = updated.rows[0] || null;
+		if (refund?.last_error) refund.last_error = "This refund needs another status check or support review.";
 
-		if (gatewaySyncError) {
+		if (!gatewaySynced) {
 			return res.status(502).json({
 				success: false,
 				synced: false,
 				message: "Could not sync with payment gateway. Displaying last recorded status.",
-				error: gatewaySyncError,
 				refund,
 			});
 		}
@@ -1074,11 +1164,11 @@ async function reconcileCustomerRefund(req, res) {
 		res.json({
 			success: true,
 			synced: true,
-			message: "Refund status successfully verified with payment gateway.",
+			message: "Refund status checked.",
 			refund,
 		});
-	} catch (err) {
-		console.error("Reconcile customer refund failed:", err);
+	} catch {
+		console.error(JSON.stringify({ event: "booking_refund_status_unavailable" }));
 		res.status(500).json({ message: "Could not check refund status at this moment. Please try again." });
 	}
 }

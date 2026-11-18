@@ -20,7 +20,8 @@ function loadController(source = fs.readFileSync(path.join(__dirname, "../contro
 			if (sql.includes("AS valid")) return { rows: [{ valid: true }] };
 			if (sql.includes("SELECT start_time,end_time FROM provider_master")) return { rows: [{ start_time: "08:00", end_time: "20:00" }] };
 			if (sql.includes("SELECT start_time")) return { rows: [] };
-			if (sql.includes("INSERT INTO bookings")) return { rows: [{
+			if (sql.includes("INSERT INTO booking_order_intents")) return { rows: [{ booking_id: params[0], user_id: params[1], request_hash: params[2], amount_paise: params[3] }] };
+		if (sql.includes("INSERT INTO bookings")) return { rows: [{
 				booking_id: "44444444-4444-4444-8444-444444444444", provider_id: providerId,
 				user_id: customerId, service_id: serviceId, date: params[4], start_time: params[5],
 				end_time: params[6], price: params[8], payment_method: params[9], payment_status: "pending",
@@ -33,7 +34,7 @@ function loadController(source = fs.readFileSync(path.join(__dirname, "../contro
 	};
 	const stubs = {
 		razorpay: class {
-			constructor() { this.orders = { create: async (options) => { orders.push(options); return { id: "order_unit", amount: options.amount, currency: options.currency }; } }; }
+			constructor() { this.orders = { create: async (options) => { orders.push(options); return { ...options, id: "order_unit" }; } }; }
 		},
 		"../config/db": { query: async (sql, params = []) => {
 			if (sql.includes("SELECT id") && !sql.includes("SELECT ps.price")) return { rows: [{ id: providerId }] };

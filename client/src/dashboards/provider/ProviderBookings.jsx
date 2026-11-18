@@ -246,6 +246,10 @@ export default function ProviderBookings() {
 					payload.otp_provided = otpProvided;
 				}
 				const response = await api.put(`/api/bookings/${bookingId}/status`, payload);
+				if (response.data.code === "PAYMENT_CHECK_PENDING") {
+					toast.warning(response.data.message);
+					return;
+				}
 				setBookings((prev) =>
 					prev.map((b) =>
 						b.booking_id === bookingId ? { ...b, ...response.data.booking } : b,
