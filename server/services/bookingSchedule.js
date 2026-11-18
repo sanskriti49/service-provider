@@ -129,6 +129,7 @@ async function getAvailability(client, {
   service_id,
   from = indiaDate(),
   days = 14,
+  preferredStart,
   latitude,
   longitude,
   radius
@@ -178,7 +179,15 @@ async function getAvailability(client, {
     if (!intervals.length) continue;
     const conflicts = await conflictContext(client, booking, config, bookings.rows.filter(row => row.date_str === date));
     for (const interval of intervals) {
-      for (let start = minutes(interval.start_time || interval.start); start + duration <= minutes(interval.end_time || interval.end); start += Math.min(60, duration)) {
+      const firstMinute = minutes(interval.start_time || interval.start);
+      const lastMinute = minutes(interval.end_time || interval.end);
+      const starts = [];
+      for (let start = firstMinute; start + duration <= lastMinute; start += Math.min(60, duration)) starts.push(start);
+      if (preferredStart) {
+        const preferred = minutes(preferredStart);
+        if (preferred >= firstMinute && preferred + duration <= lastMinute) starts.push(preferred);
+      }
+      for (const start of starts) {
         const end = start + duration;
         if (end >= 1440 || new Date(`${date}T${time(start)}:00+05:30`).getTime() < now.getTime() + 45 * 60000 || hasConflict(conflicts, start, end)) continue;
         if (!free_slots.some(slot => slot.start === time(start))) free_slots.push({

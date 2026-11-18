@@ -1,5 +1,5 @@
 const db = require("../config/db");
-const { integritySchema, recoverySchema } = require("./migrate_booking_integrity");
+const { integritySchema, recoverySchema, replacementSchema } = require("./migrate_booking_integrity");
 const { chatSchema } = require("./migrate_chat");
 const { locationSchema } = require("./migrate_booking_location");
 const { supportModerationSchema } = require("./migrate_support_moderation");
@@ -292,6 +292,7 @@ const queries = [
 	...spatialQueries,
 	integritySchema,
 	recoverySchema,
+	replacementSchema,
 	locationSchema,
 	supportModerationSchema,
 	outboxSchema,

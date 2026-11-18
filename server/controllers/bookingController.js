@@ -199,6 +199,11 @@ async function createBooking(req, res) {
 
 async function updateBookingStatus(req, res) {
     const { status, otp_provided } = req.body;
+    const reason = req.body.cancellation_reason;
+    if (status === "cancelled" && req.user.role === "provider" && reason !== undefined &&
+        (typeof reason !== "string" || reason.length > 300)) {
+        return res.status(400).json({ message: "Cancellation reason must be 300 characters or fewer." });
+    }
     if (status === "cancelled") {
         try {
             const snapshot = await readCheckout(req.params.booking_id);
@@ -237,12 +242,26 @@ async function updateBookingStatus(req, res) {
             paymentStatus = "refund_pending";
         } else if (status === "completed" && booking.payment_method === "cod") paymentStatus = "paid";
         const updated = await client.query("UPDATE bookings SET status=$1,payment_status=$2,action_by=$3,updated_at=NOW() WHERE booking_id=$4 RETURNING *", [status,paymentStatus,req.user.role,booking.booking_id]);
+        const offerReplacement = status === "cancelled" && req.user.role === "provider" &&
+            (booking.status === "confirmed" || booking.status === "booked" ||
+                (booking.status === "pending" && booking.replaces_booking_id));
+        if (offerReplacement) {
+            const cancellationReason = reason?.trim() || (booking.status === "pending"
+                ? "The provider declined the replacement request."
+                : "The provider could no longer make the appointment.");
+            await client.query("UPDATE bookings SET replacement_offered=true,cancellation_reason=$2 WHERE booking_id=$1",
+                [booking.booking_id, cancellationReason]);
+            Object.assign(updated.rows[0], { replacement_offered: true, cancellation_reason: cancellationReason });
+        }
         await queueStatusEmails(client, booking, status, paymentStatus);
         await client.query("COMMIT");
         client.release(); client = null;
         bookingsTotal.inc({ status });
         const recipient = req.user.id === booking.user_id ? booking.provider_id : booking.user_id;
-        await sendNotification({ userId: recipient, title: "Booking updated", message: `Booking status: ${status}.${paymentStatus === "refund_pending" ? " Refund awaits gateway confirmation." : ""}`, type: "booking_status", data: { booking_id: booking.booking_id, status, payment_status: paymentStatus } }).catch((error) => console.error("Status notification failed:", error.message));
+        const message = offerReplacement
+            ? "Your provider cancelled. Open Recovery & Refunds in My Bookings to find a replacement."
+            : `Booking status: ${status}.${paymentStatus === "refund_pending" ? " Refund awaits gateway confirmation." : ""}`;
+        await sendNotification({ userId: recipient, title: "Booking updated", message, type: "booking_status", data: { booking_id: booking.booking_id, status, payment_status: paymentStatus } }).catch((error) => console.error("Status notification failed:", error.message));
         return res.json({ message: "Booking updated", booking: serializeBooking(updated.rows[0], req.user) });
     } catch (error) { if (client) await client.query("ROLLBACK").catch(() => {}); return respondError(res, error); }
     finally { if (client) client.release(); }
@@ -602,6 +621,7 @@ async function getUserHistory(req, res) {
 
 		const dataQuery = `
             SELECT b.booking_id, b.service_id, b.date, b.status, b.price, b.start_time, b.end_time, b.address, b.payment_status, b.payment_method,
+                   b.replacement_offered,
                    COALESCE(b.completion_otp, b.otp) AS completion_otp, b.otp,
                    pu.id AS provider_id,
                    pu.custom_id AS custom_id,

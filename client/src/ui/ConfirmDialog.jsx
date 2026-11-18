@@ -14,6 +14,7 @@ export default function ConfirmDialog({
 	variant = "danger", // "danger" | "warning" | "default"
 	icon: CustomIcon,
 	loading = false,
+	children,
 }) {
 	// Centralized modal stack & Escape handling
 	useModal({
@@ -115,6 +116,7 @@ export default function ConfirmDialog({
 							<p className="text-xs sm:text-sm text-slate-300 leading-relaxed pl-0.5">
 								{description}
 							</p>
+							{children}
 
 							{/* Actions Row */}
 							<div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.08]">

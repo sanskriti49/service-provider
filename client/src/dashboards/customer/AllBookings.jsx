@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import BookingDetailsSheet from "./BookingDetailsSheet";
 import BookingPaymentRecovery from "./BookingPaymentRecovery";
+import BookingReplacementRecovery from "./BookingReplacementRecovery";
 import ConfirmModal from "../../ui/ConfirmModal";
 import api from "../../api/axiosInstance";
 import ChatButton from "../../chat/ChatButton";
@@ -396,7 +397,13 @@ function BookingRow({ item, busy, onOpen, onCancel, onRebook }) {
 							Rate
 						</RowButton>
 					)}
-					{canRebook && (
+					{item.replacement_offered && (
+						<Link className="rounded-lg border border-violet-400/30 px-3 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-400/15"
+							to={`?tab=recovery&replacement=${item.booking_id}`}>
+							Replacement options
+						</Link>
+					)}
+					{canRebook && !item.replacement_offered && (
 						<RowButton icon={Repeat} onClick={() => onRebook(item)}>
 							Book again
 						</RowButton>
@@ -636,6 +643,14 @@ export default function AllBookings() {
 			setActiveTab(tabParam);
 		}
 	}, [searchParams]);
+
+	useEffect(() => {
+		const onNotification = ({ detail }) => {
+			if (detail?.type === "booking_status") setReloadKey((key) => key + 1);
+		};
+		window.addEventListener("app:notification", onNotification);
+		return () => window.removeEventListener("app:notification", onNotification);
+	}, []);
 
 	// Fetch recovery badge count
 	useEffect(() => {
@@ -1124,10 +1139,13 @@ export default function AllBookings() {
 				className="min-h-[280px] scroll-mt-24"
 			>
 				{activeTab === "recovery" ? (
-					<BookingPaymentRecovery
-						initialData={outlet.recoveryData}
-						onRecoveryCountChange={setRecoveryCount}
-					/>
+					<>
+						<BookingReplacementRecovery selectedId={searchParams.get("replacement")} />
+						<BookingPaymentRecovery
+							initialData={outlet.recoveryData}
+							onRecoveryCountChange={setRecoveryCount}
+						/>
+					</>
 				) : (
 					<>
 						{activeTab === "upcoming" && recoveryCount > 0 && (

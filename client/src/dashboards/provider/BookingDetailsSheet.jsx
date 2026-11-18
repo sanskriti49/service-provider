@@ -63,6 +63,9 @@ export default function BookingDetailsSheet({
 	const now = new Date();
 	const GRACE = 20 * 60000;
 	const isPastStart = !isNaN(bdt.getTime()) && now > bdt.getTime() + GRACE;
+	const confirmed = ["booked", "confirmed"].includes(booking.status);
+	const startsAt = Date.parse(`${datePart}T${booking.start_time?.slice(0, 5)}:00+05:30`);
+	const canCancelConfirmed = startsAt - now.getTime() >= 2 * 60 * 60 * 1000;
 
 	const displayStatus = (booking.status || "").replace(/_/g, " ");
 
@@ -277,6 +280,15 @@ export default function BookingDetailsSheet({
 								Decline Request
 							</button>
 						</div>
+					)}
+					{confirmed && (
+						canCancelConfirmed ? (
+							<button type="button" onClick={() => onUpdateStatus(booking.booking_id, "cancelled")}
+								disabled={actionLoading === booking.booking_id}
+								className="w-full rounded-xl border border-rose-400/25 px-4 py-2.5 text-xs font-bold text-rose-200 hover:bg-rose-400/10 disabled:opacity-50">
+								Cancel confirmed booking
+							</button>
+						) : <p className="text-xs text-slate-400">Contact support if you need to cancel within two hours of the appointment.</p>
 					)}
 
 					{/* Financial Settlement Card */}

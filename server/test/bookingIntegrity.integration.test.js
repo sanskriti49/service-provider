@@ -33,6 +33,8 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 	await pool.query(migration); await pool.query(migration);
 	const recoveryMigration = require("../migrations/migrate_booking_integrity").recoverySchema.replaceAll("public.", `${schema}.`);
 	await pool.query(recoveryMigration); await pool.query(recoveryMigration);
+	const replacementMigration = require("../migrations/migrate_booking_integrity").replacementSchema.replaceAll("public.", `${schema}.`);
+	await pool.query(replacementMigration); await pool.query(replacementMigration);
 	const { outboxSchema } = require("../migrations/migrate_notification_outbox");
 	await pool.query(outboxSchema.replaceAll("public.", `${schema}.`));
 	const { EventQueue } = require("../utils/eventQueue");
@@ -506,5 +508,157 @@ test("booking integrity: actual controllers, PostgreSQL constraints, concurrent 
 				fs.writeFileSync(path.join(process.env.TASKGENIE_EVIDENCE_DIR, "concurrency.json"), JSON.stringify(report, null, 2) + "\n");
 			}
 		} finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
+	});
+	await t.test("provider replacement uses actual booking transactions and the existing verified refund", async (t) => {
+		const replacement = randomUUID();
+		const hidden = randomUUID();
+		const distant = randomUUID();
+		for (const [id, visible, lng] of [[replacement, true, 77], [hidden, false, 77], [distant, true, 80]]) {
+			await pool.query("INSERT INTO users(id,name,email,password,role,custom_id,lat,lng) VALUES($1,'Replacement fixture',$2,'unused','provider',$3,12,$4)",
+				[id, `${id}@example.com`, `SRV${id.replaceAll("-", "").slice(0,20).toUpperCase()}`, lng]);
+			await pool.query("INSERT INTO providers(user_id,status) VALUES($1,'approved')", [id]);
+			await pool.query("INSERT INTO provider_services(provider_id,service_id,price,is_visible) VALUES($1,$2,1300,$3)", [id, service, visible]);
+			await pool.query("INSERT INTO provider_master_availability(provider_id,day_of_week,start_time,end_time) SELECT $1,day,'08:00','20:00' FROM generate_series(0,6) day", [id]);
+		}
+		let failNotice = false;
+		const recovery = load("../controllers/bookingReplacementController.js", {
+			"../config/db": stubDb, "../services/bookingSchedule": schedule,
+			"../utils/notificationService": { async sendNotification() { if (failNotice) throw new Error("fixture notification failed"); }, emitNotification() {} },
+		});
+		const providerActor = { id: provider, role: "provider" };
+		const secondActor = { id: other, role: "customer" };
+		async function invoke(handler, user, id, body = {}, query = {}) {
+			const res = response();
+			await handler({ user, params: { booking_id: id }, body, query }, res);
+			return res;
+		}
+		const status = (b, status, user = providerActor, reason) => invoke(controller.updateBookingStatus, user, b.booking_id,
+			{ status, cancellation_reason: reason });
+		async function cancel(b, user = providerActor) {
+			const res = await status(b, "cancelled", user, "Scheduling conflict");
+			assert.equal(res.statusCode, 200, JSON.stringify(res.data));
+			return res.data.booking;
+		}
+		async function original(date, time = "10:30") {
+			const res = await book(time, "cod", { date });
+			assert.equal(res.statusCode, 201, JSON.stringify(res.data));
+			const b = res.data.booking;
+			assert.equal((await status(b, "confirmed")).statusCode, 200);
+			assert.equal((await cancel(b)).replacement_offered, true);
+			return b;
+		}
+		const discover = (b, user = actor, date) => invoke(recovery.replacementOptions, user, b.booking_id, {}, { date });
+		const confirm = (b, date, extra = {}, user = actor) => invoke(recovery.confirmReplacement, user, b.booking_id,
+			{ provider_id: replacement, date, start_time: "10:30", approved_price_paise: 130000, ...extra });
+
+		await t.test("only the owner can recover an eligible cancellation, and discovery preserves an off-grid time", async () => {
+			const date = "2040-10-01";
+			const pending = (await book("08:00", "cod", { date })).data.booking;
+			assert.equal((await cancel(pending)).replacement_offered, false);
+			assert.equal((await discover(pending)).statusCode, 404);
+			const customerCancelled = (await book("08:00", "cod", { date })).data.booking;
+			await status(customerCancelled, "confirmed");
+			assert.equal((await cancel(customerCancelled, actor)).replacement_offered, false);
+
+			const b = await original(date);
+			const options = await discover(b);
+			assert.equal(options.statusCode, 200, JSON.stringify(options.data));
+			assert.equal(options.data.original.cancellation_reason, "Scheduling conflict");
+			assert.equal(options.data.original.price_paise, 120000);
+			assert.deepEqual(options.data.options.map(p => [p.provider_id, p.price_paise]), [[replacement, 130000]]);
+			assert.ok(options.data.options[0].slots.some(s => s.start === "10:30" && s.same_time));
+			assert.equal((await discover(b, secondActor)).statusCode, 404);
+			assert.equal((await confirm(b, date, {}, secondActor)).statusCode, 404);
+			assert.equal((await confirm(b, date, { provider_id: provider })).statusCode, 409);
+			assert.equal((await confirm(b, date, { approved_price_paise: undefined })).statusCode, 400);
+			assert.equal((await confirm(b, date, { approved_price_paise: 120000 })).statusCode, 409);
+			const list = await invoke(recovery.listReplacements, actor);
+			assert.deepEqual(list.data.items.map(item => item.booking_id), [b.booking_id]);
+		});
+
+		await t.test("rechecks changed schedules, handles empty results, rolls back failure and links exactly one replacement", async () => {
+			const date = "2040-10-02";
+			const b = await original(date);
+			assert.equal((await discover(b)).data.options.length, 1);
+			await pool.query("INSERT INTO provider_date_exceptions(provider_id,date,is_available) VALUES($1,$2,false)", [replacement, date]);
+			assert.equal((await confirm(b, date)).statusCode, 409);
+			assert.deepEqual((await discover(b)).data.options, []);
+			const alternate = "2040-10-03";
+			assert.ok((await discover(b, actor, alternate)).data.options[0].slots.some(s => !s.same_time));
+			failNotice = true;
+			try { assert.equal((await confirm(b, alternate)).statusCode, 500); } finally { failNotice = false; }
+			assert.equal((await pool.query("SELECT 1 FROM bookings WHERE replaces_booking_id=$1", [b.booking_id])).rowCount, 0);
+			const attempts = await Promise.all([confirm(b, alternate), confirm(b, alternate), status(b, "cancelled")]);
+			assert.deepEqual(attempts.map(res => res.statusCode).sort(), [200, 201, 409]);
+			assert.equal(attempts[0].data.original.replacement_id, attempts[1].data.original.replacement_id);
+			const { rows: [created] } = await pool.query("SELECT * FROM bookings WHERE replaces_booking_id=$1", [b.booking_id]);
+			assert.equal(created.status, "pending");
+			assert.equal(created.payment_method, "cod");
+			assert.equal(created.razorpay_order_id, null);
+			assert.notEqual(created.otp, created.completion_otp);
+			assert.equal((await discover(b)).data.original.replacement_id, created.booking_id);
+		});
+
+		await t.test("two customers cannot reserve the same replacement slot", async () => {
+			const date = "2040-10-04";
+			const first = await original(date, "08:00");
+			const second = await original(date, "16:00");
+			await pool.query("UPDATE bookings SET user_id=$1 WHERE booking_id=$2", [other, second.booking_id]);
+			const outcomes = await Promise.all([confirm(first, date), confirm(second, date, {}, secondActor)]);
+			assert.deepEqual(outcomes.map(res => res.statusCode).sort(), [201, 409]);
+			assert.equal((await pool.query("SELECT 1 FROM bookings WHERE provider_id=$1 AND date=$2", [replacement, date])).rowCount, 1);
+		});
+
+		await t.test("prepaid cancellations wait for a verified full refund and never transfer or submit a payment", async () => {
+			const date = "2040-10-05";
+			const b = (await book("10:30", "online", { date })).data.booking;
+			const payment = capture(b);
+			await controller.paymentService.finalize(b.razorpay_order_id, payment, actor);
+			const cancelled = await cancel(b);
+			assert.equal(cancelled.payment_status, "refund_pending");
+			assert.match((await discover(b)).data.payment_block, /full refund/);
+			assert.equal((await confirm(b, date)).statusCode, 409);
+			const { rows: [intent] } = await pool.query("SELECT id FROM booking_refunds WHERE booking_id=$1", [b.booking_id]);
+			const calls = refundCalls;
+			await controller.paymentService.reconcileRefund(intent.id);
+			assert.equal(refundCalls, calls + 1);
+			assert.equal((await discover(b)).data.payment_block, null);
+			assert.equal((await confirm(b, date)).statusCode, 201);
+			assert.equal(refundCalls, calls + 1);
+			const { rows: [created] } = await pool.query("SELECT payment_method,payment_status,razorpay_payment_id FROM bookings WHERE replaces_booking_id=$1", [b.booking_id]);
+			assert.deepEqual(created, { payment_method: "cod", payment_status: "pending", razorpay_payment_id: null });
+			assert.equal((await pool.query("SELECT 1 FROM booking_refunds WHERE booking_id=$1", [b.booking_id])).rowCount, 1);
+		});
+
+		await t.test("decline and later provider cancellation both reopen recovery without replaying failed providers", async () => {
+			const date = "2040-10-06";
+			const b = await original(date);
+			const first = (await confirm(b, date)).data.original.replacement_id;
+			const declined = await cancel({ booking_id: first }, { role: "provider", id: replacement });
+			assert.equal(declined.replacement_offered, true);
+			assert.equal((await discover(b)).data.original.replacement_can_retry, true);
+			assert.deepEqual((await discover(declined)).data.options, []);
+			assert.equal((await confirm(declined, date)).statusCode, 409);
+			assert.equal((await confirm(declined, date, { provider_id: provider })).statusCode, 409);
+
+			await pool.query("UPDATE provider_services SET is_visible=true WHERE provider_id=$1 AND service_id=$2", [hidden, service]);
+			assert.deepEqual((await discover(declined)).data.options.map(p => p.provider_id), [hidden]);
+			const retries = await Promise.all([
+				confirm(declined, date, { provider_id: hidden }),
+				confirm(declined, date, { provider_id: hidden }),
+			]);
+			assert.deepEqual(retries.map(r => r.statusCode).sort(), [200, 201]);
+			const second = retries[0].data.original.replacement_id;
+			assert.equal(retries[1].data.original.replacement_id, second);
+			const nextProvider = { role: "provider", id: hidden };
+			assert.equal((await status({ booking_id: second }, "confirmed", nextProvider)).statusCode, 200);
+			assert.equal((await discover(declined)).data.original.replacement_status, "confirmed");
+			const cancelled = await cancel({ booking_id: second }, nextProvider);
+			assert.equal(cancelled.replacement_offered, true);
+			assert.equal((await discover(declined)).data.original.replacement_can_retry, true);
+			assert.deepEqual((await discover(cancelled)).data.options, []);
+			assert.equal((await confirm(b, date, { provider_id: hidden })).data.original.replacement_id, first);
+			assert.equal((await pool.query("SELECT count(*)::int AS n FROM bookings WHERE replaces_booking_id=ANY($1)", [[b.booking_id, first, second]])).rows[0].n, 2);
+		});
 	});
 });

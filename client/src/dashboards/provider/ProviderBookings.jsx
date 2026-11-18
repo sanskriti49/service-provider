@@ -128,6 +128,7 @@ const StatusBadge = ({ status, date, startTime }) => {
 export default function ProviderBookings() {
 	const [activeTab, setActiveTab] = useState("upcoming");
 	const [bookings, setBookings] = useState([]);
+	const [reloadKey, setReloadKey] = useState(0);
 	const [loading, setLoading] = useState(true);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -201,7 +202,15 @@ export default function ProviderBookings() {
 		};
 		fetchBookingsList();
 		return () => controller.abort();
-	}, [meta.current_page, activeTab, debouncedSearch, activeFilters]);
+	}, [meta.current_page, activeTab, debouncedSearch, activeFilters, reloadKey]);
+
+	useEffect(() => {
+		const onNotification = ({ detail }) => {
+			if (["booking_created", "booking_status"].includes(detail?.type)) setReloadKey((key) => key + 1);
+		};
+		window.addEventListener("app:notification", onNotification);
+		return () => window.removeEventListener("app:notification", onNotification);
+	}, []);
 
 	const handleTabChange = (tab) => {
 		setActiveTab(tab);
@@ -224,13 +233,20 @@ export default function ProviderBookings() {
 
 	const handleStatusUpdate = (bookingId, newStatus, otpProvided, setError) => {
 		if (newStatus === "cancelled") {
+			const booking = bookings.find((item) => item.booking_id === bookingId);
+			const confirmed = ["booked", "confirmed"].includes(booking?.status);
+			const offersRecovery = confirmed || Boolean(booking?.replaces_booking_id);
 			setConfirmConfig({
 				isOpen: true,
 				bookingId,
 				newStatus,
-				title: "Decline Booking Request?",
-				message:
-					"Are you sure you want to decline this booking? The customer will be notified. Eligible online refunds remain pending until the gateway confirms processing.",
+				title: confirmed ? "Cancel this booking?" : "Decline booking request?",
+				message: offersRecovery
+					? "The customer will be notified and can look for a replacement. Eligible online refunds follow the usual process."
+					: "The customer will be notified. Eligible online refunds remain pending until the gateway confirms processing.",
+				confirmed,
+				offersRecovery,
+				reason: "",
 			});
 			return;
 		}
@@ -238,10 +254,11 @@ export default function ProviderBookings() {
 	};
 
 	const executeUpdate = useCallback(
-		async (bookingId, newStatus, otpProvided, setError) => {
+		async (bookingId, newStatus, otpProvided, setError, reason) => {
 			setActionLoading(bookingId);
 			try {
 				const payload = { status: newStatus };
+				if (reason) payload.cancellation_reason = reason;
 				if (otpProvided) {
 					payload.otp_provided = otpProvided;
 				}
@@ -259,6 +276,7 @@ export default function ProviderBookings() {
 					setSelectedBooking((prev) => ({ ...prev, ...response.data.booking }));
 				}
 				setConfirmConfig((c) => ({ ...c, isOpen: false }));
+				if (newStatus === "cancelled") setReloadKey((key) => key + 1);
 				toast.success(`Booking ${newStatus.replace(/_/g, " ")} successfully`);
 				return true;
 			} catch (err) {
@@ -624,18 +642,32 @@ export default function ProviderBookings() {
 				isOpen={confirmConfig.isOpen}
 				onClose={() => setConfirmConfig((c) => ({ ...c, isOpen: false }))}
 				onConfirm={() =>
-					executeUpdate(confirmConfig.bookingId, confirmConfig.newStatus)
+					executeUpdate(confirmConfig.bookingId, confirmConfig.newStatus, undefined, undefined, confirmConfig.reason)
 				}
 				title={confirmConfig.title || "Decline Booking Request?"}
 				message={
 					confirmConfig.message ||
 					"The customer will be notified. Eligible online refunds remain pending until the gateway confirms processing."
 				}
-				confirmText="Decline booking"
+				confirmText={confirmConfig.confirmed ? "Cancel booking" : "Decline booking"}
 				cancelText="Keep booking"
 				variant="danger"
 				loading={actionLoading === confirmConfig.bookingId}
-			/>
+			>
+				{confirmConfig.offersRecovery && (
+					<label className="block space-y-1 text-sm text-slate-200">
+						<span>Reason shared with the customer (optional)</span>
+						<textarea
+							className="block w-full rounded-lg border border-white/15 bg-white/5 p-2"
+							maxLength={300}
+							rows={3}
+							value={confirmConfig.reason}
+							disabled={actionLoading === confirmConfig.bookingId}
+							onChange={(event) => setConfirmConfig((config) => ({ ...config, reason: event.target.value }))}
+						/>
+					</label>
+				)}
+			</ConfirmModal>
 		</div>
 	);
 }

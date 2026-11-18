@@ -13,6 +13,7 @@ const browser = await chromium.launch();
 try {
 	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 	page.setDefaultTimeout(10000);
+	page.setDefaultNavigationTimeout(30000);
 	const errors = [];
 	const diagnostics = [];
 	page.on("pageerror", (error) => errors.push(error.message));
@@ -36,6 +37,12 @@ try {
 	}, { user, provider, booking, token });
 
 	const attempts = [];
+	const original = { ...booking, cancellation_reason: "Schedule conflict", provider_name: "Original provider",
+		price_paise: 120000, payment_method: "cod", replacement_id: null };
+	const replacement = { provider_id: provider.id, name: "Replacement provider", price_paise: 130000,
+		slots: [{ start: "10:00", end: "11:00", same_time: true }] };
+	const replacementAttempts = [];
+	let recovered = false, stale = false;
 	let checks = 0;
 	await page.route("**/api/**", async (route) => {
 		const req = route.request();
@@ -55,6 +62,25 @@ try {
 		} });
 		if (pathname.endsWith("/recovery/items")) return route.fulfill({ json: { success: true, interrupted_checkouts: [booking],
 			refunds: [], summary: { active_holds_count: 1, interrupted_count: 1 } } });
+		if (pathname.endsWith("/recovery/replacements")) return route.fulfill({ json: { items: [original] } });
+		if (pathname.endsWith("/replacement")) {
+			const { searchParams } = new URL(req.url());
+			const date = searchParams.get("date") || booking.date;
+			const resolved = { ...original, replacement_id: provider.id, replacement_status: "pending", replacement_provider_name: replacement.name };
+			if (req.method() === "POST") {
+				replacementAttempts.push(req.postDataJSON());
+				if (!stale) {
+					stale = true;
+					return route.fulfill({ status: 409, json: { message: "That slot was just taken." } });
+				}
+				recovered = true;
+				return route.fulfill({ status: 201, json: { original: resolved } });
+			}
+			return route.fulfill({ json: { original: recovered ? resolved : original, date,
+				window: { min: booking.date, preferred: booking.date, max: "2040-05-25" },
+				options: recovered || (stale && date === booking.date) ? [] : [{ ...replacement,
+					slots: replacement.slots.map(slot => ({ ...slot, same_time: date === booking.date })) }] } });
+		}
 		if (pathname.endsWith("/resume-checkout")) {
 			checks++;
 			if (checks === 1) return route.fulfill({ status: 202, json: { can_pay: false,
@@ -106,8 +132,27 @@ try {
 	assert.equal(await page.evaluate(() => window.checkoutRetryEnabled), false);
 	assert.equal(attempts[3].body.payment_method, "online");
 	assert.notEqual(attempts[3].key, attempts[0].key);
+
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto(`${base}/dashboard/bookings?tab=recovery&replacement=${booking.booking_id}`);
+	await page.getByText("Original provider cancelled. Schedule conflict").waitFor();
+	await page.getByText("₹100.00 more than the original").waitFor();
+	await page.getByRole("button", { name: /Original time/ }).click();
+	await page.getByRole("button", { name: /Confirm replacement for/ }).click();
+	await page.getByText(/That slot was just taken/).waitFor();
+	await page.getByRole("button", { name: "Refresh options" }).click();
+	await page.getByText(/No matching providers showed availability/).waitFor();
+	await page.getByLabel("Appointment date").fill("2040-05-21");
+	await page.getByRole("button", { name: "10:00–11:00" }).click();
+	await page.getByRole("button", { name: /Confirm replacement for/ }).click();
+	await page.getByText(/Awaiting provider acceptance/).waitFor();
+	assert.deepEqual(replacementAttempts[1], {
+		provider_id: provider.id, date: "2040-05-21", start_time: "10:00", approved_price_paise: 130000,
+	});
+	await page.reload();
+	await page.getByText(/Awaiting provider acceptance/).waitFor();
 	assert.deepEqual(errors, []);
-	console.log("Booking browser flow passed: render, fresh online and cash booking, refresh and replay, pending check, recovered capture, and unconfirmed release.");
+	console.log("Booking browser flows passed: online and cash checkout, payment recovery, and replacement price, stale slot, alternate date, confirmation and reload.");
 } finally {
 	await browser.close();
 }

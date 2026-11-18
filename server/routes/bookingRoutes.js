@@ -20,6 +20,7 @@ const {
 const authMiddleware = require("../middleware/authMiddleware");
 const { bookingLimiter } = require("../middleware/rateLimiter");
 const db = require("../config/db");
+const { listReplacements, replacementOptions, confirmReplacement } = require("../controllers/bookingReplacementController");
 
 function allowRoles(...roles) {
 	return (req, res, next) => {
@@ -36,6 +37,9 @@ router.delete("/:booking_id/unpaid", bookingLimiter, authMiddleware, allowRoles(
 
 // Booking & payment recovery endpoints (customer)
 router.get("/recovery/items", authMiddleware, allowRoles("customer"), getRecoveryItems);
+router.get("/recovery/replacements", authMiddleware, allowRoles("customer"), listReplacements);
+router.get("/:booking_id/replacement", bookingLimiter, authMiddleware, allowRoles("customer"), replacementOptions);
+router.post("/:booking_id/replacement", bookingLimiter, authMiddleware, allowRoles("customer"), confirmReplacement);
 router.post("/recovery/reconcile-refund/:refund_id", bookingLimiter, authMiddleware, allowRoles("customer"), reconcileCustomerRefund);
 router.post("/:booking_id/resume-checkout", bookingLimiter, authMiddleware, allowRoles("customer"), resumeCheckout);
 router.get("/recovery/health", authMiddleware, allowRoles("admin"), async (_req, res) => {

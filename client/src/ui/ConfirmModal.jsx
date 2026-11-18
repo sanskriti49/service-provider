@@ -13,6 +13,7 @@ export default function ConfirmModal({
 	cancelText = "Cancel",
 	variant = "danger",
 	loading = false,
+	children,
 }) {
 	return (
 		<ConfirmDialog
@@ -25,6 +26,8 @@ export default function ConfirmModal({
 			cancelText={cancelText}
 			variant={variant}
 			loading={loading}
-		/>
+		>
+			{children}
+		</ConfirmDialog>
 	);
 }

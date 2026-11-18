@@ -10,6 +10,16 @@ Recovery reuses the original non-partial order. Razorpay rejects more payments o
 
 Razorpay references: [create order and receipt rules](https://razorpay.com/docs/api/orders/create/), [lookup by receipt](https://razorpay.com/docs/api/orders/fetch-all/), [payments for an order](https://razorpay.com/docs/api/orders/fetch-payments/).
 
+## Replacement-provider recovery
+
+When a provider cancels an eligible accepted booking, its reason stays in booking history and the customer can open **My Bookings → Recovery & Refunds** to choose another provider. TaskGenie reuses the service, location, search radius and travel-aware availability checks, prioritizes the original time when available, and shows the price difference before confirmation. The replacement reserves a slot and awaits provider acceptance. If that provider declines or later cancels, the customer can try again from the new cancellation, with providers already tried excluded.
+
+Confirmation runs in one PostgreSQL transaction. It locks the customer's cancelled booking row to serialize requests for that offer, then takes the existing advisory lock for the replacement provider and date. It rechecks the schedule and exact customer-approved price in paise before inserting. The active-booking exclusion constraint prevents overlapping reservations, and a unique index on `replaces_booking_id` permits one direct successor per cancellation. A retry returns the existing linked booking, including its current status. A fresh provider cancellation starts a separate offer. The migration runner and fresh database bootstrap both install `20261118_provider_replacement.sql`. Older cancellations are left as recorded.
+
+Replacements are pay after service. Customers with prepaid bookings can browse immediately, but reservation waits for the original payment's full refund to be recorded as processed. The refund stays on the original booking and follows the existing reconciliation flow. This feature does not move funds between bookings or contact Razorpay to reserve a replacement.
+
+Local verification used Chromium against the real API, PostgreSQL and Redis. It covered cancellation, replacement selection, decline and retry, a later cancellation, provider acceptance, dashboard status, reload and sign-out followed by a fresh signed fixture session. In a separate real HTTP race, competing customers received one `201` and one `409`, and duplicate requests returned the same reservation. PostgreSQL integration tests covered rollback and the refund gate. Live Razorpay refunds, interactive Turnstile sign-in and external routing between distinct addresses were outside this verification.
+
 # Operations
 
 - Configure matching Razorpay server and browser keys, auto-capture, and a webhook secret. Configure signed `payment.captured`, `order.paid` and refund events on `/api/bookings/webhook`. Use test mode for verification.
